@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkbillpay_book=self.webpackChunkbillpay_book||[]).push([["1668"],{6569(e,r,s){s.r(r),s.d(r,{default:()=>p});var a=s(4848);s(6540);var l=s(4164),u=s(4308),c=s(8287),o=s(2831),n=s(6525);function p(e){return(0,a.jsx)(u.e3,{className:(0,l.A)(c.G.wrapper.docsPages),children:(0,a.jsx)(n.A,{children:(0,o.v)(e.route.routes)})})}}}]);
