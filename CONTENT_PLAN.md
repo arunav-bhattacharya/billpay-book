@@ -112,7 +112,7 @@ Spec-grounding / corrections vs. reference:
   `requiresMandateAuthorization`; full state model (incl. `ALLOCATING`/`ALLOCATED`)
   deferred to Design → payment state model.
 
-**Architecture — drafted `◐`, pending review (2026-07-04).** `architecture/index` (Big
+**Architecture — approved `✅` (2026-07-04). Phase B (Vision + Architecture) complete.** `architecture/index` (Big
 Picture), `architecture/overview` (layered system-map Mermaid + layer responsibilities +
 "Why Temporal" + brief persistence), `architecture/components` (One-Data→API table, Router
 Mermaid, Online/Offline workers, the component model, async edges). Grounded in the spec's

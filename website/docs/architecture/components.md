@@ -60,8 +60,8 @@ The router sits between the core APIs and the workflows and decides **which work
     {trigger: 'Update', condition: 'a scheduled payment', workflows: [{name: 'UpdatePaymentWF', worker: 'Online'}]},
     {trigger: 'Cancel', condition: 'scheduled or accepted', workflows: [{name: 'CancelPaymentWF', worker: 'Online'}]},
     {trigger: 'Return', condition: 'money-movement event', workflows: [{name: 'ProcessReturnedPaymentWF', worker: 'Offline'}, {name: 'ProcessRepresentmentWF', worker: 'Offline'}]},
-    {trigger: 'Inbound', condition: 'third-party', workflows: [{name: 'ProcessInboundPaymentWF', worker: 'Offline'}]},
-    {trigger: 'Intent', condition: 'awaiting FI confirmation', workflows: [{name: 'CreatePaymentIntentWF', worker: 'Online'}]},
+    {trigger: 'Inbound Payments', condition: 'third-party', workflows: [{name: 'ProcessInboundPaymentWF', worker: 'Offline'}]},
+    {trigger: 'Payment Intent', condition: 'awaiting FI confirmation', workflows: [{name: 'CreatePaymentIntentWF', worker: 'Online'}]},
   ]}
 />
 

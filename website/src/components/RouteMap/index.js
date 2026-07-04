@@ -3,31 +3,39 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 function WfChip({name, worker}) {
+  const tone = (worker || 'Online').toLowerCase() === 'offline' ? styles.offline : styles.online;
   return (
     <span className={styles.wf}>
-      <span className={styles.wfName}>{name}</span>
-      <span
-        className={clsx(styles.worker, worker.toLowerCase() === 'offline' ? styles.offline : styles.online)}>
-        {worker}
-      </span>
+      <code className={styles.wfName}>{name}</code>
+      <span className={clsx(styles.worker, tone)}>{worker}</span>
     </span>
   );
 }
 
-function WfList({workflows}) {
-  return workflows.map((w, j) => (
-    <React.Fragment key={j}>
-      {j > 0 && <span className={styles.then}>then</span>}
-      <WfChip name={w.name} worker={w.worker} />
-    </React.Fragment>
-  ));
+/** A workflow pipeline — one or more chips joined by "→" to show sequence. */
+function Pipeline({workflows}) {
+  return (
+    <div className={styles.pipeline}>
+      {workflows.map((w, j) => (
+        <React.Fragment key={j}>
+          {j > 0 && (
+            <span className={styles.seq} aria-hidden="true">
+              →
+            </span>
+          )}
+          <WfChip name={w.name} worker={w.worker} />
+        </React.Fragment>
+      ))}
+    </div>
+  );
 }
 
 /**
- * RouteMap — how the Billpay Router turns a request into workflow(s).
- * Each route: a trigger (+ condition) → one or more workflow chips (with a
- * gradient Online/Offline worker badge). Optional `children` show conditional
- * child workflows (e.g. splits / corporate allocations) with their `when`.
+ * RouteMap — how the Billpay Router turns a request into workflow(s), as a
+ * grouped table. Consecutive routes that share a `trigger` collapse into one
+ * trigger cell (rowspan); each route's `condition` is a row, and any
+ * conditional `children` (splits / corporate allocations) render as indented
+ * sub-rows beneath their parent condition.
  *
  * routes: [{
  *   trigger, condition,
@@ -36,45 +44,66 @@ function WfList({workflows}) {
  * }]
  */
 export default function RouteMap({routes = []}) {
-  return (
-    <div className={styles.routes}>
-      {routes.map((r, i) => {
-        const tone = (r.workflows[0]?.worker || 'Online').toLowerCase();
-        return (
-          <div
-            key={i}
-            className={clsx(styles.route, tone === 'offline' ? styles.toneOffline : styles.toneOnline)}>
-            <div className={styles.routeMain}>
-              <div className={styles.trigger}>
-                <span className={styles.triggerName}>{r.trigger}</span>
-                {r.condition && <span className={styles.triggerCond}>{r.condition}</span>}
-              </div>
-              <span className={styles.arrow} aria-hidden="true">
-                →
-              </span>
-              <div className={styles.targets}>
-                <WfList workflows={r.workflows} />
-              </div>
-            </div>
+  // Collapse consecutive same-trigger routes into groups.
+  const groups = [];
+  routes.forEach((r) => {
+    const last = groups[groups.length - 1];
+    if (last && last.trigger === r.trigger) {
+      last.routes.push(r);
+    } else {
+      groups.push({trigger: r.trigger, routes: [r]});
+    }
+  });
 
-            {r.children && r.children.length > 0 && (
-              <div className={styles.children}>
-                {r.children.map((ch, k) => (
-                  <div key={k} className={styles.child}>
-                    <span className={styles.when}>{ch.when}</span>
-                    <span className={styles.childArrow} aria-hidden="true">
-                      →
+  return (
+    <div className={styles.wrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th className={styles.thTrigger}>Trigger</th>
+            <th className={styles.thCond}>Condition</th>
+            <th className={styles.thRoute}>Routes to</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((g, gi) => {
+            // Flatten the group into rows: each route's main row, then its children.
+            const rows = [];
+            g.routes.forEach((r) => {
+              rows.push({kind: 'main', label: r.condition, workflows: r.workflows});
+              (r.children || []).forEach((ch) =>
+                rows.push({kind: 'child', label: ch.when, workflows: ch.workflows}),
+              );
+            });
+
+            return rows.map((row, rj) => (
+              <tr
+                key={`${gi}-${rj}`}
+                className={clsx(
+                  row.kind === 'child' && styles.childRow,
+                  rj === 0 && gi > 0 && styles.groupStart,
+                )}>
+                {rj === 0 && (
+                  <th scope="rowgroup" rowSpan={rows.length} className={styles.triggerCell}>
+                    {g.trigger}
+                  </th>
+                )}
+                <td className={clsx(styles.condCell, row.kind === 'child' && styles.condChild)}>
+                  {row.kind === 'child' && (
+                    <span className={styles.branch} aria-hidden="true">
+                      ↳
                     </span>
-                    <div className={styles.childWfs}>
-                      <WfList workflows={ch.workflows} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                  )}
+                  {row.label}
+                </td>
+                <td className={styles.routeCell}>
+                  <Pipeline workflows={row.workflows} />
+                </td>
+              </tr>
+            ));
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

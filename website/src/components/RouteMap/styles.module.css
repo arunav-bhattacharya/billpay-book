@@ -1,180 +1,155 @@
-.routes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
+/* RouteMap — the Billpay Router as a grouped, scannable table. */
+
+.wrap {
   margin: 1.4rem 0 2rem;
-}
-
-.route {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 0.8rem 1rem 0.8rem 1.15rem;
-  border: 1px solid #dbe3f0;
+  overflow-x: auto;
+  border: 1px solid var(--amex-line-strong);
   border-radius: 12px;
-  /* Raised surface — stands out from the page in both themes. */
-  background: linear-gradient(162deg, #f1f4fb 0%, #e7edf7 100%);
   box-shadow: var(--amex-sh-sm);
-  overflow: hidden;
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
-}
-:global([data-theme='dark']) .route {
-  border-color: #294a80;
-  background: linear-gradient(162deg, #193c73 0%, #102a54 100%);
-}
-.route:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--amex-sh);
 }
 
-/* gradient left rail, tinted to the primary worker */
-.route::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--rt-accent);
-}
-.toneOnline {
-  --rt-accent: linear-gradient(180deg, #0166c8, #14a3dd);
-}
-.toneOffline {
-  --rt-accent: linear-gradient(180deg, #b06f16, #dca02f);
+.table {
+  width: 100%;
+  min-width: 660px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: var(--ifm-background-color);
 }
 
-.routeMain {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto minmax(210px, 1.5fr);
-  align-items: center;
-  gap: 0.85rem;
-}
-
-.trigger {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-.triggerName {
-  font-weight: 650;
-  color: var(--amex-txt-strong);
-  font-size: 0.98rem;
-}
-.triggerCond {
+/* ---- header ---- */
+.table thead th {
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   color: var(--amex-mut);
-  font-size: 0.8rem;
+  padding: 0.7rem 0.95rem;
+  background: color-mix(in srgb, var(--amex-cat-architecture) 7%, var(--ifm-background-color));
+  border-bottom: 1px solid var(--amex-line-strong);
+  white-space: nowrap;
+}
+.thTrigger { width: 1%; }
+.thCond { width: 24%; }
+
+/* ---- cells ---- */
+.table td,
+.table tbody th {
+  padding: 0.6rem 0.95rem;
+  vertical-align: top;
+  border-top: 1px solid var(--amex-line);
 }
 
-.arrow {
-  color: color-mix(in srgb, var(--amex-blue) 60%, var(--amex-mut));
-  font-size: 1.2rem;
+/* Trigger group cell — spans its rows, accented left rail, subtle tint. */
+.triggerCell {
+  vertical-align: middle;
+  text-align: left;
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--amex-txt-strong);
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--amex-cat-architecture) 5%, var(--ifm-background-color));
+  border-right: 1px solid var(--amex-line);
+  box-shadow: inset 3px 0 0 var(--amex-cat-architecture);
+}
+
+/* Stronger rule between trigger groups. */
+.groupStart > * {
+  border-top: 2px solid var(--amex-line-strong);
+}
+
+/* Condition column. */
+.condCell {
+  color: var(--amex-txt);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+.condChild {
+  padding-left: 1.6rem;
+  color: var(--amex-mut);
+  font-size: 0.82rem;
+}
+.branch {
+  margin-right: 0.35rem;
+  color: color-mix(in srgb, var(--amex-cat-architecture) 60%, var(--amex-mut));
   font-weight: 700;
 }
 
-.targets {
+/* Child (split / allocation) rows attach to their parent — no top rule, faint tint. */
+.childRow > td {
+  border-top: none;
+  background: color-mix(in srgb, var(--amex-cat-architecture) 4%, transparent);
+}
+
+/* ---- workflow pipeline ---- */
+.pipeline {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
+  gap: 0.35rem 0.5rem;
 }
-
-/* workflow chip — light pill on the raised surface */
 .wf {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.28rem 0.4rem 0.28rem 0.6rem;
-  border-radius: 9px;
-  background: #ffffff;
-  border: 1px solid #d5deec;
-}
-:global([data-theme='dark']) .wf {
-  background: #14305c;
-  border-color: #2c4e86;
+  gap: 0.4rem;
 }
 .wfName {
   font-family: var(--amex-font-mono);
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   color: var(--amex-txt);
+  background: none;
+  border: none;
+  padding: 0;
+}
+.seq {
+  color: var(--amex-mut);
+  font-weight: 700;
+  font-size: 0.85rem;
 }
 
-/* Online / Offline — high-contrast complementary hues (blue vs amber) */
+/* Online / Offline — calm tinted pills (blue vs amber) rather than solid fills. */
 .worker {
-  font-size: 0.6rem;
+  font-size: 0.56rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0.12rem 0.42rem;
-  border-radius: 6px;
-  color: #fff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
   white-space: nowrap;
 }
 .online {
-  background: linear-gradient(135deg, #0166c8, #14a3dd);
+  color: #0159ad;
+  background: color-mix(in srgb, #0166c8 13%, transparent);
 }
 .offline {
-  background: linear-gradient(135deg, #b06f16, #dca02f);
+  color: #97600c;
+  background: color-mix(in srgb, #dca02f 22%, transparent);
 }
 
-.then {
-  color: var(--amex-mut);
-  font-size: 0.72rem;
-  font-style: italic;
+/* ---- dark theme ---- */
+:global([data-theme='dark']) .table {
+  background: var(--amex-panel);
 }
-
-/* ---- conditional child workflows (splits / allocations) ---- */
-.children {
-  margin-top: 0.7rem;
-  padding-top: 0.65rem;
-  border-top: 1px dashed color-mix(in srgb, var(--amex-line-strong) 70%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+:global([data-theme='dark']) .table thead th {
+  background: color-mix(in srgb, var(--amex-cat-architecture) 20%, var(--amex-panel));
 }
-.child {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
-  padding-left: 0.2rem;
+:global([data-theme='dark']) .triggerCell {
+  background: color-mix(in srgb, var(--amex-cat-architecture) 16%, var(--amex-panel));
 }
-.when {
-  font-size: 0.72rem;
-  font-weight: 650;
-  color: var(--amex-txt-strong);
-  padding: 0.14rem 0.5rem;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--amex-cat-architecture) 14%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--amex-cat-architecture) 30%, #d7deea);
-  white-space: nowrap;
+:global([data-theme='dark']) .childRow > td {
+  background: color-mix(in srgb, var(--amex-cat-architecture) 12%, transparent);
 }
-:global([data-theme='dark']) .when {
-  color: #e8f0fb;
-  background: color-mix(in srgb, var(--amex-cat-architecture) 26%, #0b2246);
-  border-color: color-mix(in srgb, var(--amex-cat-architecture) 42%, #1c355f);
+:global([data-theme='dark']) .online {
+  color: #7cc4f2;
+  background: color-mix(in srgb, #35b6e8 20%, transparent);
 }
-.childArrow {
-  color: var(--amex-mut);
-  font-weight: 700;
-}
-.childWfs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+:global([data-theme='dark']) .offline {
+  color: #e6c060;
+  background: color-mix(in srgb, #e0b34e 20%, transparent);
 }
 
 @media (max-width: 640px) {
-  .routeMain {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-  }
-  .arrow {
-    transform: rotate(90deg);
-    justify-self: start;
-    margin-left: 0.2rem;
+  .table {
+    font-size: 0.84rem;
   }
 }
