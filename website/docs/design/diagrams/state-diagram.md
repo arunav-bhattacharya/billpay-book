@@ -7,9 +7,9 @@ sidebar_label: State Diagram
 
 The [payment state model](../payment-state-model.md) shows the whole lifecycle. This page takes it apart one workflow at a time — the states each workflow drives and how it hands off to the next. A `<<choice>>` diamond is a routing decision, not a state.
 
-## Create Immediate Payment · `#CreateImmediatePaymentWF`
+## Create Immediate Payment WF
 
-Validate, accept, then either run the payment straight through or, for a split, fan it out to `#ExecuteSplitPaymentWF`.
+Validate, accept, then either run the payment straight through or, for a split, fan it out to `ExecuteSplitPaymentWF`.
 
 ```mermaid
 stateDiagram-v2
@@ -20,12 +20,12 @@ stateDiagram-v2
   PROCESSING --> PROCESSED: fulfill
   state "ACCEPTED (splits)" as ACCEPTED_SPLITS
   ACCEPTED --> ACCEPTED_SPLITS: create splits (Consumer)
-  ACCEPTED_SPLITS --> [*]: #ExecuteSplitPaymentWF
+  ACCEPTED_SPLITS --> [*]: ExecuteSplitPaymentWF
   DECLINED --> [*]: notify
   PROCESSED --> [*]
 ```
 
-## Create Schedule Payment · `#CreateSchedulePaymentWF`
+## Create Schedule Payment WF
 
 Validate and park the payment at `SCHEDULED` for its future run date.
 
@@ -38,7 +38,7 @@ stateDiagram-v2
   DECLINED --> [*]: notify
 ```
 
-## Execute Scheduled Payment · `#ExecuteScheduledPaymentWF`
+## Execute Scheduled Payment WF
 
 Runs on the execution date. It picks up a scheduled payment (or a corporate one that has already been allocated), re-validates, and processes it.
 
@@ -56,12 +56,12 @@ stateDiagram-v2
   PROCESSING --> PROCESSED: fulfill
   state "ACCEPTED (splits)" as ACCEPTED_SPLITS
   ACCEPTED --> ACCEPTED_SPLITS: create splits (Consumer)
-  ACCEPTED_SPLITS --> [*]: #ExecuteSplitPaymentWF
+  ACCEPTED_SPLITS --> [*]: ExecuteSplitPaymentWF
   DECLINED --> [*]: notify
   PROCESSED --> [*]
 ```
 
-## Execute Split Payment · `#ExecuteSplitPaymentWF`
+## Execute Split Payment WF
 
 Processes one split leg — the same clearing, posting, and fulfilment as a full payment, at the leg level.
 
@@ -73,7 +73,7 @@ stateDiagram-v2
   PROCESSED --> [*]
 ```
 
-## Cancel Payment · `#CancelPaymentWF`
+## Cancel Payment WF
 
 Cancels a payment that hasn't processed yet — either scheduled or accepted.
 
@@ -88,7 +88,7 @@ stateDiagram-v2
   CANCELLED --> [*]
 ```
 
-## Update Payment · `#UpdatePaymentWF`
+## Update Payment WF
 
 Cancels the original scheduled payment, creates a replacement, and maps the new payment back to the old one for the audit trail.
 
@@ -96,12 +96,12 @@ Cancels the original scheduled payment, creates a replacement, and maps the new 
 stateDiagram-v2
   [*] --> PENDING: idempotency
   state "Original payment" as Orig {
-    SCHEDULED --> CANCELLED: #CancelPaymentWF
+    SCHEDULED --> CANCELLED: CancelPaymentWF
   }
   state "Replacement payment" as New {
     PENDING_new: PENDING
-    PENDING_new --> SCHEDULED_new: #CreateSchedulePaymentWF
-    PENDING_new --> DECLINED_new: #CreateSchedulePaymentWF
+    PENDING_new --> SCHEDULED_new: CreateSchedulePaymentWF
+    PENDING_new --> DECLINED_new: CreateSchedulePaymentWF
     SCHEDULED_new: SCHEDULED
     DECLINED_new: DECLINED
   }
@@ -112,7 +112,7 @@ stateDiagram-v2
   Mapping --> [*]
 ```
 
-## Process Returned Payment · `#ProcessReturnedPaymentWF`
+## Process Returned Payment WF
 
 A payment that has processed, been fulfilled, or been paid can still be returned by the bank. If the return is representable, it spawns a representment.
 
@@ -129,10 +129,10 @@ stateDiagram-v2
   PROCESSED --> RETURNED: return
   RETURNED --> REPRESENTING: create representment
   RETURNED --> [*]
-  REPRESENTING --> [*]: #ProcessRepresentmentWF
+  REPRESENTING --> [*]: ProcessRepresentmentWF
 ```
 
-## Process Representment · `#ProcessRepresentmentWF`
+## Process Representment WF
 
 Re-attempts a returned payment. It settles as `REPRESENTED`, or fails validation as `DECLINED`.
 
@@ -145,9 +145,9 @@ stateDiagram-v2
   DECLINED --> [*]
 ```
 
-## Get Corporate Payment Allocations · `#GetCorporatePaymentAllocationsWF`
+## Get Corporate Payment Allocations WF
 
-Requests a corporate payment's allocation breakdown, waits for it, creates the split legs, and hands each to `#ExecuteSplitPaymentWF`.
+Requests a corporate payment's allocation breakdown, waits for it, creates the split legs, and hands each to `ExecuteSplitPaymentWF`.
 
 ```mermaid
 stateDiagram-v2
@@ -161,7 +161,7 @@ stateDiagram-v2
   ALLOCATED --> [*]
 ```
 
-## Process Inbound Payment · `#ProcessInboundPaymentWF`
+## Process Inbound Payment WF
 
 Handles a payment a third party initiates. If Amex doesn't accept it, the payment is `DISALLOWED`.
 
@@ -174,12 +174,12 @@ stateDiagram-v2
   PROCESSING --> PROCESSED: fulfill
   state "ACCEPTED (splits)" as ACCEPTED_SPLITS
   ACCEPTED --> ACCEPTED_SPLITS: create splits (Consumer)
-  ACCEPTED_SPLITS --> [*]: #ExecuteSplitPaymentWF
+  ACCEPTED_SPLITS --> [*]: ExecuteSplitPaymentWF
   DISALLOWED --> [*]
   PROCESSED --> [*]
 ```
 
-## Create Balance Refund · `#CreateBalanceRefundWF`
+## Create Balance Refund WF
 
 Sends money back to the customer from a credit balance, following the same validate-process-fulfil path as a payment.
 
@@ -194,7 +194,7 @@ stateDiagram-v2
   DECLINED --> [*]
 ```
 
-## Paid Events Processing · `#PaidEventsProcessingWF`
+## Paid Events Processing WF
 
 The periodic sweep that closes a payment out. A `PROCESSED` payment becomes `PAID` only once both its clearing-settlement and AR-posted events have arrived.
 

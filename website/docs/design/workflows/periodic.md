@@ -4,31 +4,48 @@ sidebar_label: Periodic
 ---
 
 import Lead from '@site/src/components/Lead';
+import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 # Periodic Workflows
 
-<Lead>Scheduler-driven workflows that run in waves on the Offline worker. Temporal Schedules trigger them in batches — for example, picking up 2,500 scheduled payments a minute, then the next 2,500 a minute later.</Lead>
+<Lead>Two kinds of thing run on a timer here: **schedules** that re-trigger core workflows in waves, and a few **standalone workflows** that reconcile settlement and tidy up. All of it runs on the Offline worker, with no end user waiting.</Lead>
 
-## Scheduled Payments Executor
+## Scheduler-driven executors
 
-Triggers `#ExecuteScheduledPaymentWF` in batches for payments that are due to run.
+These are Temporal Schedules rather than workflows of their own. Each fires on a timer and hands work to a core workflow in batches — for example, picking up 2,500 payments a minute, then the next 2,500 a minute later.
 
-## Corporate Allocations Processor
+- **Scheduled Payments Executor** — finds payments whose run date has arrived (still `SCHEDULED`) and triggers Execute Scheduled Payment for each.
+- **Corporate Allocations Processor** — drains the corporate allocations that are ready and triggers Execute Split Payment for each.
+- **Scheduled Representment Executor** — finds returned payments due to be re-attempted and triggers their representment execution.
 
-Triggers `#ExecuteSplitPaymentWF` in batches for corporate allocations.
+## Paid Events Processing
 
-## Scheduled Representment Executor
+<WorkflowMeta worker="Offline" dimensions="generic" />
 
-Triggers representment execution in batches for returned payments due to be re-attempted.
+Closes a payment out to the terminal `PAID` state — but only once **both** halves of settlement have been confirmed. Billpay does not mark a payment paid on the strength of one event; it waits for the money to settle at the bank *and* for Accounts Receivable to post it.
 
-## Paid Events Processing — `#PaidEventsProcessingWF`
+1. Find every payment in the External Transaction Events Tracker that has received **both** its clearing-settlement event and its AR-posted event.
+2. Mark those rows "Picked-up-for-processing" in the tracker, so a later run does not pick them up again.
+3. Insert a `PAID` entry into the Transaction Lifecycle Event table.
+4. Update the payment's status to `PAID` in the Transaction Detail table.
+5. Publish the `PAID` lifecycle event.
 
-Finds payments in the External Transaction Events Tracker that have both the clearing-settlement and the AR-posted event, marks them picked up, moves them to `PAID`, and publishes the `PAID` lifecycle event.
+## Missing Paid Events Processing
 
-## Missing Paid Events Processing — `#MissingPaidEventsProcessingWF`
+<WorkflowMeta worker="Offline" dimensions="generic" />
 
-Finds payments still missing a settlement or AR-posted event after 48 hours, queries the owning system for the current status, and either records the events or raises an alert.
+Catches payments that stalled on their way to `PAID` because an expected event never arrived, and either recovers the event or flags it.
 
-## Data Purger — `#DataPurgingWF`
+1. Find every payment in the External Transaction Events Tracker that is still missing its clearing-settlement event, its AR-posted event, or both, after 48 hours.
+2. Ask the system that owns the missing event for the latest status.
+   - **Found** — insert the corresponding event into the tracker, so Paid Events Processing can finish the payment.
+   - **Still missing** — raise an alert for someone to investigate.
 
-Purges older records from the transactional tables.
+## Data Purger
+
+<WorkflowMeta worker="Offline" dimensions="generic" />
+
+Keeps the transactional tables from growing without bound.
+
+1. Find older records in the database that are past their retention window.
+2. Delete those records.

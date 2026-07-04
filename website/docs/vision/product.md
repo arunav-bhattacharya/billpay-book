@@ -8,29 +8,35 @@ import Highlights from '@site/src/components/Highlights';
 
 # Product Vision
 
-<Lead>Billpay is **American Express's platform for credit-card bill payments and refunds** — one system that carries every payment from the moment it is initiated to the moment it settles, consistently across every market Amex operates in.</Lead>
+<Lead highlight>Billpay is where American Express processes **credit-card bill payments, and the refunds that send money back the other way**. It carries a payment from the moment a customer submits it to the moment it settles, and it does so the same way in every market Amex operates in — however much the local rules differ.</Lead>
 
-## What we're building
+## What Billpay is
 
-A single platform that orchestrates the full lifecycle of a credit-card bill payment — and its reversal as a refund — so processing stays consistent and extensible across markets, instead of being rebuilt for each one.
+When a cardmember pays their Amex bill, something has to take that request, check it, pull the money from their bank, reduce what they owe, and tell every Amex system that needs to know. Billpay is that something. It runs the whole life of a bill payment, and the reverse direction too, when money goes back to the customer as a refund.
 
-Requests arrive through Billpay's API gateway (**One-Data Functions**) and core APIs, and span the flows the platform supports:
+Historically each market built its own version of this. The aim of Billpay is one platform every market shares, so bringing on a new market is a matter of *configuring* it, not rebuilding the plumbing.
 
-- **Create** a payment — **immediate**, or **future-dated (scheduled)** for a later run.
-- **Update** or **cancel** a scheduled payment before it processes.
-- **Inbound** payments initiated or confirmed by a third party.
-- **Returns & representment** — process a payment the bank returns, and re-attempt (represent) it when it is eligible.
-- **Refunds**, including credit-balance refunds that send money back to the customer.
-- **Installments** and other **composite** flows that span domains — *Pay & Plan* (Billpay + Accounts Receivable) and *Pay with MR Points* (Billpay + Loyalty).
-- **Payment intent** — register an intent that becomes a payment only once the customer's financial institution confirms it.
+## What a payment can be
 
-Any of these can run as a **full** payment or be **split into allocations** — for example, a corporate payment allocated across accounts.
+Requests reach Billpay through its API gateway, the **One-Data Functions**, and its core APIs. Across those entry points the platform handles:
 
-## Market onboarding & dimensions
+- **Create** a payment, either **immediate** (run now) or **scheduled** (run on a future date the customer chooses).
+- **Update** or **cancel** a scheduled payment before it runs.
+- **Inbound** payments that a third party initiates or confirms on the customer's behalf.
+- **Returns and representment**: handle a payment the bank sends back, and re-attempt it when the customer is eligible.
+- **Refunds**, including credit-balance refunds that pay money back to the customer.
+- **Composite flows** that combine Billpay with another domain, such as *Pay & Plan* (a payment plus an installment plan) or *Pay with MR points* (a payment funded by loyalty points).
+- **Payment intent**: record that a customer means to pay, which becomes a real payment only once their bank confirms it.
 
-New markets come onto the platform through a Billpay **onboarding journey** — a UI where the team selects which Billpay APIs the market will use and answers questions that set its **dimensions**: the processing variants that shape how each payment is handled.
+### Full and split payments
 
-Four dimensions travel with every payment:
+Every payment is either full or split. A **full payment** settles as a single amount against one card account. A **split payment** is divided into **allocations**: separate legs that are each validated, processed, and settled on their own, and then roll back up to the original payment. The common split case is a **corporate payment**, where one payment a company makes is allocated across the several accounts it covers. Each allocation clears and posts independently, even though the customer still sees one payment.
+
+## Markets and dimensions
+
+A market comes onto Billpay through an **onboarding journey**: a UI where the team picks which Billpay APIs the market will use and answers a short set of questions. Those answers set the market's **dimensions**.
+
+A dimension is a processing variant, a yes/no or either/or choice that changes *how* a payment is handled in that market. Four dimensions travel with every payment:
 
 <Highlights
   items={[
@@ -38,7 +44,7 @@ Four dimensions travel with every payment:
       term: 'Account type',
       desc: (
         <>
-          Consumer, Corporate, or Small Business (<code>accountType</code>).
+          Whether the payment is for a <strong>Consumer</strong>, <strong>Corporate</strong>, or <strong>Small Business</strong> account (<code>accountType</code>). This shapes more of the processing than any other dimension — corporate payments, for instance, are the ones that split into allocations.
         </>
       ),
     },
@@ -46,7 +52,7 @@ Four dimensions travel with every payment:
       term: 'AR posting',
       desc: (
         <>
-          Whether a processed payment must be notified to Accounts Receivable (<code>requiresArPosting</code>).
+          Whether a processed payment must be reported to <strong>Accounts Receivable</strong>, the system that tracks what the cardmember owes (<code>requiresArPosting</code>).
         </>
       ),
     },
@@ -54,7 +60,7 @@ Four dimensions travel with every payment:
       term: 'Realtime clearing',
       desc: (
         <>
-          Whether clearing runs realtime or non-realtime (<code>requiresRealtimeClearing</code>).
+          Whether the payment clears the customer's bank in <strong>realtime</strong> or in a periodic <strong>batch</strong> (<code>requiresRealtimeClearing</code>).
         </>
       ),
     },
@@ -62,40 +68,29 @@ Four dimensions travel with every payment:
       term: 'Mandate authorization',
       desc: (
         <>
-          Whether mandate verification is required while a payment is processed (<code>requiresMandateAuthorization</code>).
+          Whether a <strong>mandate</strong> — a standing authorization to collect the payment — has to be verified while the payment is processed (<code>requiresMandateAuthorization</code>).
         </>
       ),
     },
   ]}
 />
 
-A market is onboarded with one or more **profiles** — specific combinations of these dimensions — and each profile maps automatically to the exact stage and activity-group implementations a workflow should run. Behavior is selected at runtime from the market's configuration, not branched in code. And a combination a market hasn't onboarded simply can't run: if a market is live only for Consumer payments and a Corporate request arrives, it is rejected before any workflow starts.
+The team captures a market as one or more **profiles**: specific combinations of these dimensions. When a payment arrives, its profile decides which version of each processing step runs. Nothing is branched by hand in code; the behaviour is looked up from the market's configuration. And a combination a market never onboarded simply cannot run. If a market is live only for consumer payments and a corporate request shows up, Billpay rejects it before any processing starts.
 
-## A consistent lifecycle, across every dimension
+## The same lifecycle, every time
 
-Dimensions change *how* a payment is handled, never *how it is described*. Whatever its account type, clearing rule, or authorization requirements, every payment moves through the **same canonical lifecycle states** — the shared vocabulary that lets operations, reporting, and downstream systems treat a corporate payment in one market and a consumer payment in another as the same kind of thing.
+Dimensions change how a payment is handled. They never change how it is *described*. Whatever the market, account type, or clearing rule, every payment moves through the **same set of lifecycle states**. That shared vocabulary is what lets operations, reporting, and downstream systems treat a corporate payment in one market and a consumer payment in another as the same kind of thing.
 
-`PENDING` → `SCHEDULED` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED`, and `DISALLOWED` as the other outcomes. Corporate payments add two allocation states — `ALLOCATING` and `ALLOCATED` — but the rest of the journey is identical. The full state model lives in the Design section.
+The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED`, and `DISALLOWED` as the other outcomes. Corporate payments add two states while their allocations are worked out, `ALLOCATING` and `ALLOCATED`, but the rest of the journey is identical. The full state model lives in the Design section.
 
 ## What processing a payment involves
 
-Handling a payment runs through a few steps — validation first, then downstream coordination in parallel where it can:
+Handling a payment is a sequence of steps. Validation comes first; the downstream steps then run together wherever they can.
 
-- **Validation** — confirming the payment is valid before it is processed (which may mean calling other Amex systems to check); a payment that fails is declined rather than processed.
-- **Clearing** — sending the payment to the funding bank, realtime or non-realtime per the market's clearing rule.
-- **Accounts Receivable** — reducing the card's statement balance.
-- **Authorization** — increasing the cardmember's **Open-To-Buy (OTB)**, the spendable credit that frees up once a payment is recognized.
-- **Fulfillment** — notifying accounting, balance-and-control (audit), risk, and communications once the payment is processed.
+- **Validation** — confirm the payment is good before any money moves. This can mean calling other Amex systems to check the account and the request. A payment that fails validation is declined, not processed.
+- **Clearing** — send the payment to the customer's bank so the funds actually move. Depending on the market's rule, clearing happens in realtime or in a batch.
+- **Accounts Receivable (AR)** — reduce the cardmember's statement balance, the amount they owe on the card.
+- **Authorization (Open-To-Buy)** — restore the customer's spendable credit. *Open-To-Buy* is how much room is left to spend on the card; paying the bill frees it up again.
+- **Fulfillment** — once the payment is processed, notify the systems that need to know: accounting, balance-and-control (audit), risk, and customer communications.
 
-A payment reaches the terminal `PAID` state only once Billpay has reconciled **both** the clearing-settlement and the AR-posted events — so "paid" always means genuinely settled and posted.
-
-## Out of scope
-
-Billpay orchestrates payments and drives the systems that complete them — but it does **not own** those downstream domains:
-
-- **Statement balances & Open-To-Buy** — owned by Accounts Receivable and Authorization; Billpay notifies them.
-- **Clearing & settlement** — the banking networks move and settle the funds; Billpay sends payments for clearing and tracks the outcome.
-- **Fulfillment systems** — accounting, balance-and-control (audit), risk, and communications are their own domains.
-- **Customer channels** — the app, web, and servicing experiences that call Billpay are owned upstream.
-
-The [Engineering Vision](./engineering.md#what-were-explicitly-not-building) restates these boundaries as engineering commitments.
+A payment only reaches the final `PAID` state once Billpay has seen **both** confirmations come back: that the bank settled the funds, and that AR posted the payment. Until both arrive it is not called paid, so "paid" always means genuinely settled and booked.

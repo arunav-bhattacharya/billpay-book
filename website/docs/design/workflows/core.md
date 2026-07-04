@@ -4,83 +4,140 @@ sidebar_label: Core
 ---
 
 import Lead from '@site/src/components/Lead';
+import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 # Core Workflows
 
-<Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle; the [state diagrams](../diagrams/state-diagram.md) show the transitions per workflow.</Lead>
+<Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle. The row under each heading shows the Temporal worker it runs on and the dimensions that select its stage and activity-group implementations.</Lead>
 
-## Create Immediate Payment — `#CreateImmediatePaymentWF`
+The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, and the [state diagrams](../diagrams/state-diagram.md) show the transitions.
 
-*Online · dimensions: accountType, requiresArPosting, requiresRealtimeClearing, requiresMandateAuthorization*
+## Create Immediate Payment
 
-Persist and idempotency-check the payment (`InitiatedToPendingStage`), validate it, and either decline it or accept it and return to the caller. After the early return it processes:
+<WorkflowMeta worker="Online" dimensions="all" />
 
-- **Corporate** — move to `PROCESSING`, fetch allocations via `#GetCorporatePaymentAllocationsWF`, wait for the *AllocationsReceived* signal, then run `#ExecuteSplitPaymentWF` per split.
-- **Full consumer** — `AcceptedToProcessingStage`, then `ProcessingToProcessedStage`.
-- **Split consumer** — create the split legs, then run `#ExecuteSplitPaymentWF` per leg.
+Runs when a payment is submitted to go out today. It records the request, validates it, replies to the caller as soon as the outcome is known, and then completes the money movement in the background.
 
-## Create Schedule Payment — `#CreateSchedulePaymentWF`
+1. **InitiatedToPendingStage** — turn the input into a `PENDING` payment by persisting it together with its idempotency record.
+2. If the request is not idempotent (a duplicate has already been seen), return the existing payment and stop.
+3. Validate the pending payment (`PaymentValidationActivityGroup`). If it fails, run **PendingToDeclinedStage** (`PENDING` → `DECLINED`) and return the declined payment.
+4. **PendingToAcceptedStage** — move the payment to `ACCEPTED` and **return early to the caller**. Everything below runs in the background.
+5. Finish processing, by account type and full-vs-split:
+   - **Corporate** — **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`); trigger Get Corporate Payment Allocations; wait for the *AllocationsReceived* signal; then run Execute Split Payment for each allocation.
+   - **Full consumer** — **AcceptedToProcessingStage**, then **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
+   - **Split consumer** — create the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), then run Execute Split Payment for each leg.
 
-*Online or Offline · dimensions: accountType, requiresArPosting, requiresMandateAuthorization*
+## Create Schedule Payment
 
-Validate and park the payment at `SCHEDULED`, returning early. For a corporate payment, kick off `#GetCorporatePaymentAllocationsWF`. An invalid payment is declined.
+<WorkflowMeta worker="Online / Offline" dimensions={['accountType', 'requiresArPosting', 'requiresMandateAuthorization']} />
 
-## Execute Scheduled Payment — `#ExecuteScheduledPaymentWF`
+Runs when a payment is booked for a future date. It validates the request now and parks the payment until its run date.
 
-*Offline · dimensions: all four*
+1. **InitiatedToPendingStage** — persist the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
+2. Validate the pending payment (`PaymentValidationActivityGroup`):
+   - **Valid** — **PendingToScheduledStage** (`PENDING` → `SCHEDULED`) and return early. If the payment is **corporate**, trigger Get Corporate Payment Allocations now, so the allocation breakdown is ready before the run date.
+   - **Invalid** — **PendingToDeclinedStage** (`PENDING` → `DECLINED`).
 
-Runs on the execution date. Re-validate the scheduled (or already-allocated) payment, accept it, then process it full or split — the same fan-out as the immediate flow.
+## Execute Scheduled Payment
 
-## Execute Split Payment — `#ExecuteSplitPaymentWF`
+<WorkflowMeta worker="Offline" dimensions="all" />
 
-*Online or Offline · dimensions: accountType, requiresArPosting, requiresRealtimeClearing*
+Runs on the payment's execution date, picked up in batches by the Scheduled Payments Executor. It re-checks the payment before moving any money, because time has passed since it was scheduled.
 
-Process one split leg: `AcceptedToProcessingStage`, then `ProcessingToProcessedStage`. For a corporate leg this means updating balances and Open-To-Buy; for a consumer leg it also clears.
+1. Re-validate the scheduled (or already-allocated) payment (`PaymentValidationOnExecutionActivityGroup`):
+   - **Valid** — **ScheduledToAcceptedStage** (`SCHEDULED` → `ACCEPTED`), then finish processing:
+     - **Full** — **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
+     - **Corporate split** — **AcceptedToProcessingStage**; trigger Get Corporate Payment Allocations; wait for the *AllocationsReceived* signal; run Execute Split Payment per split.
+     - **Consumer split** — create the split legs (`PaymentSplitsCreationActivity`), then run Execute Split Payment per leg.
+   - **Invalid** — **PendingToDeclinedStage** (→ `DECLINED`).
 
-## Cancel Payment — `#CancelPaymentWF`
+## Execute Split Payment
 
-*Online · dimensions: accountType, requiresArPosting*
+<WorkflowMeta worker="Online / Offline" dimensions={['accountType', 'requiresArPosting', 'requiresRealtimeClearing']} />
 
-Idempotency-check, validate the cancellation and read the current state, then cancel a `SCHEDULED` or `ACCEPTED` payment.
+Processes a single leg of a split payment. It runs the same two stages as a full payment, scoped to one allocation.
 
-## Update Payment — `#UpdatePaymentWF`
+1. **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`).
+2. **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
 
-*Online · dimensions: all four*
+The first stage varies by account type: for a **corporate** leg it only updates balances and Open-To-Buy; for a **consumer** leg it also clears the payment at the bank.
 
-Cancel the original scheduled payment, build a replacement (new payment id, same confirmation number) through `#CreateSchedulePaymentWF`, and map the new payment back to the original for the audit trail.
+## Cancel Payment
 
-## Process Returned Payment — `#ProcessReturnedPaymentWF`
+<WorkflowMeta worker="Online" dimensions={['accountType', 'requiresArPosting']} />
 
-*Offline · dimensions: accountType*
+Withdraws a payment that has not yet gone out.
 
-Validate the return against a `PAID`, `PROCESSING`, or `PROCESSED` payment and move it to `RETURNED`. If the return is representable, create a `REPRESENTING` transaction for `#ProcessRepresentmentWF`.
+1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
+2. Validate the cancellation and read the payment's current state (`PaymentCancelValidationActivityGroup`).
+3. If the payment is eligible to cancel:
+   - Currently `SCHEDULED` — **ScheduledToCancelledStage** (→ `CANCELLED`).
+   - Currently `ACCEPTED` — **AcceptedToCancelledStage** (→ `CANCELLED`).
 
-## Process Representment — `#ProcessRepresentmentWF`
+## Update Payment
 
-*Offline · dimensions: all four*
+<WorkflowMeta worker="Online" dimensions="all" />
 
-Re-validate the representment and either settle it (`REPRESENTED`) or decline it.
+Changes a scheduled payment. Rather than editing it in place, Billpay cancels the original and creates a replacement, so the history stays clean.
 
-## Get Corporate Payment Allocations — `#GetCorporatePaymentAllocationsWF`
+1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
+2. **ScheduledToCancelledStage** — cancel the original payment (`SCHEDULED` → `CANCELLED`). This can be done by invoking Cancel Payment.
+3. Build a new pending payment with a new payment id, the **same confirmation number**, and the updated details.
+4. Invoke Create Schedule Payment for the replacement, which validates it and then runs **PendingToScheduledStage** (→ `SCHEDULED`) if valid, or **PendingToDeclinedStage** (→ `DECLINED`) if not.
+5. Map the new payment to the original in the database for audit (`MapNewPaymentIdToPreviousIdActivity`).
 
-*Offline · generic*
+## Process Returned Payment
 
-Request the allocation breakdown (`ToAllocatingStage`), wait for the *AllocationsReady* signal, mark the payment `ALLOCATED`, create the split legs, and run `#ExecuteSplitPaymentWF` for each.
+<WorkflowMeta worker="Offline" dimensions={['accountType']} />
 
-## Process Inbound Payment — `#ProcessInboundPaymentWF`
+Handles a payment the bank sends back after it was processed, and decides whether it can be re-attempted.
 
-*Offline*
+1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
+2. Validate the return by looking up the payment (full or split) and its current status; the eligible statuses are `PAID`, `PROCESSING`, and `PROCESSED`.
+3. If the return is valid:
+   - **ToReturnedStage** — move the payment to `RETURNED` (from `PAID`, `PROCESSING`, or `PROCESSED`).
+   - Check whether the return can be re-presented (`PaymentRepresentmentEligibilityActivityGroup`).
+   - If it is representable, run **ReturnedToRepresentingStage** — enrich the representment details (such as the next representable date) and create a new `REPRESENTING` transaction (`PaymentRepresentmentCreationActivityGroup`).
 
-Handle a third-party-initiated payment: validate, accept, and process it (full, or a consumer split). A payment Amex does not accept becomes `DISALLOWED`.
+## Process Representment
 
-## Create Payment Intent — `#CreatePaymentIntentWF`
+<WorkflowMeta worker="Offline" dimensions="all" />
 
-*Online · dimensions: accountType, instrumentType, requiresMandateAuthorization*
+Re-attempts a returned payment on its representment date.
 
-Registers an intent that only becomes a payment once the customer's financial institution confirms it. The detailed logic is still being defined in the spec.
+1. Validate the representment (`PaymentRepresentmentValidationActivityGroup`):
+   - **Valid** — **RepresentingToRepresentedStage** (`REPRESENTING` → `REPRESENTED`).
+   - **Invalid** — **RepresentingToDeclinedStage** (`REPRESENTING` → `DECLINED`).
 
-## Create Balance Refund — `#CreateBalanceRefundWF`
+## Get Corporate Payment Allocations
 
-*Online or Offline*
+<WorkflowMeta worker="Offline" dimensions="generic" />
 
-Sends money back to the customer from a credit balance, following the validate → process → fulfill path. The detailed logic is still being defined in the spec.
+Fetches how a corporate payment splits across the accounts it covers, then kicks off the per-allocation execution. It waits on a signal, because the breakdown comes back asynchronously from the allocation-processing system.
+
+1. **ToAllocatingStage** — ask the appropriate allocations manager for the breakdown and move the payment to `ALLOCATING`.
+2. Wait for the *AllocationsReady* signal.
+3. **AllocatingToAllocatedStage** — move the parent payment to `ALLOCATED`; create the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`); run Execute Split Payment for each.
+
+## Process Inbound Payment
+
+<WorkflowMeta worker="Offline" dimensions={['TBD']} />
+
+Posts a payment that a third party initiated on the customer's behalf into Billpay.
+
+1. **InitiatedToPendingStage** — persist the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
+2. Validate the pending payment (`PaymentValidationActivityGroup`):
+   - **Valid** — **PendingToAcceptedStage** (`PENDING` → `ACCEPTED`) and return early, then:
+     - **Full** — **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
+     - **Consumer split** — create the split legs (`PaymentSplitsCreationActivity`), then run Execute Split Payment per leg.
+   - **Invalid** — **PendingToDisallowedStage** (`PENDING` → `DISALLOWED`). This is the inbound-only outcome for a payment Amex does not accept.
+
+## Create Payment Intent
+
+<WorkflowMeta worker="Online" dimensions={['accountType', 'instrumentType', 'requiresMandateAuthorization']} />
+
+Registers that a customer means to pay. It becomes a real payment only once the customer's financial institution confirms it. The detailed step logic is still being defined in the spec.
+
+## Create Balance Refund
+
+Sends money back to the customer from a credit balance on the card, following the validate → process → fulfill path. Its detailed logic and dimensions are still being defined in the spec; it runs on the Online or Offline worker depending on where it is invoked.

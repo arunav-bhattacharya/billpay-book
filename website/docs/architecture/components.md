@@ -39,8 +39,8 @@ The router sits between the core APIs and the workflows and decides **which work
       condition: 'today · single-instruction',
       workflows: [{name: 'CreateImmediatePaymentWF', worker: 'Online'}],
       children: [
-        {when: 'Consumer (split)', workflows: [{name: 'ExecuteSplitPaymentWF', worker: 'Online'}]},
-        {when: 'Corporate (allocations)', workflows: [{name: 'GetCorporatePaymentAllocationsWF', worker: 'Offline'}, {name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
+        {account: 'Consumer', when: 'split', workflows: [{name: 'ExecuteSplitPaymentWF', worker: 'Online'}]},
+        {account: 'Corporate', when: 'allocations', workflows: [{name: 'GetCorporatePaymentAllocationsWF', worker: 'Offline'}, {name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
       ],
     },
     {
@@ -53,19 +53,28 @@ The router sits between the core APIs and the workflows and decides **which work
       condition: 'future-dated',
       workflows: [{name: 'CreateSchedulePaymentWF', worker: 'Online'}, {name: 'ExecuteScheduledPaymentWF', worker: 'Offline'}],
       children: [
-        {when: 'Consumer (split)', workflows: [{name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
-        {when: 'Corporate (allocations)', workflows: [{name: 'GetCorporatePaymentAllocationsWF', worker: 'Offline'}, {name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
+        {account: 'Consumer', when: 'split', workflows: [{name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
+        {account: 'Corporate', when: 'allocations', workflows: [{name: 'GetCorporatePaymentAllocationsWF', worker: 'Offline'}, {name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
       ],
     },
-    {trigger: 'Update', condition: 'a scheduled payment', workflows: [{name: 'UpdatePaymentWF', worker: 'Online'}]},
-    {trigger: 'Cancel', condition: 'scheduled or accepted', workflows: [{name: 'CancelPaymentWF', worker: 'Online'}]},
-    {trigger: 'Return', condition: 'money-movement event', workflows: [{name: 'ProcessReturnedPaymentWF', worker: 'Offline'}, {name: 'ProcessRepresentmentWF', worker: 'Offline'}]},
-    {trigger: 'Inbound Payments', condition: 'third-party', workflows: [{name: 'ProcessInboundPaymentWF', worker: 'Offline'}]},
-    {trigger: 'Payment Intent', condition: 'awaiting FI confirmation', workflows: [{name: 'CreatePaymentIntentWF', worker: 'Online'}]},
+    {trigger: 'Update payment', condition: 'a scheduled payment', workflows: [{name: 'UpdatePaymentWF', worker: 'Online'}]},
+    {trigger: 'Cancel payment', condition: 'scheduled or accepted', workflows: [{name: 'CancelPaymentWF', worker: 'Online'}]},
+    {trigger: 'Money movement event', condition: 'return', workflows: [{name: 'ProcessReturnedPaymentWF', worker: 'Offline'}, {name: 'ProcessRepresentmentWF', worker: 'Offline'}]},
+    {trigger: 'Inbound payment', condition: 'third-party initiated', workflows: [{name: 'ProcessInboundPaymentWF', worker: 'Offline'}]},
+    {trigger: 'Payment intent', condition: 'awaiting FI confirmation', workflows: [{name: 'CreatePaymentIntentWF', worker: 'Online'}]},
+    {
+      trigger: 'From Accounts Receivable',
+      condition: 'future-dated · single-instruction',
+      workflows: [{name: 'CreateSchedulePaymentWF', worker: 'Offline'}, {name: 'ExecuteScheduledPaymentWF', worker: 'Offline'}],
+      children: [
+        {account: 'Consumer', when: 'split', workflows: [{name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
+        {account: 'Corporate', when: 'allocations', workflows: [{name: 'GetCorporatePaymentAllocationsWF', worker: 'Offline'}, {name: 'ExecuteSplitPaymentWF', worker: 'Offline'}]},
+      ],
+    },
   ]}
 />
 
-The indented rows are the **child workflows** a create route triggers once the payment is accepted — one `ExecuteSplitPaymentWF` per leg for consumers, preceded by `GetCorporatePaymentAllocationsWF` for corporate allocations.
+The tagged, indented rows are the **child workflows** a route triggers once the payment is accepted, and the tag is the `accountType` dimension that selects them: a consumer split runs one `ExecuteSplitPaymentWF` per leg, while a corporate payment first runs `GetCorporatePaymentAllocationsWF` to fetch its allocation breakdown, then an `ExecuteSplitPaymentWF` per allocation.
 
 ## The two workers
 
@@ -138,8 +147,8 @@ The call direction is strict — **Workflow → Stage → ActivityGroup → Acti
 
   | Schedule | Workflow |
   | --- | --- |
-  | Scheduled Payment Executor | `#ExecuteScheduledPaymentWF` |
-  | Corporate Allocations Processor | `#ExecuteSplitPaymentWF` |
-  | Paid Events Processor | `#PaidEventsProcessingWF` |
-  | Missing Paid Events Processor | `#MissingPaidEventsProcessingWF` |
-  | Data Purge | `#DataPurgingWF` |
+  | Scheduled Payment Executor | `ExecuteScheduledPaymentWF` |
+  | Corporate Allocations Processor | `ExecuteSplitPaymentWF` |
+  | Paid Events Processor | `PaidEventsProcessingWF` |
+  | Missing Paid Events Processor | `MissingPaidEventsProcessingWF` |
+  | Data Purge | `DataPurgingWF` |

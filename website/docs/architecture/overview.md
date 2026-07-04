@@ -97,8 +97,8 @@ import LayerStack from '@site/src/components/LayerStack';
 
 | Worker | Trigger | Examples |
 | --- | --- | --- |
-| **Online** | An end user is awaiting a response | `#CreateImmediatePaymentWF`, `#UpdatePaymentWF`, `#CancelPaymentWF`, `#CreatePaymentIntentWF` |
-| **Offline** | Async — events, async systems (RTF), or a scheduler | `#ExecuteScheduledPaymentWF`, `#ProcessInboundPaymentWF`, `#ProcessReturnedPaymentWF`, the periodic workflows |
+| **Online** | An end user is awaiting a response | `CreateImmediatePaymentWF`, `UpdatePaymentWF`, `CancelPaymentWF`, `CreatePaymentIntentWF` |
+| **Offline** | Async — events, async systems (RTF), or a scheduler | `ExecuteScheduledPaymentWF`, `ProcessInboundPaymentWF`, `ProcessReturnedPaymentWF`, the periodic workflows |
 
 **6. Component model** — a workflow never talks to an external system directly. It composes **Stages** (state-transition decision points), **ActivityGroups** (cohesive business concerns), **Activities** (single retryable actions), and **Clients** (adapters to a downstream system), selected from the market's dimensions. The detailed call rules are covered in the Design section.
 

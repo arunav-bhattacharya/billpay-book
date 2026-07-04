@@ -54,15 +54,15 @@ Work flows in one direction — **Workflow → Stage → ActivityGroup → Activ
 | **Activity** | Clients | Workflows, Stages, ActivityGroups, other Activities, external systems |
 | **Client** | other Clients, external systems | Workflows, Stages, ActivityGroups, Activities |
 
-## Where each lives, and how it's named
+## Component Nomenclature
 
-| Component | Location | Naming |
-| --- | --- | --- |
-| **Workflow** | `core/lib/workflows/impl/` · `market/{m}/workflows/` | `{Market}InitiatePaymentWorkflow` |
-| **Stage** | `core/lib/stages/impl/` · `market/{m}/stages/` | `{From}To{To}Stage` — e.g. `InitiatedToPendingStage` |
-| **ActivityGroup** | `core/lib/activityGroups/` · `market/{m}/activityGroups/` | `{Responsibility}ActivityGroup` |
-| **Activity** | `core/lib/activities/` + `impl/` | `{Action}Activity` / `{Action}ActivityImpl` |
-| **Client** | `core/lib/clients/` | `{System}Client` |
+| Component | Naming |
+| --- | --- |
+| **Workflow** | `{Market}InitiatePaymentWorkflow` |
+| **Stage** | `{From}To{To}Stage` — e.g. `InitiatedToPendingStage` |
+| **ActivityGroup** | `{Responsibility}ActivityGroup` |
+| **Activity** | `{Action}Activity` / `{Action}ActivityImpl` |
+| **Client** | `{System}Client` |
 
 ## Composition, not inheritance
 

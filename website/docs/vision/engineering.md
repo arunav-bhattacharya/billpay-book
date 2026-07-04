@@ -8,30 +8,47 @@ import Highlights from '@site/src/components/Highlights';
 
 # Engineering Vision
 
-<Lead>Billpay is a **Temporal-orchestrated, configuration-driven platform**: each payment runs as a **durable, resumable workflow**, while the behavior that differs by market or account type lives in the components a workflow composes — not in the workflow itself.</Lead>
+<Lead highlight>Billpay runs each payment as a **durable, resumable workflow on Temporal**, and keeps the parts that differ by market or account type in small, swappable components rather than in the workflow itself. One workflow describes the journey; configuration decides how each step behaves.</Lead>
 
-## Core engineering principles
+## The shape of the system
 
-- **Separation of concerns.** A payment is layered — Workflow → Stage → ActivityGroup → Activity → Client — so business sequencing, state transitions, retryable actions, and external calls each live in exactly one place.
-- **One workflow, many implementations.** There is a single workflow per journey; market and account-type variation comes from swappable stage and activity-group implementations, composed rather than inherited.
-- **Durable execution.** Each payment is a Temporal workflow with durable state, retries, timers, and signals — it survives failures and long waits, and never loses its place.
-- **Idempotent and auditable.** Every entry point is idempotency-checked, and every state transition is persisted and published as a lifecycle event.
-- **Configuration-driven change.** Market behavior is resolved at runtime from dimensions and profiles, and contracts are versioned — so change lands through configuration, not edits to a live orchestration.
+Three things make up the platform: the **APIs** that take requests in, the **workflows** that carry each payment from received to settled, and the **event handlers** that bring asynchronous outcomes back.
 
-## How we run
+- **APIs — the way in.** Amex's channels never call Billpay directly. They call **One-Data Functions** — versioned, stable gateway contracts, one per operation, such as creating a payment, updating or cancelling one, or registering a payment intent. Each function delegates to Billpay's core REST APIs. A **Billpay Router** then reads the request — its instructions, its date, and the market's dimensions — and decides which workflow to run.
+- **Workflows — the orchestration.** Each payment runs as a workflow: an ordered set of steps that takes it from received to settled, assembled from four smaller kinds of component, each with one job:
+  - **Stage** — one state transition, for example pending to accepted. A stage does the validation, persistence, and event publication for that single move.
+  - **ActivityGroup** — a cohesive set of actions for one concern, for example everything involved in executing a payment.
+  - **Activity** — a single retryable action, such as writing a database row or calling one downstream system.
+  - **Client** — the adapter that actually talks to an external system.
+- **Event handlers — the way back.** Much of a payment's life happens after the caller already has an answer — the bank settles the funds, Accounts Receivable posts the payment, an Open-To-Buy update lands, or the payment is returned days later. Event handlers take those events in and record them so the owning workflow can move forward: a return event starts the return workflow, and a payment is marked `PAID` only once both its settlement and its AR-posted events have arrived.
 
-Workflows execute on one of two Temporal workers:
+The workflow only sequences the business steps. The difference between markets is *which implementation* of a stage or activity group runs, chosen from the market's dimensions. That is why there is one Create Immediate Payment workflow, not one per market. The Design section covers the model in full.
 
-- **Online Worker** — runs workflows triggered by an end user (customer, representative) that **await a response** — e.g. Create Immediate Payment, Update Payment, Cancel Payment, Create Payment Intent.
-- **Offline Worker** — runs workflows triggered **asynchronously** by events or async systems (such as RTF, the Reliable Transaction Framework) or by a scheduler, where **no end user is waiting** — e.g. Execute Scheduled Payment, Process Inbound Payment, Process Returned Payment, and the periodic workflows.
+## Core principles
 
-Some workflows (e.g. Create Schedule Payment, Execute Split Payment, Create Balance Refund) can run on either worker, depending on where in the journey they're invoked.
+- **One workflow, many implementations.** A single workflow per journey. Market and account-type differences come from swapping stage and activity-group implementations, composed together rather than inherited.
+- **Durable execution.** Every payment is a Temporal workflow, and its progress is saved as it goes. It survives process restarts, host failures, and long waits — a scheduled payment may sit for weeks — and always resumes exactly where it left off. Nothing is lost, and nothing runs twice.
+- **Idempotent entry points.** Every request is checked for a duplicate before it does anything, so the same payment submitted twice becomes one payment, not two.
+- **Auditable by construction.** Every state transition is persisted and published as a lifecycle event, so a payment's whole history can be reconstructed after the fact.
+- **Change through configuration.** New markets and rules arrive as dimensions and profiles, and contracts are versioned. Change lands as configuration, not as edits to a running orchestration.
 
-Around the workers:
+## How it runs
 
-- **One-Data Functions** are the API gateway between channels and the platform; a **Billpay Router** sits between the core APIs and the workflows and, based on the instructions, date, and dimensions, routes each request to the right workflow.
-- **Temporal Schedules** drive the periodic (Offline) workflows — the scheduled-payment executor, corporate-allocations processor, representment executor, paid- and missing-paid-events processors, and the data purger.
-- **Event handlers** absorb downstream events — money movement (returns/settlement), Accounts-Receivable posting, and Open-To-Buy updates — recording them so the right workflow can advance.
+Workflows execute on one of two Temporal **workers**, divided by whether someone is waiting for the answer:
+
+- **Online worker** — runs the workflows a person is waiting on, where the response goes straight back to the caller: Create Immediate Payment, Update Payment, Cancel Payment, Create Payment Intent.
+- **Offline worker** — runs everything triggered asynchronously, where no one is blocked: Execute Scheduled Payment, Process Inbound Payment, Process Returned Payment, and the periodic sweeps. Work reaches it through events (for example from RTF, the Reliable Transaction Framework) or through a scheduler.
+
+<div className="runs-note">
+
+:::note
+
+- A few workflows — Create Schedule Payment, Execute Split Payment, Create Balance Refund — run on either worker, depending on where in the journey they are called.
+- The Offline worker also carries the periodic work, driven by **Temporal Schedules**: the scheduled-payment executor, the corporate-allocations processor, the representment executor, the paid- and missing-paid-events processors, and the data purger.
+
+:::
+
+</div>
 
 ## What we optimize for
 
@@ -39,33 +56,23 @@ Around the workers:
   items={[
     {
       term: 'Correctness',
-      desc: `Idempotency checks on entry points; deterministic, replay-safe workflows. Wrong is worse than slow.`,
+      desc: 'A payment must be right before it is fast. Idempotency checks stop duplicates, and Temporal workflows are deterministic and replay-safe, so re-running one reaches the same result.',
     },
     {
       term: 'Traceability',
-      desc: `Every state transition is persisted and published as a lifecycle event; a payment is followable from entry, through its workflow, stages, and activities, to each downstream system.`,
+      desc: 'Every state transition is persisted and published, so any payment can be followed from its entry point, through its workflow, stages, and activities, to each downstream system it touches.',
     },
     {
       term: 'Latency',
-      desc: `Trigger clearing, AR, and OTB in parallel and run them realtime where the market and rails support it; let asynchronous outcomes arrive as events rather than blocking.`,
+      desc: 'Where the market allows, clearing, AR, and Open-To-Buy are triggered together and run in realtime; slower outcomes come back later as events instead of blocking the caller.',
     },
     {
       term: 'Change safety',
-      desc: `New markets and rules land through dimensions, profile mapping, and workflow versioning — never by editing a live orchestration.`,
+      desc: 'A new market or rule is a new set of dimensions, a profile mapping, and workflow versioning. No one edits a live orchestration to onboard it.',
     },
     {
       term: 'Reliability',
-      desc: `Durable Temporal execution with retries and signals; periodic sweeps reconcile settlement and catch missing events.`,
+      desc: 'Durable Temporal execution with retries and signals, backed by periodic sweeps that reconcile settlement and catch events that never arrived.',
     },
   ]}
 />
-
-## What we're explicitly NOT building
-
-Mirroring the [Product Vision's out-of-scope boundaries](./product.md#out-of-scope), the platform integrates with the systems that own these domains rather than replacing them:
-
-- **A ledger or balance system of record.** Statement balances (Accounts Receivable) and Open-To-Buy (Authorization) are owned elsewhere; Billpay notifies and updates them.
-- **A clearing or settlement network.** Billpay sends payments to the funding bank for clearing and tracks settlement; the networks move the funds.
-- **A custom orchestration framework.** Billpay uses Temporal's native workflows, activities, signals, and schedules instead of a proprietary engine.
-- **The downstream fulfillment domains.** Accounting, balance-and-control/audit, risk, and customer communications remain their own systems that Billpay notifies.
-- **The customer-facing channels.** Channels call Billpay through One-Data Functions; the app, web, and servicing experiences are owned upstream.

@@ -12,6 +12,15 @@ function WfChip({name, worker}) {
   );
 }
 
+/** An account-type tag on a split/allocation branch — the routing dimension. */
+function AccountTag({account}) {
+  if (!account) return null;
+  const key = account.toLowerCase();
+  const tone =
+    key === 'corporate' ? styles.corporate : key.includes('small') ? styles.smb : styles.consumer;
+  return <span className={clsx(styles.acct, tone)}>{account}</span>;
+}
+
 /** A workflow pipeline — one or more chips joined by "→" to show sequence. */
 function Pipeline({workflows}) {
   return (
@@ -35,12 +44,13 @@ function Pipeline({workflows}) {
  * grouped table. Consecutive routes that share a `trigger` collapse into one
  * trigger cell (rowspan); each route's `condition` is a row, and any
  * conditional `children` (splits / corporate allocations) render as indented
- * sub-rows beneath their parent condition.
+ * sub-rows beneath their parent condition, tagged with the account type that
+ * selects them.
  *
  * routes: [{
  *   trigger, condition,
  *   workflows: [{name, worker: 'Online'|'Offline'}],
- *   children?: [{when, workflows: [{name, worker}]}]
+ *   children?: [{when, account?: 'Consumer'|'Corporate'|'Small Business', workflows: [...]}]
  * }]
  */
 export default function RouteMap({routes = []}) {
@@ -72,7 +82,12 @@ export default function RouteMap({routes = []}) {
             g.routes.forEach((r) => {
               rows.push({kind: 'main', label: r.condition, workflows: r.workflows});
               (r.children || []).forEach((ch) =>
-                rows.push({kind: 'child', label: ch.when, workflows: ch.workflows}),
+                rows.push({
+                  kind: 'child',
+                  label: ch.when,
+                  account: ch.account,
+                  workflows: ch.workflows,
+                }),
               );
             });
 
@@ -81,6 +96,7 @@ export default function RouteMap({routes = []}) {
                 key={`${gi}-${rj}`}
                 className={clsx(
                   row.kind === 'child' && styles.childRow,
+                  row.kind === 'main' && rj > 0 && styles.condStart,
                   rj === 0 && gi > 0 && styles.groupStart,
                 )}>
                 {rj === 0 && (
@@ -94,6 +110,7 @@ export default function RouteMap({routes = []}) {
                       ↳
                     </span>
                   )}
+                  {row.account && <AccountTag account={row.account} />}
                   {row.label}
                 </td>
                 <td className={styles.routeCell}>

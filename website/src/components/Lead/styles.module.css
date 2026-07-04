@@ -14,6 +14,14 @@
   color: var(--amex-txt-strong);
 }
 
+/* Highlighted lead — colours the whole statement in the section accent. */
+.highlight {
+  color: var(--lead-accent);
+}
+.highlight strong {
+  color: var(--lead-accent);
+}
+
 @media (max-width: 500px) {
   .lead {
     font-size: 1.05rem;

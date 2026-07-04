@@ -171,11 +171,11 @@ h3 {
   --ifm-color-primary-lighter: #7abced;
   --ifm-color-primary-lightest: #a6d2f3;
 
-  --amex-bg: #030d1f;
+  --amex-bg: #020304;
   --amex-bg-grad:
-    radial-gradient(85% 65% at 88% 108%, rgba(214, 162, 46, 0.1), transparent 55%),
-    radial-gradient(75% 60% at 2% -8%, rgba(0, 163, 224, 0.12), transparent 62%),
-    radial-gradient(140% 120% at 50% -12%, #0c3068 0%, #06193c 40%, #030f26 72%, #010712 100%);
+    radial-gradient(85% 65% at 88% 108%, rgba(214, 162, 46, 0.06), transparent 55%),
+    radial-gradient(75% 60% at 2% -8%, rgba(0, 163, 224, 0.06), transparent 62%),
+    radial-gradient(140% 120% at 50% -12%, #06152f 0%, #03091a 40%, #02050e 72%, #010204 100%);
   --amex-card: linear-gradient(158deg, #143365 0%, #0c1f42 55%, #0b1830 100%);
   --amex-card-hover: linear-gradient(158deg, #1a3f73 0%, #10254c 55%, #0d1c37 100%);
   --amex-panel: #0b1c3a;
@@ -559,4 +559,53 @@ table thead tr {
 .docusaurus-mermaid-container svg.statediagram .edgeLabel rect {
   fill: var(--amex-bg) !important;
   opacity: 0.85 !important;
+}
+
+/* ==================================================================== *
+ * 14. "How it runs" callout note (Engineering Vision) — a distinct tint,
+ * with its left edge aligned to the bulleted worker list above it.
+ * ==================================================================== */
+.runs-note {
+  margin-left: 1.5rem;
+}
+.runs-note .theme-admonition {
+  background-color: color-mix(in srgb, #006fcf 8%, var(--amex-panel));
+  border-color: color-mix(in srgb, #006fcf 32%, transparent);
+}
+
+/* ==================================================================== *
+ * 15. Sequence diagrams — Amex-branded participants, notes, and messages.
+ * Theme-aware via tokens; the box/rect background zones stay inline in the
+ * mermaid source. These classes are sequence-only, so state diagrams are
+ * untouched.
+ * ==================================================================== */
+/* Participant (actor) boxes — Amex-blue tinted with a navy border. */
+.docusaurus-mermaid-container rect.actor {
+  fill: color-mix(in srgb, var(--amex-state-intermediate) 16%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-intermediate) !important;
+  stroke-width: 1.2px !important;
+  rx: 6px !important;
+  ry: 6px !important;
+}
+.docusaurus-mermaid-container text.actor,
+.docusaurus-mermaid-container text.actor > tspan {
+  fill: var(--amex-txt-strong) !important;
+  font-weight: 600 !important;
+}
+/* Lifelines. */
+.docusaurus-mermaid-container .actor-line {
+  stroke: color-mix(in srgb, var(--amex-state-intermediate) 42%, transparent) !important;
+}
+/* Notes — a solid callout that reads on any background, with a gold border. */
+.docusaurus-mermaid-container rect.note {
+  fill: var(--amex-panel) !important;
+  stroke: color-mix(in srgb, var(--amex-state-choice) 60%, transparent) !important;
+}
+.docusaurus-mermaid-container text.noteText,
+.docusaurus-mermaid-container text.noteText > tspan {
+  fill: var(--amex-txt-strong) !important;
+}
+/* Message labels. */
+.docusaurus-mermaid-container text.messageText {
+  fill: var(--amex-txt) !important;
 }

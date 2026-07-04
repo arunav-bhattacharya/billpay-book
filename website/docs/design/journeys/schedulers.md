@@ -11,10 +11,10 @@ import Lead from '@site/src/components/Lead';
 
 | Schedule | Workflow |
 | --- | --- |
-| Schedule Payment Executor | `#ExecuteScheduledPaymentWF` |
-| Corporate Allocations Processor | `#ExecuteSplitPaymentWF` |
-| Paid Events Processor | `#PaidEventsProcessingWF` |
-| Missing Paid Events Processor | `#MissingPaidEventsProcessingWF` |
-| Data Purge | `#DataPurgingWF` |
+| Schedule Payment Executor | `ExecuteScheduledPaymentWF` |
+| Corporate Allocations Processor | `ExecuteSplitPaymentWF` |
+| Paid Events Processor | `PaidEventsProcessingWF` |
+| Missing Paid Events Processor | `MissingPaidEventsProcessingWF` |
+| Data Purge | `DataPurgingWF` |
 
 See [Periodic Workflows](../workflows/periodic.md) for what each one does.

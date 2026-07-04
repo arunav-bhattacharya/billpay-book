@@ -58,6 +58,12 @@
   border-top: 2px solid var(--amex-line-strong);
 }
 
+/* Divider between conditions within one trigger group, so each condition and
+   its account variations read as a single block. */
+.condStart > td {
+  border-top: 1px solid var(--amex-line-strong);
+}
+
 /* Condition column. */
 .condCell {
   color: var(--amex-txt);
@@ -126,6 +132,31 @@
   background: color-mix(in srgb, #dca02f 22%, transparent);
 }
 
+/* Account-type tag on split/allocation rows — the routing dimension, made visible. */
+.acct {
+  display: inline-block;
+  margin-right: 0.45rem;
+  padding: 0.05rem 0.42rem;
+  border-radius: 5px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: 1px;
+}
+.consumer {
+  color: #0f766e;
+  background: color-mix(in srgb, #0f766e 13%, transparent);
+}
+.corporate {
+  color: #7c3aed;
+  background: color-mix(in srgb, #7c3aed 14%, transparent);
+}
+.smb {
+  color: #97600c;
+  background: color-mix(in srgb, #97600c 14%, transparent);
+}
+
 /* ---- dark theme ---- */
 :global([data-theme='dark']) .table {
   background: var(--amex-panel);
@@ -146,6 +177,18 @@
 :global([data-theme='dark']) .offline {
   color: #e6c060;
   background: color-mix(in srgb, #e0b34e 20%, transparent);
+}
+:global([data-theme='dark']) .consumer {
+  color: #5eead4;
+  background: color-mix(in srgb, #2dd4bf 18%, transparent);
+}
+:global([data-theme='dark']) .corporate {
+  color: #c4b5fd;
+  background: color-mix(in srgb, #a78bfa 20%, transparent);
+}
+:global([data-theme='dark']) .smb {
+  color: #e6c060;
+  background: color-mix(in srgb, #e0b34e 18%, transparent);
 }
 
 @media (max-width: 640px) {
