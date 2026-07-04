@@ -1,7 +1,13 @@
 ---
 title: API Spec
+sidebar_label: API Spec
 ---
 
-:::note Stub
-Scaffolded in **Phase A**. Content will be authored from `docs/Wiki_Spec.md`, then verified against the spec by a sub-agent.
-:::
+import Lead from '@site/src/components/Lead';
+
+# API Spec
+
+<Lead>The two contract layers a request travels through: the One-Data Function gateway, and the Billpay core REST APIs it delegates to.</Lead>
+
+- **[One-Data Functions API](./one-data.md)** — the gateway function contracts.
+- **[Billpay Core APIs](./billpay-core.md)** — the REST endpoints and how each routes to a workflow.

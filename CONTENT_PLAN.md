@@ -127,3 +127,9 @@ Reference divergences corrected (spec wins):
   360/AVS) and non-spec tables (`card_acct`, `trans_exec_queue`, `trans_exec_context`);
   kept only spec-grounded downstreams and persistence, deferring the data model to Design/Build.
 - Removed the dead link to the Product Vision "speed problem" section (since deleted).
+
+## Phase C — progress (2026-07-04) ✅
+
+**Design — done.** `principles` (Component Nomenclature + call rules), `payment-state-model` (Consumer/Corporate tabs), `journeys` (apis/schedulers), `workflows` (core/composite/periodic, each with a Worker+Dimensions `WorkflowMeta`), `stages` (grouped by workflow, one sub-section per stage), `activities` (Generic/Dimensions column + full spec detail incl. table names), `diagrams` (per-workflow state diagrams + the 12 adapted sequence diagrams). Grounded in the spec; **no "Payment Services"**. Mermaid is Amex-themed (monospace font, brighter sequence palette).
+
+**Build — drafted.** All 19 pages authored spec-primary: `index`, `principles/core-build` (temporal-workflows, temporal-activities), `one-data`, `billpay-core/modules-in-monorepo`, `api-spec` (one-data, billpay-core), `data-model` (domain, database), `workflows/interfaces`, `activities/interfaces`, `schedules`. **No "Services" subsection.** Flagged as TBD rather than invented (absent from the spec): DB column schemas, API request/response bodies, and the reference's determinism / versioning / ActivityOptions / "Payment Services" / `:module` material. **Phase C (Design + Build) complete.**

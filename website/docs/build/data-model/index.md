@@ -1,7 +1,13 @@
 ---
 title: Data Model
+sidebar_label: Data Model
 ---
 
-:::note Stub
-Scaffolded in **Phase A**. Content will be authored from `docs/Wiki_Spec.md`, then verified against the spec by a sub-agent.
-:::
+import Lead from '@site/src/components/Lead';
+
+# Data Model
+
+<Lead>What Billpay persists as a payment moves through its lifecycle: the payment and its splits, an append-only event log, the idempotency guard, and the trackers that reconcile settlement.</Lead>
+
+- **[Domain Model](./domain.md)** — the entities a payment is made of.
+- **[Database Schema](./database.md)** — the tables that store them.

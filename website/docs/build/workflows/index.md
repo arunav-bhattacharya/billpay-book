@@ -1,7 +1,14 @@
 ---
-title: Workflows (Build)
+title: Workflows
+sidebar_label: Workflows
 ---
 
-:::note Stub
-Scaffolded in **Phase A**. Content will be authored from `docs/Wiki_Spec.md`, then verified against the spec by a sub-agent.
-:::
+import Lead from '@site/src/components/Lead';
+
+# Workflows
+
+<Lead>How the workflows from the Design section are expressed in code — the Temporal workflow definitions the platform runs.</Lead>
+
+- **[Workflow Interfaces](./interfaces.md)** — the workflow definitions and where they live.
+
+For each workflow's business logic, see [Design → Workflows](../../design/workflows/index.md).
