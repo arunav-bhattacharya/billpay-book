@@ -1,0 +1,163 @@
+.map {
+  margin: 1.6rem 0 2.4rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- a layer band ---- */
+.layer {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 0.95rem;
+  align-items: center;
+  padding: 0.95rem 1.15rem;
+  border: 1px solid #dbe3f0;
+  border-radius: 15px;
+  /* Raised surface — deliberately cooler/darker than the page so boxes stand out. */
+  background: linear-gradient(162deg, #f1f4fb 0%, #e7edf7 100%);
+  box-shadow: var(--amex-sh-sm);
+  overflow: hidden;
+}
+:global([data-theme='dark']) .layer {
+  border-color: #294a80;
+  background: linear-gradient(162deg, #193c73 0%, #102a54 100%);
+}
+
+/* gradient accent rail down the left edge */
+.layer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(
+    180deg,
+    var(--ly-accent),
+    color-mix(in srgb, var(--ly-accent) 25%, transparent)
+  );
+}
+
+/* number badge — gradient fill in the layer accent */
+.badge {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+  background: linear-gradient(
+    140deg,
+    var(--ly-accent),
+    color-mix(in srgb, var(--ly-accent) 55%, #05132b)
+  );
+  box-shadow: 0 4px 13px color-mix(in srgb, var(--ly-accent) 42%, transparent);
+}
+
+.body {
+  min-width: 0;
+}
+
+.title {
+  font-weight: 650;
+  font-size: 1.04rem;
+  letter-spacing: -0.003em;
+  color: var(--amex-txt-strong);
+}
+
+.role {
+  color: var(--amex-mut);
+  font-size: 0.85rem;
+  margin: 0.08rem 0 0.55rem;
+}
+
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* chips read as light pills on the raised surface */
+.chip {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  padding: 0.22rem 0.58rem;
+  border-radius: 8px;
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--ly-accent) 13%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--ly-accent) 34%, #d7deea);
+  white-space: nowrap;
+}
+:global([data-theme='dark']) .chip {
+  color: #e8f0fb;
+  background: color-mix(in srgb, var(--ly-accent) 30%, #0b2246);
+  border-color: color-mix(in srgb, var(--ly-accent) 45%, #1c355f);
+}
+
+.code {
+  font-family: var(--amex-font-mono);
+  font-size: 0.71rem;
+}
+
+/* ---- dotted flow connector between layers ---- */
+.connector {
+  height: 26px;
+  width: 0;
+  margin-left: 23px; /* centers under the 46px badge (padding + half badge) */
+  border-left: 2px dotted var(--amex-line-strong);
+  position: relative;
+}
+.connector::after {
+  content: '▾';
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  color: var(--amex-line-strong);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* ---- dashed "loops back" connector before the async band ---- */
+.loopConnector {
+  margin: 0.35rem 0;
+  padding: 0.4rem 0 0.4rem 0.9rem;
+  margin-left: 23px;
+  border-left: 2px dashed var(--amex-cat-architecture);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--amex-cat-architecture);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.loopConnector::before {
+  content: '↺';
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* the async return band reads as an aside — dashed border keeps it distinct */
+.layerLoop {
+  border-style: dashed;
+}
+
+@media (max-width: 560px) {
+  .layer {
+    grid-template-columns: 40px 1fr;
+    gap: 0.7rem;
+    padding: 0.85rem 0.9rem;
+  }
+  .badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+  }
+  .connector,
+  .loopConnector {
+    margin-left: 20px;
+  }
+}

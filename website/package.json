@@ -2,7 +2,7 @@
   "name": "billpay-book",
   "version": "0.0.0",
   "private": true,
-  "description": "Billpay Book — a Docusaurus wiki documenting Amex's Billpay payment platform",
+  "description": "Billpay Wiki — a Docusaurus wiki documenting Amex's Billpay payment platform",
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start --port 3100",

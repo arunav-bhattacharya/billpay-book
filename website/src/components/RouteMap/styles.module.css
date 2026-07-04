@@ -1,0 +1,180 @@
+.routes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin: 1.4rem 0 2rem;
+}
+
+.route {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0.8rem 1rem 0.8rem 1.15rem;
+  border: 1px solid #dbe3f0;
+  border-radius: 12px;
+  /* Raised surface — stands out from the page in both themes. */
+  background: linear-gradient(162deg, #f1f4fb 0%, #e7edf7 100%);
+  box-shadow: var(--amex-sh-sm);
+  overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+:global([data-theme='dark']) .route {
+  border-color: #294a80;
+  background: linear-gradient(162deg, #193c73 0%, #102a54 100%);
+}
+.route:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--amex-sh);
+}
+
+/* gradient left rail, tinted to the primary worker */
+.route::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--rt-accent);
+}
+.toneOnline {
+  --rt-accent: linear-gradient(180deg, #0166c8, #14a3dd);
+}
+.toneOffline {
+  --rt-accent: linear-gradient(180deg, #b06f16, #dca02f);
+}
+
+.routeMain {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(210px, 1.5fr);
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.trigger {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.triggerName {
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+  font-size: 0.98rem;
+}
+.triggerCond {
+  color: var(--amex-mut);
+  font-size: 0.8rem;
+}
+
+.arrow {
+  color: color-mix(in srgb, var(--amex-blue) 60%, var(--amex-mut));
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* workflow chip — light pill on the raised surface */
+.wf {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.28rem 0.4rem 0.28rem 0.6rem;
+  border-radius: 9px;
+  background: #ffffff;
+  border: 1px solid #d5deec;
+}
+:global([data-theme='dark']) .wf {
+  background: #14305c;
+  border-color: #2c4e86;
+}
+.wfName {
+  font-family: var(--amex-font-mono);
+  font-size: 0.73rem;
+  color: var(--amex-txt);
+}
+
+/* Online / Offline — high-contrast complementary hues (blue vs amber) */
+.worker {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.12rem 0.42rem;
+  border-radius: 6px;
+  color: #fff;
+  white-space: nowrap;
+}
+.online {
+  background: linear-gradient(135deg, #0166c8, #14a3dd);
+}
+.offline {
+  background: linear-gradient(135deg, #b06f16, #dca02f);
+}
+
+.then {
+  color: var(--amex-mut);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+/* ---- conditional child workflows (splits / allocations) ---- */
+.children {
+  margin-top: 0.7rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed color-mix(in srgb, var(--amex-line-strong) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  padding-left: 0.2rem;
+}
+.when {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+  padding: 0.14rem 0.5rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--amex-cat-architecture) 14%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--amex-cat-architecture) 30%, #d7deea);
+  white-space: nowrap;
+}
+:global([data-theme='dark']) .when {
+  color: #e8f0fb;
+  background: color-mix(in srgb, var(--amex-cat-architecture) 26%, #0b2246);
+  border-color: color-mix(in srgb, var(--amex-cat-architecture) 42%, #1c355f);
+}
+.childArrow {
+  color: var(--amex-mut);
+  font-weight: 700;
+}
+.childWfs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+@media (max-width: 640px) {
+  .routeMain {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .arrow {
+    transform: rotate(90deg);
+    justify-self: start;
+    margin-left: 0.2rem;
+  }
+}

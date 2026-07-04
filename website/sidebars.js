@@ -1,5 +1,5 @@
 // @ts-check
-// Nav tree for the Billpay Book. Structure mirrors the reference billpay-wiki,
+// Nav tree for the Billpay Wiki. Structure mirrors the reference billpay-wiki,
 // minus the banned Services / Payment-Services pages and the non-spec-supported
 // tool-selection subtree. See CONTENT_PLAN.md for the treatment of each section.
 
@@ -10,6 +10,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Vision',
+      className: 'sidebar-sec sidebar-sec--vision',
       collapsed: false,
       link: {type: 'doc', id: 'vision/index'},
       items: ['vision/product', 'vision/engineering'],
@@ -17,6 +18,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Architecture',
+      className: 'sidebar-sec sidebar-sec--architecture',
       collapsed: false,
       link: {type: 'doc', id: 'architecture/index'},
       items: ['architecture/overview', 'architecture/components'],
@@ -24,6 +26,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Design',
+      className: 'sidebar-sec sidebar-sec--design',
       collapsed: false,
       link: {type: 'doc', id: 'design/index'},
       items: [
@@ -64,6 +67,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Build',
+      className: 'sidebar-sec sidebar-sec--build',
       collapsed: true,
       link: {type: 'doc', id: 'build/index'},
       items: [
@@ -127,6 +131,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Testing',
+      className: 'sidebar-sec sidebar-sec--testing',
       collapsed: true,
       link: {type: 'doc', id: 'testing/index'},
       items: [
@@ -154,6 +159,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Deployment',
+      className: 'sidebar-sec sidebar-sec--deployment',
       collapsed: true,
       link: {type: 'doc', id: 'deployment/index'},
       items: [
@@ -179,6 +185,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Observability',
+      className: 'sidebar-sec sidebar-sec--observability',
       collapsed: true,
       link: {type: 'doc', id: 'observability/index'},
       items: [
@@ -214,6 +221,7 @@ const sidebars = {
     {
       type: 'category',
       label: 'Operations',
+      className: 'sidebar-sec sidebar-sec--operations',
       collapsed: true,
       link: {type: 'doc', id: 'operations/index'},
       items: [
@@ -234,13 +242,6 @@ const sidebars = {
         },
         'operations/sops',
       ],
-    },
-    {
-      type: 'category',
-      label: 'Contributing',
-      collapsed: true,
-      link: {type: 'doc', id: 'contributing/index'},
-      items: ['contributing/run-locally', 'contributing/publish'],
     },
   ],
 };

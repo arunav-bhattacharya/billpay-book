@@ -85,3 +85,45 @@ subtle-3D cards, per-category accents, Mermaid state-machine semantic colors. To
 - Spec inconsistencies logged for Phase B/C: EventHandler vs EventListener naming,
   singular `/payment/` DELETE path, `instrumentType` dimension, undocumented
   `CreateBalanceRefundWF` / `CreatePaymentWithMultipleInstructionsWF`.
+
+## Phase B — progress (2026-07-03)
+
+**Vision — approved `✅` (2026-07-04).** `vision/index` (TL;DR/"The Big Picture" via a
+`Highlights` grid), `vision/product`, `vision/engineering` — authored on the main thread
+from a full read of `docs/Wiki_Spec.md`; reference used for tone/structure only. Reusable
+`Lead` + `Highlights` components (Amex tokens, light/dark) drive the design.
+Rule reinforced (see memory `spec-source-of-truth`): spec is the sole source of truth every
+phase; don't carry over reference details it doesn't support; don't invent.
+
+Spec-grounding / corrections vs. reference:
+- **Workers renamed** to **Online / Offline Temporal Workers** (spec §Billpay Workflows) —
+  reference's "Realtime / Batch workers" is stale. Online = end-user-triggered, awaits a
+  response; Offline = async (events / RTF / scheduler), no user waiting.
+- Account types now include **Small Business** (`accountType`: CONSUMER, CORPORATE,
+  SMALL_BUSINESS).
+- Removed non-spec embellishments carried over from the reference: voice-servicing /
+  mobile channels, hardship plans, "wait hours / batch cycles", market "cutoffs /
+  settlement windows / regulators", and "recurring" as a core frequency.
+- Grounded in spec instead: refunds, inbound/third-party payments, composite flows
+  (*Pay & Plan*, *Pay with MR Points*), installments, split/allocations, the **Billpay
+  Router**, the real periodic workflows, and the downstream domains (clearing / AR / OTB /
+  fulfillment) with `PAID` reconciled from settlement + AR-posted events.
+- "dimensions" reserved for `accountType`, `requiresArPosting`, `requiresRealtimeClearing`,
+  `requiresMandateAuthorization`; full state model (incl. `ALLOCATING`/`ALLOCATED`)
+  deferred to Design → payment state model.
+
+**Architecture — drafted `◐`, pending review (2026-07-04).** `architecture/index` (Big
+Picture), `architecture/overview` (layered system-map Mermaid + layer responsibilities +
+"Why Temporal" + brief persistence), `architecture/components` (One-Data→API table, Router
+Mermaid, Online/Offline workers, the component model, async edges). Grounded in the spec's
+**Overall Payments View** routing table and **Core Components**. Build passes with
+`onBrokenLinks: 'throw'`; Mermaid compiled into client JS (renders in-browser).
+
+Reference divergences corrected (spec wins):
+- **Dropped the banned "Payment Services" layer** — replaced with the spec's component
+  model (Workflow → Stage → ActivityGroup → Activity → Client). No link to `design/services`.
+- **Realtime/Batch workers → Online/Offline.**
+- Dropped invented external systems (Instruments/Plans/Mandates/Payment-Options/Customer
+  360/AVS) and non-spec tables (`card_acct`, `trans_exec_queue`, `trans_exec_context`);
+  kept only spec-grounded downstreams and persistence, deferring the data model to Design/Build.
+- Removed the dead link to the Product Vision "speed problem" section (since deleted).

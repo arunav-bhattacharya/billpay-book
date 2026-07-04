@@ -1,5 +1,5 @@
 // @ts-check
-// Docusaurus config — Billpay Book
+// Docusaurus config — Billpay Wiki
 // A wiki documenting Amex's Billpay payment platform. Structure mirrors the
 // reference billpay-wiki; facts come from docs/Wiki_Spec.md. See ../CLAUDE.md.
 
@@ -11,10 +11,10 @@ const REPO_NAME = 'billpay-book';
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Billpay Book',
+  title: 'Billpay Wiki',
   tagline:
     'Billpay core APIs, event-handlers & workflows, generic activities, and periodic processes for payments and refunds',
-  favicon: 'img/favicon.svg',
+  favicon: 'img/amex-logo.png',
 
   future: {
     v4: true,
@@ -97,10 +97,10 @@ const config = {
         },
       },
       navbar: {
-        title: 'Billpay Book',
+        title: 'Billpay Wiki',
         logo: {
-          alt: 'Billpay Book',
-          src: 'img/logo.svg',
+          alt: 'American Express — Billpay Wiki',
+          src: 'img/amex-logo.png',
         },
         items: [
           {to: '/docs/vision', label: 'Vision', position: 'left'},
@@ -151,7 +151,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Billpay Book — © ${new Date().getFullYear()}`,
+        copyright: `Billpay Wiki — © ${new Date().getFullYear()}`,
       },
       prism: {
         theme: prismThemes.github,

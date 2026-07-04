@@ -50,9 +50,6 @@ export default function Home() {
       <main className="container">
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionHeadTitle}>Browse the platform</h2>
-          <p className={styles.sectionHeadSub}>
-            Ten sections, from vision through day-to-day operations.
-          </p>
         </div>
         <div className={styles.grid}>
           {SECTIONS.map((s, i) => (

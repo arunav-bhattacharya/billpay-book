@@ -15,9 +15,9 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(44% 58% at 90% 94%, rgba(230, 191, 90, 0.2), transparent 62%),
-    radial-gradient(60% 90% at 74% 6%, rgba(0, 163, 224, 0.48), transparent 60%),
-    radial-gradient(52% 82% at 10% 100%, rgba(0, 38, 99, 0.55), transparent 60%);
+    radial-gradient(44% 58% at 90% 94%, rgba(230, 191, 90, 0.16), transparent 66%),
+    radial-gradient(66% 96% at 78% 2%, rgba(0, 163, 224, 0.28), transparent 68%),
+    radial-gradient(56% 86% at 8% 100%, rgba(0, 38, 99, 0.5), transparent 66%);
 }
 
 .heroInner {

@@ -1,5 +1,5 @@
 /**
- * Billpay Book — American Express–inspired design system.
+ * Billpay Wiki — American Express–inspired design system.
  *
  * Grounded in Amex's brand identity:
  *   - Signature "Blue Box" blue  #016FD0
@@ -75,6 +75,15 @@
 /* Slightly looser body tracking for an airier, less heavy feel. */
 body {
   letter-spacing: 0.012em;
+}
+
+/* When the left sidebar is collapsed (Docusaurus' native hide button), let the
+   article reclaim most of the page instead of staying pinned to the default
+   container width — but keep a comfortable side margin. */
+@media (min-width: 997px) {
+  [class*='docItemWrapperEnhanced'] {
+    max-width: min(94%, 1600px) !important;
+  }
 }
 
 h1,
@@ -165,7 +174,7 @@ h3 {
   --amex-bg: #030d1f;
   --amex-bg-grad:
     radial-gradient(85% 65% at 88% 108%, rgba(214, 162, 46, 0.1), transparent 55%),
-    radial-gradient(70% 55% at 6% -5%, rgba(0, 163, 224, 0.22), transparent 55%),
+    radial-gradient(75% 60% at 2% -8%, rgba(0, 163, 224, 0.12), transparent 62%),
     radial-gradient(140% 120% at 50% -12%, #0c3068 0%, #06193c 40%, #030f26 72%, #010712 100%);
   --amex-card: linear-gradient(158deg, #143365 0%, #0c1f42 55%, #0b1830 100%);
   --amex-card-hover: linear-gradient(158deg, #1a3f73 0%, #10254c 55%, #0d1c37 100%);
@@ -351,12 +360,53 @@ table thead tr {
   font-weight: 600;
 }
 
+/* Numbered top-level sidebar sections — mirrors the homepage card indices
+   (zero-padded, in each section's accent colour). The section label text
+   picks up the same accent as its number. */
+.sidebar-sec > .menu__list-item-collapsible > .menu__link {
+  color: var(--sec-color, inherit);
+}
+
+.sidebar-sec > .menu__list-item-collapsible > .menu__link::before {
+  display: inline-block;
+  min-width: 1.75em;
+  margin-right: 0.55rem;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sec-color, var(--ifm-color-emphasis-600));
+}
+
+.sidebar-sec--vision { --sec-color: var(--amex-cat-vision); }
+.sidebar-sec--architecture { --sec-color: var(--amex-cat-architecture); }
+.sidebar-sec--design { --sec-color: var(--amex-cat-design); }
+.sidebar-sec--build { --sec-color: var(--amex-cat-build); }
+.sidebar-sec--testing { --sec-color: var(--amex-cat-testing); }
+.sidebar-sec--deployment { --sec-color: var(--amex-cat-deployment); }
+.sidebar-sec--observability { --sec-color: var(--amex-cat-observability); }
+.sidebar-sec--operations { --sec-color: var(--amex-cat-operations); }
+
+.sidebar-sec--vision > .menu__list-item-collapsible > .menu__link::before { content: '01'; }
+.sidebar-sec--architecture > .menu__list-item-collapsible > .menu__link::before { content: '02'; }
+.sidebar-sec--design > .menu__list-item-collapsible > .menu__link::before { content: '03'; }
+.sidebar-sec--build > .menu__list-item-collapsible > .menu__link::before { content: '04'; }
+.sidebar-sec--testing > .menu__list-item-collapsible > .menu__link::before { content: '05'; }
+.sidebar-sec--deployment > .menu__list-item-collapsible > .menu__link::before { content: '06'; }
+.sidebar-sec--observability > .menu__list-item-collapsible > .menu__link::before { content: '07'; }
+.sidebar-sec--operations > .menu__list-item-collapsible > .menu__link::before { content: '08'; }
+
 /* ==================================================================== *
  * 11. Footer — deep navy with gradient top stripe
  * ==================================================================== */
 .footer {
   position: relative;
-  background-color: var(--amex-midnight); /* deep navy in both themes */
+  /* Deep navy in both themes, lifted with a subtle brand-blue gradient
+     and a faint cyan wash that echoes the hero. */
+  background-color: var(--amex-midnight);
+  background-image:
+    radial-gradient(80% 120% at 88% 0%, rgba(0, 163, 224, 0.1), transparent 60%),
+    linear-gradient(160deg, #01306f 0%, #002663 48%, #001a48 100%);
   color: #ece7da; /* creamish white */
 }
 .footer::before {

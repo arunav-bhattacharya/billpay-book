@@ -1,0 +1,21 @@
+.lead {
+  font-size: 1.12rem;
+  line-height: 1.6;
+  font-weight: 450;
+  color: var(--ifm-color-emphasis-700);
+  border-left: 3px solid var(--lead-accent);
+  padding: 0.15rem 0 0.15rem 1.15rem;
+  margin: 1.1rem 0 2.2rem;
+  letter-spacing: -0.002em;
+}
+
+.lead strong {
+  font-weight: 680;
+  color: var(--amex-txt-strong);
+}
+
+@media (max-width: 500px) {
+  .lead {
+    font-size: 1.05rem;
+  }
+}
