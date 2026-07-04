@@ -1,0 +1,25 @@
+.docItemContainer header + *,
+.docItemContainer article > *:first-child {
+  margin-top: 0;
+}
+
+@media (min-width: 997px) {
+  .docItemCol {
+    max-width: 75% !important;
+    transition: max-width .2s ease, flex-basis .2s ease;
+  }
+  .docItemColWide {
+    max-width: calc(100% - 64px) !important;
+    flex: 1 1 auto !important;
+    transition: max-width .2s ease, flex-basis .2s ease;
+  }
+  .docTocCol {
+    transition: max-width .2s ease, flex-basis .2s ease;
+  }
+  .docTocColCollapsed {
+    flex: 0 0 56px !important;
+    max-width: 56px !important;
+    min-width: 56px !important;
+    transition: flex-basis .2s ease, max-width .2s ease;
+  }
+}

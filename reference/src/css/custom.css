@@ -1,0 +1,1848 @@
+/* Billpay Platform — global styles */
+
+:root {
+  /* Indigo as the brand primary; cyan + violet + amber + mint + rose as the spectrum.
+     Background is warm off-white, not pure white — keeps the eye from fatiguing. */
+  --ifm-color-primary: #4F46E5;
+  --ifm-color-primary-dark: #4338CA;
+  --ifm-color-primary-darker: #3730A3;
+  --ifm-color-primary-darkest: #312E81;
+  --ifm-color-primary-light: #6366F1;
+  --ifm-color-primary-lighter: #818CF8;
+  --ifm-color-primary-lightest: #A5B4FC;
+  --ifm-code-font-size: 92%;
+  --ifm-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ifm-heading-font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --ifm-heading-font-weight: 600;
+  --ifm-background-color: #FAFAF9;
+  --docusaurus-highlighted-code-line-bg: rgba(79, 70, 229, 0.10);
+
+  /* Spectrum tokens — used in card rails, gradient text, glows */
+  --bp-iris: #6366F1;          /* indigo */
+  --bp-iris-soft: #A5B4FC;
+  --bp-cyan: #0891B2;
+  --bp-cyan-soft: #22D3EE;
+  --bp-violet: #8B5CF6;
+  --bp-violet-soft: #C4B5FD;
+  --bp-magenta: #E11D48;
+  --bp-magenta-soft: #FB7185;
+  --bp-amber: #D97706;
+  --bp-amber-soft: #FBBF24;
+  --bp-mint: #10B981;
+  --bp-mint-soft: #6EE7B7;
+  --bp-rose: #E11D48;
+  --bp-rose-soft: #FDA4AF;
+
+  --bp-accent: var(--bp-iris);
+  --bp-accent-soft: var(--bp-iris-soft);
+  --bp-accent-rgb: 99, 102, 241;
+  --bp-primary-rgb: 79, 70, 229;
+  --bp-ink: #0F0F1A;
+  --bp-text: #1F2027;
+  --bp-muted: #6B6E78;
+  --bp-card-bg: #FFFFFF;
+  --bp-card-border: #E5E7EB;
+  --bp-surface-2: #F4F4F6;
+
+  /* Headline gradient — indigo → cyan, used on the highlighted word */
+  --bp-headline-grad: linear-gradient(90deg, #6366F1, #0891B2);
+  /* Hero atmospheric gradient — richer violet + cyan + indigo on the warm plate */
+  --bp-hero-bg:
+    radial-gradient(60% 60% at 80% 12%, rgba(139,92,246,0.38), transparent 70%),
+    radial-gradient(60% 60% at 12% 88%, rgba(8,145,178,0.32), transparent 70%),
+    radial-gradient(50% 50% at 50% 50%, rgba(99,102,241,0.18), transparent 75%),
+    linear-gradient(180deg, #FAFAF9 0%, #EEEDEA 100%);
+  /* Rich rule gradient under section titles */
+  --bp-rule-grad: linear-gradient(90deg, #6366F1, #8B5CF6, #0891B2);
+
+  --bp-shadow-card: 0 1px 2px rgba(15, 15, 26, 0.04), 0 8px 24px rgba(15, 15, 26, 0.06);
+  --bp-shadow-card-hover: 0 2px 4px rgba(99, 102, 241, 0.10), 0 18px 42px rgba(99, 102, 241, 0.18);
+}
+
+[data-theme='dark'] {
+  /* Dark mode is the headline mode — deep ink with vibrant accents.
+     Primary shifts to a light indigo so it reads on the dark surface. */
+  --ifm-color-primary: #A5B4FC;
+  --ifm-color-primary-dark: #818CF8;
+  --ifm-color-primary-darker: #6366F1;
+  --ifm-color-primary-darkest: #4F46E5;
+  --ifm-color-primary-light: #C7D2FE;
+  --ifm-color-primary-lighter: #DDE2FB;
+  --ifm-color-primary-lightest: #EEF2FF;
+  --ifm-background-color: #0B0C10;
+  --ifm-background-surface-color: #11131A;
+  --docusaurus-highlighted-code-line-bg: rgba(165, 180, 252, 0.12);
+
+  --bp-iris: #A5B4FC;
+  --bp-iris-soft: #C7D2FE;
+  --bp-cyan: #22D3EE;
+  --bp-cyan-soft: #67E8F9;
+  --bp-violet: #C4B5FD;
+  --bp-violet-soft: #DDD6FE;
+  --bp-magenta: #FB7185;
+  --bp-magenta-soft: #FDA4AF;
+  --bp-amber: #FBBF24;
+  --bp-amber-soft: #FCD34D;
+  --bp-mint: #6EE7B7;
+  --bp-mint-soft: #A7F3D0;
+  --bp-rose: #FB7185;
+  --bp-rose-soft: #FDA4AF;
+
+  --bp-accent: var(--bp-iris);
+  --bp-accent-soft: var(--bp-iris-soft);
+  --bp-accent-rgb: 165, 180, 252;
+  --bp-primary-rgb: 165, 180, 252;
+  --bp-ink: #F5F5F0;
+  --bp-text: #D8DAE3;
+  --bp-muted: #8D909C;
+  --bp-card-bg: #14161E;
+  --bp-card-border: #262A36;
+  --bp-surface-2: #1A1D26;
+
+  --bp-headline-grad: linear-gradient(90deg, #A5B4FC, #22D3EE);
+  --bp-hero-bg:
+    radial-gradient(70% 60% at 80% 10%, rgba(99,102,241,0.32), transparent 70%),
+    radial-gradient(60% 60% at 10% 90%, rgba(8,145,178,0.28), transparent 70%),
+    radial-gradient(50% 50% at 50% 50%, rgba(139,92,246,0.10), transparent 70%),
+    linear-gradient(180deg, #0B0C10 0%, #07080B 100%);
+  --bp-rule-grad: linear-gradient(90deg, #A5B4FC, #C4B5FD, #22D3EE);
+
+  --bp-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+  --bp-shadow-card-hover: 0 2px 4px rgba(99, 102, 241, 0.25), 0 22px 48px rgba(99, 102, 241, 0.30);
+}
+
+/* Body typography polish — Inter stylistic alternates and tightened heading rhythm */
+html, body {
+  font-feature-settings: "cv11", "ss01", "cv02";
+}
+h1 { letter-spacing: -0.025em; line-height: 1.15; }
+h2 { letter-spacing: -0.018em; line-height: 1.22; }
+h3 { letter-spacing: -0.012em; line-height: 1.3; }
+h4, h5, h6 { letter-spacing: -0.008em; }
+
+/* Smoother scroll */
+html { scroll-behavior: smooth; }
+
+/* Navbar refinement — frosted glass with hairline border */
+.navbar {
+  background: rgba(250, 250, 249, 0.72);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  border-bottom: 1px solid var(--bp-card-border);
+  box-shadow: 0 1px 0 rgba(15, 15, 26, 0.03);
+}
+[data-theme='dark'] .navbar {
+  background: rgba(11, 12, 16, 0.72);
+  border-bottom: 1px solid var(--bp-card-border);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+.navbar__title {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  font-size: 1.05rem;
+}
+.navbar__link {
+  font-weight: 500;
+  position: relative;
+  transition: color 0.15s;
+}
+.navbar__link--active { color: var(--bp-ink); }
+[data-theme='dark'] .navbar__link--active { color: var(--bp-iris-soft); }
+.navbar__link--active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 2px;
+  height: 2px;
+  background: var(--bp-rule-grad);
+  border-radius: 2px;
+}
+
+/* Mermaid containers — give diagrams breathing room */
+.docusaurus-mermaid-container {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+/* Mermaid diagrams render text as SVG <text> elements — use the SF Mono
+   system stack across every flavor (flowchart, sequence, state, gantt,
+   timeline, ER). System fonts are already loaded when Mermaid runs, so the
+   font used for box measurement matches the font used for rendering. */
+.docusaurus-mermaid-container svg text,
+.docusaurus-mermaid-container svg foreignObject,
+.docusaurus-mermaid-container svg foreignObject div,
+.docusaurus-mermaid-container svg foreignObject span,
+.docusaurus-mermaid-container svg .nodeLabel,
+.docusaurus-mermaid-container svg .edgeLabel,
+.docusaurus-mermaid-container svg .actor,
+.docusaurus-mermaid-container svg .messageText,
+.docusaurus-mermaid-container svg .noteText,
+.docusaurus-mermaid-container svg .label,
+.docusaurus-mermaid-container svg .titleText {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace !important;
+}
+
+/* Sequence-diagram readability in both themes.
+   Mermaid's `actor` class is shared by both <text> and <rect> elements;
+   we override text fill but leave the rect to render with the theme box
+   color so the badge stays visible behind the label. */
+[data-theme='light'] .docusaurus-mermaid-container svg text.actor,
+[data-theme='light'] .docusaurus-mermaid-container svg text.actor-box,
+[data-theme='light'] .docusaurus-mermaid-container svg .messageText,
+[data-theme='light'] .docusaurus-mermaid-container svg text.labelText {
+  fill: #1f2937 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg text.actor,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.actor-box,
+[data-theme='dark'] .docusaurus-mermaid-container svg .messageText,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.labelText {
+  fill: #f1f5f9 !important;
+}
+
+/* Actor badge boxes (the small box at top of each lifeline) — theme-aware
+   solid background so the actor text reads cleanly on top. */
+[data-theme='light'] .docusaurus-mermaid-container svg rect.actor,
+[data-theme='light'] .docusaurus-mermaid-container svg rect.actor-box,
+[data-theme='light'] .docusaurus-mermaid-container svg rect.actor-man {
+  fill: #f1f5f9 !important;
+  stroke: #94a3b8 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg rect.actor,
+[data-theme='dark'] .docusaurus-mermaid-container svg rect.actor-box,
+[data-theme='dark'] .docusaurus-mermaid-container svg rect.actor-man {
+  fill: #1e293b !important;
+  stroke: #475569 !important;
+}
+
+/* Vertical lifelines */
+[data-theme='light'] .docusaurus-mermaid-container svg line.actor-line {
+  stroke: #94a3b8 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg line.actor-line {
+  stroke: #64748b !important;
+}
+
+/* Sequence arrows readable in both themes */
+[data-theme='light'] .docusaurus-mermaid-container svg line.messageLine0,
+[data-theme='light'] .docusaurus-mermaid-container svg line.messageLine1,
+[data-theme='light'] .docusaurus-mermaid-container svg path.messageLine0,
+[data-theme='light'] .docusaurus-mermaid-container svg path.messageLine1 {
+  stroke: #1f2937 !important;
+  fill: none !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg line.messageLine0,
+[data-theme='dark'] .docusaurus-mermaid-container svg line.messageLine1,
+[data-theme='dark'] .docusaurus-mermaid-container svg path.messageLine0,
+[data-theme='dark'] .docusaurus-mermaid-container svg path.messageLine1 {
+  stroke: #e2e8f0 !important;
+  fill: none !important;
+}
+/* Arrowheads */
+[data-theme='light'] .docusaurus-mermaid-container svg #arrowhead path,
+[data-theme='light'] .docusaurus-mermaid-container svg [id*="arrowhead"] path {
+  fill: #1f2937 !important;
+  stroke: #1f2937 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg #arrowhead path,
+[data-theme='dark'] .docusaurus-mermaid-container svg [id*="arrowhead"] path {
+  fill: #e2e8f0 !important;
+  stroke: #e2e8f0 !important;
+}
+
+/* Note backgrounds — theme-aware. Default notes (client response, async
+   markers, etc.) get an amber-tinted background that's clearly visible on
+   both light and dark page backgrounds. */
+.docusaurus-mermaid-container svg rect.note {
+  stroke-width: 1px !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg rect.note {
+  fill: #fef3c7 !important;
+  stroke: #d97706 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg rect.note {
+  fill: #422006 !important;
+  stroke: #f59e0b !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg .noteText,
+[data-theme='light'] .docusaurus-mermaid-container svg text.noteText,
+[data-theme='light'] .docusaurus-mermaid-container svg text.noteText tspan {
+  fill: #78350f !important;
+  font-weight: 500 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg .noteText,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.noteText,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.noteText tspan {
+  fill: #fde68a !important;
+  font-weight: 500 !important;
+}
+
+/* Worker notes (Realtime Worker · / Batch Worker · ...) — distinct color
+   so workflow scope identifiers stand apart from informational notes.
+   The classifying client module adds `.bp-worker-note` to matching rects. */
+[data-theme='light'] .docusaurus-mermaid-container svg rect.note.bp-worker-note {
+  fill: #dbeafe !important;
+  stroke: #2563eb !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg rect.note.bp-worker-note {
+  fill: #1e3a8a !important;
+  stroke: #60a5fa !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg text.noteText.bp-worker-note,
+[data-theme='light'] .docusaurus-mermaid-container svg text.noteText.bp-worker-note tspan,
+[data-theme='light'] .docusaurus-mermaid-container svg tspan.bp-worker-note {
+  fill: #1e3a8a !important;
+  font-weight: 600 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg text.noteText.bp-worker-note,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.noteText.bp-worker-note tspan,
+[data-theme='dark'] .docusaurus-mermaid-container svg tspan.bp-worker-note {
+  fill: #dbeafe !important;
+  font-weight: 600 !important;
+}
+
+/* Loop / alt / opt / par labels */
+[data-theme='light'] .docusaurus-mermaid-container svg text.loopText,
+[data-theme='light'] .docusaurus-mermaid-container svg text.loopText tspan,
+[data-theme='light'] .docusaurus-mermaid-container svg text.labelText,
+[data-theme='light'] .docusaurus-mermaid-container svg text.labelText tspan {
+  fill: #1f2937 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg text.loopText,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.loopText tspan,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.labelText,
+[data-theme='dark'] .docusaurus-mermaid-container svg text.labelText tspan {
+  fill: #f1f5f9 !important;
+}
+
+/* Group box LABELS — Mermaid renders these as plain <text class="text">.
+   They default to black fill which is invisible in dark mode. */
+[data-theme='light'] .docusaurus-mermaid-container svg text.text {
+  fill: #1f2937 !important;
+  font-weight: 700 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg text.text {
+  fill: #f1f5f9 !important;
+  font-weight: 700 !important;
+}
+
+/* labelBox (the small rect around alt/opt/par keyword) — theme-aware */
+[data-theme='light'] .docusaurus-mermaid-container svg rect.labelBox {
+  fill: #e5e7eb !important;
+  stroke: #94a3b8 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg rect.labelBox {
+  fill: #1e293b !important;
+  stroke: #475569 !important;
+}
+
+/* Loop line strokes */
+[data-theme='light'] .docusaurus-mermaid-container svg line.loopLine {
+  stroke: #64748b !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg line.loopLine {
+  stroke: #94a3b8 !important;
+}
+
+/* Catch-all for any SVG text inside mermaid that doesn't have a specific
+   color rule above — applies the base text color of the theme. */
+[data-theme='light'] .docusaurus-mermaid-container svg text:not([class*="messageLine"]):not([class*="arrowhead"]) {
+  /* not !important — only acts as a fallback when no more-specific rule wins */
+}
+
+/* Mermaid should render at natural size; the SVG already has useMaxWidth
+   so it scales to container. Keep `overflow: visible` as a safety belt for
+   sub-pixel rounding differences across OSes — but the measurement vs.
+   render font now agree (both system SF Mono), so labels naturally fit
+   their boxes and we no longer need to force nowrap or inline-block. */
+.docusaurus-mermaid-container svg foreignObject {
+  overflow: visible !important;
+}
+.docusaurus-mermaid-container svg foreignObject > div {
+  overflow: visible !important;
+}
+
+/* State-diagram transition labels — shrink for cleaner look on arrows */
+.docusaurus-mermaid-container svg.statediagram .edgeLabel,
+.docusaurus-mermaid-container svg.statediagram .edgeLabel .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .edgeLabel .label,
+.docusaurus-mermaid-container svg.statediagram .edgeLabel foreignObject span,
+.docusaurus-mermaid-container svg.statediagram .edgeLabel foreignObject p,
+.docusaurus-mermaid-container svg[class*="statediagram"] .edgeLabel,
+.docusaurus-mermaid-container svg[class*="statediagram"] .edgeLabel span,
+.docusaurus-mermaid-container svg[class*="statediagram"] .edgeLabel p {
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+}
+
+/* =====================================================================
+   State-diagram NODES — semantic color coding by state name.
+   Default fill is a soft indigo wash (in-flight states inherit this).
+   Terminal-success states (PROCESSED / PAID / REPRESENTED / *_RECEIVED /
+   ACCEPTED_SPLITS) → mint. Terminal-failure (DECLINED / REJECTED /
+   RETURNED / CANCELLED) → rose. In-flight processing (PROCESSING /
+   REPRESENTING / *_REQUESTED) → violet. The remaining (PENDING /
+   ACCEPTED / SCHEDULED) keep the default indigo.
+   Selectors include the SVG-id wildcard because Mermaid prefixes every
+   state-id with the diagram SVG id. ===================================== */
+
+/* --- Default state box: violet (every intermediate state inherits this) --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state > rect.label-container {
+  fill: #F5F3FF !important;
+  stroke: #8B5CF6 !important;
+  stroke-width: 1.4px !important;
+  rx: 8 !important;
+  ry: 8 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state > rect.label-container {
+  fill: #1F1735 !important;
+  stroke: #C4B5FD !important;
+  stroke-width: 1.4px !important;
+  rx: 8 !important;
+  ry: 8 !important;
+}
+
+/* --- State label text inside each box --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state foreignObject p {
+  color: #4C1D95 !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state foreignObject p {
+  color: #DDD6FE !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* --- Terminal-success: green (PAID, RETURNED, REPRESENTED).
+   PROCESSED, ALLOCATIONS_RECEIVED, ACCEPTED_SPLITS are intermediate —
+   they fall through to the violet default. --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] > rect.label-container,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] > rect.label-container,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] > rect.label-container {
+  fill: #ECFDF5 !important;
+  stroke: #10B981 !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] foreignObject p,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] foreignObject p,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] foreignObject p {
+  color: #065F46 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] > rect.label-container,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] > rect.label-container,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] > rect.label-container {
+  fill: #0E2A1F !important;
+  stroke: #6EE7B7 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-PAID"] foreignObject p,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-RETURNED"] foreignObject p,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REPRESENTED"] foreignObject p {
+  color: #A7F3D0 !important;
+}
+
+/* --- Terminal-failure: red (DECLINED, REJECTED, CANCELLED) --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] > rect.label-container,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] > rect.label-container,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] > rect.label-container {
+  fill: #FFF1F2 !important;
+  stroke: #E11D48 !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] foreignObject p,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] foreignObject p,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] foreignObject p {
+  color: #881337 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] > rect.label-container,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] > rect.label-container,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] > rect.label-container {
+  fill: #2A1018 !important;
+  stroke: #FB7185 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-DECLINED"] foreignObject p,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-REJECTED"] foreignObject p,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*="state-CANCELLED"] foreignObject p {
+  color: #FDA4AF !important;
+}
+
+/* --- Start circle: solid indigo dot --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram circle.state-start {
+  fill: #4F46E5 !important;
+  stroke: none !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram circle.state-start {
+  fill: #A5B4FC !important;
+  stroke: none !important;
+}
+
+/* --- End marker: concentric circle uses `g.outer-path` wrapper containing
+       an outer ring + inner filled circle. Style both. --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle:first-child,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle.outer {
+  fill: #FAFAF9 !important;
+  stroke: #4F46E5 !important;
+  stroke-width: 1.5px !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle:last-child,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle.inner {
+  fill: #4F46E5 !important;
+  stroke: none !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle:first-child,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle.outer {
+  fill: #0B0C10 !important;
+  stroke: #A5B4FC !important;
+  stroke-width: 1.5px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle:last-child,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram g.outer-path circle.inner {
+  fill: #A5B4FC !important;
+  stroke: none !important;
+}
+
+/* --- Choice diamonds (state Foo <<choice>>) --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.default > rect:not(.label-container),
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .node.default polygon {
+  fill: #FEF3C7 !important;
+  stroke: #D97706 !important;
+  stroke-width: 1.4px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.default > rect:not(.label-container),
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .node.default polygon {
+  fill: #2A1F08 !important;
+  stroke: #FBBF24 !important;
+  stroke-width: 1.4px !important;
+}
+
+/* --- Transition arrows --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram path.transition {
+  stroke: #4F46E5 !important;
+  stroke-width: 1.5px !important;
+  fill: none !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram path.transition {
+  stroke: #A5B4FC !important;
+  stroke-width: 1.5px !important;
+  fill: none !important;
+}
+/* Arrowheads on transitions */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram marker path {
+  fill: #4F46E5 !important;
+  stroke: #4F46E5 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram marker path {
+  fill: #A5B4FC !important;
+  stroke: #A5B4FC !important;
+}
+
+/* --- Composite-state clusters (state "X" as Y { ... }).
+   Mermaid v11 emits .statediagram-cluster as the cluster <g>. --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .cluster rect,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .statediagram-cluster > rect {
+  fill: rgba(99, 102, 241, 0.05) !important;
+  stroke: rgba(99, 102, 241, 0.55) !important;
+  stroke-width: 1px !important;
+  stroke-dasharray: 5 4 !important;
+  rx: 12 !important;
+  ry: 12 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .cluster rect,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .statediagram-cluster > rect {
+  fill: rgba(165, 180, 252, 0.06) !important;
+  stroke: rgba(165, 180, 252, 0.55) !important;
+  stroke-width: 1px !important;
+  stroke-dasharray: 5 4 !important;
+  rx: 12 !important;
+  ry: 12 !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .cluster-label foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .cluster-label .nodeLabel {
+  color: #4F46E5 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .cluster-label foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .cluster-label .nodeLabel {
+  color: #A5B4FC !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+/* --- Transition labels: opaque pill background so they read cleanly even
+       when they sit on top of an arrow --- */
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .edgeLabel foreignObject span,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .edgeLabel foreignObject p,
+[data-theme='light'] .docusaurus-mermaid-container svg.statediagram .edgeLabel .nodeLabel {
+  background: #FAFAF9 !important;
+  color: #1F2A3D !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .edgeLabel foreignObject span,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .edgeLabel foreignObject p,
+[data-theme='dark'] .docusaurus-mermaid-container svg.statediagram .edgeLabel .nodeLabel {
+  background: #0B0C10 !important;
+  color: #DDE2FB !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+}
+
+/* Flowchart edge labels — slightly reduce for aesthetic balance */
+.docusaurus-mermaid-container svg.flowchart .edgeLabel,
+.docusaurus-mermaid-container svg.flowchart .edgeLabel .label,
+.docusaurus-mermaid-container svg.flowchart .edgeLabel foreignObject span,
+.docusaurus-mermaid-container svg.flowchart .edgeLabel foreignObject p,
+.docusaurus-mermaid-container svg[class*="flowchart"] .edgeLabel,
+.docusaurus-mermaid-container svg[class*="flowchart"] .edgeLabel span,
+.docusaurus-mermaid-container svg[class*="flowchart"] .edgeLabel p {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+/* Pretty tables */
+.markdown table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--bp-card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15,42,74,0.03);
+}
+[data-theme='dark'] .markdown table { box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.markdown table th {
+  background: var(--bp-surface-2);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--bp-ink);
+}
+[data-theme='dark'] .markdown table th { background: var(--bp-surface-2); color: var(--bp-ink); }
+.markdown table td, .markdown table th { padding: 10px 14px; }
+.markdown table tbody tr { transition: background 0.15s; }
+.markdown table tbody tr:hover { background: rgba(var(--bp-primary-rgb), 0.03); }
+[data-theme='dark'] .markdown table tbody tr:hover { background: rgba(var(--bp-primary-rgb), 0.06); }
+
+/* Inline + block code */
+.markdown :not(pre) > code {
+  background: var(--bp-surface-2);
+  color: var(--bp-ink);
+  border: 1px solid var(--bp-card-border);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.88em;
+}
+[data-theme='dark'] .markdown :not(pre) > code { color: var(--bp-accent-soft); }
+.theme-code-block {
+  border: 1px solid var(--bp-card-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15,42,74,0.04);
+}
+[data-theme='dark'] .theme-code-block { box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+
+/* Body link color — gold-tinted hover for refinement */
+.markdown a, article a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+}
+.markdown a:hover, article a:hover { color: var(--bp-accent); }
+[data-theme='dark'] .markdown a:hover, [data-theme='dark'] article a:hover { color: var(--bp-accent-soft); }
+
+/* Footer — deep ink plinth with iris→cyan gradient top stripe */
+.footer--dark {
+  position: relative;
+  background: #07080B;
+  --ifm-footer-background-color: #07080B;
+  --ifm-footer-color: #B5B8C2;
+  --ifm-footer-link-color: #B5B8C2;
+  --ifm-footer-title-color: #C7D2FE;
+}
+.footer--dark::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366F1, #8B5CF6, #22D3EE, #6EE7B7);
+}
+.footer--dark .footer__title {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+.footer--dark .footer__link-item { transition: color 0.15s; }
+.footer--dark .footer__link-item:hover {
+  color: var(--bp-iris-soft);
+  text-decoration: none;
+}
+.footer--dark .footer__copyright {
+  color: rgba(255,255,255,0.42);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+
+/* Status pill — used in workflow tables for state badges */
+.bp-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(var(--bp-primary-rgb), 0.10);
+  color: var(--ifm-color-primary);
+  border: 1px solid rgba(var(--bp-primary-rgb), 0.22);
+}
+[data-theme='dark'] .bp-pill { color: var(--ifm-color-primary-lightest); }
+/* Match the state-diagram palette: violet = intermediate, green = terminal-success,
+   red = terminal-failure. The light/dark dark-mode variants are below. */
+.bp-pill--success      { background: rgba(16,185,129,0.10); color:#047857; border-color:rgba(16,185,129,0.32); }
+.bp-pill--warn         { background: rgba(245,158,11,0.12); color:#d97706; border-color:rgba(245,158,11,0.25); }
+.bp-pill--danger       { background: rgba(225,29,72,0.10);  color:#9F1239; border-color:rgba(225,29,72,0.32); }
+.bp-pill--intermediate { background: rgba(139,92,246,0.10); color:#5B21B6; border-color:rgba(139,92,246,0.32); }
+.bp-pill--muted        { background: rgba(148,163,184,0.12); color:#64748b; border-color:rgba(148,163,184,0.25); }
+.bp-pill--accent       { background: rgba(var(--bp-accent-rgb), 0.14); color: var(--bp-accent); border-color: rgba(var(--bp-accent-rgb), 0.32); }
+
+[data-theme='dark'] .bp-pill--success      { background: rgba(110,231,183,0.10); color:#6EE7B7; border-color:rgba(110,231,183,0.32); }
+[data-theme='dark'] .bp-pill--danger       { background: rgba(251,113,133,0.10); color:#FDA4AF; border-color:rgba(251,113,133,0.32); }
+[data-theme='dark'] .bp-pill--intermediate { background: rgba(196,181,253,0.10); color:#DDD6FE; border-color:rgba(196,181,253,0.32); }
+
+/* Terminal vs non-terminal status pill — used in the Payment State Model.
+   Light: slate-grey vs indigo. Dark must mirror that contrast — keep terminal
+   distinctly slate (not the bright indigo the default pill picks up). */
+.bp-pill--terminal { background: rgba(100,116,139,0.18); color:#475569; border-color:rgba(100,116,139,0.35); }
+[data-theme='dark'] .bp-pill--terminal {
+  background: rgba(148,163,184,0.12);
+  color: #94a3b8;
+  border-color: rgba(148,163,184,0.32);
+}
+
+/* Hero on home page — layered radial gradients on ink, SF Mono-flavored */
+.bp-hero {
+  background: var(--bp-hero-bg);
+  color: var(--bp-ink);
+  padding: 112px 0 108px;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--bp-card-border);
+}
+.bp-hero::before {
+  /* Faint dotted grid for texture — barely-there, gives depth */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
+          -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 30%, transparent 75%);
+  pointer-events: none;
+  opacity: 0.6;
+}
+[data-theme='dark'] .bp-hero::before {
+  background-image: radial-gradient(rgba(165, 180, 252, 0.08) 1px, transparent 1px);
+}
+.bp-hero::after {
+  /* Thin gradient hairline at bottom */
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.45), rgba(8,145,178,0.45), transparent);
+  pointer-events: none;
+}
+.bp-hero__inner { position: relative; z-index: 1; text-align: center; }
+.bp-hero__eyebrows {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.bp-hero__eyebrow {
+  display: inline-block;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--bp-muted);
+  padding: 5px 12px;
+  border: 1px solid var(--bp-card-border);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.04);
+}
+[data-theme='dark'] .bp-hero__eyebrow {
+  background: rgba(165, 180, 252, 0.06);
+  color: var(--bp-iris-soft);
+  border-color: rgba(165, 180, 252, 0.18);
+}
+.bp-hero__title {
+  /* SF Pro Text on Apple devices; Inter (designed as an open SF Pro analogue)
+     everywhere else. Avoid pure monospace — body font at a display weight. */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  margin: 0 0 22px;
+  letter-spacing: -0.008em;
+  font-weight: 600;
+  line-height: 1.06;
+  color: var(--bp-ink);
+  font-feature-settings: "ss01", "cv11";
+}
+.bp-hero__title-grad {
+  background: var(--bp-headline-grad);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+          color: transparent;
+}
+.bp-hero__sub {
+  font-size: 1.18rem;
+  color: var(--bp-text);
+  opacity: 0.86;
+  max-width: 680px;
+  margin: 0 auto 36px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+[data-theme='dark'] .bp-hero__sub { color: #C7C9D3; opacity: 0.95; }
+.bp-hero__ctas { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.bp-hero__btn {
+  display: inline-block;
+  padding: 13px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.98rem;
+  text-decoration: none;
+  letter-spacing: -0.005em;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s, background 0.2s, border-color 0.2s;
+}
+.bp-hero__btn--primary {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  color: #fff;
+  border: 1px solid rgba(99, 102, 241, 0.6);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.bp-hero__btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.55), inset 0 1px 0 rgba(255,255,255,0.22);
+  filter: brightness(1.06);
+  text-decoration: none;
+}
+.bp-hero__btn--ghost {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--bp-ink);
+  border: 1px solid var(--bp-card-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+[data-theme='dark'] .bp-hero__btn--ghost {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--bp-ink);
+  border-color: rgba(165, 180, 252, 0.22);
+}
+.bp-hero__btn--ghost:hover {
+  border-color: var(--bp-iris);
+  color: var(--bp-iris);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.18);
+  text-decoration: none;
+}
+[data-theme='dark'] .bp-hero__btn--ghost:hover {
+  color: var(--bp-iris-soft);
+  border-color: var(--bp-iris-soft);
+  background: rgba(165, 180, 252, 0.06);
+}
+
+/* Stat strip below hero */
+.bp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  max-width: 1100px;
+  margin: -48px auto 0;
+  padding: 0 24px;
+  position: relative;
+  z-index: 2;
+}
+@media (max-width: 768px) { .bp-stats { grid-template-columns: repeat(2, 1fr); } }
+.bp-stat {
+  position: relative;
+  background: var(--bp-card-bg);
+  border: 1px solid var(--bp-card-border);
+  border-radius: 14px;
+  padding: 24px 20px;
+  text-align: center;
+  box-shadow: var(--bp-shadow-card);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s, border-color 0.2s;
+  overflow: hidden;
+}
+.bp-stat::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 2px;
+  background: var(--bp-rule-grad);
+  opacity: 0.85;
+}
+.bp-stat:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--bp-shadow-card-hover);
+  border-color: color-mix(in srgb, var(--bp-iris) 35%, var(--bp-card-border));
+}
+[data-theme='dark'] .bp-stat { box-shadow: var(--bp-shadow-card), inset 0 1px 0 rgba(255,255,255,0.03); }
+.bp-stat__num {
+  display: inline-block;
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-feature-settings: "tnum", "cv11";
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--bp-ink);
+}
+[data-theme='dark'] .bp-stat__num { color: var(--bp-ink); }
+.bp-stat__label {
+  color: var(--bp-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+}
+
+/* Feature card grid */
+.bp-features { padding: 80px 0 96px; }
+.bp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (max-width: 996px) { .bp-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .bp-grid { grid-template-columns: 1fr; } }
+
+/* Two-card variant for inline navigation grids (e.g. SLA index page) */
+.bp-grid--two {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 860px;
+  margin: 22px auto;
+  padding: 0;
+}
+@media (max-width: 640px) { .bp-grid--two { grid-template-columns: 1fr; } }
+.bp-card {
+  --bp-card-tone: var(--bp-iris);
+  --bp-card-tone-soft: var(--bp-iris-soft);
+  position: relative;
+  background: var(--bp-card-bg);
+  border: 1px solid color-mix(in srgb, var(--bp-card-tone) 22%, var(--bp-card-border));
+  border-radius: 14px;
+  padding: 22px 22px 22px 28px;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s, box-shadow 0.25s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  box-shadow: var(--bp-shadow-card);
+  overflow: hidden;
+}
+/* Tone variants — drive the rail color and the hover glow */
+.bp-card--iris    { --bp-card-tone: #6366F1; --bp-card-tone-soft: #A5B4FC; }
+.bp-card--cyan    { --bp-card-tone: #0891B2; --bp-card-tone-soft: #22D3EE; }
+.bp-card--violet  { --bp-card-tone: #8B5CF6; --bp-card-tone-soft: #C4B5FD; }
+.bp-card--amber   { --bp-card-tone: #D97706; --bp-card-tone-soft: #FBBF24; }
+.bp-card--mint    { --bp-card-tone: #10B981; --bp-card-tone-soft: #6EE7B7; }
+.bp-card--rose    { --bp-card-tone: #E11D48; --bp-card-tone-soft: #FB7185; }
+[data-theme='dark'] .bp-card--iris    { --bp-card-tone: #A5B4FC; --bp-card-tone-soft: #C7D2FE; }
+[data-theme='dark'] .bp-card--cyan    { --bp-card-tone: #22D3EE; --bp-card-tone-soft: #67E8F9; }
+[data-theme='dark'] .bp-card--violet  { --bp-card-tone: #C4B5FD; --bp-card-tone-soft: #DDD6FE; }
+[data-theme='dark'] .bp-card--amber   { --bp-card-tone: #FBBF24; --bp-card-tone-soft: #FCD34D; }
+[data-theme='dark'] .bp-card--mint    { --bp-card-tone: #6EE7B7; --bp-card-tone-soft: #A7F3D0; }
+[data-theme='dark'] .bp-card--rose    { --bp-card-tone: #FB7185; --bp-card-tone-soft: #FDA4AF; }
+
+/* Vertical color rail along the left edge */
+.bp-card__rail {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--bp-card-tone-soft), var(--bp-card-tone));
+  pointer-events: none;
+}
+.bp-card::before {
+  /* Soft tone glow behind the card on hover */
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--bp-card-tone) 14%, transparent), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.bp-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--bp-card-tone) 50%, var(--bp-card-border));
+  box-shadow:
+    0 2px 4px rgba(15, 15, 26, 0.06),
+    0 18px 42px color-mix(in srgb, var(--bp-card-tone) 24%, transparent);
+  text-decoration: none;
+}
+[data-theme='dark'] .bp-card:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 22px 48px color-mix(in srgb, var(--bp-card-tone) 32%, transparent);
+}
+.bp-card:hover::before { opacity: 1; }
+.bp-card__icon {
+  position: relative;
+  z-index: 1;
+  width: 44px; height: 44px;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+  background: color-mix(in srgb, var(--bp-card-tone) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bp-card-tone) 40%, transparent);
+  margin-bottom: 16px;
+  transition: background 0.25s, border-color 0.25s, transform 0.25s;
+}
+[data-theme='dark'] .bp-card__icon {
+  background: color-mix(in srgb, var(--bp-card-tone) 14%, transparent);
+  border-color: color-mix(in srgb, var(--bp-card-tone) 32%, transparent);
+}
+.bp-card:hover .bp-card__icon {
+  background: color-mix(in srgb, var(--bp-card-tone) 18%, transparent);
+  border-color: color-mix(in srgb, var(--bp-card-tone) 40%, transparent);
+  transform: rotate(-2deg) scale(1.04);
+}
+.bp-card h3 {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--bp-ink);
+  letter-spacing: -0.012em;
+  transition: color 0.2s;
+}
+.bp-card:hover h3 { color: var(--bp-card-tone); }
+[data-theme='dark'] .bp-card:hover h3 { color: var(--bp-card-tone-soft); }
+.bp-card p  {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--bp-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+/* Section heading */
+.bp-section-title {
+  text-align: center;
+  margin-bottom: 44px;
+}
+.bp-section-title__rule {
+  display: inline-block;
+  width: 44px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--bp-rule-grad);
+  margin-bottom: 16px;
+}
+.bp-section-title h2 {
+  font-size: clamp(1.8rem, 3.2vw, 2.3rem);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  margin: 0;
+  color: var(--bp-ink);
+  line-height: 1.2;
+}
+[data-theme='dark'] .bp-section-title h2 { color: var(--bp-ink); }
+.bp-section-title p  {
+  color: var(--bp-muted);
+  font-size: 0.96rem;
+  letter-spacing: 0.01em;
+  margin: 12px 0 0;
+}
+
+/* Right-side TOC collapse */
+.bp-toc {
+  position: sticky;
+  top: calc(var(--ifm-navbar-height) + 1rem);
+  max-height: calc(100vh - (var(--ifm-navbar-height) + 2rem));
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+/* Cancel Docusaurus' inner sticky so only our outer wrapper sticks */
+.bp-toc .theme-doc-toc-desktop {
+  position: static !important;
+  top: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* The TOC list scrolls within the sticky container if too tall */
+.bp-toc__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  animation: bp-toc-fade .15s ease-out;
+}
+.bp-toc__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px 14px 0;
+  padding: 0;
+  background: var(--bp-card-bg);
+  border: 1px solid var(--bp-card-border);
+  border-radius: 999px;
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s, transform .15s, box-shadow .15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.bp-toc__toggle:hover {
+  color: #fff;
+  background: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(var(--bp-primary-rgb), 0.28);
+}
+[data-theme='dark'] .bp-toc__toggle {
+  background: rgba(var(--bp-primary-rgb), 0.10);
+  border-color: rgba(var(--bp-primary-rgb), 0.30);
+  color: var(--ifm-color-primary);
+}
+[data-theme='dark'] .bp-toc__toggle:hover {
+  background: var(--ifm-color-primary);
+  color: var(--bp-ink);
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 4px 14px rgba(var(--bp-primary-rgb), 0.32);
+}
+.bp-toc__toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.bp-toc__toggle-label { line-height: 1; }
+
+/* When collapsed, keep the button neatly anchored at the top */
+.bp-toc--collapsed { min-height: auto; }
+.bp-toc--collapsed .bp-toc__toggle { margin-bottom: 0; }
+
+/* DocItem column widths during TOC show/hide.
+   Docusaurus puts .docItemCol's max-width: 75% in `@layer docusaurus.theme-classic`,
+   so we wrap our overrides in the same layer (the @layer keyword merges by name).
+   Selectors use [class*=...] to be hash-agnostic since CSS Modules add a hash. */
+@layer docusaurus.theme-classic {
+  @media (min-width: 997px) {
+    .row > [class*="docItemColWide"] {
+      flex: 1 1 auto !important;
+      max-width: calc(100% - 64px) !important;
+    }
+    .row > [class*="docTocColCollapsed"] {
+      flex: 0 0 56px !important;
+      max-width: 56px !important;
+      min-width: 56px !important;
+    }
+  }
+  /* Smooth transitions in both directions */
+  .row > [class*="docItemCol"],
+  .row > [class*="docTocCol"] {
+    transition: max-width .2s ease, flex-basis .2s ease;
+  }
+}
+
+@keyframes bp-toc-fade {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Gantt chart wrapper — make schedule cadence breathable */
+.bp-gantt-wrapper {
+  background: var(--bp-card-bg);
+  border: 1px solid var(--bp-card-border);
+  border-radius: 12px;
+  padding: 16px 8px 8px;
+  margin: 24px 0 16px;
+  overflow-x: auto;
+}
+.bp-gantt-wrapper .docusaurus-mermaid-container { width: 100%; min-width: 0; justify-content: flex-start; }
+.bp-gantt-wrapper svg { width: 100%; height: auto; max-width: 100%; min-width: 0; }
+.bp-gantt-wrapper svg .sectionTitle,
+.bp-gantt-wrapper svg .titleText {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+.bp-gantt-wrapper svg .taskText,
+.bp-gantt-wrapper svg .taskTextOutsideRight,
+.bp-gantt-wrapper svg .taskTextOutsideLeft {
+  font-size: 13px !important;
+}
+.bp-gantt-wrapper svg .tick text {
+  font-size: 12.5px !important;
+}
+
+/* SLA / SLI / SLO cards */
+.bp-sla {
+  margin: 28px 0;
+  padding: 22px;
+  background: var(--bp-card-bg);
+  border: 1px solid var(--bp-card-border);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+}
+[data-theme='dark'] .bp-sla { box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
+.bp-sla__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--bp-card-border);
+}
+.bp-sla__title  { font-size: 1.05rem; font-weight: 700; margin: 0; }
+.bp-sla__title code {
+  background: rgba(var(--bp-primary-rgb), 0.08);
+  color: var(--ifm-color-primary);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+[data-theme='dark'] .bp-sla__title code { background: rgba(var(--bp-primary-rgb), 0.14); }
+.bp-sla__avail { color: var(--bp-muted); font-size: 0.88rem; }
+.bp-sla__avail strong { color: var(--ifm-color-primary); font-weight: 700; }
+.bp-sla__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0,1fr));
+  gap: 10px;
+}
+@media (max-width: 768px) { .bp-sla__grid { grid-template-columns: repeat(2, 1fr); } }
+.bp-sla__cell {
+  background: rgba(var(--bp-primary-rgb), 0.04);
+  border: 1px solid var(--bp-card-border);
+  border-radius: 10px;
+  padding: 12px 10px;
+  text-align: center;
+}
+[data-theme='dark'] .bp-sla__cell { background: rgba(var(--bp-primary-rgb), 0.08); }
+.bp-sla__pct {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--bp-muted);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.bp-sla__val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ifm-color-primary);
+}
+.bp-sla__unit {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--bp-muted);
+  margin-left: 2px;
+}
+.bp-sla__sli {
+  margin-top: 14px;
+  font-size: 0.9rem;
+  color: var(--bp-muted);
+}
+.bp-sla__sli strong { color: inherit; font-weight: 700; }
+.bp-sla__endpoint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--bp-muted);
+  letter-spacing: 0.01em;
+}
+.bp-sla__endpoint code {
+  background: rgba(var(--bp-primary-rgb), 0.05);
+  color: var(--bp-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+[data-theme='dark'] .bp-sla__endpoint code {
+  background: rgba(var(--bp-primary-rgb), 0.10);
+  color: #b6c4d9;
+}
+
+/* SLA / SLI / SLO definitions strip */
+.bp-defs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 18px 0 8px;
+}
+@media (max-width: 768px) { .bp-defs { grid-template-columns: 1fr; } }
+.bp-def {
+  background: var(--bp-card-bg);
+  border: 1px solid var(--bp-card-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  border-left: 4px solid var(--ifm-color-primary);
+}
+.bp-def h4 { margin: 0 0 4px; font-size: 0.95rem; }
+.bp-def h4 code {
+  background: rgba(var(--bp-primary-rgb), 0.08);
+  color: var(--ifm-color-primary);
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+[data-theme='dark'] .bp-def h4 code { background: rgba(var(--bp-primary-rgb), 0.14); }
+.bp-def p  { margin: 0; color: var(--bp-muted); font-size: 0.88rem; }
+
+/* Section divider used on SLA page between ODF and APIs */
+.bp-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 36px 0 10px;
+  color: var(--bp-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.bp-divider::before,
+.bp-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--bp-card-border);
+}
+
+/* Pill chains (e.g. variant1 + variant2 + variant3) */
+.bp-pillchain {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.bp-pillchain__plus {
+  color: var(--bp-muted);
+  font-weight: 700;
+  padding: 0 2px;
+}
+
+/* Layered Architecture diagram (no mermaid) */
+.bp-arch {
+  --bp-arch-gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bp-arch-gap);
+  margin: 24px 0 8px;
+}
+.bp-arch__layer {
+  background: var(--bp-card-bg);
+  border: 1px solid var(--bp-card-border);
+  border-left: 4px solid var(--ifm-color-primary);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 18px;
+  align-items: center;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+.bp-arch__layer:hover {
+  box-shadow: 0 6px 20px rgba(var(--bp-primary-rgb), 0.12);
+  transform: translateX(2px);
+}
+[data-theme='dark'] .bp-arch__layer:hover {
+  box-shadow: 0 6px 24px rgba(var(--bp-primary-rgb), 0.18);
+}
+.bp-arch__layer--accent { background: linear-gradient(180deg, rgba(var(--bp-primary-rgb), 0.05), rgba(var(--bp-primary-rgb), 0)); }
+[data-theme='dark'] .bp-arch__layer--accent {
+  background: linear-gradient(180deg, rgba(var(--bp-primary-rgb), 0.08), rgba(var(--bp-primary-rgb), 0));
+}
+.bp-arch__head { display: flex; align-items: center; gap: 12px; }
+.bp-arch__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(var(--bp-primary-rgb), 0.10);
+  color: var(--ifm-color-primary);
+  font-weight: 800;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+[data-theme='dark'] .bp-arch__num { background: rgba(var(--bp-primary-rgb), 0.18); }
+.bp-arch__num--side {
+  background: rgba(245,158,11,0.12);
+  color: #d97706;
+  font-size: 1.1rem;
+}
+.bp-arch__head h4 { margin: 0; font-size: 0.98rem; font-weight: 700; line-height: 1.25; }
+.bp-arch__head p  { margin: 2px 0 0; color: var(--bp-muted); font-size: 0.82rem; }
+.bp-arch__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bp-arch__item {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(var(--bp-primary-rgb), 0.06);
+  color: var(--ifm-color-primary);
+  border: 1px solid rgba(var(--bp-primary-rgb), 0.18);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+[data-theme='dark'] .bp-arch__item {
+  background: rgba(var(--bp-primary-rgb), 0.10);
+  color: var(--ifm-color-primary-lightest);
+  border-color: rgba(var(--bp-primary-rgb), 0.26);
+}
+.bp-arch__item--code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  font-weight: 500;
+  background: rgba(148,163,184,0.10);
+  color: var(--ifm-font-color-base);
+  border-color: rgba(148,163,184,0.18);
+}
+[data-theme='dark'] .bp-arch__item--code {
+  background: rgba(148,163,184,0.10);
+  color: #cbd5e1;
+  border-color: rgba(148,163,184,0.18);
+}
+.bp-arch__arrow {
+  position: relative;
+  height: 18px;
+  margin: -2px 0;
+}
+.bp-arch__arrow::before {
+  content: '';
+  position: absolute;
+  left: 38px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(var(--bp-primary-rgb), 0.45), rgba(var(--bp-primary-rgb), 0.15));
+}
+.bp-arch__arrow::after {
+  content: '';
+  position: absolute;
+  left: 33px;
+  bottom: -3px;
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid rgba(var(--bp-primary-rgb), 0.55);
+}
+[data-theme='dark'] .bp-arch__arrow::before {
+  background: linear-gradient(180deg, rgba(var(--bp-primary-rgb), 0.55), rgba(var(--bp-primary-rgb), 0.15));
+}
+[data-theme='dark'] .bp-arch__arrow::after {
+  border-top-color: rgba(var(--bp-primary-rgb), 0.65);
+}
+
+/* Side / event-handlers callout */
+.bp-arch__side {
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px dashed var(--bp-card-border);
+  border-radius: 12px;
+  background: rgba(245,158,11,0.04);
+}
+[data-theme='dark'] .bp-arch__side { background: rgba(245,158,11,0.06); }
+.bp-arch__side-label {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c2820a;
+  margin-bottom: 10px;
+}
+[data-theme='dark'] .bp-arch__side-label { color: #f59e0b; }
+.bp-arch__layer--side {
+  border-left-color: #f59e0b;
+}
+
+@media (max-width: 768px) {
+  .bp-arch__layer { grid-template-columns: 1fr; gap: 10px; }
+}
+
+/* Mermaid gantt — readable in both themes (Mermaid 11) */
+
+/* Section title (left labels) — explicit fills per theme so they always read */
+.bp-gantt-wrapper svg .sectionTitle,
+.bp-gantt-wrapper svg .sectionTitle0,
+.bp-gantt-wrapper svg .sectionTitle1,
+.bp-gantt-wrapper svg .sectionTitle2,
+.bp-gantt-wrapper svg .sectionTitle3,
+.bp-gantt-wrapper svg .sectionTitle4 {
+  fill: var(--bp-ink) !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg .sectionTitle,
+[data-theme='dark'] .bp-gantt-wrapper svg .sectionTitle0,
+[data-theme='dark'] .bp-gantt-wrapper svg .sectionTitle1,
+[data-theme='dark'] .bp-gantt-wrapper svg .sectionTitle2,
+[data-theme='dark'] .bp-gantt-wrapper svg .sectionTitle3,
+[data-theme='dark'] .bp-gantt-wrapper svg .sectionTitle4 {
+  fill: #E5EEF9 !important;
+}
+
+/* Background section bands */
+.bp-gantt-wrapper svg .section0 { fill: rgba(var(--bp-primary-rgb), 0.04) !important; }
+.bp-gantt-wrapper svg .section1 { fill: rgba(var(--bp-primary-rgb), 0.08) !important; }
+.bp-gantt-wrapper svg .section2 { fill: rgba(var(--bp-primary-rgb), 0.04) !important; }
+.bp-gantt-wrapper svg .section3 { fill: rgba(var(--bp-primary-rgb), 0.08) !important; }
+.bp-gantt-wrapper svg .section4 { fill: rgba(var(--bp-primary-rgb), 0.04) !important; }
+[data-theme='dark'] .bp-gantt-wrapper svg .section0 { fill: rgba(var(--bp-primary-rgb), 0.05) !important; }
+[data-theme='dark'] .bp-gantt-wrapper svg .section1 { fill: rgba(var(--bp-primary-rgb), 0.09) !important; }
+[data-theme='dark'] .bp-gantt-wrapper svg .section2 { fill: rgba(var(--bp-primary-rgb), 0.05) !important; }
+[data-theme='dark'] .bp-gantt-wrapper svg .section3 { fill: rgba(var(--bp-primary-rgb), 0.09) !important; }
+[data-theme='dark'] .bp-gantt-wrapper svg .section4 { fill: rgba(var(--bp-primary-rgb), 0.05) !important; }
+
+/* Grid lines */
+.bp-gantt-wrapper svg .grid .tick line {
+  stroke: rgba(148,163,184,0.25) !important;
+}
+.bp-gantt-wrapper svg .grid path {
+  stroke: rgba(148,163,184,0.35) !important;
+}
+.bp-gantt-wrapper svg .grid .tick text {
+  fill: var(--bp-muted) !important;
+  font-size: 12px !important;
+  /* Push the time-axis labels down so they don't crowd the last bar row */
+  transform: translateY(10px);
+}
+
+/* Per-section task bars — reverted to the original navy/amber palette
+   the user preferred. Only done2 (Continuous batch) uses a contrasting
+   cyan so it stands out from the navy and amber neighbours. */
+.bp-gantt-wrapper svg .active0 {
+  fill: #1F3D63 !important;
+  stroke: #0F2A4A !important;
+  stroke-width: 1px !important;
+}
+.bp-gantt-wrapper svg .task1 {
+  fill: #0F2A4A !important;
+  stroke: #06152A !important;
+  stroke-width: 1px !important;
+}
+.bp-gantt-wrapper svg .done2 {
+  fill: #0891B2 !important;
+  stroke: #155E75 !important;
+  stroke-width: 1px !important;
+}
+.bp-gantt-wrapper svg .crit3 {
+  fill: #D97706 !important;
+  stroke: #92400E !important;
+  stroke-width: 1px !important;
+}
+.bp-gantt-wrapper svg .task4 {
+  fill: #059669 !important;
+  stroke: #047857 !important;
+  stroke-width: 1px !important;
+}
+
+/* Dark mode — slightly lifted versions of the same hues */
+[data-theme='dark'] .bp-gantt-wrapper svg .active0 {
+  fill: #818CF8 !important;
+  stroke: #A5B4FC !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg .task1 {
+  fill: #A78BFA !important;
+  stroke: #C4B5FD !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg .done2 {
+  fill: #22D3EE !important;
+  stroke: #67E8F9 !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg .crit3 {
+  fill: #F59E0B !important;
+  stroke: #FCD34D !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg .task4 {
+  fill: #34D399 !important;
+  stroke: #6EE7B7 !important;
+}
+
+/* Task text on bars — white on the saturated brand colours */
+.bp-gantt-wrapper svg .taskText,
+.bp-gantt-wrapper svg .taskText0,
+.bp-gantt-wrapper svg .taskText1,
+.bp-gantt-wrapper svg .taskText2,
+.bp-gantt-wrapper svg .taskText3,
+.bp-gantt-wrapper svg .taskText4,
+.bp-gantt-wrapper svg .activeText,
+.bp-gantt-wrapper svg .activeText0,
+.bp-gantt-wrapper svg .activeText1,
+.bp-gantt-wrapper svg .activeText2,
+.bp-gantt-wrapper svg .activeText3,
+.bp-gantt-wrapper svg .activeText4,
+.bp-gantt-wrapper svg .doneText,
+.bp-gantt-wrapper svg .doneText0,
+.bp-gantt-wrapper svg .doneText1,
+.bp-gantt-wrapper svg .doneText2,
+.bp-gantt-wrapper svg .doneText3,
+.bp-gantt-wrapper svg .doneText4,
+.bp-gantt-wrapper svg .critText,
+.bp-gantt-wrapper svg .critText0,
+.bp-gantt-wrapper svg .critText1,
+.bp-gantt-wrapper svg .critText2,
+.bp-gantt-wrapper svg .critText3,
+.bp-gantt-wrapper svg .critText4 {
+  fill: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+/* In dark mode the brighter bar fills want dark text for legibility */
+[data-theme='dark'] .bp-gantt-wrapper svg .taskText,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskText0,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskText1,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskText2,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskText3,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskText4,
+[data-theme='dark'] .bp-gantt-wrapper svg .activeText,
+[data-theme='dark'] .bp-gantt-wrapper svg .activeText0,
+[data-theme='dark'] .bp-gantt-wrapper svg .activeText1,
+[data-theme='dark'] .bp-gantt-wrapper svg .activeText2,
+[data-theme='dark'] .bp-gantt-wrapper svg .activeText3,
+[data-theme='dark'] .bp-gantt-wrapper svg .activeText4,
+[data-theme='dark'] .bp-gantt-wrapper svg .doneText,
+[data-theme='dark'] .bp-gantt-wrapper svg .doneText0,
+[data-theme='dark'] .bp-gantt-wrapper svg .doneText1,
+[data-theme='dark'] .bp-gantt-wrapper svg .doneText2,
+[data-theme='dark'] .bp-gantt-wrapper svg .doneText3,
+[data-theme='dark'] .bp-gantt-wrapper svg .doneText4,
+[data-theme='dark'] .bp-gantt-wrapper svg .critText,
+[data-theme='dark'] .bp-gantt-wrapper svg .critText0,
+[data-theme='dark'] .bp-gantt-wrapper svg .critText1,
+[data-theme='dark'] .bp-gantt-wrapper svg .critText2,
+[data-theme='dark'] .bp-gantt-wrapper svg .critText3,
+[data-theme='dark'] .bp-gantt-wrapper svg .critText4 {
+  fill: #0F0F1A !important;
+}
+
+/* Task text rendered outside the bar — base body color in each theme */
+.bp-gantt-wrapper svg .taskTextOutsideRight,
+.bp-gantt-wrapper svg .taskTextOutsideLeft,
+.bp-gantt-wrapper svg .taskTextOutsideRight0,
+.bp-gantt-wrapper svg .taskTextOutsideRight1,
+.bp-gantt-wrapper svg .taskTextOutsideRight2,
+.bp-gantt-wrapper svg .taskTextOutsideRight3,
+.bp-gantt-wrapper svg .taskTextOutsideRight4,
+.bp-gantt-wrapper svg .taskTextOutsideLeft0,
+.bp-gantt-wrapper svg .taskTextOutsideLeft1,
+.bp-gantt-wrapper svg .taskTextOutsideLeft2,
+.bp-gantt-wrapper svg .taskTextOutsideLeft3,
+.bp-gantt-wrapper svg .taskTextOutsideLeft4 {
+  fill: var(--bp-ink) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideRight,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideLeft,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideRight0,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideRight1,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideRight2,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideRight3,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideRight4,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideLeft0,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideLeft1,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideLeft2,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideLeft3,
+[data-theme='dark'] .bp-gantt-wrapper svg .taskTextOutsideLeft4 {
+  fill: #E5EEF9 !important;
+}
+
+/* Chart title — explicit fills so light & dark both read clearly */
+.bp-gantt-wrapper svg text.titleText {
+  fill: var(--bp-ink) !important;
+  font-weight: 700 !important;
+}
+[data-theme='dark'] .bp-gantt-wrapper svg text.titleText { fill: #F1F5F9 !important; }
+
+/* TOC items — per-heading collapse toggles */
+.bp-toc__list .table-of-contents__link--active { font-weight: 700; }
+
+.bp-toc__list ul li { list-style: none; }
+.bp-toc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  position: relative;
+}
+.bp-toc-row > .table-of-contents__link {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0;
+}
+/* Reserve space on rows without a toggle button so labels stay aligned */
+.bp-toc__list li > .bp-toc-row > .table-of-contents__link:only-child {
+  margin-left: 18px;
+}
+.bp-toc-group__btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--bp-muted);
+  padding: 0;
+  margin-top: 2px;
+  width: 14px; height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.bp-toc-group__btn:hover {
+  color: var(--ifm-color-primary);
+  background: rgba(var(--bp-primary-rgb), 0.10);
+}
+.bp-toc-group__btn[aria-expanded='false'] .bp-toc-group__icon {
+  transform: rotate(-90deg);
+}
+.bp-toc-group__icon {
+  transition: transform .15s;
+  display: inline-block;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Proposal-section Mermaid flowchart styling.
+   The bpPropN gradient classes are filled by inject-proposal-flowchart-gradients.js.
+   This block handles the bits the JS can't reach: cluster (subgraph) chrome,
+   default flowchart edges, and arrow colours per theme. The font already comes
+   from the global .docusaurus-mermaid-container rule (line ~174).
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Subgraph (cluster) chrome — neutral, theme-aware. The cluster rect doesn't
+   carry a bpProp class, so we style it directly. */
+[data-theme='light'] .docusaurus-mermaid-container svg g.cluster > rect {
+  fill: rgba(250, 248, 242, 0.55) !important;
+  stroke: #C9C3B0 !important;
+  stroke-dasharray: 4 4 !important;
+  stroke-width: 1px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg g.cluster > rect {
+  fill: rgba(40, 38, 34, 0.45) !important;
+  stroke: #5C594F !important;
+  stroke-dasharray: 4 4 !important;
+  stroke-width: 1px !important;
+}
+
+/* Subgraph titles — make them readable on both themes. */
+[data-theme='light'] .docusaurus-mermaid-container svg g.cluster .cluster-label,
+[data-theme='light'] .docusaurus-mermaid-container svg g.cluster .cluster-label *,
+[data-theme='light'] .docusaurus-mermaid-container svg g.cluster .nodeLabel,
+[data-theme='light'] .docusaurus-mermaid-container svg g.cluster .nodeLabel * {
+  color: #2C2C2A !important;
+  fill: #2C2C2A !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg g.cluster .cluster-label,
+[data-theme='dark'] .docusaurus-mermaid-container svg g.cluster .cluster-label *,
+[data-theme='dark'] .docusaurus-mermaid-container svg g.cluster .nodeLabel,
+[data-theme='dark'] .docusaurus-mermaid-container svg g.cluster .nodeLabel * {
+  color: #E8E6DD !important;
+  fill: #E8E6DD !important;
+}
+
+/* Flowchart edges (arrows between nodes) — readable on both themes. */
+[data-theme='light'] .docusaurus-mermaid-container svg g.edgePaths path.flowchart-link,
+[data-theme='light'] .docusaurus-mermaid-container svg g.edgePaths path.path {
+  stroke: #8E8B82 !important;
+  stroke-width: 1.5px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg g.edgePaths path.flowchart-link,
+[data-theme='dark'] .docusaurus-mermaid-container svg g.edgePaths path.path {
+  stroke: #9B968A !important;
+  stroke-width: 1.5px !important;
+}
+[data-theme='light'] .docusaurus-mermaid-container svg defs marker path,
+[data-theme='light'] .docusaurus-mermaid-container svg marker path {
+  fill: #8E8B82 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg defs marker path,
+[data-theme='dark'] .docusaurus-mermaid-container svg marker path {
+  fill: #9B968A !important;
+}
+
+/* Padding around proposal-page mermaid containers so the bigger diagrams
+   breathe a little. */
+.docusaurus-mermaid-container:has(g.bpProp1, g.bpProp2, g.bpProp3, g.bpProp4, g.bpProp5, g.bpProp6, g.bpProp7) {
+  padding: 20px 0;
+}
+
+/* Constrain the overall flowchart canvas so the Runtime-flow diagram doesn't
+   stretch full-width and balloon vertically. Keeps a comfortable reading
+   width on wide screens; mobile falls back to natural sizing. */
+.docusaurus-mermaid-container:has(g.bpProp4) > svg {
+  max-width: 760px !important;
+  height: auto !important;
+}
+
+/* Worked-resolution rulebook boxes (Idea 02): the box rect widths are
+   equalised at runtime by `inject-proposal-flowchart-gradients.js` after
+   Mermaid renders. CSS here just makes sure label content can wrap within
+   the rewritten width. */
+.docusaurus-mermaid-container:has(g.bpProp6):has(g.bpProp3):has(g.bpProp1):not(:has(g.bpProp4)) g.node foreignObject .nodeLabel {
+  white-space: normal !important;
+}

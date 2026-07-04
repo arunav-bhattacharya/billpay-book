@@ -1,0 +1,81 @@
+---
+title: SLA · SLI · SLO
+sidebar_position: 3
+---
+
+import Link from '@docusaurus/Link';
+
+# SLA · SLI · SLO
+
+Internal targets and external commitments for everything the Billpay platform
+exposes. Numbers are stated at the percentiles we measure to:
+
+<span className="bp-pill">P50</span>
+<span className="bp-pill">P90</span>
+<span className="bp-pill">P99</span>
+<span className="bp-pill">P99.9</span>
+<span className="bp-pill">P99.99</span>
+
+## What these terms mean
+
+<div className="bp-defs">
+  <div className="bp-def">
+    <h4><code>SLA</code> — Service Level Agreement</h4>
+    <p>The <strong>external commitment</strong> to consumers. If breached, it's incident-grade and contractually visible.</p>
+  </div>
+  <div className="bp-def">
+    <h4><code>SLO</code> — Service Level Objective</h4>
+    <p>The <strong>internal target</strong> engineering steers to. Tighter than the SLA by design — gives us headroom before customers notice.</p>
+  </div>
+  <div className="bp-def">
+    <h4><code>SLI</code> — Service Level Indicator</h4>
+    <p>The <strong>signal we actually measure</strong> — the metric that proves whether we're meeting the SLO.</p>
+  </div>
+</div>
+
+:::info[Quick reference]
+- **SLA** is the promise. **SLO** is the goal. **SLI** is the measurement.
+- Latency cells in the sub-pages are **SLO targets** — internal numbers.
+- The availability pill on each card is the **SLA** — the external commitment.
+- The "SLI" line under each card describes what we measure to produce these numbers.
+- Numbers are **indicative targets** — confirm the latest contracted values with the Billpay team before quoting externally.
+:::
+
+## How to read a card
+
+Each entry has:
+
+1. **Title** — the function or API name (the endpoint sits underneath as a smaller note).
+2. **SLA availability pill** — the contractual uptime.
+3. **A 5-cell latency grid** — SLO targets at P50, P90, P99, P99.9, P99.99.
+4. **The SLI** — the metric + the error budget.
+
+## Pick a surface
+
+<div className="bp-grid bp-grid--two">
+  <Link className="bp-card" to="/docs/observability/monitoring/sla-sli-slo/one-data-functions">
+    <div className="bp-card__icon">📜</div>
+    <h3>One-Data Functions</h3>
+    <p>SLA / SLI / SLO for the 7 versioned, contract-level functions (<code>CreatePayment.v3</code>, <code>UpdatePayment.v1</code>, …). Tighter SLAs because they're the visible surface.</p>
+  </Link>
+  <Link className="bp-card" to="/docs/observability/monitoring/sla-sli-slo/billpay-apis">
+    <div className="bp-card__icon">🔌</div>
+    <h3>Billpay Core APIs</h3>
+    <p>SLA / SLI / SLO for the 9 REST endpoints (<code>POST /payments</code>, <code>PUT /payments/:id</code>, …). Slightly tighter latency targets — no function-edge overhead.</p>
+  </Link>
+</div>
+
+## Error budget at a glance
+
+| SLA target | Allowable downtime / 30 days | Allowable downtime / year |
+| --- | --- | --- |
+| **99.99%** | ~4.3 minutes | ~52 minutes |
+| **99.95%** | ~21.6 minutes | ~4.4 hours |
+| **99.9%**  | ~43.2 minutes | ~8.8 hours |
+
+:::tip[Operationally]
+The **SLO** is what engineering steers to. The **SLA** is what the platform
+commits to externally. We deliberately leave headroom — if our SLO is being
+breached but our SLA isn't, that's the cue to fix things **before** customers
+notice.
+:::
