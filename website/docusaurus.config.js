@@ -31,6 +31,9 @@ const config = {
 
   onBrokenLinks: 'throw',
 
+  // Text uses SF Pro Rounded, code uses SF Mono — Apple system fonts, so no
+  // external webfont (Google Fonts) load is needed.
+
   markdown: {
     mermaid: true,
     hooks: {
@@ -80,6 +83,18 @@ const config = {
       },
       mermaid: {
         theme: {light: 'neutral', dark: 'dark'},
+        options: {
+          fontFamily:
+            "ui-rounded, 'SF Pro Rounded', -apple-system, 'Segoe UI', Roboto, sans-serif",
+          themeVariables: {
+            primaryColor: '#e8f1fb',
+            primaryBorderColor: '#016fd0',
+            primaryTextColor: '#002663',
+            lineColor: '#016fd0',
+            secondaryColor: '#eaf6fc',
+            tertiaryColor: '#fbf4e2',
+          },
+        },
       },
       navbar: {
         title: 'Billpay Book',

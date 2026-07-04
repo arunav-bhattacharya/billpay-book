@@ -1,191 +1,401 @@
 /**
- * Billpay Book — design tokens.
+ * Billpay Book — American Express–inspired design system.
  *
- * House design system ported onto Docusaurus (Infima):
- *   - Fonts:  Google Sans Flex (body) + Google Sans Code (mono), with robust
- *             system fallbacks until the self-hosted woff2 files are added.
- *   - Accent: bright pink in BOTH themes (the house signature).
- *   - Look:   subtle-3D cards (layered shadow + hairline border), restrained bold.
- *   - Theme:  dark is the default (set in docusaurus.config.js).
+ * Grounded in Amex's brand identity:
+ *   - Signature "Blue Box" blue  #016FD0
+ *   - Midnight Blue              #002663
+ *   - Typeface: SF Pro Rounded (Apple system rounded face) for text and
+ *     SF Mono for code — both system fonts, no webfont load.
  *
- * Everything is a CSS custom property so pages/components never hardcode colors.
- * Section/stage accents live under --bp-cat-* for later color-coding.
+ * Design language: deep-navy → electric-blue → cyan multi-tone gradients,
+ * premium metallic (gold / platinum) secondary accents, subtle layered depth.
+ * Both light and dark modes are first-class. All values are CSS custom
+ * properties — components never hardcode color.
  */
 
-/* ------------------------------------------------------------------ *
- * Fonts
- * Font-family stacks ship now; self-hosted Google Sans woff2 is a
- * follow-up (see the Phase A plan). Fallbacks render cleanly meanwhile.
- * ------------------------------------------------------------------ */
+/* ==================================================================== *
+ * 1. Brand palette (theme-independent raw values)
+ * ==================================================================== */
 :root {
-  --bp-font-sans: 'Google Sans Flex', system-ui, -apple-system, 'Segoe UI',
-    Roboto, Helvetica, Arial, sans-serif;
-  --bp-font-mono: 'Google Sans Code', ui-monospace, 'SF Mono', SFMono-Regular,
-    Menlo, Consolas, 'Liberation Mono', monospace;
+  --amex-blue: #016fd0;          /* signature Blue Box */
+  --amex-blue-bright: #00a3e0;   /* electric / digital blue */
+  --amex-blue-deep: #01488f;
+  --amex-midnight: #002663;      /* Amex Midnight Blue */
+  --amex-navy: #00175a;
+  --amex-ink: #010f2b;           /* near-black navy */
 
-  --ifm-font-family-base: var(--bp-font-sans);
-  --ifm-font-family-monospace: var(--bp-font-mono);
+  --amex-gold: #c69214;          /* Gold Card family */
+  --amex-gold-bright: #e6bf5a;
+  --amex-green: #2f7d54;         /* classic Green Card */
+  --amex-platinum: #6f7c8f;      /* Platinum slate */
+  --amex-teal: #0e7c86;
+  --amex-indigo: #34519e;
+}
+
+/* ==================================================================== *
+ * 2. Signature gradients (shared; tuned per-theme where noted)
+ * ==================================================================== */
+:root {
+  /* The hero / brand gradient: midnight → blue → cyan. */
+  --amex-grad-brand: linear-gradient(125deg, #002663 0%, #015bb3 46%, #00a3e0 100%);
+  /* Button gradient. */
+  --amex-grad-btn: linear-gradient(135deg, #0164c4 0%, #018ad6 55%, #00a3e0 100%);
+  --amex-grad-btn-hover: linear-gradient(135deg, #01579f 0%, #0176bd 55%, #0d94cf 100%);
+  /* Premium accents. */
+  --amex-grad-gold: linear-gradient(135deg, #9c6f14 0%, #e6bf5a 100%);
+  --amex-grad-platinum: linear-gradient(135deg, #58616e 0%, #aeb8c6 100%);
+  /* Thin shimmer rule for dividers / underlines: blue → cyan → gold. */
+  --amex-grad-rule: linear-gradient(90deg, #016fd0 0%, #12a7dd 55%, #d7c690 100%);
+  /* Warm gold wash for backgrounds / accents. */
+  --amex-gold-soft: #f5edd7;
+}
+
+/* ==================================================================== *
+ * 3. Typography
+ * ==================================================================== */
+:root {
+  --amex-font-sans: ui-rounded, 'SF Pro Rounded', 'SF Pro Text', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --amex-font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --ifm-font-family-base: var(--amex-font-sans);
+  --ifm-font-family-monospace: var(--amex-font-mono);
+  --ifm-heading-font-family: var(--amex-font-sans);
 
   --ifm-font-size-base: 17px;
   --ifm-line-height-base: 1.7;
-  --ifm-heading-font-weight: 640;
-  --ifm-h1-font-size: 2.6rem;
-
-  /* Reading column — house style keeps prose measured. */
+  --ifm-heading-font-weight: 600;
+  --ifm-font-weight-semibold: 600;
+  --ifm-h1-font-size: 2.7rem;
+  --ifm-heading-line-height: 1.2;
   --ifm-container-width: 1180px;
 }
 
-/* ------------------------------------------------------------------ *
- * Accent — bright pink in both themes
- * ------------------------------------------------------------------ */
+/* Slightly looser body tracking for an airier, less heavy feel. */
+body {
+  letter-spacing: 0.012em;
+}
+
+h1,
+.hero__title {
+  letter-spacing: -0.004em;
+}
+h2,
+h3 {
+  letter-spacing: 0.004em;
+}
+
+/* ==================================================================== *
+ * 4. LIGHT theme
+ * ==================================================================== */
 :root {
-  --ifm-color-primary: #cf1d6e;
-  --ifm-color-primary-dark: #bb1a63;
-  --ifm-color-primary-darker: #b0195d;
-  --ifm-color-primary-darkest: #91154d;
-  --ifm-color-primary-light: #e0287d;
-  --ifm-color-primary-lighter: #e53a88;
-  --ifm-color-primary-lightest: #ec6ca6;
+  /* Primary ramp derived from Amex Blue. */
+  --ifm-color-primary: #016fd0;
+  --ifm-color-primary-dark: #0164bb;
+  --ifm-color-primary-darker: #015eb1;
+  --ifm-color-primary-darkest: #014e92;
+  --ifm-color-primary-light: #1a7dd6;
+  --ifm-color-primary-lighter: #2f89da;
+  --ifm-color-primary-lightest: #57a0e2;
 
-  --bp-accent: #cf1d6e;
-  --bp-accent-bright: #ee5d9d;
-  --bp-tint: rgba(207, 29, 110, 0.09);
+  /* Surfaces — near-white with the faintest cream warmth, never flat white. */
+  --amex-bg: #faf9f7;
+  --amex-bg-grad:
+    radial-gradient(115% 95% at 88% 100%, rgba(206, 192, 150, 0.04), transparent 60%),
+    radial-gradient(105% 95% at 8% 0%, rgba(1, 111, 208, 0.045), transparent 55%),
+    linear-gradient(158deg, #fcfcfa 0%, #f8f8f5 50%, #fbfbf7 100%);
+  --amex-card: linear-gradient(160deg, #ffffff 0%, #fbfbf8 52%, #f8f7f2 100%);
+  --amex-card-hover: linear-gradient(160deg, #ffffff 0%, #fafaf6 48%, #f6f5f0 100%);
+  --amex-panel: #fdfdfb;
 
-  --ifm-link-color: var(--ifm-color-primary);
-  --docusaurus-highlighted-code-line-bg: rgba(207, 29, 110, 0.1);
+  --amex-txt: #0b1b34;           /* deep navy ink */
+  --amex-txt-strong: #001a45;
+  --amex-mut: #566988;
+  --amex-line: #e8e6df;
+  --amex-line-strong: #d9d5cd;
+
+  /* Navy-tinted layered shadow (subtle depth, not flat). */
+  --amex-sh-sm: 0 2px 6px rgba(0, 38, 99, 0.07);
+  --amex-sh: 0 10px 28px rgba(0, 38, 99, 0.1), 0 2px 6px rgba(0, 38, 99, 0.06);
+  --amex-sh-lg: 0 22px 48px rgba(0, 38, 99, 0.16), 0 4px 12px rgba(0, 38, 99, 0.08);
+  --amex-glow: 0 8px 26px rgba(1, 111, 208, 0.28);
+
+  /* Per-section accent coding (Amex-family hues). */
+  --amex-cat-vision: #016fd0;
+  --amex-cat-architecture: #1e4f8a;
+  --amex-cat-design: #0090cf;
+  --amex-cat-build: #b5810f;
+  --amex-cat-testing: #2f7d54;
+  --amex-cat-deployment: #5f6f86;
+  --amex-cat-observability: #34519e;
+  --amex-cat-operations: #0e7c86;
+
+  /* Map onto Infima surfaces. */
+  --ifm-background-color: var(--amex-bg);
+  --ifm-background-surface-color: var(--amex-panel);
+  --ifm-font-color-base: var(--amex-txt);
+  --ifm-heading-color: var(--amex-txt-strong);
+  --ifm-link-color: var(--amex-blue);
+  --ifm-link-hover-color: var(--amex-blue-deep);
+  --ifm-toc-border-color: var(--amex-line);
+  --ifm-hr-border-color: var(--amex-line);
+  --ifm-navbar-background-color: rgba(252, 252, 249, 0.85);
+  --ifm-navbar-shadow: 0 1px 0 var(--amex-line), 0 6px 22px rgba(0, 38, 99, 0.06);
+  --ifm-footer-background-color: #002663;
+  --ifm-menu-color-background-active: rgba(1, 111, 208, 0.09);
+  --ifm-menu-color-background-hover: rgba(1, 111, 208, 0.07);
+  --ifm-blockquote-color: var(--amex-mut);
+  --ifm-blockquote-border-color: var(--amex-blue);
+  --docusaurus-highlighted-code-line-bg: rgba(1, 111, 208, 0.12);
 }
 
+/* ==================================================================== *
+ * 5. DARK theme — premium "Platinum / Centurion" register
+ * ==================================================================== */
 [data-theme='dark'] {
-  --ifm-color-primary: #ee5d9d;
-  --ifm-color-primary-dark: #eb4890;
-  --ifm-color-primary-darker: #ea3d89;
-  --ifm-color-primary-darkest: #e51e73;
-  --ifm-color-primary-light: #f172aa;
-  --ifm-color-primary-lighter: #f37db2;
-  --ifm-color-primary-lightest: #f8abcf;
+  --ifm-color-primary: #4da3e6;
+  --ifm-color-primary-dark: #2f92e1;
+  --ifm-color-primary-darker: #1f8ade;
+  --ifm-color-primary-darkest: #1670bc;
+  --ifm-color-primary-light: #6bb4eb;
+  --ifm-color-primary-lighter: #7abced;
+  --ifm-color-primary-lightest: #a6d2f3;
 
-  --bp-accent: #ee5d9d;
-  --bp-accent-bright: #ff7ab4;
-  --bp-tint: rgba(238, 93, 157, 0.13);
+  --amex-bg: #030d1f;
+  --amex-bg-grad:
+    radial-gradient(85% 65% at 88% 108%, rgba(214, 162, 46, 0.1), transparent 55%),
+    radial-gradient(70% 55% at 6% -5%, rgba(0, 163, 224, 0.22), transparent 55%),
+    radial-gradient(140% 120% at 50% -12%, #0c3068 0%, #06193c 40%, #030f26 72%, #010712 100%);
+  --amex-card: linear-gradient(158deg, #143365 0%, #0c1f42 55%, #0b1830 100%);
+  --amex-card-hover: linear-gradient(158deg, #1a3f73 0%, #10254c 55%, #0d1c37 100%);
+  --amex-panel: #0b1c3a;
 
-  --docusaurus-highlighted-code-line-bg: rgba(238, 93, 157, 0.15);
+  --amex-txt: #e8f0fb;
+  --amex-txt-strong: #f4f8fe;
+  --amex-mut: #93a7c8;
+  --amex-line: #1c355f;
+  --amex-line-strong: #274372;
+
+  --amex-sh-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --amex-sh: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(90, 160, 230, 0.07);
+  --amex-sh-lg: 0 26px 60px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(90, 160, 230, 0.09);
+  --amex-glow: 0 10px 34px rgba(0, 130, 224, 0.4);
+
+  --amex-cat-vision: #4da3e6;
+  --amex-cat-architecture: #6f9fdc;
+  --amex-cat-design: #35b6e8;
+  --amex-cat-build: #e0b34e;
+  --amex-cat-testing: #57b483;
+  --amex-cat-deployment: #93a3bb;
+  --amex-cat-observability: #7b93de;
+  --amex-cat-operations: #3fb3bd;
+
+  --ifm-background-color: var(--amex-bg);
+  --ifm-background-surface-color: var(--amex-panel);
+  --ifm-font-color-base: var(--amex-txt);
+  --ifm-heading-color: var(--amex-txt-strong);
+  --ifm-link-color: var(--amex-blue-bright);
+  --ifm-link-hover-color: #6bb4eb;
+  --ifm-toc-border-color: var(--amex-line);
+  --ifm-hr-border-color: var(--amex-line);
+  --ifm-navbar-background-color: rgba(6, 20, 44, 0.72);
+  --ifm-navbar-shadow: 0 1px 0 var(--amex-line), 0 8px 26px rgba(0, 0, 0, 0.5);
+  --ifm-footer-background-color: #010812;
+  --ifm-menu-color-background-active: rgba(77, 163, 230, 0.14);
+  --ifm-menu-color-background-hover: rgba(77, 163, 230, 0.1);
+  --ifm-blockquote-border-color: var(--amex-blue-bright);
+  --docusaurus-highlighted-code-line-bg: rgba(77, 163, 230, 0.16);
 }
 
-/* ------------------------------------------------------------------ *
- * Core surface tokens (backgrounds, text, lines, shadows)
- * ------------------------------------------------------------------ */
-:root {
-  --bp-bg: #f6f7fa;
-  --bp-bg-grad: linear-gradient(165deg, #f8f9fb, #f2f4f8 60%, #f5f6f9);
-  --bp-card: linear-gradient(180deg, #ffffff, #f7f9fc);
-  --bp-txt: #22262e;
-  --bp-mut: #626b79;
-  --bp-line: #dde2ea;
-  --bp-sh: 0 8px 22px rgba(45, 55, 75, 0.1), 0 1px 2px rgba(45, 55, 75, 0.06);
-  --bp-radius-card: 13px;
-  --bp-radius-pill: 99px;
-
-  --ifm-background-color: var(--bp-bg);
-  --ifm-background-surface-color: #ffffff;
-  --ifm-heading-color: var(--bp-txt);
-  --ifm-font-color-base: var(--bp-txt);
-  --ifm-toc-border-color: var(--bp-line);
-  --ifm-hr-border-color: var(--bp-line);
-}
-
-[data-theme='dark'] {
-  --bp-bg: #0d0d0f;
-  --bp-bg-grad: radial-gradient(140% 120% at 50% 0%, #2a2a2e, #18181b 45%,
-      #0c0c0e 80%, #050506);
-  --bp-card: linear-gradient(180deg, #242426, #131315 70%, #0b0b0d);
-  --bp-txt: #f3f3f3;
-  --bp-mut: #9b9b9b;
-  --bp-line: #2c2c30;
-  --bp-sh: 0 10px 26px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-
-  --ifm-background-color: var(--bp-bg);
-  --ifm-background-surface-color: #141416;
-  --ifm-heading-color: var(--bp-txt);
-  --ifm-font-color-base: var(--bp-txt);
-}
-
-/* Atmospheric page background (house "subtle-3D rich" backdrop). */
+/* ==================================================================== *
+ * 6. Page canvas
+ * ==================================================================== */
 html,
 body {
-  background: var(--bp-bg-grad);
+  background: var(--amex-bg-grad);
   background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* ------------------------------------------------------------------ *
- * Per-category / per-stage accents (light / dark pairs)
- * Use via --bp-cat-* for section color-coding and stage roadmaps.
- * ------------------------------------------------------------------ */
-:root {
-  --bp-cat-coral: #b13a2e;
-  --bp-cat-amber: #9a7410;
-  --bp-cat-green: #2e7d4a;
-  --bp-cat-blue: #3a63a8;
-}
-
-[data-theme='dark'] {
-  --bp-cat-coral: #e06a5c;
-  --bp-cat-amber: #d9aa3c;
-  --bp-cat-green: #5cb377;
-  --bp-cat-blue: #6c98dd;
-}
-
-/* ------------------------------------------------------------------ *
- * Mermaid — state-machine semantic colors, wired to tokens so the
- * state/sequence diagrams authored later read consistently.
- *   intermediate = violet · terminal-success = green · terminal-failure
- *   = rose · choice = amber
- * ------------------------------------------------------------------ */
-:root {
-  --bp-state-intermediate: #8b5cf6;
-  --bp-state-success: var(--bp-cat-green);
-  --bp-state-failure: #e11d48;
-  --bp-state-choice: var(--bp-cat-amber);
-}
-
-[data-theme='dark'] {
-  --bp-state-intermediate: #a78bfa;
-  --bp-state-failure: #fb7185;
-}
-
-/* ------------------------------------------------------------------ *
- * Component polish — subtle-3D cards, restrained bold, hairline rules
- * ------------------------------------------------------------------ */
-
-/* Google Sans renders heavy — hold a sensible floor for strong text. */
 b,
 strong {
   font-weight: 600;
 }
 
-/* Cards (feature cards, admonitions) get the layered-shadow treatment. */
-.card {
-  background: var(--bp-card);
-  border: 1px solid var(--bp-line);
-  border-radius: var(--bp-radius-card);
-  box-shadow: var(--bp-sh);
+/* Gradient-underline accent for section headings on content pages. */
+.markdown > h2 {
+  padding-bottom: 0.3em;
+  border-bottom: 2px solid transparent;
+  border-image: var(--amex-grad-rule) 1;
 }
 
-.badge,
-.pill {
-  border-radius: var(--bp-radius-pill);
+/* Horizontal rules become a blue→cyan→gold shimmer. */
+hr {
+  border: 0;
+  height: 2px;
+  background: var(--amex-grad-rule);
+  opacity: 0.6;
 }
 
-/* Sidebar / navbar hairlines follow the token line color. */
+/* ==================================================================== *
+ * 7. Navbar — frosted, gradient hairline
+ * ==================================================================== */
 .navbar {
-  border-bottom: 1px solid var(--bp-line);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--amex-line);
 }
-.menu {
-  border-right: 1px solid transparent;
+.navbar__title {
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+.navbar__link--active {
+  color: var(--ifm-color-primary);
+}
+/* Gradient underline under the active/hover navbar item. */
+.navbar__link {
+  position: relative;
+}
+.navbar__link:hover::after,
+.navbar__link--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--amex-grad-rule);
 }
 
-/* Inline code + code blocks pick up the accent tint subtly. */
+/* ==================================================================== *
+ * 8. Buttons — rich gradient with lift
+ * ==================================================================== */
+.button--primary {
+  background: var(--amex-grad-btn);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: var(--amex-glow);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+.button--primary:hover {
+  background: var(--amex-grad-btn-hover);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(1, 111, 208, 0.42);
+}
+.button--secondary {
+  background: transparent;
+  border: 1.5px solid var(--amex-line-strong);
+  color: var(--ifm-font-color-base);
+  font-weight: 600;
+}
+.button--secondary:hover {
+  border-color: var(--amex-blue);
+  color: var(--amex-blue);
+}
+
+/* ==================================================================== *
+ * 9. Cards & surfaces — gradient fill, layered depth, hairline
+ * ==================================================================== */
+.card {
+  background: var(--amex-card);
+  border: 1px solid var(--amex-line);
+  border-radius: 14px;
+  box-shadow: var(--amex-sh);
+}
+
+/* ==================================================================== *
+ * 10. Links, code, tables, admonitions
+ * ==================================================================== */
+a {
+  text-underline-offset: 2px;
+}
+
 :not(pre) > code {
-  background: var(--bp-tint);
-  border: 1px solid var(--bp-line);
+  background: rgba(1, 111, 208, 0.08);
+  border: 1px solid var(--amex-line);
   border-radius: 6px;
+  color: var(--amex-blue-deep);
+  font-size: 0.88em;
+}
+[data-theme='dark'] :not(pre) > code {
+  background: rgba(77, 163, 230, 0.12);
+  color: #add4f5;
+}
+
+.table-of-contents__link--active {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+table thead tr {
+  background: rgba(1, 111, 208, 0.06);
+}
+[data-theme='dark'] table thead tr {
+  background: rgba(77, 163, 230, 0.1);
+}
+
+.theme-admonition {
+  border-radius: 12px;
+  box-shadow: var(--amex-sh-sm);
+}
+
+/* Sidebar active item gets an Amex-blue left rail. */
+.menu__link--active:not(.menu__link--sublist) {
+  box-shadow: inset 3px 0 0 var(--ifm-color-primary);
+  font-weight: 600;
+}
+
+/* ==================================================================== *
+ * 11. Footer — deep navy with gradient top stripe
+ * ==================================================================== */
+.footer {
+  position: relative;
+  background-color: var(--amex-midnight); /* deep navy in both themes */
+  color: #ece7da; /* creamish white */
+}
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--amex-grad-rule);
+}
+.footer__title {
+  color: #f7f3ea;
+  letter-spacing: 0.03em;
+}
+.footer__link-item {
+  color: #ddd7c9;
+  transition: color 0.16s ease;
+}
+.footer__link-item:hover {
+  color: #fdfbf5;
+  text-decoration: none;
+}
+.footer__copyright {
+  color: #b3ac9d;
+}
+
+/* ==================================================================== *
+ * 12. Mermaid — Amex-blue nodes, semantic state colors
+ * ==================================================================== */
+:root {
+  --amex-state-intermediate: #34519e;
+  --amex-state-success: #2f7d54;
+  --amex-state-failure: #c0392b;
+  --amex-state-choice: #c69214;
+}
+[data-theme='dark'] {
+  --amex-state-intermediate: #7b93de;
+  --amex-state-success: #57b483;
+  --amex-state-failure: #e2685c;
+  --amex-state-choice: #e0b34e;
 }

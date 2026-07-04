@@ -1,61 +1,183 @@
+/* ---- Hero: full-bleed Amex brand gradient ---- */
 .hero {
-  background: transparent;
-  padding: 5rem 0 3rem;
+  position: relative;
+  overflow: hidden;
+  background: var(--amex-grad-brand);
+  color: #fff;
+  padding: 5.5rem 1rem 5rem;
   text-align: center;
+  isolation: isolate;
+}
+
+/* Soft radial highlight + faint "Blue Box" motif for depth. */
+.heroGlow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(44% 58% at 90% 94%, rgba(230, 191, 90, 0.2), transparent 62%),
+    radial-gradient(60% 90% at 74% 6%, rgba(0, 163, 224, 0.48), transparent 60%),
+    radial-gradient(52% 82% at 10% 100%, rgba(0, 38, 99, 0.55), transparent 60%);
+}
+
+.heroInner {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e9dfc9;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgba(230, 191, 90, 0.32);
+  border-radius: 999px;
+  background: rgba(230, 191, 90, 0.08);
+  backdrop-filter: blur(6px);
+  margin-bottom: 1.4rem;
 }
 
 .heroTitle {
-  font-size: clamp(2.6rem, 6vw, 4rem);
-  font-weight: 680;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.5rem;
-  color: var(--bp-txt);
+  font-size: clamp(2.8rem, 6.5vw, 4.4rem);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.06;
+  margin: 0 0 0.6rem;
+  color: #fff;
 }
 
 .heroTagline {
-  font-size: 1.2rem;
-  color: var(--bp-mut);
-  max-width: 720px;
-  margin: 0 auto 2rem;
+  font-size: 1.22rem;
+  line-height: 1.55;
+  color: rgba(233, 242, 251, 0.9);
+  max-width: 680px;
+  margin: 0 auto 2.2rem;
 }
 
 .heroActions {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 1rem;
+}
+
+/* Ghost button reads correctly on the dark hero regardless of theme. */
+.heroGhost {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  color: #fff;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+.heroGhost:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: #fff;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* ---- Section grid ---- */
+.sectionHead {
+  text-align: center;
+  margin: 3.5rem 0 2rem;
+}
+.sectionHeadTitle {
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: -0.002em;
+  margin: 0 0 0.4rem;
+  color: var(--amex-txt-strong);
+}
+.sectionHeadSub {
+  color: var(--amex-mut);
+  margin: 0;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
   gap: 1.25rem;
-  padding: 1rem 0 5rem;
+  padding: 0 0 5rem;
 }
 
-.sectionCard {
+/* ---- Section card: per-section accent via --cat ---- */
+.card {
+  position: relative;
   display: block;
-  padding: 1.4rem 1.5rem;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 1.5rem 1.5rem 1.6rem;
+  border-radius: 16px;
+  background: var(--amex-card);
+  border: 1px solid var(--amex-line);
+  box-shadow: var(--amex-sh);
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition: transform 0.17s ease, box-shadow 0.17s ease, border-color 0.17s ease;
+}
+/* Gradient top accent bar tinted to the section color. */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--cat), transparent 92%);
+  opacity: 0.9;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--amex-sh-lg);
+  border-color: color-mix(in srgb, var(--cat) 55%, var(--amex-line));
   text-decoration: none;
   color: inherit;
 }
 
-.sectionCard:hover {
-  transform: translateY(-3px);
-  text-decoration: none;
-  color: inherit;
+.cardIndex {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  color: var(--cat);
+  margin-bottom: 0.5rem;
 }
 
 .cardTitle {
   margin: 0 0 0.4rem;
-  font-size: 1.15rem;
-  font-weight: 620;
-  color: var(--bp-accent);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.004em;
+  color: var(--amex-txt-strong);
 }
 
 .cardBlurb {
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--bp-mut);
+  font-size: 0.94rem;
   line-height: 1.5;
+  color: var(--amex-mut);
+}
+
+.cardArrow {
+  position: absolute;
+  right: 1.3rem;
+  bottom: 1.2rem;
+  font-size: 1.1rem;
+  color: var(--cat);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.17s ease, transform 0.17s ease;
+}
+.card:hover .cardArrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (max-width: 500px) {
+  .hero {
+    padding: 4rem 1rem 3.5rem;
+  }
 }
