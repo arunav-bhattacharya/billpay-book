@@ -449,3 +449,114 @@ table thead tr {
   --amex-state-failure: #e2685c;
   --amex-state-choice: #e0b34e;
 }
+
+/* ==================================================================== *
+ * 13. Mermaid state diagrams
+ * Colours read from the theme-aware --amex-state-* tokens above, so one
+ * rule set covers light and dark. Mermaid scopes its own styles under a
+ * random svg #id, so node fills need !important to win.
+ * ==================================================================== */
+.docusaurus-mermaid-container {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+
+/* Diagram text uses the monospace stack, forced over Mermaid's inline font. */
+.docusaurus-mermaid-container svg text,
+.docusaurus-mermaid-container svg .nodeLabel,
+.docusaurus-mermaid-container svg .nodeLabel p,
+.docusaurus-mermaid-container svg .edgeLabel,
+.docusaurus-mermaid-container svg .edgeLabel p,
+.docusaurus-mermaid-container svg .cluster .nodeLabel {
+  font-family: var(--amex-font-mono) !important;
+}
+
+/* State boxes — rounded; default (in-flight) is the navy-blue bucket. */
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state > rect.label-container {
+  rx: 9px !important;
+  ry: 9px !important;
+  stroke-width: 1.5px !important;
+  fill: color-mix(in srgb, var(--amex-state-intermediate) 13%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-intermediate) !important;
+}
+.docusaurus-mermaid-container svg.statediagram .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .nodeLabel p {
+  fill: var(--amex-txt-strong) !important;
+  color: var(--amex-txt-strong) !important;
+  font-weight: 600;
+}
+
+/* Terminal success — PAID, RETURNED, REPRESENTED (green). */
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-PAID'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-RETURNED'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-REPRESENTED'] > rect.label-container {
+  fill: color-mix(in srgb, var(--amex-state-success) 15%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-success) !important;
+}
+
+/* Terminal failure — DECLINED, DISALLOWED, CANCELLED (red). */
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DISALLOWED'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] > rect.label-container {
+  fill: color-mix(in srgb, var(--amex-state-failure) 13%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-failure) !important;
+}
+
+/* Choice diamonds (<<choice>>) — gold. */
+.docusaurus-mermaid-container svg.statediagram .node.default > rect:not(.label-container),
+.docusaurus-mermaid-container svg.statediagram .node.default polygon {
+  fill: color-mix(in srgb, var(--amex-state-choice) 16%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-choice) !important;
+  stroke-width: 1.5px !important;
+}
+
+/* Start dot, end ring, transitions and arrowheads — Amex blue. */
+.docusaurus-mermaid-container svg.statediagram .start-state,
+.docusaurus-mermaid-container svg.statediagram circle.state-start,
+.docusaurus-mermaid-container svg.statediagram .end-state-outer,
+.docusaurus-mermaid-container svg.statediagram .end-state-inner {
+  fill: var(--amex-blue) !important;
+  stroke: var(--amex-blue) !important;
+}
+.docusaurus-mermaid-container svg.statediagram .transition,
+.docusaurus-mermaid-container svg.statediagram path.transition {
+  stroke: var(--amex-blue) !important;
+  stroke-width: 1.6px !important;
+}
+.docusaurus-mermaid-container svg.statediagram marker path {
+  fill: var(--amex-blue) !important;
+  stroke: var(--amex-blue) !important;
+}
+
+/* Composite-state clusters — dashed Amex-blue frame, labelled in blue. */
+.docusaurus-mermaid-container svg.statediagram .cluster > rect,
+.docusaurus-mermaid-container svg.statediagram .statediagram-cluster rect {
+  fill: color-mix(in srgb, var(--amex-blue) 5%, transparent) !important;
+  stroke: var(--amex-blue) !important;
+  stroke-dasharray: 5 4 !important;
+  stroke-width: 1.3px !important;
+  rx: 12px !important;
+  ry: 12px !important;
+}
+.docusaurus-mermaid-container svg.statediagram .cluster .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .statediagram-cluster .nodeLabel {
+  fill: var(--amex-blue) !important;
+  color: var(--amex-blue) !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Transition labels — smaller and tighter than the state text, on the page bg. */
+.docusaurus-mermaid-container svg.statediagram .edgeLabel,
+.docusaurus-mermaid-container svg.statediagram .edgeLabel p {
+  color: var(--amex-mut) !important;
+  fill: var(--amex-mut) !important;
+  background-color: var(--amex-bg) !important;
+  font-size: 0.74rem !important;
+  letter-spacing: -0.02em !important;
+}
+.docusaurus-mermaid-container svg.statediagram .edgeLabel rect {
+  fill: var(--amex-bg) !important;
+  opacity: 0.85 !important;
+}

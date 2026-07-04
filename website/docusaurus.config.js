@@ -84,15 +84,19 @@ const config = {
       mermaid: {
         theme: {light: 'neutral', dark: 'dark'},
         options: {
+          // Colours are driven from custom.css (theme-aware); keep only layout
+          // + font here, since Mermaid options are shared across light/dark.
           fontFamily:
-            "ui-rounded, 'SF Pro Rounded', -apple-system, 'Segoe UI', Roboto, sans-serif",
+            "'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          state: {
+            useMaxWidth: true,
+            padding: 18,
+            nodeSpacing: 70,
+            rankSpacing: 80,
+          },
           themeVariables: {
-            primaryColor: '#e8f1fb',
-            primaryBorderColor: '#016fd0',
-            primaryTextColor: '#002663',
-            lineColor: '#016fd0',
-            secondaryColor: '#eaf6fc',
-            tertiaryColor: '#fbf4e2',
+            fontFamily:
+              "'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
           },
         },
       },
