@@ -3,12 +3,11 @@ node_modules/
 .pnp/
 .pnp.js
 
-# Docusaurus build output
-website/build/
-website/.docusaurus/
-website/.cache-loader/
-build/
-.docusaurus/
+# Docusaurus build output (anchored to the site root — do NOT use a bare
+# `build/`, which would also ignore the docs/build/ content section)
+/website/build/
+/website/.docusaurus/
+/website/.cache-loader/
 
 # Env / secrets
 .env

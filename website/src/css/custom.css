@@ -1,0 +1,191 @@
+/**
+ * Billpay Book — design tokens.
+ *
+ * House design system ported onto Docusaurus (Infima):
+ *   - Fonts:  Google Sans Flex (body) + Google Sans Code (mono), with robust
+ *             system fallbacks until the self-hosted woff2 files are added.
+ *   - Accent: bright pink in BOTH themes (the house signature).
+ *   - Look:   subtle-3D cards (layered shadow + hairline border), restrained bold.
+ *   - Theme:  dark is the default (set in docusaurus.config.js).
+ *
+ * Everything is a CSS custom property so pages/components never hardcode colors.
+ * Section/stage accents live under --bp-cat-* for later color-coding.
+ */
+
+/* ------------------------------------------------------------------ *
+ * Fonts
+ * Font-family stacks ship now; self-hosted Google Sans woff2 is a
+ * follow-up (see the Phase A plan). Fallbacks render cleanly meanwhile.
+ * ------------------------------------------------------------------ */
+:root {
+  --bp-font-sans: 'Google Sans Flex', system-ui, -apple-system, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+  --bp-font-mono: 'Google Sans Code', ui-monospace, 'SF Mono', SFMono-Regular,
+    Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --ifm-font-family-base: var(--bp-font-sans);
+  --ifm-font-family-monospace: var(--bp-font-mono);
+
+  --ifm-font-size-base: 17px;
+  --ifm-line-height-base: 1.7;
+  --ifm-heading-font-weight: 640;
+  --ifm-h1-font-size: 2.6rem;
+
+  /* Reading column — house style keeps prose measured. */
+  --ifm-container-width: 1180px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Accent — bright pink in both themes
+ * ------------------------------------------------------------------ */
+:root {
+  --ifm-color-primary: #cf1d6e;
+  --ifm-color-primary-dark: #bb1a63;
+  --ifm-color-primary-darker: #b0195d;
+  --ifm-color-primary-darkest: #91154d;
+  --ifm-color-primary-light: #e0287d;
+  --ifm-color-primary-lighter: #e53a88;
+  --ifm-color-primary-lightest: #ec6ca6;
+
+  --bp-accent: #cf1d6e;
+  --bp-accent-bright: #ee5d9d;
+  --bp-tint: rgba(207, 29, 110, 0.09);
+
+  --ifm-link-color: var(--ifm-color-primary);
+  --docusaurus-highlighted-code-line-bg: rgba(207, 29, 110, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #ee5d9d;
+  --ifm-color-primary-dark: #eb4890;
+  --ifm-color-primary-darker: #ea3d89;
+  --ifm-color-primary-darkest: #e51e73;
+  --ifm-color-primary-light: #f172aa;
+  --ifm-color-primary-lighter: #f37db2;
+  --ifm-color-primary-lightest: #f8abcf;
+
+  --bp-accent: #ee5d9d;
+  --bp-accent-bright: #ff7ab4;
+  --bp-tint: rgba(238, 93, 157, 0.13);
+
+  --docusaurus-highlighted-code-line-bg: rgba(238, 93, 157, 0.15);
+}
+
+/* ------------------------------------------------------------------ *
+ * Core surface tokens (backgrounds, text, lines, shadows)
+ * ------------------------------------------------------------------ */
+:root {
+  --bp-bg: #f6f7fa;
+  --bp-bg-grad: linear-gradient(165deg, #f8f9fb, #f2f4f8 60%, #f5f6f9);
+  --bp-card: linear-gradient(180deg, #ffffff, #f7f9fc);
+  --bp-txt: #22262e;
+  --bp-mut: #626b79;
+  --bp-line: #dde2ea;
+  --bp-sh: 0 8px 22px rgba(45, 55, 75, 0.1), 0 1px 2px rgba(45, 55, 75, 0.06);
+  --bp-radius-card: 13px;
+  --bp-radius-pill: 99px;
+
+  --ifm-background-color: var(--bp-bg);
+  --ifm-background-surface-color: #ffffff;
+  --ifm-heading-color: var(--bp-txt);
+  --ifm-font-color-base: var(--bp-txt);
+  --ifm-toc-border-color: var(--bp-line);
+  --ifm-hr-border-color: var(--bp-line);
+}
+
+[data-theme='dark'] {
+  --bp-bg: #0d0d0f;
+  --bp-bg-grad: radial-gradient(140% 120% at 50% 0%, #2a2a2e, #18181b 45%,
+      #0c0c0e 80%, #050506);
+  --bp-card: linear-gradient(180deg, #242426, #131315 70%, #0b0b0d);
+  --bp-txt: #f3f3f3;
+  --bp-mut: #9b9b9b;
+  --bp-line: #2c2c30;
+  --bp-sh: 0 10px 26px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+
+  --ifm-background-color: var(--bp-bg);
+  --ifm-background-surface-color: #141416;
+  --ifm-heading-color: var(--bp-txt);
+  --ifm-font-color-base: var(--bp-txt);
+}
+
+/* Atmospheric page background (house "subtle-3D rich" backdrop). */
+html,
+body {
+  background: var(--bp-bg-grad);
+  background-attachment: fixed;
+}
+
+/* ------------------------------------------------------------------ *
+ * Per-category / per-stage accents (light / dark pairs)
+ * Use via --bp-cat-* for section color-coding and stage roadmaps.
+ * ------------------------------------------------------------------ */
+:root {
+  --bp-cat-coral: #b13a2e;
+  --bp-cat-amber: #9a7410;
+  --bp-cat-green: #2e7d4a;
+  --bp-cat-blue: #3a63a8;
+}
+
+[data-theme='dark'] {
+  --bp-cat-coral: #e06a5c;
+  --bp-cat-amber: #d9aa3c;
+  --bp-cat-green: #5cb377;
+  --bp-cat-blue: #6c98dd;
+}
+
+/* ------------------------------------------------------------------ *
+ * Mermaid — state-machine semantic colors, wired to tokens so the
+ * state/sequence diagrams authored later read consistently.
+ *   intermediate = violet · terminal-success = green · terminal-failure
+ *   = rose · choice = amber
+ * ------------------------------------------------------------------ */
+:root {
+  --bp-state-intermediate: #8b5cf6;
+  --bp-state-success: var(--bp-cat-green);
+  --bp-state-failure: #e11d48;
+  --bp-state-choice: var(--bp-cat-amber);
+}
+
+[data-theme='dark'] {
+  --bp-state-intermediate: #a78bfa;
+  --bp-state-failure: #fb7185;
+}
+
+/* ------------------------------------------------------------------ *
+ * Component polish — subtle-3D cards, restrained bold, hairline rules
+ * ------------------------------------------------------------------ */
+
+/* Google Sans renders heavy — hold a sensible floor for strong text. */
+b,
+strong {
+  font-weight: 600;
+}
+
+/* Cards (feature cards, admonitions) get the layered-shadow treatment. */
+.card {
+  background: var(--bp-card);
+  border: 1px solid var(--bp-line);
+  border-radius: var(--bp-radius-card);
+  box-shadow: var(--bp-sh);
+}
+
+.badge,
+.pill {
+  border-radius: var(--bp-radius-pill);
+}
+
+/* Sidebar / navbar hairlines follow the token line color. */
+.navbar {
+  border-bottom: 1px solid var(--bp-line);
+}
+.menu {
+  border-right: 1px solid transparent;
+}
+
+/* Inline code + code blocks pick up the accent tint subtly. */
+:not(pre) > code {
+  background: var(--bp-tint);
+  border: 1px solid var(--bp-line);
+  border-radius: 6px;
+}

@@ -1,0 +1,61 @@
+.hero {
+  background: transparent;
+  padding: 5rem 0 3rem;
+  text-align: center;
+}
+
+.heroTitle {
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  color: var(--bp-txt);
+}
+
+.heroTagline {
+  font-size: 1.2rem;
+  color: var(--bp-mut);
+  max-width: 720px;
+  margin: 0 auto 2rem;
+}
+
+.heroActions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+  padding: 1rem 0 5rem;
+}
+
+.sectionCard {
+  display: block;
+  padding: 1.4rem 1.5rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.sectionCard:hover {
+  transform: translateY(-3px);
+  text-decoration: none;
+  color: inherit;
+}
+
+.cardTitle {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 620;
+  color: var(--bp-accent);
+}
+
+.cardBlurb {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--bp-mut);
+  line-height: 1.5;
+}

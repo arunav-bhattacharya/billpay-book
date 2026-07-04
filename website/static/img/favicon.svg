@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Billpay">
+  <defs>
+    <linearGradient id="bp-g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#18b6f6"/>
+      <stop offset="100%" stop-color="#00308f"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded card-shaped background, evoking a payment card -->
+  <rect x="0" y="0" width="64" height="64" rx="12" fill="url(#bp-g)"/>
+  <!-- chunky 'B' optimised for 16px legibility -->
+  <path d="M14 12 H38 c6.5 0 11.5 4 11.5 10 c0 3.7-2.1 6.3-4.9 7.6 c4.3 1.1 7 4.2 7 8.7 c0 6.3-5.2 10.7-12.5 10.7 H14 V12 z" fill="#fff"/>
+  <path d="M22 18 v8.4 h13 c2.7 0 4.3-1.6 4.3-4.2 c0-2.6-1.6-4.2-4.3-4.2 H22 z M22 33.4 v9 h14 c3.1 0 5-1.7 5-4.5 c0-2.8-1.9-4.5-5-4.5 H22 z" fill="url(#bp-g)"/>
+  <!-- subtle payment-flow accent: small arrow / chevron at lower-right -->
+  <path d="M50 52 L58 52 L54 56 Z" fill="#fff" opacity="0.75"/>
+</svg>
