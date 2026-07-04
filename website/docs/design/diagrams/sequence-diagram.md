@@ -35,12 +35,12 @@ validation declines and notifies (`PaymentDeclinedNotificationActivityGroup`).
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
     participant ODF as CreatePayment.v3
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as POST /payments
     participant R as Billpay Router
     participant WF as Immediate WF
@@ -56,19 +56,19 @@ sequenceDiagram
   API->>R: route(date=today, single)
   R->>WF: invoke(workflow-key)
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over WF,PDN: Online · Immediate WF — validates inline, accepts or declines
     WF->>IDEMP: check idempotency
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       IDEMP-->>WF: state → PENDING
     end
     WF->>PVAL: validate
     alt validation passes
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVAL-->>WF: state → ACCEPTED
       end
     else validation fails
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVAL-->>WF: state → DECLINED
       end
       WF->>PDN: notify decline
@@ -80,14 +80,14 @@ sequenceDiagram
   API-->>ODF: 201 Created
   ODF-->>C: payment-id, status
 
-  rect rgba(224,150,40,0.16)
+  rect rgba(235,160,35,0.22)
     Note over WF,PFL: Online · Immediate WF — async execution and fulfillment run only on ACCEPTED
     WF->>PEX: execute
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       PEX-->>WF: state → PROCESSING
     end
     WF->>PFL: fulfill
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       PFL-->>WF: state → PROCESSED
     end
   end
@@ -107,11 +107,11 @@ Scheduled Payment Executor drains `SCHEDULED` payments into
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as POST /payments
     participant R as Billpay Router
     participant CSP as Schedule WF
@@ -131,20 +131,20 @@ sequenceDiagram
   API->>R: route(date=future)
   R->>CSP: invoke(workflow-key)
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over CSP,PDN: Online · Schedule WF — validates the schedule, schedules or declines
     CSP->>IDEMP: check idempotency
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       IDEMP-->>CSP: state → PENDING
     end
     CSP->>PVS: validate schedule
     alt validation passes
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVS-->>CSP: state → SCHEDULED
       end
       CSP->>PSN: notify scheduled
     else validation fails
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVS-->>CSP: state → DECLINED
       end
       CSP->>PDN: notify decline
@@ -156,24 +156,24 @@ sequenceDiagram
 
   Note over SCH,ESP: On payment date · Sched. Executor fires (2,500/min) — only SCHEDULED
 
-  rect rgba(224,150,40,0.16)
+  rect rgba(235,160,35,0.22)
     Note over SCH,PFL: Offline · Exec Scheduled WF — re-validates, executes and fulfills or declines
     SCH->>ESP: pick up SCHEDULED payments (batches of 2,500/min)
     ESP->>PVX: validate
     alt validation passes
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVX-->>ESP: state → ACCEPTED
       end
       ESP->>PEX: execute
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PEX-->>ESP: state → PROCESSING
       end
       ESP->>PFL: fulfill
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PFL-->>ESP: state → PROCESSED
       end
     else validation fails
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVX-->>ESP: state → DECLINED
       end
       ESP->>PDNE: notify decline on execution
@@ -198,11 +198,11 @@ sequenceDiagram
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as POST /payments
     participant R as Billpay Router
     participant CIP as Immediate WF
@@ -222,19 +222,19 @@ sequenceDiagram
   API->>R: route(date=today, corporate)
   R->>CIP: invoke
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over CIP,PDN: Online · Immediate WF — validates inline, accepts or declines
     CIP->>IDEMP: check idempotency
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       IDEMP-->>CIP: state → PENDING
     end
     CIP->>PVAL: validate
     alt validation passes
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVAL-->>CIP: state → ACCEPTED
       end
     else validation fails
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVAL-->>CIP: state → DECLINED
       end
       CIP->>PDN: notify decline
@@ -245,32 +245,32 @@ sequenceDiagram
   CIP-->>API: success (payment-id, ACCEPTED or DECLINED)
   API-->>C: 201 Created
 
-  rect rgba(224,150,40,0.16)
+  rect rgba(235,160,35,0.22)
     Note over CIP,PFL: Async — corporate allocations fetched, then per-split execution runs in waves
 
-    rect rgba(0,111,207,0.15)
+    rect rgba(1,111,208,0.2)
       Note over GPA,PSC: Offline · Allocations WF — fetches the split breakdown
       CIP->>GPA: trigger allocations workflow
       GPA->>ARQ: request allocations
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         ARQ-->>GPA: state → ALLOCATING
       end
       GPA->>ARC: process allocations payload
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         ARC-->>GPA: state → ALLOCATED
       end
       GPA->>PSC: create payment splits
     end
 
-    rect rgba(0,111,207,0.15)
+    rect rgba(1,111,208,0.2)
       Note over ESP,PFL: Offline · Split WF — drained by Allocations Sched.
       GPA->>ESP: trigger split execution
       ESP->>PEX: execute split
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PEX-->>ESP: state → PROCESSING
       end
       ESP->>PFL: fulfill split
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PFL-->>ESP: state → PROCESSED
       end
     end
@@ -289,11 +289,11 @@ the date arrives, `ExecuteScheduledPaymentWF` re-validates
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as POST /payments
     participant R as Billpay Router
     participant CSP as Schedule WF
@@ -317,19 +317,19 @@ sequenceDiagram
   API->>R: route(date=future, corporate)
   R->>CSP: invoke
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over CSP,PDN: Online · Schedule WF — validates the schedule, schedules or declines
     CSP->>IDEMP: check idempotency
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       IDEMP-->>CSP: state → PENDING
     end
     CSP->>PVS: validate schedule
     alt validation passes
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVS-->>CSP: state → SCHEDULED
       end
     else validation fails
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PVS-->>CSP: state → DECLINED
       end
       CSP->>PDN: notify decline
@@ -339,18 +339,18 @@ sequenceDiagram
   CSP-->>API: SCHEDULED or DECLINED
   API-->>C: 201 Created (status)
 
-  rect rgba(224,150,40,0.16)
+  rect rgba(235,160,35,0.22)
     Note over CSP,PSC: Async (today) — allocations fetched up front, ready on payment date
 
-    rect rgba(0,111,207,0.15)
+    rect rgba(1,111,208,0.2)
       Note over GPA,PSC: Offline · Allocations WF — fetches the split breakdown
       CSP->>GPA: trigger allocations workflow
       GPA->>ARQ: request allocations
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         ARQ-->>GPA: state → ALLOCATING
       end
       GPA->>ARC: process allocations payload
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         ARC-->>GPA: state → ALLOCATED
       end
       GPA->>PSC: create payment splits
@@ -359,34 +359,34 @@ sequenceDiagram
 
   Note over SCH,ESPS: On payment date · Sched. Executor fires (2,500/min)
 
-  rect rgba(224,150,40,0.16)
+  rect rgba(235,160,35,0.22)
     Note over SCH,PFL: Offline chain — re-validate, then execute and fulfill each split
 
-    rect rgba(0,111,207,0.15)
+    rect rgba(1,111,208,0.2)
       Note over SCH,PDNE: Offline · Exec Scheduled WF — re-validates, accepts or declines
       SCH->>ESPS: pick up ALLOCATED payments
       ESPS->>PVX: validate
       alt validation passes
-        rect rgba(124,92,246,0.2)
+        rect rgba(150,75,232,0.28)
           PVX-->>ESPS: state → ACCEPTED
         end
       else validation fails
-        rect rgba(124,92,246,0.2)
+        rect rgba(150,75,232,0.28)
           PVX-->>ESPS: state → DECLINED
         end
         ESPS->>PDNE: notify decline on execution
       end
     end
 
-    rect rgba(0,111,207,0.15)
+    rect rgba(1,111,208,0.2)
       Note over ESP,PFL: Offline · Split WF — only on ACCEPTED, drained by Allocations Sched.
       ESPS->>ESP: trigger split execution
       ESP->>PEX: execute split
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PEX-->>ESP: state → PROCESSING
       end
       ESP->>PFL: fulfill split
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PFL-->>ESP: state → PROCESSED
       end
     end
@@ -406,11 +406,11 @@ the audit trail (`MapNewPaymentIdToPreviousIdActivity`).
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as PUT /payments/:id
     participant U as Update WF
     participant IDEMP as Idempotency
@@ -424,10 +424,10 @@ sequenceDiagram
   C->>API: PUT /payments/:id
   API->>U: invoke
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over U,MAP: Online · Update WF — cancels original, creates replacement, maps old → new
     U->>IDEMP: check idempotency
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       IDEMP-->>U: state → PENDING
     end
 
@@ -435,7 +435,7 @@ sequenceDiagram
       U->>CAN: cancel original
       CAN->>PCV: validate cancel
       CAN->>PCN: cancel
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PCN-->>CAN: state → CANCELLED
       end
       CAN-->>U: cancelled
@@ -443,7 +443,7 @@ sequenceDiagram
 
     rect rgba(0,111,207,0.18)
       U->>CSP: create replacement
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         CSP-->>U: new payment-id (state → SCHEDULED or DECLINED)
       end
     end
@@ -466,11 +466,11 @@ sequenceDiagram
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as DELETE /payments/:id
     participant CWF as Cancel WF
     participant IDEMP as Idempotency
@@ -481,13 +481,13 @@ sequenceDiagram
   C->>API: DELETE /payments/:id
   API->>CWF: invoke
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over CWF,PCN: Online · Cancel WF — checks eligibility, transitions to CANCELLED
     CWF->>IDEMP: check idempotency
     CWF->>PCV: validate cancel
     alt eligible
       CWF->>PCN: cancel
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PCN-->>CWF: state → CANCELLED
       end
       CWF-->>API: CANCELLED
@@ -514,7 +514,7 @@ invalid return is notified and the payment keeps its state.
 sequenceDiagram
   autonumber
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant MMH as MM Handler
     participant API as POST /payments/returns
     participant PR as Returned WF
@@ -531,19 +531,19 @@ sequenceDiagram
   MMH->>API: POST /payments/returns
   API->>PR: invoke
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over PR,PRC: Offline · Returned WF — handles return, then checks representment eligibility
     PR->>IDEMP: check idempotency
     PR->>PRV: validate return
     alt valid return
       PR->>PRX: execute return
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PRX-->>PR: state → RETURNED
       end
       PR->>PRE: check representment eligibility
       alt representable
         PR->>PRC: create representment
-        rect rgba(124,92,246,0.2)
+        rect rgba(150,75,232,0.28)
           PRC-->>PR: state → REPRESENTING
         end
         PR->>PRP: hand off to ProcessRepresentmentWF
@@ -570,7 +570,7 @@ otherwise it falls to `DECLINED`.
 sequenceDiagram
   autonumber
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant PR as Returned WF
     participant PRP as Representment WF
     participant PRRV as Repr. Validate
@@ -579,16 +579,16 @@ sequenceDiagram
 
   PR->>PRP: hand off (state = REPRESENTING)
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over PRP,PRRX: Offline · Representment WF — re-clears a returned transaction on the representment day
     PRP->>PRRV: validate representment
     alt valid representment
       PRP->>PRRX: execute representment
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PRRX-->>PRP: state → REPRESENTED
       end
     else invalid representment
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         Note over PRP: state → DECLINED
       end
     end
@@ -609,7 +609,7 @@ payment to `DISALLOWED` (`PendingToDisallowedStage`).
 sequenceDiagram
   autonumber
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant UPH as Inbound Handler
     participant API as POST /payments/inbound
     participant IB as Inbound WF
@@ -625,27 +625,27 @@ sequenceDiagram
   UPH->>API: POST /payments/inbound
   API->>IB: invoke
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over IB,PRJ: Offline · Inbound WF — posts an upstream-originated payment into Billpay
     IB->>IDEMP: check idempotency
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       IDEMP-->>IB: state → PENDING
     end
     IB->>PVP: validate posting
     alt accepted (Full)
       IB->>PPS: post
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PPS-->>IB: state → PROCESSING
       end
       IB->>PFL: fulfill
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PFL-->>IB: state → PROCESSED
       end
     else accepted (Split, Consumer)
       IB->>PSC: create splits, trigger ExecuteSplitPaymentWF
     else not accepted
       IB->>PRJ: disallow
-      rect rgba(124,92,246,0.2)
+      rect rgba(150,75,232,0.28)
         PRJ-->>IB: state → DISALLOWED
       end
     end
@@ -663,7 +663,7 @@ moves to `PAID`.
 sequenceDiagram
   autonumber
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant PPH as Posted Handler
     participant MMH as MM Handler
     participant TRK as Events Tracker
@@ -679,12 +679,12 @@ sequenceDiagram
     MMH->>TRK: insert Settled row
   end
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over SCH,PEP: Offline · Paid Events WF — closes the payment to PAID once both events arrive
     SCH->>PEP: tick (continuous batch)
     PEP->>TRK: find pairs (AR-Posted + Settled)
     PEP->>TRK: mark Picked-up-for-processing
-    rect rgba(124,92,246,0.2)
+    rect rgba(150,75,232,0.28)
       Note over PEP: state → PAID (insert lifecycle event, update status, publish PAID lifecycle event)
     end
   end
@@ -701,13 +701,13 @@ alert.
 sequenceDiagram
   autonumber
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant SCH as Missing Paid Sched.
     participant MPE as Missing Paid WF
     participant TRK as Events Tracker
   end
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over SCH,TRK: Offline · Missing Paid WF — hourly probe for AR-Posted or Settled missing over 48h
     SCH->>MPE: tick (hourly / configurable)
     MPE->>TRK: find payments missing AR-Posted or Settled > 48h
@@ -742,12 +742,12 @@ autopay.
 sequenceDiagram
   autonumber
 
-  box rgba(100,116,139,0.1) Caller
+  box rgba(120,132,152,0.16) Caller
     participant C as Client
     participant ODF as CreatePaymentInstallment.v1
   end
 
-  box rgba(0,111,207,0.08) Billpay Platform
+  box rgba(1,111,208,0.1) Billpay Platform
     participant API as POST /paymentInstallments
     participant CWF as Installment WF
     participant CIP as Immediate WF
@@ -757,13 +757,13 @@ sequenceDiagram
   ODF->>API: POST /paymentInstallments
   API->>CWF: invoke composite
 
-  rect rgba(0,111,207,0.15)
+  rect rgba(1,111,208,0.2)
     Note over CWF,CIP: Online · Installment WF — composite: payment + installment plan + optional autopay
 
     rect rgba(0,111,207,0.18)
       CWF->>CIP: invoke CreateImmediatePaymentWF
       alt inner payment ACCEPTED
-        rect rgba(124,92,246,0.2)
+        rect rgba(150,75,232,0.28)
           CIP-->>CWF: payment-id (state → ACCEPTED)
         end
         Note over CWF: call Installments API to create installment plan, receive installment-id
@@ -771,7 +771,7 @@ sequenceDiagram
           Note over CWF: call Autopay API to update autopay
         end
       else inner payment DECLINED
-        rect rgba(124,92,246,0.2)
+        rect rgba(150,75,232,0.28)
           CIP-->>CWF: payment-id (state → DECLINED)
         end
         Note over CWF: composite short-circuits — no installment plan created, no autopay

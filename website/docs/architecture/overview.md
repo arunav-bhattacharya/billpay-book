@@ -77,7 +77,7 @@ import LayerStack from '@site/src/components/LayerStack';
       loop: true,
       title: 'Event Handlers & Schedules',
       role: 'Async outcomes and periodic sweeps loop back into workflows',
-      accent: '#016fd0',
+      accent: '#0e7c86',
       items: ['Money movement', 'AR posting', 'OTB updates', 'Periodic sweeps'],
     },
   ]}

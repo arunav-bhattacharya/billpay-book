@@ -579,33 +579,33 @@ table thead tr {
  * mermaid source. These classes are sequence-only, so state diagrams are
  * untouched.
  * ==================================================================== */
-/* Participant (actor) boxes — Amex-blue tinted with a navy border. */
+/* Participant (actor) boxes — bold, bright Amex-blue with white labels. */
 .docusaurus-mermaid-container rect.actor {
-  fill: color-mix(in srgb, var(--amex-state-intermediate) 16%, var(--amex-panel)) !important;
-  stroke: var(--amex-state-intermediate) !important;
-  stroke-width: 1.2px !important;
+  fill: #016fd0 !important;
+  stroke: #01488f !important;
+  stroke-width: 1px !important;
   rx: 6px !important;
   ry: 6px !important;
 }
 .docusaurus-mermaid-container text.actor,
 .docusaurus-mermaid-container text.actor > tspan {
-  fill: var(--amex-txt-strong) !important;
+  fill: #ffffff !important;
   font-weight: 600 !important;
 }
 /* Lifelines. */
 .docusaurus-mermaid-container .actor-line {
-  stroke: color-mix(in srgb, var(--amex-state-intermediate) 42%, transparent) !important;
+  stroke: color-mix(in srgb, #016fd0 45%, transparent) !important;
 }
-/* Notes — a solid callout that reads on any background, with a gold border. */
+/* Notes — bright amber callouts with dark text, distinct from the blue. */
 .docusaurus-mermaid-container rect.note {
-  fill: var(--amex-panel) !important;
-  stroke: color-mix(in srgb, var(--amex-state-choice) 60%, transparent) !important;
+  fill: #f5cf7a !important;
+  stroke: #b9820f !important;
 }
 .docusaurus-mermaid-container text.noteText,
 .docusaurus-mermaid-container text.noteText > tspan {
-  fill: var(--amex-txt-strong) !important;
+  fill: #3a2c08 !important;
 }
-/* Message labels. */
+/* Message labels stay readable per theme. */
 .docusaurus-mermaid-container text.messageText {
   fill: var(--amex-txt) !important;
 }

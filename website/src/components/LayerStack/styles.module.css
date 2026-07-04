@@ -2,6 +2,15 @@
   margin: 1.6rem 0 2.4rem;
   display: flex;
   flex-direction: column;
+  /* Single-hue box ramp — lightest at the top layer, deepest at the bottom. */
+  --ly-top: #eef3fc;
+  --ly-bottom: #aec3e8;
+  --ly-border: #cbd7ee;
+}
+:global([data-theme='dark']) .map {
+  --ly-top: #1d4278;
+  --ly-bottom: #0a1a38;
+  --ly-border: #23446f;
 }
 
 /* ---- a layer band ---- */
@@ -12,16 +21,13 @@
   gap: 0.95rem;
   align-items: center;
   padding: 0.95rem 1.15rem;
-  border: 1px solid #dbe3f0;
+  border: 1px solid var(--ly-border);
   border-radius: 15px;
-  /* Raised surface — deliberately cooler/darker than the page so boxes stand out. */
-  background: linear-gradient(162deg, #f1f4fb 0%, #e7edf7 100%);
+  /* Depth ramp: --ly-depth runs 0% (top) → 100% (bottom), mixing toward the
+     deepest shade. One rule serves both themes via the --ly-* tokens. */
+  background: color-mix(in srgb, var(--ly-bottom) var(--ly-depth, 0%), var(--ly-top));
   box-shadow: var(--amex-sh-sm);
   overflow: hidden;
-}
-:global([data-theme='dark']) .layer {
-  border-color: #294a80;
-  background: linear-gradient(162deg, #193c73 0%, #102a54 100%);
 }
 
 /* gradient accent rail down the left edge */
@@ -140,9 +146,15 @@
   line-height: 1;
 }
 
-/* the async return band reads as an aside — dashed border keeps it distinct */
+/* the async return band reads as an aside — its own colour + dashed border */
 .layerLoop {
   border-style: dashed;
+  border-color: #b7dbd8;
+  background: linear-gradient(162deg, #e6f3f1 0%, #d6ebe8 100%);
+}
+:global([data-theme='dark']) .layerLoop {
+  border-color: #1c5a62;
+  background: linear-gradient(162deg, #0e3038 0%, #0a2329 100%);
 }
 
 @media (max-width: 560px) {
