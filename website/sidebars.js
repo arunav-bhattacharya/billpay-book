@@ -47,10 +47,11 @@ const sidebars = {
           items: [
             'design/workflows/core',
             'design/workflows/composite',
-            'design/workflows/scheduled',
-            'design/workflows/event-handlers',
+            'design/workflows/periodic',
           ],
         },
+        'design/stages',
+        'design/activities',
         'design/database',
         {
           type: 'category',
