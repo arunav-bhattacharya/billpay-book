@@ -168,6 +168,6 @@ Notice the pending→accepted edge *demands* the verified pieces as arguments �
 
 A [stage](../principles/core-build/stages.md) is essentially one of these functions plus the persistence and event publication around it — which is why stage signatures are so clean.
 
-:::note Still to be modelled
+:::note[Still to be modelled]
 No types yet for `DISALLOWED`, `ALLOCATING`, or `ALLOCATED`; no first-class Allocation entity (splits + `SplitSlice` carry that today); the processing dimensions ride in the routing context, not on these types. The [spec's state model](../../design/payment-state-model.md) remains the target picture.
 :::

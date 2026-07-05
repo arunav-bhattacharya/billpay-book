@@ -39,7 +39,7 @@ Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete
 - **[Instruments](./instruments.md)** — bank accounts, debit cards, and loyalty as funding instruments, with the international identification schemas.
 - **[Database](./database.md)** — the Oracle tables underneath, and how the model maps onto them.
 
-:::note Still to be modelled
+:::note[Still to be modelled]
 The code doesn't yet cover everything the [spec's state model](../../design/payment-state-model.md) defines. Known gaps, tracked deliberately rather than papered over:
 
 - No payment types for **`DISALLOWED`** (inbound), or corporate **`ALLOCATING`** / **`ALLOCATED`**.

@@ -56,6 +56,6 @@ The `RegulatedInstrument` split matters for compliance: anything that touches re
 
 **`LoyaltyInstrument`** — the contract instrument: an enrollment id and nothing else, because the loyalty program owns the balance.
 
-:::warning Two different "account types"
+:::warning[Two different "account types"]
 `FIAccountType` here describes the **funding bank account** — savings vs checking. It is *not* the `accountType` **dimension** (`CONSUMER` / `CORPORATE` / `SMALL_BUSINESS`) that routes processing, which lives on the Amex `Account`, not on the instrument. Conflating them is the easiest mistake to make in this part of the codebase.
 :::
