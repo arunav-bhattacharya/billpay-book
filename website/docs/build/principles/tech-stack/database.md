@@ -29,7 +29,7 @@ import Lead from '@site/src/components/Lead';
 
 ## How we use it
 
-One logical schema for billpay-core, with separate read-write and read-only users. Connection pooling is [Agroal](./datasource.md), tuned differently for the Online and Offline workers. Schema migrations are version-controlled and run through the standard Amex DB pipeline — never by hand, never by the ORM. And application code reaches Oracle exclusively through [Exposed](./orm.md); there is no raw JDBC in stages, activities, or anywhere else.
+One logical schema for billpay-core, with separate read-write and read-only users. Connection pooling is [Agroal](./datasource.md). Schema migrations are version-controlled and run through the standard Amex DB pipeline — never by hand, never by the ORM. And application code reaches Oracle exclusively through [Exposed](./orm.md); there is no raw JDBC in stages, activities, or anywhere else.
 
 :::tip
 Reporting and analytics belong on a read replica or a downstream warehouse. If a dashboard query is hitting the primary, that's a bug — file it.
