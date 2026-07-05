@@ -7,7 +7,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Vision
 
-<Lead>American Express's platform for credit-card **bill payments and refunds** — one core that processes every payment the same way across markets, while absorbing how markets, account types, and processing rules differ.</Lead>
+<Lead>American Express's platform for credit card **bill payments and refunds** — one core that processes every payment the same way across markets, while absorbing how markets, account types, and processing rules differ.</Lead>
 
 ## The Big Picture
 
