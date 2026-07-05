@@ -574,38 +574,183 @@ table thead tr {
 }
 
 /* ==================================================================== *
- * 15. Sequence diagrams — Amex-branded participants, notes, and messages.
- * Theme-aware via tokens; the box/rect background zones stay inline in the
- * mermaid source. These classes are sequence-only, so state diagrams are
+ * 15. Sequence diagrams — Amex-branded, theme-aware.
+ *
+ * The mermaid source carries light-tuned rgba() "sentinel" fills on its
+ * box / rect regions; every role uses a unique RGB triple, so dark mode
+ * re-tints each role here via [fill^=...] attribute selectors (CSS wins
+ * over SVG presentation attributes; !important wins over mermaid's own
+ * injected #id-scoped stylesheet). Everything else — actors, lifelines,
+ * notes, alt/opt frames, message lines, autonumber badges — is styled
+ * below. Selectors are scoped to the sequence svg so state diagrams are
  * untouched.
  * ==================================================================== */
-/* Participant (actor) boxes — bold, bright Amex-blue with white labels. */
-.docusaurus-mermaid-container rect.actor {
+:root {
+  --seq-ink: rgba(11, 27, 52, 0.6); /* message lines + arrowheads */
+}
+[data-theme='dark'] {
+  --seq-ink: #a6c6ec;
+}
+
+/* Participant (actor) boxes — solid Amex Blue Box, white labels. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.actor {
   fill: #016fd0 !important;
   stroke: #01488f !important;
   stroke-width: 1px !important;
-  rx: 6px !important;
-  ry: 6px !important;
+  rx: 8px !important;
+  ry: 8px !important;
 }
-.docusaurus-mermaid-container text.actor,
-.docusaurus-mermaid-container text.actor > tspan {
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.actor {
+  fill: #1670bc !important;
+  stroke: #4da3e6 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.actor,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.actor > tspan {
   fill: #ffffff !important;
   font-weight: 600 !important;
 }
-/* Lifelines. */
-.docusaurus-mermaid-container .actor-line {
-  stroke: color-mix(in srgb, #016fd0 45%, transparent) !important;
+/* Lifelines — faint blue threads. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .actor-line {
+  stroke: color-mix(in srgb, #016fd0 40%, transparent) !important;
 }
-/* Notes — bright amber callouts with dark text, distinct from the blue. */
-.docusaurus-mermaid-container rect.note {
-  fill: #f5cf7a !important;
-  stroke: #b9820f !important;
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .actor-line {
+  stroke: color-mix(in srgb, #4da3e6 40%, transparent) !important;
 }
-.docusaurus-mermaid-container text.noteText,
-.docusaurus-mermaid-container text.noteText > tspan {
+
+/* Notes — gold callouts, re-inked per theme (no more glare in dark). */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
+  fill: #f7e3ab !important;
+  stroke: #c69214 !important;
+  stroke-width: 1px !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText > tspan {
   fill: #3a2c08 !important;
 }
-/* Message labels stay readable per theme. */
-.docusaurus-mermaid-container text.messageText {
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
+  fill: #33290f !important;
+  stroke: #9c7a24 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText,
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText > tspan {
+  fill: #f0deac !important;
+}
+
+/* alt / opt / loop frames — blue label pentagon, dashed hairline frame. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelBox {
+  fill: #016fd0 !important;
+  stroke: #01488f !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelBox {
+  fill: #1670bc !important;
+  stroke: #4da3e6 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelText,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelText > tspan {
+  fill: #ffffff !important;
+  font-weight: 600 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopLine {
+  stroke: color-mix(in srgb, #016fd0 45%, transparent) !important;
+  stroke-dasharray: 3, 3 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopLine {
+  stroke: color-mix(in srgb, #4da3e6 45%, transparent) !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText > tspan {
+  fill: var(--amex-mut) !important;
+}
+
+/* Messages — theme ink for lines, arrowheads, and labels. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .messageLine0,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .messageLine1 {
+  stroke: var(--seq-ink) !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.messageText {
   fill: var(--amex-txt) !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] marker path {
+  fill: var(--seq-ink) !important;
+  stroke: var(--seq-ink) !important;
+}
+/* Autonumber badges — Amex-blue disc, white numeral. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] marker circle {
+  fill: #016fd0 !important;
+  stroke: none !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.sequenceNumber {
+  fill: #ffffff !important;
+}
+
+/* --- Region-rect sentinel re-tints (dark) + chip chrome (both themes) ---
+ * Sentinel key (unique RGB triples, source values tuned for light):
+ *   111,124,143 caller box      | 1,111,208  platform box
+ *   1,91,179    workflow span   | 0,163,224  nested sub-workflow span
+ *   198,146,20  async span      | 148,163,184 event-ingestion strip
+ *   47,125,84   chip: success   | 192,57,43  chip: failure
+ *   52,81,158   chip: in-flight
+ */
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(111,124,143'] {
+  fill: rgba(147, 163, 187, 0.14) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  fill: rgba(77, 163, 230, 0.08) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  fill: rgba(1, 111, 208, 0.17) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  fill: rgba(0, 163, 224, 0.13) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  fill: rgba(224, 179, 78, 0.13) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(148,163,184'] {
+  fill: rgba(148, 163, 184, 0.07) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(47,125,84'] {
+  fill: rgba(87, 180, 131, 0.2) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(192,57,43'] {
+  fill: rgba(226, 104, 92, 0.17) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
+  fill: rgba(123, 147, 222, 0.18) !important;
+}
+
+/* State-transition chips read as rounded, hairline-stroked pills. */
+.docusaurus-mermaid-container rect[fill^='rgba(47,125,84'],
+.docusaurus-mermaid-container rect[fill^='rgba(192,57,43'],
+.docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
+  rx: 6px !important;
+  ry: 6px !important;
+  stroke-width: 1px !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(47,125,84'] {
+  stroke: rgba(47, 125, 84, 0.5) !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(192,57,43'] {
+  stroke: rgba(192, 57, 43, 0.45) !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
+  stroke: rgba(52, 81, 158, 0.45) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(47,125,84'] {
+  stroke: rgba(87, 180, 131, 0.55) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(192,57,43'] {
+  stroke: rgba(226, 104, 92, 0.5) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
+  stroke: rgba(123, 147, 222, 0.5) !important;
+}
+
+/* Workflow / async / group regions get soft rounded corners. */
+.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'],
+.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'],
+.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'],
+.docusaurus-mermaid-container rect[fill^='rgba(148,163,184'] {
+  rx: 8px !important;
+  ry: 8px !important;
 }
