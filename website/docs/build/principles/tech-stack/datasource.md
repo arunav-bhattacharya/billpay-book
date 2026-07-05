@@ -22,11 +22,3 @@ import Lead from '@site/src/components/Lead';
 | **Indifferent to the ORM** | It's a plain `javax.sql.DataSource`, so [Exposed](./orm.md) neither knows nor cares which pool sits underneath. |
 
 **Runner-up:** HikariCP. Excellent, battle-tested, and it was close — Agroal won on richer instrumentation and cleaner integration with our metrics stack, not because Hikari is deficient. C3P0 and the DBCP family lost on age and noisy behaviour under load; "no pool" was never an option with Oracle connection costs.
-
-## Sizing
-
-The worker app runs one pool, serving both worker pools' activities and the API request path. The rule that matters: the sum of max connections across every instance must stay comfortably under the Oracle session limit — the Oracle ration is the binding constraint, not Agroal.
-
-:::tip
-An acquisition-timeout exception almost always means a slow downstream query is hogging connections — not an undersized pool. Find the query before you touch the pool size.
-:::
