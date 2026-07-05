@@ -7,16 +7,26 @@ import Lead from '@site/src/components/Lead';
 
 # Schedules
 
-<Lead>The periodic workflows are driven by **Temporal Schedules** — each registered with the cluster and firing its workflow in waves on the Offline worker.</Lead>
+<Lead>The periodic workflows don't run on cron jobs bolted to a host — they run on <strong>Temporal Schedules</strong>, registered with the cluster and durable like everything else. If the worker fleet restarts, the schedules don't care.</Lead>
 
-| Schedule | Triggers |
-| --- | --- |
-| Schedule Payment Executor | `ExecuteScheduledPaymentWF` — scheduled payments due to run. |
-| Corporate Allocations Processor | `ExecuteSplitPaymentWF` — corporate allocations ready to process. |
-| Paid Events Processor | `PaidEventsProcessingWF` — close payments out to `PAID` once both settlement events have arrived. |
-| Missing Paid Events Processor | `MissingPaidEventsProcessingWF` — recover or flag payments missing a settlement or AR-posted event. |
-| Data Purge | `DataPurgingWF` — purge older records from the transactional tables. |
+## Schedule → workflow
 
-Each executor picks work up in batches — for example, 2,500 scheduled payments a minute, then the next 2,500 a minute later. A **Scheduled Representments Executor** — driving representment execution in the same batched way — is described alongside these in the spec but is not yet in the schedule table; it belongs in the same set.
+All of these fire on the **Offline worker** — nothing here has a user waiting:
 
-See [Design → Periodic Workflows](../design/workflows/periodic.md) for what each workflow does.
+| Schedule | Triggers | What it drives |
+| --- | --- | --- |
+| Schedule Payment Executor | `ExecuteScheduledPaymentWF` | Scheduled payments whose run date has arrived. |
+| Corporate Allocations Processor | `ExecuteSplitPaymentWF` | Corporate allocation legs ready to process. |
+| Paid Events Processor | `PaidEventsProcessingWF` | Closes payments to `PAID` once **both** the settlement and AR-posted events are in the tracker. |
+| Missing Paid Events Processor | `MissingPaidEventsProcessingWF` | Payments still missing a settlement or AR-posted event after 48 hours — recover the event from the owning system, or raise an alert. |
+| Data Purge | `DataPurgingWF` | Retires old rows from the transactional tables — by dropping date partitions, per the [database conventions](./data-model/database.md). |
+
+The spec also describes a **Scheduled Representments Executor** — batching returned payments due for re-presentment the same way — that hasn't been added to its schedule table yet. Treat it as the sixth member of this set.
+
+## The batching rhythm
+
+Executors work in waves rather than draining everything at once: pick up **2,500 items, spread over the next minute, then the next 2,500 a minute later**. The cadence is deliberate — it turns a morning spike of due payments into a flat, predictable load on the Offline worker and every downstream system behind it, and it means a stuck batch delays the next wave rather than swallowing the whole backlog.
+
+## Build-time wiring
+
+Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys — which makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. What each periodic workflow actually does, step by step, is in [Design → Periodic Workflows](../design/workflows/periodic.md).
