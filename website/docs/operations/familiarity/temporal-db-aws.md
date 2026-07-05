@@ -1,7 +1,12 @@
 ---
 title: Temporal DB on AWS
+sidebar_label: Temporal DB (AWS)
 ---
 
-:::note[Stub]
-Scaffolded in **Phase A**. Content will be **mirrored from the reference site** (re-theme only), per the Content Plan.
-:::
+import Lead from '@site/src/components/Lead';
+
+# Temporal DB on AWS
+
+<Lead>The **Temporal persistence layer** on AWS.</Lead>
+
+The notes on the persistence setup are still to be written.

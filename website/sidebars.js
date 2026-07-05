@@ -170,8 +170,8 @@ const sidebars = {
           link: {type: 'doc', id: 'deployment/deployables/index'},
           items: [
             'deployment/deployables/one-data-functions',
-            'deployment/deployables/realtime-app',
-            'deployment/deployables/batch-app',
+            'deployment/deployables/online-worker-app',
+            'deployment/deployables/offline-worker-app',
             'deployment/deployables/codec-server-app',
             'deployment/deployables/ui-app',
             'deployment/deployables/mocks-app',

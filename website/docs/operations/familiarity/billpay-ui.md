@@ -2,6 +2,10 @@
 title: Billpay UI
 ---
 
-:::note[Stub]
-Scaffolded in **Phase A**. Content will be **mirrored from the reference site** (re-theme only), per the Content Plan.
-:::
+import Lead from '@site/src/components/Lead';
+
+# Billpay UI
+
+<Lead>The standalone Billpay UI — **what each screen does and when to reach for it**.</Lead>
+
+The screen-by-screen guide is still to be written.

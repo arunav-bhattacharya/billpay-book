@@ -2,6 +2,10 @@
 title: Tracing UI
 ---
 
-:::note[Stub]
-Scaffolded in **Phase A**. Content will be **mirrored from the reference site** (re-theme only), per the Content Plan.
-:::
+import Lead from '@site/src/components/Lead';
+
+# Tracing UI
+
+<Lead>How to use the tracing UI to **follow a payment end to end**.</Lead>
+
+The walkthrough is still to be written.

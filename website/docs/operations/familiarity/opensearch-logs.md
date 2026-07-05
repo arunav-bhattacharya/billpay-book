@@ -2,6 +2,10 @@
 title: OpenSearch Logs
 ---
 
-:::note[Stub]
-Scaffolded in **Phase A**. Content will be **mirrored from the reference site** (re-theme only), per the Content Plan.
-:::
+import Lead from '@site/src/components/Lead';
+
+# OpenSearch Logs
+
+<Lead>Querying logs in OpenSearch — **saved searches, common queries, and retention**.</Lead>
+
+The query guide is still to be written.

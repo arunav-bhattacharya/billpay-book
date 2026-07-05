@@ -2,6 +2,10 @@
 title: UI App
 ---
 
-:::note[Stub]
-Scaffolded in **Phase A**. Content will be **mirrored from the reference site** (re-theme only), per the Content Plan.
-:::
+import Lead from '@site/src/components/Lead';
+
+# UI App
+
+<Lead>The **standalone UI** built on top of Billpay.</Lead>
+
+This page hasn't been fleshed out yet; the app's deployment story will land here.

@@ -2,6 +2,10 @@
 title: Temporal Web UI
 ---
 
-:::note[Stub]
-Scaffolded in **Phase A**. Content will be **mirrored from the reference site** (re-theme only), per the Content Plan.
-:::
+import Lead from '@site/src/components/Lead';
+
+# Temporal Web UI
+
+<Lead>How to navigate the Temporal Web UI — **workflow search, the history view, signals, and queries**.</Lead>
+
+The click-through walkthrough for this surface is still to be written.
