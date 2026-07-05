@@ -21,7 +21,11 @@ const sidebars = {
       className: 'sidebar-sec sidebar-sec--architecture',
       collapsed: false,
       link: {type: 'doc', id: 'architecture/index'},
-      items: ['architecture/overview', 'architecture/components'],
+      items: [
+        'architecture/overview',
+        'architecture/components',
+        'architecture/high-availability',
+      ],
     },
     {
       type: 'category',
@@ -170,8 +174,7 @@ const sidebars = {
           link: {type: 'doc', id: 'deployment/deployables/index'},
           items: [
             'deployment/deployables/one-data-functions',
-            'deployment/deployables/online-worker-app',
-            'deployment/deployables/offline-worker-app',
+            'deployment/deployables/worker-app',
             'deployment/deployables/codec-server-app',
             'deployment/deployables/ui-app',
             'deployment/deployables/mocks-app',
@@ -180,6 +183,7 @@ const sidebars = {
         'deployment/ci-checks',
         'deployment/code-merge-strategy',
         'deployment/pipeline',
+        'deployment/temporal-server',
       ],
     },
     {

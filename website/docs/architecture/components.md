@@ -102,7 +102,7 @@ Workflows run on two Temporal worker pools, split on purpose:
   ]}
 />
 
-Keeping synchronous and asynchronous work on separate workers means a burst of async work — say a settlement sweep draining a backlog — can't hold up the customer-facing path, and each can scale and deploy independently. A few workflows (Create Schedule Payment, Execute Split Payment, Create Balance Refund) can run on either, depending on where in the journey they're invoked.
+Keeping synchronous and asynchronous work on separate workers means a burst of async work — say a settlement sweep draining a backlog — can't hold up the customer-facing path: each pool polls its own task queues with its own tuning. The two pools ship together in a single JVM — the [Worker App](../deployment/deployables/worker-app.md) — so the isolation is logical rather than deployment-level. A few workflows (Create Schedule Payment, Execute Split Payment, Create Balance Refund) can run on either, depending on where in the journey they're invoked.
 
 ## The component model
 

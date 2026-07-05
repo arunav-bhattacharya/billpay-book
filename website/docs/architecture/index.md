@@ -43,3 +43,4 @@ import Highlights from '@site/src/components/Highlights';
 
 - **[Overview](./overview.md)** — the system map from One-Data Functions to workflows to downstream systems, and why the platform is Temporal-first.
 - **[Components](./components.md)** — a closer look at each block: the router, the Online/Offline workers, the component model, event handlers, and schedules.
+- **[High Availability](./high-availability.md)** — where everything physically runs: the two on-prem sites, the two AWS regions, and what fails over to what.

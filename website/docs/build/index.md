@@ -48,4 +48,4 @@ import Highlights from '@site/src/components/Highlights';
 - **[Data Model](./data-model/index.md)** — the Kotlin domain model (payments, options, instruments) and the Oracle tables underneath it.
 - **[Schedules](./schedules.md)** — the Temporal Schedules that drive the periodic workflows.
 
-The artifacts we ship — the worker apps, codec server, mocks — live under [Deployment](../deployment/index.md).
+The artifacts we ship — the worker app, codec server, mocks — live under [Deployment](../deployment/index.md).

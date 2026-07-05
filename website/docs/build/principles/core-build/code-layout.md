@@ -35,4 +35,4 @@ This isn't tidiness. Temporal replays workflow code from its event history to re
 
 Name implementations for the **behaviour**, not the market: a stage that skips realtime clearing is `NonRealtimeClearingExecutionStage`-shaped, not `GermanyExecutionStage` — the next market with the same rule reuses it instead of copying it.
 
-The deployables this monorepo produces — the Online and Offline worker apps, codec server, UI, mocks — are covered under [Deployment](../../../deployment/deployables/index.md).
+The deployables this monorepo produces — the worker app (one JVM hosting both the Online and Offline workers), codec server, UI, mocks — are covered under [Deployment](../../../deployment/deployables/index.md).

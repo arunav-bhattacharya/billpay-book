@@ -1,0 +1,156 @@
+/* HADiagram — theme-aware SVG topology. All colour from design tokens. */
+
+.wrap {
+  margin: 1.4rem 0 2rem;
+  overflow-x: auto;
+  border: 1px solid var(--amex-line);
+  border-radius: 14px;
+  background: var(--ifm-background-color);
+  box-shadow: var(--amex-sh-sm);
+  padding: 6px 2px;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 940px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+/* ---- panels ---- */
+.panelPrem {
+  fill: color-mix(in srgb, var(--amex-platinum) 8%, var(--amex-panel));
+  stroke: var(--amex-line-strong);
+  stroke-width: 1.2;
+}
+.panelAws {
+  fill: color-mix(in srgb, var(--amex-blue) 7%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--amex-blue) 38%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 7 5;
+}
+.panelTitle {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  fill: var(--amex-mut);
+}
+.siteText {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.22em;
+  fill: var(--amex-txt-strong);
+}
+
+/* ---- nodes ---- */
+.node {
+  fill: color-mix(in srgb, var(--amex-state-intermediate) 13%, var(--amex-panel));
+  stroke: var(--amex-state-intermediate);
+  stroke-width: 1.4;
+}
+.capsule {
+  fill: color-mix(in srgb, var(--amex-teal) 14%, var(--amex-panel));
+  stroke: var(--amex-teal);
+}
+.nodeTitle {
+  font-size: 14.5px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.nodeSub {
+  font-size: 11px;
+  fill: var(--amex-mut);
+}
+.faded {
+  opacity: 0.55;
+}
+
+/* ---- badges (tinted pills) ---- */
+.badge rect {
+  stroke-width: 1;
+}
+.badge text {
+  font-size: 9.5px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+.bActive rect {
+  fill: color-mix(in srgb, var(--amex-state-success) 16%, var(--amex-panel));
+  stroke: var(--amex-state-success);
+}
+.bActive text {
+  fill: var(--amex-state-success);
+}
+.bAa rect {
+  fill: color-mix(in srgb, var(--amex-teal) 16%, var(--amex-panel));
+  stroke: var(--amex-teal);
+}
+.bAa text {
+  fill: var(--amex-teal);
+}
+.bPrimary rect {
+  fill: color-mix(in srgb, var(--amex-blue) 14%, var(--amex-panel));
+  stroke: var(--amex-blue);
+}
+.bPrimary text {
+  fill: var(--amex-blue);
+}
+.bStandby rect {
+  fill: color-mix(in srgb, var(--amex-state-choice) 16%, var(--amex-panel));
+  stroke: var(--amex-state-choice);
+}
+.bStandby text {
+  fill: var(--amex-state-choice);
+}
+
+/* dark theme: brighten the teal + success tokens' contrast a touch */
+:global([data-theme='dark']) .capsule {
+  stroke: color-mix(in srgb, var(--amex-teal) 60%, #7fd4d0);
+}
+:global([data-theme='dark']) .bAa text {
+  fill: color-mix(in srgb, var(--amex-teal) 45%, #9be3df);
+}
+:global([data-theme='dark']) .bPrimary text {
+  fill: var(--amex-blue-bright);
+}
+
+/* ---- flows ---- */
+.flow {
+  stroke: var(--amex-blue);
+  stroke-width: 2;
+  fill: none;
+}
+.buffer {
+  stroke: var(--amex-state-choice);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  fill: none;
+}
+.repl {
+  stroke: var(--amex-mut);
+  stroke-width: 1.7;
+  stroke-dasharray: 8 5;
+  fill: none;
+}
+.flowLabel {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--amex-blue);
+}
+.bufferLabel {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--amex-state-choice);
+}
+.replLabel {
+  font-size: 11px;
+  fill: var(--amex-mut);
+}
+
+/* ---- legend ---- */
+.legend text {
+  font-size: 12px;
+  fill: var(--amex-txt);
+}

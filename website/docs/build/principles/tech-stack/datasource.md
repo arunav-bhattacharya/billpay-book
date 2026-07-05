@@ -7,7 +7,7 @@ import Lead from '@site/src/components/Lead';
 
 # DataSource: AgroalDataSource
 
-<Lead>Opening an Oracle connection is far too expensive to do per request, so everything runs through a pool. We use Agroal — the connection pool built by the Quarkus team — across every deployable: both workers, the codec server, the mocks.</Lead>
+<Lead>Opening an Oracle connection is far too expensive to do per request, so everything runs through a pool. We use Agroal — the connection pool built by the Quarkus team — across every deployable: the worker app, the codec server, the mocks.</Lead>
 
 ## Why Agroal
 
