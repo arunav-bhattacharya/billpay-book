@@ -12,8 +12,7 @@ const REPO_NAME = 'billpay-book';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Billpay Wiki',
-  tagline:
-    'Billpay core APIs, event-handlers & workflows, generic activities, and periodic processes for payments and refunds',
+  tagline: "American Express's platform for credit-card bill payments and refunds",
   favicon: 'img/amex-logo.png',
 
   future: {
@@ -57,6 +56,7 @@ const config = {
           routeBasePath: 'docs',
           editUrl: `https://github.com/${GH_USER}/${REPO_NAME}/edit/main/website/`,
           showLastUpdateTime: true,
+          showLastUpdateAuthor: true,
         },
         blog: false,
         theme: {
