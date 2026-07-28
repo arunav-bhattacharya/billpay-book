@@ -48,6 +48,7 @@ const sidebars = {
           items: [
             'design/journeys/customer-initiated',
             'design/journeys/system-initiated',
+            'design/journeys/api',
           ],
         },
         {

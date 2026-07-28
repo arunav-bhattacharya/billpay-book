@@ -10,7 +10,7 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 <Lead accent="var(--amex-cat-design)">A person starts every journey on this page. They pay a bill, change one, or look one up, and they are waiting for an answer while Billpay works.</Lead>
 
-## The journeys at a glance
+## Journeys at a glance
 
 ### Make a payment
 
