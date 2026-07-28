@@ -227,6 +227,7 @@ One request, more than one instruction. The customer settles part of the bill wi
     channels: [
       {icon: 'monitor', label: 'Web'},
       {icon: 'phone', label: 'Mobile app'},
+      {icon: 'headset', label: 'Servicing rep'},
     ],
   }}
   entry={[{kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'}]}

@@ -14,7 +14,7 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 - [A payment is Posted](#a-payment-is-posted), the tail every payment ends in
 - [A payment is returned](#a-payment-is-returned), where the bank sends the money back and Billpay decides whether to try again
-- [A payment is initiated via third-party source](#a-payment-is-initiated-via-third-party-source), where someone other than the cardmember pays the bill
+- [A Third Party Initiated Payment](#a-payment-is-initiated-via-third-party-source), where someone other than the cardmember pays the bill
 - [Accounts Receivable initiates a payment](#accounts-receivable-initiates-a-payment), raised inside Amex rather than by a customer
 
 ## A payment is Posted
@@ -96,7 +96,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
 
 <JourneyMap
   title="A payment is returned"
-  topLayer="Events from other systems"
+  topLayer=""
   origin={{
     actor: 'Bank',
     icon: 'bank',
@@ -158,14 +158,13 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
   reference={{to: '/docs/design/diagrams/sequence-diagram#7-return-processing--representment-eligibility-check', label: 'Sequence diagram'}}
 />
 
-## A payment is initiated via third-party source
+## A Third-party initiated Payment
 
 Someone other than the cardmember pushes money at the account. A bank, a partner, a third-party service. Amex did not ask for it, so the first question is whether it will be accepted at all.
 
 <JourneyMap
-  eyebrow="Third-party payment"
-  title="A payment is initiated via third-party source"
-  topLayer="Third party"
+  title="A Third-party initiated Payment"
+  topLayer=""
   origin={{
     actor: 'A third party',
     icon: 'inbox',
