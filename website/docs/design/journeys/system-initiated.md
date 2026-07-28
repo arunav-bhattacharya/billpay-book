@@ -10,11 +10,11 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 <Lead accent="var(--amex-cat-design)">Not every journey starts with someone tapping Pay. Banks return money, third parties push payments in, Accounts Receivable raises its own, and every payment ever made still has to be closed out. **Nobody is waiting on these.** They run when an event arrives or a timer fires.</Lead>
 
-## The journeys at a glance
+## Journeys at a glance
 
 - [A payment is Posted](#a-payment-is-posted), the tail every payment ends in
-- [A payment is returned](#a-payment-is-returned), where the bank sends the money back and Billpay decides whether to try again
-- [A Third Party Initiated Payment](#a-payment-is-initiated-via-third-party-source), where someone other than the cardmember pays the bill
+- [A payment is Returned](#a-payment-is-returned), where the bank sends the money back and Billpay decides whether to try again
+- [A Third Party pushes a Payment](#a-third-party-pushes-a-payment), where someone other than the cardmember pays the bill
 - [Accounts Receivable initiates a payment](#accounts-receivable-initiates-a-payment), raised inside Amex rather than by a customer
 
 ## A payment is Posted
@@ -90,7 +90,7 @@ This is where every payment on the [customer journeys](./customer-initiated.md) 
 
 Nothing here is a single request. The two confirmations land whenever the owning system produces them, the event handlers write each one into the tracker, and this workflow only acts once both are there.
 
-## A payment is returned
+## A payment is Returned
 
 Days after a payment looks finished, the bank can send the money back. Billpay reverses the payment, then decides whether it is worth presenting again. Most returns are worth one more try, and that second attempt is scheduled rather than immediate.
 
@@ -158,7 +158,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
   reference={{to: '/docs/design/diagrams/sequence-diagram#7-return-processing--representment-eligibility-check', label: 'Sequence diagram'}}
 />
 
-## A Third-party initiated Payment
+## A Third-party pushes a Payment
 
 Someone other than the cardmember pushes money at the account. A bank, a partner, a third-party service. Amex did not ask for it, so the first question is whether it will be accepted at all.
 
