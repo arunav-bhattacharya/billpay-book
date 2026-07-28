@@ -184,3 +184,50 @@ New components: `LandscapeMap` (CSS Grid — no flows to draw, and 18 boxes in a
 viewBox would force horizontal scroll) and `LegacyMap` (inline SVG, following the
 `HADiagram` precedent, because the tangle *is* the argument). Both theme-aware off the
 Amex tokens.
+
+## Phase G — Vision ▸ Payments Overview, legacy diagram replaced (2026-07-28)
+
+**`## Before the split` renamed to `## Legacy Payments Landscape`.** `LegacyMap`
+(nine conceptual boxes) replaced by **`LegacyEstateMap`**, a ~76-node map of the estate
+as it actually runs. `LegacyMap/` deleted; it had exactly one usage.
+
+**Source-hierarchy exception, extending the Phase F note above.** These facts are in
+neither `docs/Wiki_Spec.md` nor the reference site. A repo-wide and git-history-wide
+search found **zero** hits for AM, GPP, GHDB, FTN, IGOR, TL, WROC/SROC DB2, QREP,
+APIGEE, DataPower, Boomerang, the caches and the mainframe chain. The spec has no
+current-state section at all. The sole sources are two user-supplied Confluence
+screenshots:
+
+1. **`customer-journey.png`** — "Payments Customer Journey / Traceability Mapping".
+   Channels, the interface thicket, Arrangement Manager, GPP, IL/IGOR/TL, FTN, the
+   file and card rails, the mainframe batch chain and the reporting estate, plus the
+   red "systems with traceability challenges" markers.
+2. **`parsec.png`** — "Payment Elig Lite and Max Allowed". The modernisation layer:
+   APIGEE, Service Facade (Routing / CircuitBreaker / PreEligibilityHandler), SOR
+   Cache, Pre-Eligibility Cache, Eligibility (PreEligibilityHandler / CmInfoHandler /
+   BalancesHandler), GAR, Legacy Bridge, CAS, AlternatePayment and Boomerang.
+
+**Merges, on user direction:** *AM Legacy = Arrangement Manager* (one node);
+*GPHDB = GHDB = HDB/GHDB* (one node, fed from AM over JDBC **and** from FTN by
+mainframe batch, read by AlternatePayment). **Merges inferred, flagged in the plan and
+not contradicted:** *Globestar* and *CAS* each appear twice in the sources and are
+drawn once with both edges.
+
+**Deliberately dropped:** Parsec's numbered `/inquiry` and `/payment` step sequences
+and their walkthrough (user chose "structure only"). Non-sequence facts survive as node
+sub-labels: the 5-minute cache TTL, "max of GAR and CAS", the routing keys
+(channel / market / program).
+
+**Drawing rules** (all in `src/components/LegacyEstateMap/`): orthogonal routing only,
+every trunk hand-placed into a numbered lane so parallel runs never overlap; connected
+boxes share centrelines so the busiest edges are dead straight. Verified in-browser with
+a geometry checker: **0** edges through boxes, **0** node overlaps, **0** label
+collisions. Local `--lem-*` colour ramp (channels Amex blue, interfaces cyan, key
+systems green, third parties amber, databases pink, replication slate, SDK teal,
+fallback red, "added on top" violet); line glyphs for database / file / message /
+batch / SFT. Layer-spotlight chips, zoom, pan and a full-screen mode; nothing is ever
+removed from the canvas, only dimmed. `showIncremental` prop (default `true`) toggles
+the violet "added on top of the legacy estate" treatment.
+
+`## Legacy vs modern` rewritten as a three-column table with a named **What changed**
+aspect column, styled by `.compareTable` (section 14 of `src/css/custom.css`).

@@ -1,0 +1,430 @@
+/* LegacyEstateMap — the estate as it actually runs, at full size.
+   Every node sets --kind and every edge sets --ec, so the box fill, the stroke,
+   the arrowhead and the legend swatch all mix off one hue and the legend cannot
+   drift from the drawing. Purple is reserved for what was added on top of the
+   legacy estate: it appears nowhere else in the palette, so it cannot be read
+   as one more system. */
+
+.wrap {
+  /* One local ramp for the whole map. Every hue is far enough from its
+     neighbours to survive being drawn as a 1.6px line on a dark background. */
+  --lem-chan: var(--amex-blue);   /* channels: the signature blue the journey banners use */
+  --lem-iface: #0aa2c0;  /* interfaces: bright cyan */
+  --lem-key: #10893f;    /* payments domain systems: bright green */
+  --lem-ext: #5b6b7f;    /* outside the payments domain: cool stone */
+  --lem-tp: #a07a12;     /* third parties: gold */
+  --lem-db: #e2620b;     /* databases and database access: bright orange */
+  --lem-repl: #64748b;   /* replication: slate */
+  --lem-sdk: #0e7c86;    /* SDK / JRE: teal */
+  --lem-fail: #c0392b;   /* fallback and traceability: red */
+  --lem-new: #6d4aca;    /* added on top: violet, used nowhere else */
+  margin: 1.5rem 0 2.4rem;
+  padding: 0.9rem 0.9rem 1.1rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 16px;
+  background: var(--amex-panel);
+  box-shadow: var(--amex-sh-sm);
+}
+:global([data-theme='dark']) .wrap {
+  --lem-iface: #22d3ee;
+  --lem-key: #34d97a;
+  --lem-ext: #9fb3c8;
+  --lem-tp: #d8c45f;
+  --lem-db: #fb923c;
+  --lem-repl: #94a3b8;
+  --lem-sdk: #2dd4bf;
+  --lem-fail: #e2685c;
+  --lem-new: #a78bfa;
+}
+
+.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  overflow-y: auto;
+  background: var(--amex-bg);
+}
+
+/* ---- toolbar ---- */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+}
+
+.chip {
+  --chip: var(--amex-mut);
+  padding: 0.28rem 0.66rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chip) 45%, transparent);
+  background: color-mix(in srgb, var(--chip) 10%, var(--amex-panel));
+  color: var(--amex-txt);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chip:hover {
+  border-color: color-mix(in srgb, var(--chip) 75%, transparent);
+  background: color-mix(in srgb, var(--chip) 20%, var(--amex-panel));
+}
+.chipOn {
+  color: #fff;
+  border-color: transparent;
+  background: var(--chip);
+}
+
+.c_channel { --chip: var(--lem-chan); }
+.c_facade { --chip: var(--lem-new); }
+.c_am { --chip: var(--lem-key); }
+.c_processing { --chip: var(--lem-iface); }
+.c_files { --chip: var(--lem-tp); }
+.c_mainframe { --chip: var(--lem-repl); }
+
+.tools {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.tool {
+  min-width: 30px;
+  padding: 0.28rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--amex-line-strong);
+  background: transparent;
+  color: var(--amex-mut);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.tool:hover {
+  color: var(--amex-txt-strong);
+  border-color: var(--amex-mut);
+}
+
+.hint {
+  margin: 0.55rem 0 0.35rem;
+  font-size: 0.73rem;
+  color: var(--amex-mut);
+}
+
+/* ---- canvas ---- */
+/* The frame tracks the 2400x1000 canvas, so the drawing fills it instead of
+   sitting letterboxed in a taller box. */
+.svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 2;
+  height: auto;
+  max-height: 74vh;
+  min-height: 300px;
+  font-family: var(--amex-font-sans);
+  cursor: grab;
+  touch-action: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--amex-mut) 5%, var(--amex-panel));
+}
+.svg:active {
+  cursor: grabbing;
+}
+.expanded .svg {
+  aspect-ratio: auto;
+  height: calc(100vh - 190px);
+  max-height: none;
+}
+
+/* ---- kind hues, shared by the nodes and the legend swatches ----
+   Channels carry the signature Amex blue; interfaces stay in the blue family
+   but are drawn as hollow capsules, so the two never read as the same thing. */
+.k_fe { --kind: var(--lem-chan); }
+.k_iface { --kind: var(--lem-iface); }
+.k_key { --kind: var(--lem-key); }
+.k_hero { --kind: var(--lem-key); }
+.k_ext { --kind: var(--lem-ext); }
+.k_tp { --kind: var(--lem-tp); }
+.k_db { --kind: var(--lem-db); }
+.k_note { --kind: var(--amex-mut); }
+.k_sub { --kind: var(--amex-mut); }
+
+.node { transition: opacity 0.22s ease; }
+
+.box {
+  fill: color-mix(in srgb, var(--kind) 15%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--kind) 62%, transparent);
+  stroke-width: 1.4;
+}
+.k_hero .box {
+  fill: color-mix(in srgb, var(--kind) 26%, var(--amex-panel));
+  stroke: var(--kind);
+  stroke-width: 2.4;
+}
+.k_note .box {
+  fill: transparent;
+  stroke-dasharray: 6 4;
+}
+.k_iface .box {
+  fill: color-mix(in srgb, var(--kind) 7%, var(--amex-panel));
+  stroke-width: 1.6;
+}
+/* the signature blue is dark by design, so channels carry more of it */
+.k_fe .box {
+  fill: color-mix(in srgb, var(--kind) 30%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--kind) 90%, transparent);
+  stroke-width: 1.6;
+}
+.k_sub .box {
+  fill: color-mix(in srgb, var(--kind) 11%, var(--amex-panel));
+}
+.dashed { stroke-dasharray: 7 5; }
+
+.t {
+  font-size: 14px;
+  font-weight: 640;
+  fill: var(--amex-txt-strong);
+  text-anchor: middle;
+}
+.s {
+  font-size: 10px;
+  fill: var(--amex-mut);
+  text-anchor: middle;
+}
+.k_hero .t { font-size: 21px; font-weight: 750; }
+.k_hero .s { font-size: 11.5px; }
+.k_sub .t { font-size: 11px; font-weight: 620; }
+.k_sub .s { font-size: 9px; }
+.k_iface .t {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  fill: color-mix(in srgb, var(--kind) 72%, var(--amex-txt-strong));
+}
+.k_note .t { font-size: 10.5px; font-style: italic; fill: var(--amex-mut); }
+.k_db .t {
+  font-size: 12.5px;
+  font-weight: 700;
+  fill: color-mix(in srgb, var(--kind) 62%, var(--amex-txt-strong));
+}
+/* a store is drawn as its icon and its name, with no box: it is not a
+   deployable, and boxing it made every column read as one long wall */
+.k_db .box { fill: none; stroke: none; }
+.k_db .glyph { stroke-width: 1.7; }
+
+.glyph {
+  fill: none;
+  stroke: color-mix(in srgb, var(--kind) 85%, var(--amex-txt-strong));
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.glyph .solid { fill: color-mix(in srgb, var(--kind) 30%, var(--amex-panel)); }
+
+.pill .glyph {
+  stroke: color-mix(in srgb, var(--ec) 85%, var(--amex-txt-strong));
+  stroke-width: 1.4;
+}
+.pill .glyph .solid { fill: color-mix(in srgb, var(--ec) 26%, var(--amex-panel)); }
+
+/* traceability marker */
+.dot {
+  fill: var(--lem-fail);
+  stroke: var(--amex-panel);
+  stroke-width: 1.6;
+}
+
+/* added on top of the legacy estate */
+.newRing {
+  fill: none;
+  stroke: var(--lem-new);
+  stroke-width: 2.6;
+}
+.isNew .box { stroke: transparent; }
+
+/* ---- panels ---- */
+.panel { transition: opacity 0.22s ease; }
+.panelBox {
+  fill: color-mix(in srgb, var(--amex-mut) 7%, transparent);
+  stroke: var(--amex-line-strong);
+  stroke-width: 1.3;
+}
+.band .panelBox {
+  fill: color-mix(in srgb, var(--amex-mut) 4%, transparent);
+  stroke-dasharray: 9 6;
+}
+/* the payments-domain services inside the modernisation band */
+.panelKey .panelBox {
+  fill: color-mix(in srgb, var(--lem-key) 9%, transparent);
+  stroke: color-mix(in srgb, var(--lem-key) 60%, transparent);
+  stroke-width: 1.6;
+}
+.panelKey .panelT { fill: color-mix(in srgb, var(--lem-key) 82%, var(--amex-txt-strong)); }
+.panelKey .panelS { fill: var(--amex-mut); }
+
+.panelNew .panelBox {
+  fill: color-mix(in srgb, var(--lem-new) 7%, transparent);
+  stroke: color-mix(in srgb, var(--lem-new) 60%, transparent);
+}
+.panelT {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  fill: var(--amex-mut);
+  text-anchor: middle;
+}
+.panelNew .panelT { fill: var(--lem-new); }
+.panelS {
+  font-size: 10px;
+  fill: var(--amex-mut);
+  text-anchor: middle;
+}
+
+/* ---- edges ---- */
+.e_svc { --ec: var(--lem-chan); }
+.e_data { --ec: var(--lem-db); }
+.e_file { --ec: var(--lem-tp); }
+.e_repl { --ec: var(--lem-repl); }
+.e_fb { --ec: var(--lem-fail); }
+.e_sdk { --ec: var(--lem-sdk); }
+
+.edge {
+  fill: none;
+  stroke: var(--ec);
+  stroke-width: 1.6;
+  opacity: 0.72;
+  transition: opacity 0.22s ease;
+}
+.e_file.edge { stroke-dasharray: 9 5; }
+.e_repl.edge { stroke-dasharray: 1 5; stroke-width: 2.6; stroke-linecap: round; }
+.e_fb.edge { stroke-dasharray: 6 4; }
+.e_sdk.edge { stroke-dasharray: 11 4 2 4; stroke-width: 2; }
+
+.m_svc { fill: var(--lem-chan); }
+.m_data { fill: var(--lem-db); }
+.m_file { fill: var(--lem-tp); }
+.m_repl { fill: var(--lem-repl); }
+.m_fb { fill: var(--lem-fail); }
+.m_sdk { fill: var(--lem-sdk); }
+
+/* ---- protocol pills, drawn on top of the edges ---- */
+.pill { transition: opacity 0.22s ease; }
+.pill rect {
+  fill: var(--amex-panel);
+  stroke: color-mix(in srgb, var(--ec) 55%, transparent);
+  stroke-width: 1.1;
+}
+.pill text {
+  font-size: 10px;
+  font-weight: 650;
+  text-anchor: middle;
+  fill: color-mix(in srgb, var(--ec) 72%, var(--amex-txt-strong));
+}
+
+.dim { opacity: 0.08; }
+.edge.dim { opacity: 0.05; }
+
+.plain {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-anchor: middle;
+  fill: color-mix(in srgb, var(--ec) 78%, var(--amex-txt-strong));
+  stroke: var(--amex-panel);
+  stroke-width: 3.5;
+  paint-order: stroke;
+  transition: opacity 0.22s ease;
+}
+
+/* ---- legend, grouped so the reader scans a category rather than 13 keys ---- */
+.legend {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--amex-line);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.9rem 1.6rem;
+}
+
+.lgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lhead {
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--amex-txt-strong);
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--amex-line);
+}
+
+.lrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.95rem;
+}
+
+.li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  color: var(--amex-mut);
+}
+
+.sw {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--kind) 62%, transparent);
+  background: color-mix(in srgb, var(--kind) 26%, var(--amex-panel));
+}
+.swNew {
+  border-color: var(--lem-new);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--lem-new) 16%, var(--amex-panel));
+}
+.swLine {
+  width: 20px;
+  height: 0;
+  border-top: 2.5px solid var(--ec);
+}
+.e_file.swLine { border-top-style: dashed; }
+.e_repl.swLine { border-top-style: dotted; }
+.e_fb.swLine { border-top-style: dashed; }
+.e_sdk.swLine { border-top-style: dotted; }
+
+@media (max-width: 996px) {
+  .bar { justify-content: flex-start; }
+}
+
+@media (max-width: 640px) {
+  .wrap { padding: 0.7rem 0.55rem 0.9rem; }
+  .svg { min-height: 340px; }
+  .chip { font-size: 0.7rem; padding: 0.24rem 0.52rem; }
+}
+
+/* legend glyphs reuse the drawing's own icons, so the key cannot drift */
+.swIcon {
+  width: 14px;
+  height: 16px;
+  flex: none;
+  overflow: visible;
+}
