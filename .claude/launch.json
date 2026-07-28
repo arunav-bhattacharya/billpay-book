@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "billpay-wiki",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "website", "run", "start"],
+      "port": 3100
+    }
+  ]
+}

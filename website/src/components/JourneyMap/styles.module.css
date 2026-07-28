@@ -1,0 +1,1524 @@
+/* JourneyMap — a payment journey as a business process flow.
+   House style: tinted fill with a saturated border, one hue per diagram, every
+   colour from a design token so light and dark both render. */
+
+.wrap {
+  /* The narrow fallbacks key off this element's width, not the viewport, because
+     collapsing the page TOC widens it without the viewport changing at all. */
+  container-type: inline-size;
+  margin: 1.5rem 0 2.6rem;
+  border: 1px solid var(--amex-line-strong);
+  border-radius: 16px;
+  background: var(--ifm-background-color);
+  box-shadow: var(--amex-sh-sm);
+
+  /* The signature Blue Box blue, not the cyan-leaning section accent. */
+  --jm-accent: var(--amex-blue);
+  /* Connectors carry the flow, so they are drawn at full strength with solid
+     arrowheads rather than hairline chevrons. */
+  --jm-edge: color-mix(in srgb, var(--jm-accent) 88%, transparent);
+  /* Fan brackets are hairlines. --amex-line-strong vanishes against the dark
+     panel, so mix off the muted ink, which holds up in both themes. */
+  --jm-soft: color-mix(in srgb, var(--amex-mut) 60%, transparent);
+  /* Step numbers are an index, not a status. They get a hue used nowhere else,
+     so they cannot be mistaken for a payment outcome. */
+  --jm-num: #6d4aca;
+  /* Worker pills name infrastructure, so they get their own neutral hues too. */
+  --jm-online: #4a5f8f;
+  --jm-offline: #6f7c8f;
+  /* The orchestrating workflow gets a hue of its own, away from the Amex blue
+     used everywhere else. It shares the step-number purple on purpose: the
+     workflow is the thing that owns those numbered steps. */
+  --jm-wf: #5b3fc4;
+  --jm-wf-ink: #ffffff;
+  /* Both layer boxes are Amex blue. They stay apart by weight, not hue: the
+     outer band is dashed on a light wash, the core is solid on a deep one. */
+  --jm-outer: var(--amex-blue);
+  /* Machine-driven things: schedules, event handlers, and the async region.
+     A vivid orange, off the blue axis entirely, so it never blurs into the
+     cards or the layer boxes the way a gold tint did. */
+  --jm-async: #f4761f;
+  --jm-gap: 30px;
+  --jm-vgap: 26px;
+}
+:global([data-theme='dark']) .wrap {
+  background: var(--amex-panel);
+  /* Amex blue lifted enough to hold its own on the dark panel. */
+  --jm-accent: #3d97e0;
+  --jm-num: #a78bfa;
+  --jm-online: #8fa8d4;
+  --jm-offline: #a3b0c2;
+  /* The lifted purple needs dark ink rather than white. */
+  --jm-wf: #a78bfa;
+  --jm-wf-ink: #1a1040;
+  --jm-outer: #3d97e0;
+  --jm-async: #ff9a4d;
+}
+
+/* ==================================================================== *
+ * Header
+ * ==================================================================== */
+
+/* Signature-blue banner. Both stops are brand tokens rather than theme ones, so
+   the white type keeps its contrast in light and dark alike. */
+.head {
+  padding: 1.05rem 1.25rem 0.95rem;
+  border-radius: 15px 15px 0 0;
+  background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-deep) 100%);
+}
+
+.eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.28rem;
+  font-weight: 650;
+  letter-spacing: -0.004em;
+  color: #ffffff;
+}
+
+/* ==================================================================== *
+ * Canvas and layers
+ * ==================================================================== */
+
+.canvas {
+  padding: 1.2rem 1.25rem 1.3rem;
+}
+
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: 0 0 auto;
+}
+
+/* Each band groups the pieces that live in one part of the estate. The outer
+   world is slate and dashed; Billpay core is the accent hue, solid, and sits on
+   a stronger wash so the two never read as one continuous surface. */
+.layer {
+  position: relative;
+  padding: 1.15rem 1rem 1rem;
+  border-radius: 15px;
+}
+.layerTop {
+  --layer-tone: color-mix(in srgb, var(--jm-outer) 55%, transparent);
+  border: 1.5px dashed var(--layer-tone);
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--jm-outer) 11%, var(--ifm-background-color)) 0%,
+    color-mix(in srgb, var(--jm-outer) 4%, var(--ifm-background-color)) 100%
+  );
+  box-shadow: var(--amex-sh-sm);
+}
+:global([data-theme='dark']) .layerTop {
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--jm-outer) 14%, var(--amex-panel)) 0%,
+    color-mix(in srgb, var(--jm-outer) 5%, var(--amex-panel)) 100%
+  );
+}
+/* Near-white in light mode. A blue wash here turned the amber async band a muddy
+   grey-green, and it left nothing for the step cards to rise from. The colour
+   moves onto the cards instead, and the solid border still bounds the box. */
+.layerCore {
+  --layer-tone: color-mix(in srgb, var(--jm-accent) 55%, transparent);
+  border: 1.5px solid var(--layer-tone);
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--jm-accent) 6%, #ffffff) 0%,
+    color-mix(in srgb, var(--jm-accent) 2%, #ffffff) 100%
+  );
+  box-shadow: var(--amex-sh-sm);
+}
+/* In dark the core wash goes well below the page panel, so the cards sitting on
+   it have somewhere to rise from. Light mode does the opposite: a deeper wash
+   under near-white cards. Either way the gap has to be wide, not subtle. */
+:global([data-theme='dark']) .layerCore {
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--jm-accent) 11%, #041324) 0%,
+    color-mix(in srgb, var(--jm-accent) 5%, #020c17) 100%
+  );
+}
+
+.layerLabel {
+  position: absolute;
+  top: -0.82rem;
+  right: 1.1rem;
+  padding: 0.15rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--amex-txt-strong);
+  background: var(--ifm-background-color);
+  border: 1.5px solid var(--layer-tone);
+}
+:global([data-theme='dark']) .layerLabel {
+  background: var(--amex-panel);
+}
+
+.layerBody {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.5rem;
+}
+
+/* ---- the person ---- */
+.actor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--amex-cat-vision) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amex-cat-vision) 8%, var(--ifm-background-color));
+}
+:global([data-theme='dark']) .actor {
+  background: color-mix(in srgb, var(--amex-cat-vision) 16%, var(--amex-panel));
+}
+.actorIcon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(
+    140deg,
+    var(--amex-cat-vision),
+    color-mix(in srgb, var(--amex-cat-vision) 55%, #05132b)
+  );
+}
+.actorIcon .icon {
+  width: 17px;
+  height: 17px;
+}
+.actorName {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+  white-space: nowrap;
+}
+
+.info {
+  margin-left: 0.35rem;
+  cursor: help;
+  border: 0;
+  text-decoration: none;
+  color: var(--amex-mut);
+}
+
+/* ---- the channels ---- */
+.channels {
+  position: relative;
+  padding: 0.7rem 0.65rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--amex-cat-vision) 32%, transparent);
+  border-radius: 13px;
+  background: var(--ifm-background-color);
+}
+:global([data-theme='dark']) .channels {
+  background: color-mix(in srgb, #ffffff 4%, transparent);
+}
+.channelsLabel {
+  position: absolute;
+  top: -0.62rem;
+  left: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0 0.4rem;
+  font-size: 0.58rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+  background: var(--ifm-background-color);
+}
+.brandLogo {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  object-fit: contain;
+  display: block;
+}
+:global([data-theme='dark']) .channelsLabel {
+  background: var(--amex-panel);
+}
+.channelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--amex-cat-vision) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-cat-vision) 26%, transparent);
+  white-space: nowrap;
+}
+
+/* ---- a connector between two things on the same row ---- */
+.arrow {
+  position: relative;
+  width: 30px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--jm-edge);
+  flex: 0 0 auto;
+  margin: 0 0.15rem;
+}
+/* Keeps an arrow with the thing it points at when the row wraps. */
+.linkGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.arrowLabelled {
+  width: 58px;
+  margin: 0 0.3rem;
+}
+.arrowLabel {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.62rem;
+  font-weight: 650;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--jm-accent) 85%, var(--amex-txt-strong));
+  background: color-mix(in srgb, var(--jm-accent) 11%, var(--ifm-background-color));
+  border: 1px solid color-mix(in srgb, var(--jm-accent) 32%, transparent);
+}
+:global([data-theme='dark']) .arrowLabel {
+  color: color-mix(in srgb, var(--jm-accent) 45%, #ffffff);
+  background: color-mix(in srgb, var(--jm-accent) 22%, var(--amex-panel));
+}
+
+.arrow::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 9px;
+  height: 10px;
+  transform: translateY(-50%);
+  background: var(--jm-edge);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* ---- the drop between the two layers ---- */
+.drop {
+  position: relative;
+  height: 40px;
+  margin: 0.35rem 0 0.35rem 34px;
+  border-left: 2px dotted var(--jm-edge);
+  width: 0;
+}
+.drop::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  bottom: 0;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--jm-edge);
+  border-bottom: 1.5px solid var(--jm-edge);
+  transform: rotate(45deg);
+}
+
+/* ---- route chips ---- */
+.route {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.1rem;
+}
+.routeItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+}
+.routeSep {
+  color: var(--amex-mut);
+  font-weight: 700;
+  margin: 0 0.3rem 0 0.15rem;
+}
+
+.hop {
+  font-family: var(--amex-font-mono);
+  font-size: 0.71rem;
+  padding: 3px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  border: 1px solid var(--amex-line-strong);
+  color: var(--amex-txt);
+  background: var(--amex-panel);
+}
+:global([data-theme='dark']) .hop {
+  background: color-mix(in srgb, #ffffff 5%, transparent);
+}
+
+/* The One-Data function is a named contract, not a path, so it gets the text
+   face and the signature blue rather than the mono treatment. */
+.kFunction {
+  font-family: var(--amex-font-sans);
+  font-weight: 650;
+  font-size: 0.82rem;
+  border-color: color-mix(in srgb, var(--jm-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--jm-accent) 13%, var(--ifm-background-color));
+  color: color-mix(in srgb, var(--jm-accent) 88%, var(--amex-txt-strong));
+}
+:global([data-theme='dark']) .kFunction {
+  background: color-mix(in srgb, var(--jm-accent) 22%, transparent);
+  color: color-mix(in srgb, var(--jm-accent) 45%, #ffffff);
+}
+
+/* Same face and size as the function chip it follows. The lighter tint and the
+   default ink still tell the two apart. */
+.kApi {
+  font-family: var(--amex-font-sans);
+  font-weight: 650;
+  font-size: 0.82rem;
+  border-color: color-mix(in srgb, var(--jm-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--jm-accent) 10%, transparent);
+}
+.kRouter {
+  font-family: var(--amex-font-sans);
+  font-weight: 650;
+  border-color: color-mix(in srgb, var(--amex-cat-architecture) 45%, transparent);
+  background: color-mix(in srgb, var(--amex-cat-architecture) 12%, transparent);
+}
+.kWorkflow {
+  border-color: color-mix(in srgb, var(--amex-state-intermediate) 45%, transparent);
+  background: color-mix(in srgb, var(--amex-state-intermediate) 12%, transparent);
+}
+.kSchedule,
+.kEvent {
+  font-family: var(--amex-font-sans);
+  font-weight: 650;
+  font-size: 0.82rem;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--jm-async) 62%, transparent);
+  background: color-mix(in srgb, var(--jm-async) 14%, var(--ifm-background-color));
+  color: color-mix(in srgb, var(--jm-async) 78%, var(--amex-txt-strong));
+}
+:global([data-theme='dark']) .kSchedule,
+:global([data-theme='dark']) .kEvent {
+  background: color-mix(in srgb, var(--jm-async) 18%, transparent);
+  color: var(--jm-async);
+}
+
+.hopWithLogo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-left: 7px;
+}
+.hopLogo {
+  width: 15px;
+  height: 15px;
+  color: inherit;
+}
+.wfLogo {
+  width: 15px;
+  height: 15px;
+}
+
+.hopNote {
+  font-size: 0.68rem;
+  color: var(--amex-mut);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* ---- the orchestrating workflow ----
+   The one filled chip on the diagram, because it drives everything below it. */
+.orchestratorRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0.9rem;
+}
+.wfThen {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+.orchestrator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 5px 13px 5px 10px;
+  border-radius: 9px;
+  font-family: var(--amex-font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--jm-wf-ink);
+  background: linear-gradient(
+    140deg,
+    var(--jm-wf),
+    color-mix(in srgb, var(--jm-wf) 62%, #05132b)
+  );
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--jm-wf) 45%, transparent);
+}
+:global([data-theme='dark']) .orchestrator {
+  background: linear-gradient(
+    140deg,
+    var(--jm-wf),
+    color-mix(in srgb, var(--jm-wf) 72%, #ffffff)
+  );
+}
+.orchestrator .icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.85;
+}
+
+/* A workflow the parent starts. Outlined rather than filled, so the hierarchy
+   is visible without a second colour. */
+.orchestratorChild {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--jm-wf) 82%, var(--amex-txt-strong));
+  background: color-mix(in srgb, var(--jm-wf) 11%, var(--ifm-background-color));
+  border: 1.5px solid color-mix(in srgb, var(--jm-wf) 50%, transparent);
+  box-shadow: none;
+}
+:global([data-theme='dark']) .orchestratorChild {
+  color: var(--jm-wf);
+  background: color-mix(in srgb, var(--jm-wf) 16%, transparent);
+}
+
+/* ==================================================================== *
+ * The rail
+ * ==================================================================== */
+
+.rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--steps), minmax(0, 1fr));
+  grid-template-rows: auto auto auto auto;
+  column-gap: var(--jm-gap);
+  /* Headroom for the band's ribbon, which would otherwise land on top of an
+     exception sitting above the band's first column. */
+  margin-top: 1.5rem;
+}
+
+/* Six or seven steps need more room than five. Tighten rather than wrap, so a
+   long journey still reads as one line. */
+.dense {
+  --jm-gap: 15px;
+}
+.dense .node {
+  padding: 0.7rem 0.3rem 0.6rem;
+  gap: 0.32rem;
+}
+.dense .nodeIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+.dense .nodeIcon .icon {
+  width: 17px;
+  height: 17px;
+}
+.dense .nodeName {
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+}
+.dense .state {
+  font-size: 0.58rem;
+  padding: 2px 5px;
+}
+.dense .modeNote {
+  font-size: 0.56rem;
+}
+.dense .sys {
+  font-size: 0.66rem;
+  padding: 1px 6px;
+}
+.dense .tableRef {
+  font-size: 0.58rem;
+}
+.dense .exitLabel {
+  font-size: 0.62rem;
+  max-width: 13ch;
+}
+
+.exitCell,
+.nodeCell,
+.tickCell,
+.fanCell {
+  position: relative;
+  z-index: 1;
+  grid-column: var(--col);
+  min-width: 0;
+}
+.exitCell {
+  grid-row: 1;
+  align-self: end;
+}
+/* Centre the node in its row. Rows are as tall as their tallest node, and a
+   fork is much taller than a plain step, so without this a short neighbour sits
+   at the top of the row and the connector between them points at nothing. */
+.nodeCell {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.tickCell {
+  grid-row: 3;
+}
+.fanCell {
+  grid-row: 4;
+}
+
+/* ---- the background region ---- */
+.band {
+  position: relative;
+  grid-column: var(--band-from) / -1;
+  /* Spans the fans too: the systems a background step calls belong inside it. */
+  grid-row: 1 / -1;
+  z-index: 0;
+  margin: -1.1rem calc(-1 * var(--jm-gap) / 2) -0.5rem;
+  border: 1px dashed color-mix(in srgb, var(--jm-async) 55%, transparent);
+  border-left-width: 2px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--jm-async) 11%, transparent);
+}
+/* The core wash is darker in dark mode, so the band needs more tint to register. */
+:global([data-theme='dark']) .band {
+  background: color-mix(in srgb, var(--jm-async) 13%, transparent);
+}
+.bandLabel {
+  position: absolute;
+  top: -0.66rem;
+  left: 0.9rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 7px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  color: #ffffff;
+  background: linear-gradient(
+    135deg,
+    var(--jm-async) 0%,
+    color-mix(in srgb, var(--jm-async) 72%, #7a2d00) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--jm-async) 70%, transparent);
+}
+:global([data-theme='dark']) .bandLabel {
+  color: #2a1300;
+}
+
+/* ---- a step node ---- */
+/* Near-white on the deeper core wash, so the cards read as raised. */
+.node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.9rem 0.5rem 0.75rem;
+  border: 1.5px solid color-mix(in srgb, var(--jm-accent) 45%, transparent);
+  border-radius: 14px;
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--jm-accent) 9%, #ffffff) 0%,
+    color-mix(in srgb, var(--jm-accent) 20%, #ffffff) 100%
+  );
+  box-shadow:
+    0 5px 16px color-mix(in srgb, var(--amex-midnight) 14%, transparent),
+    0 1px 3px color-mix(in srgb, var(--amex-midnight) 10%, transparent);
+  text-align: center;
+}
+:global([data-theme='dark']) .node {
+  background: linear-gradient(
+    158deg,
+    color-mix(in srgb, var(--jm-accent) 30%, #12356a) 0%,
+    color-mix(in srgb, var(--jm-accent) 15%, #0a1f3d) 100%
+  );
+  border-color: color-mix(in srgb, var(--jm-accent) 62%, transparent);
+  box-shadow:
+    0 7px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(150, 195, 240, 0.16);
+}
+
+.linked .node::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: var(--jm-gap);
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--jm-edge);
+}
+.linked .node::before {
+  content: '';
+  position: absolute;
+  left: calc(100% + var(--jm-gap) - 9px);
+  top: 50%;
+  width: 9px;
+  height: 10px;
+  margin-top: -5px;
+  background: var(--jm-edge);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  z-index: 1;
+}
+
+/* ---- a fork: two things running at once ---- */
+.nodeFork {
+  border-style: dashed;
+  padding: 1.05rem 0.55rem 0.7rem;
+  gap: 0.45rem;
+}
+.forkLabel {
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.08rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--jm-accent) 85%, var(--amex-txt-strong));
+  background: var(--ifm-background-color);
+  border: 1px solid color-mix(in srgb, var(--jm-accent) 40%, transparent);
+}
+:global([data-theme='dark']) .forkLabel {
+  color: color-mix(in srgb, var(--jm-accent) 45%, #ffffff);
+  background: var(--amex-panel);
+}
+
+.forkBranches {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+}
+.branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--jm-accent) 38%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--jm-accent) 7%, var(--ifm-background-color));
+}
+:global([data-theme='dark']) .branch {
+  background: color-mix(in srgb, var(--jm-accent) 22%, var(--amex-panel));
+}
+.branchHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: var(--amex-txt-strong);
+  text-align: center;
+}
+.branchIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--jm-accent);
+}
+.branchStates {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.branchArrow {
+  color: var(--amex-mut);
+  font-size: 0.7rem;
+}
+.branchSystems {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  justify-content: center;
+}
+.branchNote {
+  font-size: 0.6rem;
+  font-style: italic;
+  color: var(--amex-mut);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* A step that sits and waits for events rather than doing work. */
+.nodeWaiting {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--amex-state-choice) 62%, transparent);
+}
+.timer {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: color-mix(in srgb, var(--amex-state-choice) 90%, var(--amex-txt));
+  background: var(--ifm-background-color);
+  border: 1.5px solid color-mix(in srgb, var(--amex-state-choice) 62%, transparent);
+  cursor: help;
+}
+:global([data-theme='dark']) .timer {
+  background: var(--amex-panel);
+}
+.timer .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* The number is an index into the notes below, so it is filled and saturated. */
+.nodeNum {
+  position: absolute;
+  top: -10px;
+  left: -8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 750;
+  color: #fff;
+  background: var(--jm-num);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--jm-num) 45%, transparent);
+}
+:global([data-theme='dark']) .nodeNum {
+  color: #17123a;
+}
+
+.nodeIcon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(
+    140deg,
+    var(--jm-accent),
+    color-mix(in srgb, var(--jm-accent) 55%, #05132b)
+  );
+  box-shadow: 0 3px 11px color-mix(in srgb, var(--jm-accent) 38%, transparent);
+}
+.nodeIcon .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.nodeName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amex-txt-strong);
+}
+
+/* A table the step works in, shown where the state pill would sit. Dashed, so a
+   data store never reads as a lifecycle state. */
+.tableRef {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  padding: 2px 8px;
+  border-radius: 7px;
+  font-size: 0.64rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--amex-mut);
+  border: 1px dashed var(--jm-soft);
+  background: color-mix(in srgb, var(--amex-mut) 7%, transparent);
+}
+.tableRef .icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.modeNote {
+  display: block;
+  margin-top: 0.4rem;
+  text-align: center;
+  font-size: 0.63rem;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+/* ---- the persistence strip ---- */
+.tickCell {
+  height: 26px;
+}
+.tick {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 0;
+  height: 12px;
+  border-left: 1.5px dotted color-mix(in srgb, var(--jm-accent) 55%, transparent);
+}
+.tick::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--jm-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--jm-accent) 22%, transparent);
+}
+
+.persist {
+  position: relative;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  align-self: end;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+/* The rule runs the width of the rail and the label sits on top of it, so the
+   dashes never cut through the words. */
+.persist::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1.5px dashed color-mix(in srgb, var(--jm-accent) 45%, transparent);
+}
+/* This is a platform guarantee rather than an aside, so it is drawn as a
+   deliberate callout instead of a muted footnote. */
+.persistChip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--jm-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--jm-accent) 12%, var(--ifm-background-color));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--amex-midnight) 12%, transparent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--jm-accent) 80%, var(--amex-txt-strong));
+  text-align: center;
+}
+:global([data-theme='dark']) .persistChip {
+  background: color-mix(in srgb, var(--jm-accent) 26%, var(--amex-panel));
+  color: color-mix(in srgb, var(--jm-accent) 40%, #ffffff);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+}
+.persistChip .icon {
+  width: 15px;
+  height: 15px;
+  color: inherit;
+}
+
+/* ---- systems fanning out below a step ---- */
+.fan {
+  position: relative;
+  margin-top: 0.6rem;
+  padding-left: 22px;
+}
+.fan::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: -0.6rem;
+  bottom: 0.75rem;
+  border-left: 1px solid var(--jm-soft);
+}
+.fanList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fanList li {
+  position: relative;
+  margin: 0 0 0.26rem;
+}
+.fanList li::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 0.62em;
+  width: 10px;
+  border-top: 1px solid var(--jm-soft);
+}
+
+/* External system names read as names, so they use the text face and weight. */
+.sys {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 650;
+  padding: 2px 8px;
+  border-radius: 7px;
+  cursor: help;
+  text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--amex-cat-architecture) 32%, transparent);
+  background: color-mix(in srgb, var(--amex-cat-architecture) 9%, var(--ifm-background-color));
+  color: var(--amex-txt-strong);
+}
+:global([data-theme='dark']) .sys {
+  border-color: color-mix(in srgb, var(--amex-cat-architecture) 48%, transparent);
+  background: color-mix(in srgb, var(--amex-cat-architecture) 24%, transparent);
+}
+
+.fanNote {
+  margin: 0.3rem 0 0;
+  font-size: 0.63rem;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+/* ---- exceptions branching above a step ---- */
+.exit {
+  position: relative;
+  padding-bottom: 16px;
+  margin-bottom: 0.1rem;
+}
+.exit::after {
+  content: '';
+  position: absolute;
+  left: 21px;
+  bottom: 0;
+  height: 16px;
+  border-left: 1.5px dashed var(--x-tone);
+}
+.x_bad {
+  --x-tone: color-mix(in srgb, var(--amex-state-failure) 60%, transparent);
+}
+.x_warn {
+  --x-tone: color-mix(in srgb, var(--amex-state-choice) 65%, transparent);
+}
+.x_flight,
+.x_good {
+  --x-tone: var(--jm-soft);
+}
+
+.exitBody {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.28rem 0.5rem;
+  border: 1px dashed var(--x-tone);
+  border-radius: 10px;
+  background: var(--ifm-background-color);
+}
+:global([data-theme='dark']) .exitBody {
+  background: color-mix(in srgb, var(--jm-accent) 14%, var(--amex-panel));
+}
+.exitIcon {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--x-tone);
+}
+.exitLabel {
+  font-size: 0.68rem;
+  color: var(--amex-mut);
+  max-width: 16ch;
+}
+
+/* ==================================================================== *
+ * State pills
+ * ==================================================================== */
+
+.state {
+  display: inline-block;
+  font-family: var(--amex-font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  border: 1px solid;
+}
+.terminal {
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+}
+.flight {
+  color: var(--amex-state-intermediate);
+  border-color: color-mix(in srgb, var(--amex-state-intermediate) 42%, transparent);
+  background: color-mix(in srgb, var(--amex-state-intermediate) 12%, transparent);
+}
+.good {
+  color: var(--amex-state-success);
+  border-color: color-mix(in srgb, var(--amex-state-success) 45%, transparent);
+  background: color-mix(in srgb, var(--amex-state-success) 14%, transparent);
+}
+.bad {
+  color: var(--amex-state-failure);
+  border-color: color-mix(in srgb, var(--amex-state-failure) 45%, transparent);
+  background: color-mix(in srgb, var(--amex-state-failure) 12%, transparent);
+}
+.warn {
+  color: color-mix(in srgb, var(--amex-state-choice) 82%, var(--amex-txt));
+  border-color: color-mix(in srgb, var(--amex-state-choice) 50%, transparent);
+  background: color-mix(in srgb, var(--amex-state-choice) 15%, transparent);
+}
+
+/* ==================================================================== *
+ * Narrow widths
+ * ==================================================================== */
+
+/* A 1280 laptop with both sidebars open leaves roughly 580px here. Tighten the
+   gap and the node padding rather than giving up the rail. */
+@container (max-width: 780px) {
+  .arrow {
+    width: 18px;
+  }
+  .rail {
+    --jm-gap: 16px;
+  }
+  .node {
+    padding: 0.75rem 0.35rem 0.65rem;
+  }
+  .nodeName {
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+  }
+  .modeNote {
+    font-size: 0.6rem;
+  }
+  .persist {
+    font-size: 0.63rem;
+  }
+}
+
+/* Below this five nodes cannot hold their labels, so the rail turns vertical. */
+@container (max-width: 560px) {
+  /* A long One-Data function name is wider than a phone. Let chips wrap their
+     text here rather than push the page sideways. */
+  .hop {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .linkGroup {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .rail {
+    grid-template-columns: minmax(140px, 190px) auto auto;
+    grid-template-rows: repeat(var(--steps), auto);
+    justify-content: start;
+    column-gap: 0;
+    row-gap: var(--jm-vgap);
+  }
+  .nodeCell {
+    grid-column: 1;
+    grid-row: var(--col);
+  }
+  .fanCell {
+    grid-column: 2;
+    grid-row: var(--col);
+    align-self: center;
+    max-width: 250px;
+  }
+  .exitCell {
+    grid-column: 3;
+    grid-row: var(--col);
+    align-self: center;
+  }
+  .tickCell {
+    display: none;
+  }
+  .band {
+    grid-column: 1 / -1;
+    grid-row: var(--band-from) / -1;
+    margin: calc(-1 * var(--jm-vgap) / 2) -0.6rem -0.6rem;
+  }
+  .bandLabel {
+    left: auto;
+    right: 0.9rem;
+  }
+  .persist {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-content: flex-start;
+    text-align: left;
+    margin-top: 0.8rem;
+  }
+  .linked .node::after {
+    left: 50%;
+    top: 100%;
+    width: 0;
+    height: var(--jm-vgap);
+    border-top: 0;
+    border-left: 1.5px solid var(--jm-edge);
+  }
+  .linked .node::before {
+    left: 50%;
+    top: calc(100% + var(--jm-vgap) - 7px);
+    margin-top: 0;
+    margin-left: -3.5px;
+    border-top: 0;
+    border-right: 1.5px solid var(--jm-edge);
+    border-bottom: 1.5px solid var(--jm-edge);
+  }
+  .node {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    text-align: left;
+    padding: 0.6rem 0.7rem;
+  }
+  .nodeName {
+    flex: 1;
+  }
+  .modeNote {
+    text-align: left;
+    padding-left: 0.2rem;
+  }
+  .fan {
+    margin-top: 0;
+    padding-left: 30px;
+  }
+  .fan::before {
+    left: 0;
+    top: 50%;
+    bottom: auto;
+    height: 0;
+    width: 18px;
+    border-left: 0;
+    border-top: 1px solid var(--jm-soft);
+  }
+  .fanList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.28rem;
+  }
+  .fanList li {
+    margin: 0;
+  }
+  .fanList li::before {
+    display: none;
+  }
+  .exit {
+    padding-bottom: 0;
+    padding-left: 22px;
+  }
+  .exit::after {
+    left: 0;
+    bottom: auto;
+    top: 50%;
+    height: 0;
+    width: 22px;
+    border-left: 0;
+    border-top: 1.5px dashed var(--x-tone);
+  }
+}
+
+/* On a phone even three columns are one too many. Flatten to a single column.
+   The DOM order per step is exception, node, systems, so plain flex flow reads
+   correctly. The connectors and the band go: each node keeps its number and its
+   own caption, so nothing is lost, only drawn differently. */
+@container (max-width: 430px) {
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .exitCell,
+  .nodeCell,
+  .fanCell {
+    grid-column: auto;
+    grid-row: auto;
+    max-width: none;
+  }
+  .band {
+    display: none;
+  }
+  .linked .node::after,
+  .linked .node::before {
+    display: none;
+  }
+  .nodeCell {
+    margin-top: 0.35rem;
+  }
+  .exit {
+    padding-left: 20px;
+    padding-bottom: 0;
+  }
+  .exitLabel {
+    max-width: none;
+  }
+  .fan {
+    margin-top: 0.4rem;
+    padding-left: 20px;
+  }
+}
+
+/* ==================================================================== *
+ * Compact panel — for the APIs the spec names but does not describe
+ * ==================================================================== */
+
+.panel {
+  margin: 1rem 0 0.2rem;
+  padding: 0.8rem 1rem;
+  border: 1.5px dashed var(--amex-line-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--amex-mut) 5%, transparent);
+}
+.panelLabel {
+  margin: 0 0 0.25rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--amex-mut);
+}
+.panelLabel::before {
+  content: '◌';
+  margin-right: 0.4rem;
+}
+.panelNote {
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--amex-txt);
+}
+.panelTbd {
+  border-color: color-mix(in srgb, var(--amex-state-choice) 45%, transparent);
+  background: color-mix(in srgb, var(--amex-state-choice) 7%, transparent);
+}
+.panelTbd .panelLabel {
+  color: color-mix(in srgb, var(--amex-state-choice) 80%, var(--amex-txt));
+}
+
+/* ==================================================================== *
+ * Footer — the numbered notes and the diagram link
+ * ==================================================================== */
+
+.foot {
+  padding: 0.2rem 1.25rem 0.9rem;
+}
+
+.detail {
+  margin: 0 0 0.6rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--jm-accent) 3%, transparent);
+  overflow: hidden;
+}
+/* Matches the sequence-diagram link below it: same blue, same unbolded weight. */
+.detail > summary {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.98rem;
+  font-weight: 400;
+  color: var(--jm-accent);
+  cursor: pointer;
+  list-style: revert;
+}
+.detail > ul {
+  margin: 0;
+  padding: 0.1rem 1.1rem 0.8rem 0.95rem;
+  list-style: none;
+  font-size: 0.84rem;
+}
+.detail > ul li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-bottom: 0.45rem;
+  color: var(--amex-txt);
+}
+
+/* Same number, same colour as the step it explains. */
+.detailNum {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 7px;
+  font-size: 0.66rem;
+  font-weight: 750;
+  color: #fff;
+  background: var(--jm-num);
+  transform: translateY(2px);
+}
+:global([data-theme='dark']) .detailNum {
+  color: #17123a;
+}
+.detailDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-left: 6px;
+  margin-right: 6px;
+  background: var(--amex-mut);
+  transform: translateY(0);
+}
+
+.reference {
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: var(--jm-accent);
+}
+
+/* ==================================================================== *
+ * Legend
+ * ==================================================================== */
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 0.5rem 1.6rem;
+  margin: 1.3rem 0 2rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 14px;
+  background: var(--amex-panel);
+  box-shadow: var(--amex-sh-sm);
+
+  --jm-num: #6d4aca;
+  --jm-accent: var(--amex-cat-design);
+  --jm-soft: color-mix(in srgb, var(--amex-mut) 60%, transparent);
+}
+:global([data-theme='dark']) .legend {
+  --jm-num: #a78bfa;
+}
+
+.legendKeys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.legendKeys li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.76rem;
+  color: var(--amex-mut);
+}
+.legendKeys li > :first-child {
+  flex: 0 0 auto;
+}
+
+.legendFan,
+.legendExit,
+.legendBand {
+  display: inline-block;
+  width: 26px;
+  height: 13px;
+  transform: translateY(2px);
+}
+.legendFan {
+  border-left: 1px solid var(--jm-soft);
+  border-bottom: 1px solid var(--jm-soft);
+  width: 14px;
+  margin-left: 6px;
+}
+.legendExit {
+  border-left: 1.5px dashed color-mix(in srgb, var(--amex-state-failure) 60%, transparent);
+  border-top: 1.5px dashed color-mix(in srgb, var(--amex-state-failure) 60%, transparent);
+  width: 14px;
+  margin-left: 6px;
+}
+.legendBand {
+  border: 1px dashed color-mix(in srgb, var(--amex-state-choice) 45%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--amex-state-choice) 12%, transparent);
+}
+.legendNum {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 7px;
+  font-size: 0.66rem;
+  font-weight: 750;
+  color: #fff;
+  background: var(--jm-num);
+  transform: translateY(3px);
+}
+:global([data-theme='dark']) .legendNum {
+  color: #17123a;
+}
+
+.legendNote {
+  grid-column: 1 / -1;
+  margin: 0.3rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--amex-line);
+  font-size: 0.73rem;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+/* ==================================================================== *
+ * Print
+ * ==================================================================== */
+
+@media print {
+  .wrap {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  .nodeCell,
+  .fanCell,
+  .exitCell,
+  .detail {
+    break-inside: avoid;
+  }
+  .detail[open] > summary {
+    display: none;
+  }
+  .wrap * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

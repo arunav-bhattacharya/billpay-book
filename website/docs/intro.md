@@ -24,8 +24,8 @@ This site captures every moving part of that journey:
 ## How to read these docs
 
 - **Start with [Vision](vision/index.md)** — the *why* (product) and *how we think about it* (engineering) in under ten minutes.
-- **For product.** The [Architecture Overview](architecture/overview.md) and the [State Diagrams](design/diagrams/state-diagram.md) together give you the full mental model.
-- **For engineers.** Start with the [API → Workflow journey](design/journeys/apis.md) for the end-to-end view, then drill into the [Workflows](design/workflows/core.md) and the [Build section](build/index.md) for how it's all put together.
+- **For product.** The [Payment Journeys](design/journeys/index.md) show what happens to a payment end to end, from the channel a customer starts in to the money settling. Pair them with the [Architecture Overview](architecture/overview.md) for the full mental model.
+- **For engineers.** Start with the same [Payment Journeys](design/journeys/index.md) for the end-to-end view, then drill into the [Workflows](design/workflows/core.md) and the [Build section](build/index.md) for how it's all put together.
 
 ## Conventions
 

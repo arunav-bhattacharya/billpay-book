@@ -1,0 +1,585 @@
+/* LandscapeMap — the payments domain at the centre, flanked by the supporting
+   domains and the external parties, with channels entering from the top.
+   Ownership is carried by the two bands; the interface a domain exposes is
+   carried by the Type-A badges and rails. Every card sets --tier and the
+   border, fill, chips and number badge all mix off that one hue. */
+
+.wrap {
+  margin: 1.8rem 0 2.6rem;
+  padding: 1.75rem 1.5rem 1.4rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 18px;
+  background: var(--amex-panel);
+  box-shadow: var(--amex-sh-sm);
+}
+
+/* ---- tier hues ---- */
+.billpay {
+  --tier: var(--amex-blue-bright);
+}
+.shared {
+  --tier: var(--amex-indigo);
+}
+.support {
+  --tier: var(--amex-cat-build);
+}
+.tech {
+  --tier: var(--amex-cat-operations);
+}
+.external {
+  --tier: var(--amex-cat-testing);
+}
+.channels {
+  --tier: var(--amex-platinum);
+}
+:global([data-theme='dark']) .shared {
+  --tier: var(--amex-cat-observability);
+}
+:global([data-theme='dark']) .channels {
+  --tier: var(--amex-cat-deployment);
+}
+
+/* ---- the board ---- */
+.board {
+  display: grid;
+  grid-template-columns: 0.74fr 1.9fr 0.66fr;
+  grid-template-rows: auto auto;
+  gap: 1.5rem 1.35rem;
+  align-items: start;
+}
+
+.channelSlot {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.flank:first-of-type {
+  grid-column: 1;
+  grid-row: 2;
+}
+.centre {
+  grid-column: 2;
+  grid-row: 2;
+}
+.flank:last-of-type {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+/* ---- channels ---- */
+.chanRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chan {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  font-size: 0.78rem;
+  font-weight: 550;
+  line-height: 1.3;
+  padding: 0.34rem 0.62rem 0.34rem 0.5rem;
+  border-radius: 9px;
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--tier) 12%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--tier) 32%, #d7deea);
+}
+:global([data-theme='dark']) .chan {
+  background: color-mix(in srgb, var(--tier) 26%, #0b2246);
+  border-color: color-mix(in srgb, var(--tier) 44%, #1c355f);
+}
+
+.icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: color-mix(in srgb, var(--tier) 78%, var(--amex-txt-strong));
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- interface rails ---- */
+.rail {
+  margin: 1.1rem 0 0;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--amex-blue) 50%, transparent);
+  background: color-mix(in srgb, var(--amex-blue) 9%, var(--amex-panel));
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.65rem;
+  position: relative;
+  text-align: center;
+}
+.rail span {
+  font-weight: 750;
+  font-size: 0.84rem;
+  letter-spacing: 0.01em;
+  color: var(--amex-blue);
+}
+.rail em {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--amex-mut);
+}
+/* dotted stubs so a rail reads as a seam between two things */
+.rail::before,
+.rail::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 0;
+  height: 11px;
+  border-left: 2px dotted color-mix(in srgb, var(--amex-blue) 55%, transparent);
+}
+.rail::before {
+  top: -12px;
+}
+.rail::after {
+  bottom: -12px;
+}
+:global([data-theme='dark']) .rail span {
+  color: var(--amex-blue-bright);
+}
+
+/* the core-facing rail is quieter, and sits inside the shared band */
+.railCore {
+  margin: 1.35rem 0 1.25rem;
+  border-color: color-mix(in srgb, var(--amex-mut) 55%, transparent);
+  background: color-mix(in srgb, var(--amex-mut) 8%, var(--amex-panel));
+}
+.railCore span,
+:global([data-theme='dark']) .railCore span {
+  color: var(--amex-mut);
+}
+.railCore::before,
+.railCore::after {
+  border-left-color: color-mix(in srgb, var(--amex-mut) 60%, transparent);
+}
+
+/* ---- the centre: the payments domain ---- */
+.centre {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.55rem;
+  padding: 2rem 1.15rem 1.3rem;
+  border: 1.5px solid var(--amex-line-strong);
+  border-radius: 19px;
+  background: color-mix(in srgb, var(--amex-blue) 4%, var(--amex-panel));
+}
+
+.centreLabel {
+  position: absolute;
+  top: -0.72rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.2rem 0.85rem;
+  border-radius: 9px;
+  white-space: nowrap;
+  font-size: 0.73rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--amex-txt-strong);
+  background: var(--amex-panel);
+  border: 1.5px solid var(--amex-line-strong);
+}
+
+/* ---- the two ownership bands ---- */
+.groupBillpay,
+.groupShared {
+  position: relative;
+  padding: 1.85rem 1rem 1.1rem;
+  border-radius: 16px;
+}
+
+/* Billpay gets a saturated field of its own so it never reads as one more box
+   in the row. */
+.groupBillpay {
+  border: 1.5px solid var(--amex-blue-bright);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--amex-blue-bright) 17%, var(--amex-panel)) 0%,
+    color-mix(in srgb, var(--amex-blue) 15%, var(--amex-panel)) 100%
+  );
+  box-shadow: var(--amex-glow);
+}
+
+.groupShared {
+  border: 1px dashed color-mix(in srgb, var(--amex-indigo) 50%, transparent);
+  background: color-mix(in srgb, var(--amex-indigo) 5%, transparent);
+}
+:global([data-theme='dark']) .groupShared {
+  border-color: color-mix(in srgb, var(--amex-cat-observability) 45%, transparent);
+  background: color-mix(in srgb, var(--amex-cat-observability) 7%, transparent);
+}
+
+.groupTag {
+  position: absolute;
+  top: -0.64rem;
+  left: 1.05rem;
+  padding: 0.14rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.69rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+  background: var(--amex-panel);
+  border: 1px solid var(--amex-line-strong);
+}
+
+.groupTagBillpay {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-bright) 100%);
+  box-shadow: 0 3px 11px color-mix(in srgb, var(--amex-blue-bright) 45%, transparent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 0.95rem;
+  align-items: start;
+}
+
+/* ---- cards ---- */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 0.9rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--amex-line));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--tier) 13%, var(--amex-panel));
+  box-shadow: var(--amex-sh-sm);
+}
+
+/* a domain that exposes a Type-A API gets a solid top edge; the core-facing
+   ones get a dashed edge, so the two kinds are separable at a glance */
+.hasApi {
+  border-top-width: 3px;
+  border-top-color: var(--amex-blue);
+}
+:global([data-theme='dark']) .hasApi {
+  border-top-color: var(--amex-blue-bright);
+}
+.hasApiCore {
+  border-top-style: dashed;
+  border-top-color: var(--amex-mut);
+}
+:global([data-theme='dark']) .hasApiCore {
+  border-top-color: var(--amex-mut);
+}
+
+/* Bill Pay Core — the one box the page is about. Signature gradient, white
+   type, its own glow. Nothing else on the map is treated this way. */
+.hero {
+  grid-column: 1 / -1;
+  border: none;
+  border-top: 3px solid rgba(255, 255, 255, 0.75);
+  background: var(--amex-grad-btn);
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--amex-blue-bright) 45%, transparent);
+}
+.hero .title {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.hero .num {
+  color: var(--amex-blue-deep);
+  background: #fff;
+}
+.hero .cap {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.17);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.hero .store {
+  color: rgba(255, 255, 255, 0.86);
+}
+.hero .storeGlyph {
+  stroke: rgba(255, 255, 255, 0.8);
+}
+.hero .storeGlyph ellipse {
+  fill: rgba(255, 255, 255, 0.2);
+}
+.hero .api {
+  color: var(--amex-blue-deep);
+  background: #fff;
+  border-color: transparent;
+}
+
+/* flank cards are tighter — same content, a third of the room */
+.compact {
+  padding: 0.68rem 0.72rem 0.72rem;
+  gap: 0.45rem;
+}
+.compact .title {
+  font-size: 0.84rem;
+}
+.compact .cap {
+  font-size: 0.68rem;
+  padding: 0.16rem 0.4rem;
+}
+.compact .num {
+  width: 20px;
+  height: 20px;
+  font-size: 0.64rem;
+}
+
+/* External parties carry no capability chips, so the card does the work. */
+.ext {
+  position: relative;
+  gap: 0.3rem;
+  padding-left: 1rem;
+  min-height: 62px;
+  justify-content: center;
+  background: color-mix(in srgb, var(--tier) 20%, var(--amex-panel));
+  overflow: hidden;
+}
+.ext::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--tier);
+}
+.ext .title {
+  font-size: 0.85rem;
+}
+
+.via {
+  font-size: 0.67rem;
+  line-height: 1.35;
+  color: var(--amex-mut);
+}
+.viaBoth {
+  font-weight: 650;
+  color: color-mix(in srgb, var(--amex-cat-testing) 70%, var(--amex-txt-strong));
+}
+:global([data-theme='dark']) .viaBoth {
+  color: var(--amex-cat-testing);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.69rem;
+  font-weight: 750;
+  color: #fff;
+  background: linear-gradient(
+    140deg,
+    var(--tier),
+    color-mix(in srgb, var(--tier) 55%, #05132b)
+  );
+}
+
+.title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.004em;
+  color: var(--amex-txt-strong);
+}
+
+/* ---- the Type-A badge ---- */
+.api {
+  margin-left: auto;
+  flex: none;
+  padding: 0.12rem 0.42rem;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--amex-blue);
+  background: color-mix(in srgb, var(--amex-blue) 13%, var(--amex-panel));
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 50%, transparent);
+}
+:global([data-theme='dark']) .api {
+  color: var(--amex-blue-bright);
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 55%, transparent);
+}
+.apiCore {
+  color: var(--amex-mut);
+  background: color-mix(in srgb, var(--amex-mut) 13%, var(--amex-panel));
+  border: 1px dashed color-mix(in srgb, var(--amex-mut) 55%, transparent);
+}
+:global([data-theme='dark']) .apiCore {
+  color: var(--amex-mut);
+  border-color: color-mix(in srgb, var(--amex-mut) 60%, transparent);
+}
+
+.caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.cap {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0.2rem 0.48rem;
+  border-radius: 7px;
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--tier) 11%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--tier) 30%, #d7deea);
+}
+:global([data-theme='dark']) .cap {
+  background: color-mix(in srgb, var(--tier) 26%, #0b2246);
+  border-color: color-mix(in srgb, var(--tier) 42%, #1c355f);
+}
+
+/* ---- data store glyph ---- */
+.store {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--amex-mut);
+}
+
+.storeGlyph {
+  flex: none;
+  width: 12px;
+  height: 14px;
+  fill: none;
+  stroke: color-mix(in srgb, var(--tier) 70%, var(--amex-mut));
+  stroke-width: 1.4;
+}
+.storeGlyph ellipse {
+  fill: color-mix(in srgb, var(--tier) 18%, var(--amex-panel));
+}
+
+/* ---- flanks ---- */
+.flank {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.flankLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+  line-height: 1.4;
+}
+.flankLabel em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.7rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--amex-mut);
+  opacity: 0.85;
+}
+
+.flankStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* ---- legend ---- */
+.legend {
+  margin-top: 1.8rem;
+  padding-top: 1.05rem;
+  border-top: 1px solid var(--amex-line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 1.3rem;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-size: 0.76rem;
+  color: var(--amex-mut);
+}
+
+.swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--amex-line));
+  background: color-mix(in srgb, var(--tier) 32%, var(--amex-panel));
+}
+
+.heroSwatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  border: none;
+  background: var(--amex-grad-btn);
+}
+
+.legendApi {
+  margin-left: 0;
+  font-style: normal;
+}
+
+/* ---- narrow: unwind the three columns into one stack ---- */
+@media (max-width: 996px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+  .channelSlot,
+  .centre,
+  .flank:first-of-type,
+  .flank:last-of-type {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .flankStack {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 1.25rem 0.85rem 1.05rem;
+  }
+  .grid,
+  .flankStack {
+    grid-template-columns: 1fr;
+  }
+  .centre {
+    padding: 1.9rem 0.7rem 1rem;
+  }
+  .groupBillpay,
+  .groupShared {
+    padding: 1.75rem 0.6rem 0.9rem;
+  }
+}

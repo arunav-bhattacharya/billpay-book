@@ -32,7 +32,7 @@ import Lead from '@site/src/components/Lead';
 | `payment-date` = today, multiple instructions | Create Payment with Multiple Instructions *(Online)* |
 | `payment-date` = future | Create Schedule Payment *(Online)*, then Execute Scheduled Payment when the date arrives *(Offline)* |
 
-Once a create is accepted, account type decides the fan-out: a consumer split runs one Execute Split Payment per leg, and a corporate payment first runs Get Corporate Payment Allocations for its breakdown, then an Execute Split Payment per allocation. The full picture — every trigger, condition, and child workflow with its worker — is the [Billpay Router table](../../architecture/components.md) in Architecture and the [API journeys map](../../design/journeys/apis.md) in Design.
+Once a create is accepted, account type decides the fan-out: a consumer split runs one Execute Split Payment per leg, and a corporate payment first runs Get Corporate Payment Allocations for its breakdown, then an Execute Split Payment per allocation. The full picture — every trigger, condition, and child workflow with its worker — is the [Billpay Router table](../../architecture/components.md) in Architecture and the [Payment Journeys](../../design/journeys/index.md) in Design.
 
 ## Idempotency at the boundary
 

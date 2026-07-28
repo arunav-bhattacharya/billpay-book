@@ -13,7 +13,11 @@ const sidebars = {
       className: 'sidebar-sec sidebar-sec--vision',
       collapsed: false,
       link: {type: 'doc', id: 'vision/index'},
-      items: ['vision/product', 'vision/engineering'],
+      items: [
+        'vision/payments-overview',
+        'vision/product',
+        'vision/engineering',
+      ],
     },
     {
       type: 'category',
@@ -41,7 +45,10 @@ const sidebars = {
           label: 'Journeys',
           collapsed: true,
           link: {type: 'doc', id: 'design/journeys/index'},
-          items: ['design/journeys/apis', 'design/journeys/schedulers'],
+          items: [
+            'design/journeys/customer-initiated',
+            'design/journeys/system-initiated',
+          ],
         },
         {
           type: 'category',

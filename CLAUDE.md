@@ -22,6 +22,14 @@ Repo currently contains only `docs/Wiki_Spec.md`. Everything else — reference 
 - Palette: *(fill in once chosen — reuse the warm-orange/teal/gold gradient system from other projects if you want visual consistency, or specify a fresh one)*
 - Diagrams: Mermaid via Docusaurus's built-in mermaid support, for every sequence/state diagram the spec calls out
 
+## Writing style — applies to every page
+- **Run the `humanizer` skill before writing page prose.** Load it at the start of any content task, not as a cleanup pass at the end.
+- **No em dashes or en dashes.** Use a period, comma, colon, or parentheses. This is the most reliable AI tell and it is a hard rule.
+- **Prefer short bulleted points to paragraphs.** Verbosity is the problem, not page length.
+- **Avoid `**Bold header:** explanation` bullet lists.** Write the point directly.
+- **Plain words over inflated ones.** Simple and easy to understand beats impressive.
+- Applies to page copy and to user-visible strings inside React components.
+
 ## Working conventions
 - No page gets written ad hoc — every page starts from an entry in `CONTENT_PLAN.md`.
 - One phase per session/commit. Don't jump ahead to Design before Vision/Architecture are reviewed and approved.

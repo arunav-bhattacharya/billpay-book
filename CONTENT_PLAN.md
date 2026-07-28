@@ -139,3 +139,48 @@ Reference divergences corrected (spec wins):
 **Testing · Deployment · Observability · Operations** mirrored from the reference (copy/re-theme treatment) via four parallel sub-agents; house style (Lead intros, v3 admonitions), reference placeholders carried as short honest pages, no invented facts. Spec renames applied throughout: Realtime/Batch → Online/Offline (incl. deployables renamed `online-worker-app` / `offline-worker-app` + sidebar), no `#`-prefixed workflow names, endpoint spellings aligned to our API pages. Observability carries the reference's full SLA/SLI/SLO tables (all numbers) re-themed onto `Highlights`.
 
 Also completed (previously unassigned): `intro.md` (layer table without the banned rows, our naming conventions), the three **Contributing** pages grounded in this repo's real toolchain (nvm/arm64, port 3100, publish = push to main → Actions workflow), and the two remaining Design stubs (`design/database.md`, `design/diagrams/index.md`). **Zero stubs remain across all 87 pages.** Next: Phase E QA pass.
+
+## Phase F — Vision ▸ Payments Overview (2026-07-27)
+
+**New page: `vision/payments-overview`** — added **first** under Vision (before
+`product`), so the ecosystem context comes before the zoom into Billpay.
+
+**Source-hierarchy exception — read this before editing the page.** This page is *not*
+grounded in `docs/Wiki_Spec.md`. Its facts come from two user-supplied sources:
+
+1. `reference/payments-overview.pdf` — an ecosystem diagram of the Amex payments estate,
+   mapping 18 numbered domains plus the external parties. Transcribed box-for-box into
+   `src/components/LandscapeMap`. The source diagram's `NEW` ribbons on *Bill Pay Inbound
+   Processor* and *Allocation Manager* were deliberately dropped. Two further
+   departures from the source, both on user direction: **Allocation Manager sits outside
+   the Billpay platform**, grouped with the other payments domains, and that group is
+   named **Shared payments services** (the source diagram leaves it unnamed).
+2. The user's account of the legacy estate — one monolith owning instruments,
+   arrangements (mandates and autopays) and Amex-initiated payments; third-party-initiated
+   payments in a separate set of applications; a third application consolidating both so
+   payment history could be served. Drawn in `src/components/LegacyMap`.
+3. The user's account of the **interface rules**, which are on neither the diagram nor the
+   spec. These are the authority for the Type-A badges and rails in `LandscapeMap`:
+   - Type-A APIs exist on **Bill Pay Core, Plans, Payment Instruments and Mandates**, and
+     these four are the only domains channels call.
+   - **Multirail Gateway** and **Payments Clearing** also expose Type-A APIs, but
+     **Bill Pay Core is their only caller**.
+   - Every external party is reached through **Payments Clearing**, except
+     **3rd Party Account Verification**, which is reached from Payments Clearing *and*
+     Payment Instruments.
+
+   The map carries ownership in the two bands and the interface rules in badges plus
+   labelled rails, because the two groupings cut across each other. Drawn connector lines
+   were rejected: an SVG overlay on a responsive grid breaks on reflow.
+
+**This supersedes, for this page only, the Phase-B note that called Instruments / Plans /
+Mandates "invented external systems".** The diagram confirms they are real neighbouring
+domains. Per user direction, they are named on `vision/payments-overview` and nowhere
+else — `architecture/overview.md` and `architecture/components.md` were left untouched.
+Anyone extending the domain vocabulary into Architecture should treat that as a separate,
+explicitly approved change.
+
+New components: `LandscapeMap` (CSS Grid — no flows to draw, and 18 boxes in a fixed SVG
+viewBox would force horizontal scroll) and `LegacyMap` (inline SVG, following the
+`HADiagram` precedent, because the tangle *is* the argument). Both theme-aware off the
+Amex tokens.

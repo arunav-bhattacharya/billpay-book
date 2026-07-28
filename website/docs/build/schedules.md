@@ -29,4 +29,4 @@ Executors work in waves rather than draining everything at once: pick up **2,500
 
 ## Build-time wiring
 
-Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys — which makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. What each periodic workflow actually does, step by step, is in [Design → Periodic Workflows](../design/workflows/periodic.md).
+Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys — which makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. What each periodic workflow actually does, step by step, is in [Design → Periodic Workflows](../design/workflows/periodic.md); where each schedule fires in the life of a payment is in [Design → System Initiated Journeys](../design/journeys/system-initiated.md).

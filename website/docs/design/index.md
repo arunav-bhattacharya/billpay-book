@@ -41,7 +41,7 @@ import Highlights from '@site/src/components/Highlights';
 
 - **[Principles](./principles.md)** — the component model and its call, naming, and composition rules.
 - **[Payment state model](./payment-state-model.md)** — the canonical lifecycle states and what each means.
-- **[Journeys](./journeys/index.md)** — how a request or a schedule routes to a workflow.
+- **[Journeys](./journeys/index.md)** — each payment end to end, from the channel a customer starts in to the money settling.
 - **[Workflows](./workflows/index.md)** — the per-workflow logic (core, composite, periodic).
 - **[Stages](./stages.md)** — the state-transition steps a workflow composes.
 - **[ActivityGroups & Activities](./activities.md)** — the retryable actions the stages call.
