@@ -5,52 +5,197 @@ sidebar_label: Engineering
 
 import Lead from '@site/src/components/Lead';
 import Highlights from '@site/src/components/Highlights';
+import CompositionMap from '@site/src/components/CompositionMap';
+import Principles from '@site/src/components/Principles';
+import WorkerSplit from '@site/src/components/WorkerSplit';
+
+export const DIMENSIONS = [
+  {
+    name: 'accountType',
+    ask: 'Whose account is being paid?',
+    answers: ['CONSUMER', 'CORPORATE', 'BUSINESS_TRAVEL'],
+  },
+  {
+    name: 'requiresArPosting',
+    ask: 'Should the payment be posted to Accounts Receivable?',
+    answers: ['yes', 'no'],
+  },
+  {
+    name: 'requiresRealtimeClearing',
+    ask: 'Should clearing happen in realtime?',
+    answers: ['yes', 'no'],
+  },
+  {
+    name: 'requiresMandateAuthorization',
+    ask: 'Should a mandate be verified?',
+    answers: ['yes', 'no'],
+  },
+];
+
+export const RUN = {
+  workflow: 'Create Immediate Payment',
+  steps: ['Pending', 'Accepted', 'Processing', 'Processed'],
+};
+
+export const WORKERS = [
+  {
+    name: 'Online worker',
+    tone: 'online',
+    waiting: 'someone is waiting',
+    desc: 'Runs the workflows a person is sitting in front of, where the answer goes straight back to the caller.',
+    items: [
+      'Create Immediate Payment',
+      'Update Payment',
+      'Cancel Payment',
+      'Create Payment Intent',
+    ],
+  },
+  {
+    name: 'Offline worker',
+    tone: 'offline',
+    waiting: 'nobody is blocked',
+    desc: 'Runs everything triggered asynchronously. Work arrives through events, for example from RTF (the Reliable Transaction Framework), or through a scheduler.',
+    items: [
+      'Execute Scheduled Payment',
+      'Process Inbound Payment',
+      'Process Returned Payment',
+      'Process Representment',
+      'Get Corporate Payment Allocations',
+    ],
+  },
+];
+
+export const STRIPS = [
+  {
+    label: 'Either worker',
+    text: 'A few workflows run on both, depending on where in the journey they are called.',
+    items: ['Create Schedule Payment', 'Execute Split Payment', 'Create Balance Refund'],
+  },
+  {
+    label: 'On a schedule',
+    text: 'The offline worker also carries the periodic work, driven by Temporal Schedules.',
+    items: [
+      'Scheduled payment executor',
+      'Corporate allocations processor',
+      'Representment executor',
+      'Paid events processor',
+      'Missing paid events processor',
+      'Data purger',
+    ],
+  },
+];
 
 # Engineering Vision
 
-<Lead highlight>Billpay runs each payment as a **durable, resumable workflow on Temporal**, and keeps the parts that differ by market or account type in small, swappable components rather than in the workflow itself. One workflow describes the journey; configuration decides how each step behaves.</Lead>
+<Lead highlight>Billpay runs each payment as a **durable, resumable workflow on Temporal**, and keeps the parts that differ by market or account type in small, swappable components rather than in the workflow itself. One workflow describes the journey. The market's configuration decides how each step behaves.</Lead>
 
-## The shape of the system
+## The main parts
 
-Three things make up the platform: the **APIs** that take requests in, the **workflows** that carry each payment from received to settled, and the **event handlers** that bring asynchronous outcomes back.
+Three things make up the platform: the APIs that take requests in, the workflows that carry each payment from received to settled, and the event handlers that bring asynchronous outcomes back.
 
-- **APIs — the way in.** Amex's channels never call Billpay directly. They call **One-Data Functions** — versioned, stable gateway contracts, one per operation, such as creating a payment, updating or cancelling one, or registering a payment intent. Each function delegates to Billpay's core REST APIs. A **Billpay Router** then reads the request — its instructions, its date, and the market's dimensions — and decides which workflow to run.
-- **Workflows — the orchestration.** Each payment runs as a workflow: an ordered set of steps that takes it from received to settled, assembled from four smaller kinds of component, each with one job:
-  - **Stage** — one state transition, for example pending to accepted. A stage does the validation, persistence, and event publication for that single move.
-  - **ActivityGroup** — a cohesive set of actions for one concern, for example everything involved in executing a payment.
-  - **Activity** — a single retryable action, such as writing a database row or calling one downstream system.
-  - **Client** — the adapter that actually talks to an external system.
-- **Event handlers — the way back.** Much of a payment's life happens after the caller already has an answer — the bank settles the funds, Accounts Receivable posts the payment, an Open-To-Buy update lands, or the payment is returned days later. Event handlers take those events in and record them so the owning workflow can move forward: a return event starts the return workflow, and a payment is marked `PAID` only once both its settlement and its AR-posted events have arrived.
+<Highlights
+  items={[
+    {
+      term: 'The way in',
+      desc: `Amex's channels never call Billpay directly. They call One-Data Functions, the versioned gateway contracts, one per operation: create a payment, update or cancel one, register a payment intent. Each function delegates to Billpay's core REST APIs. A Billpay Router then reads the request, its instructions, its date, and the market's dimensions, and decides which workflow to run.`,
+    },
+    {
+      term: 'The orchestration',
+      desc: `Each payment runs as a workflow: an ordered set of steps that takes it from received to settled. The workflow sequences the business steps and nothing else. Which implementation of each step runs is settled from the market's dimensions before the workflow starts.`,
+    },
+    {
+      term: 'The way back',
+      desc: (
+        <>
+          Much of a payment's life happens after the caller already has an answer. The bank settles
+          the funds, Accounts Receivable posts the payment, an Open-To-Buy update lands, or the
+          payment is returned days later. Event handlers take those events in and record them so the
+          owning workflow can move forward. A return event starts the return workflow, and a payment
+          is marked <code>PAID</code> only once both its settlement and its AR-posted events have
+          arrived.
+        </>
+      ),
+    },
+  ]}
+/>
 
-The workflow only sequences the business steps. The difference between markets is *which implementation* of a stage or activity group runs, chosen from the market's dimensions. That is why there is one Create Immediate Payment workflow, not one per market. The Design section covers the model in full.
+A workflow is assembled from four kinds of part. A **stage** carries out one state transition, pending to accepted for instance, and does the validation, persistence, and event publication for that single move. An **activity group** gathers the actions behind one concern, such as everything involved in executing a payment. An **activity** is a single retryable action, like writing a database row or calling one downstream system. A **client** is the adapter that talks to the external system. The Design section covers the model in full.
 
 ## Core principles
 
-- **One workflow, many implementations.** A single workflow per journey. Market and account-type differences come from swapping stage and activity-group implementations, composed together rather than inherited.
-- **Durable execution.** Every payment is a Temporal workflow, and its progress is saved as it goes. It survives process restarts, host failures, and long waits — a scheduled payment may sit for weeks — and always resumes exactly where it left off. Nothing is lost, and nothing runs twice.
-- **Idempotent entry points.** Every request is checked for a duplicate before it does anything, so the same payment submitted twice becomes one payment, not two.
-- **Auditable by construction.** Every state transition is persisted and published as a lifecycle event, so a payment's whole history can be reconstructed after the fact.
-- **Change through configuration.** New markets and rules arrive as dimensions and profiles, and contracts are versioned. Change lands as configuration, not as edits to a running orchestration.
+<Principles
+  items={[
+    {
+      title: 'One workflow per journey',
+      body: 'A single workflow describes each journey, and there are no alternate versions of it. Market and account-type differences come from swapping stage and activity group implementations underneath it.',
+    },
+    {
+      title: 'Composed from the dimensions on the request',
+      body: (
+        <>
+          Stages and activity groups are built per dimension combination. The combination on the
+          request picks the implementations when the workflow is composed and started, so the run
+          itself holds no market logic. Composition over inheritance, so workflows and stages are
+          never <code>abstract</code>.
+        </>
+      ),
+    },
+    {
+      title: 'Markets onboard by configuration',
+      body: 'A new market is the APIs it turns on plus the answers it gives, which become one or more profiles. Contracts are versioned, so change lands as configuration rather than as edits to a running orchestration.',
+    },
+    {
+      title: 'Durable execution',
+      body: 'Every payment is a Temporal workflow, and its progress is saved as it goes. It survives process restarts, host failures, and long waits, since a scheduled payment may sit for weeks, and it always resumes exactly where it left off. Nothing is lost, and nothing runs twice.',
+    },
+    {
+      title: 'Idempotent entry points',
+      body: 'Every request is checked for a duplicate before it does anything, so the same payment submitted twice becomes one payment, not two.',
+    },
+    {
+      title: 'Auditable by construction',
+      body: "Every state transition is persisted and published as a lifecycle event, so a payment's whole history can be reconstructed after the fact.",
+    },
+  ]}
+/>
 
-## How it runs
+## Composable Workflows
 
-Workflows execute on one of two Temporal **workers**, divided by whether someone is waiting for the answer:
+Markets come onto the platform through configuration. Someone picks the Billpay APIs the market will use, then answers a few questions about how it processes payments. Those selections build a profile for that market and account type, held as one combination of dimensions.
 
-- **Online worker** — runs the workflows a person is waiting on, where the response goes straight back to the caller: Create Immediate Payment, Update Payment, Cancel Payment, Create Payment Intent.
-- **Offline worker** — runs everything triggered asynchronously, where no one is blocked: Execute Scheduled Payment, Process Inbound Payment, Process Returned Payment, and the periodic sweeps. Work reaches it through events (for example from RTF, the Reliable Transaction Framework) or through a scheduler.
+The profile is what composes the workflow. When a request arrives, the dimensions on it are checked and resolved to the implementations onboarded for that combination, and the workflow is started with those parts already in place. That happens before the run begins, so the workflow itself carries no market logic: it runs the same sequence of business steps everywhere.
 
-<div className="runs-note">
+<CompositionMap
+  apis={[
+    'POST /payments',
+    'PUT /payments/{payment-id}',
+    'DELETE /payment/{payment-id}',
+    'POST /payments/inbound',
+    'POST /refunds',
+  ]}
+  dims={DIMENSIONS}
+  compose={{
+    note: 'Composed for the profile, then started. The steps are the same in every market.',
+  }}
+  run={RUN}
+  footnote={
+    <>
+      If the combination on a request was never onboarded, there is nothing to compose, so the
+      request is turned away and no workflow starts. A consumer-only market rejects a corporate
+      payment instead of half-processing it.
+    </>
+  }
+/>
 
-:::note
+A new variant is a new implementation behind one combination. The workflow keeps its shape, and no market ends up as a branch inside it.
 
-- A few workflows — Create Schedule Payment, Execute Split Payment, Create Balance Refund — run on either worker, depending on where in the journey they are called.
-- The Offline worker also carries the periodic work, driven by **Temporal Schedules**: the scheduled-payment executor, the corporate-allocations processor, the representment executor, the paid- and missing-paid-events processors, and the data purger.
+## Where it runs
 
-:::
+Workflows execute on one of two Temporal workers, divided by whether someone is waiting for the answer.
 
-</div>
+<WorkerSplit workers={WORKERS} strips={STRIPS} />
 
-## What we optimize for
+## Optimize for
 
 <Highlights
   items={[
@@ -64,7 +209,7 @@ Workflows execute on one of two Temporal **workers**, divided by whether someone
     },
     {
       term: 'Latency',
-      desc: 'Where the market allows, clearing, AR, and Open-To-Buy are triggered together and run in realtime; slower outcomes come back later as events instead of blocking the caller.',
+      desc: 'Where the market allows, clearing, AR, and Open-To-Buy are triggered together and run in realtime. Slower outcomes come back later as events instead of blocking the caller.',
     },
     {
       term: 'Change safety',

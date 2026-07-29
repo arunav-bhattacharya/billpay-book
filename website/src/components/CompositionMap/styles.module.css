@@ -1,0 +1,260 @@
+/* CompositionMap — onboarding, profile, composed workflow. One accent for the
+   whole map, quiet surfaces, and monospace kept for literals only. */
+
+.wrap {
+  margin: 1.8rem 0 2.4rem;
+  padding: 1.4rem 1.35rem 1.25rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 18px;
+  background: var(--amex-panel);
+  box-shadow: var(--amex-sh-sm);
+}
+
+.band,
+.profile {
+  padding: 1.05rem 1.15rem 1.15rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 14px;
+  background: var(--amex-card);
+}
+
+/* ---- band heading ---- */
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+
+.no {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--amex-blue) 85%, var(--amex-txt-strong));
+  background: color-mix(in srgb, var(--amex-blue) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 28%, transparent);
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--amex-txt-strong);
+}
+
+.note {
+  margin-top: 0.12rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--amex-mut);
+}
+
+/* ---- labelled rows ---- */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+}
+
+.row + .row {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--amex-line);
+}
+
+.rowLabel {
+  flex: none;
+  width: 84px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--amex-mut);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.api {
+  font-family: var(--amex-font-mono);
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--amex-mut) 9%, transparent);
+  border: 1px solid var(--amex-line);
+}
+
+/* ---- the four dimensions ---- */
+/* The onboarding questions, in plain language. The field names they set live
+   in the profile band below, so they are not repeated here. */
+.dims {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.dim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.7rem;
+}
+
+.dim dt,
+.dim dd {
+  margin: 0;
+}
+
+.dim dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.7rem;
+}
+
+.ask {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--amex-txt);
+}
+
+.answers {
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+  color: var(--amex-mut);
+  white-space: nowrap;
+}
+
+/* ---- connectors ---- */
+.link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.75rem 0.3rem;
+}
+
+.linkLine {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--amex-line-strong), transparent);
+}
+
+/* the verb between two bands: this is the step being described, so it is set
+   in the accent rather than as a quiet caption */
+.linkLabel {
+  flex: none;
+  padding: 0.22rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--amex-blue) 88%, var(--amex-txt-strong));
+  background: color-mix(in srgb, var(--amex-blue) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 30%, transparent);
+}
+
+:global([data-theme='dark']) .linkLabel {
+  color: var(--amex-cat-vision);
+  background: color-mix(in srgb, var(--amex-cat-vision) 13%, transparent);
+  border-color: color-mix(in srgb, var(--amex-cat-vision) 32%, transparent);
+}
+
+/* ---- profile ---- */
+.profile {
+  border-color: color-mix(in srgb, var(--amex-blue) 28%, var(--amex-line));
+  background: color-mix(in srgb, var(--amex-blue) 4%, var(--amex-card));
+}
+
+/* nothing follows the heading in this band, so it carries no trailing gap */
+.profile .head {
+  margin-bottom: 0;
+}
+
+/* ---- the composed workflow ---- */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+}
+
+.step {
+  padding: 0.4rem 0.85rem;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 550;
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--amex-blue) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 22%, var(--amex-line));
+}
+
+.arrow {
+  font-size: 0.85rem;
+  color: var(--amex-mut);
+}
+
+/* ---- footnote ---- */
+.foot {
+  margin-top: 0.95rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 11px;
+  border: 1px solid var(--amex-line);
+  background: color-mix(in srgb, var(--amex-mut) 6%, transparent);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--amex-txt);
+}
+
+/* ---- dark tuning: the global inline-code rule is more specific in dark ---- */
+:global([data-theme='dark']) .api {
+  color: var(--amex-txt);
+  background: color-mix(in srgb, var(--amex-mut) 14%, transparent);
+  border-color: var(--amex-line);
+}
+:global([data-theme='dark']) .no {
+  color: var(--amex-cat-vision);
+}
+
+/* ---- narrow screens ---- */
+@media (max-width: 760px) {
+  .row {
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .rowLabel {
+    width: auto;
+  }
+  .dims {
+    gap: 0.7rem;
+  }
+  .answers {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 500px) {
+  .wrap {
+    padding: 1.05rem 0.8rem 0.95rem;
+  }
+  .band,
+  .profile {
+    padding: 0.9rem 0.85rem 1rem;
+  }
+}
