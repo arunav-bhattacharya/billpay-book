@@ -33,8 +33,8 @@ export const DIMENSIONS = [
 ];
 
 export const RUN = {
-  workflow: 'Create Immediate Payment',
-  steps: ['Pending', 'Accepted', 'Processing', 'Processed'],
+  title: 'Workflows',
+  note: 'Composed for the profile, then started. Each journey has one workflow, and it is the same one in every market.',
 };
 
 export const WORKERS = [
@@ -161,22 +161,20 @@ A workflow is assembled from four kinds of part. A **stage** carries out one sta
 
 ## Composable Workflows
 
-Markets come onto the platform through configuration. Someone picks the Billpay APIs the market will use, then answers a few questions about how it processes payments. Those selections build a profile for that market and account type, held as one combination of dimensions.
+Markets come onto the platform through configuration. Someone picks the One-Data APIs the market will use, then answers a few questions about how it processes payments. Those selections build a profile for that market and account type, held as one combination of dimensions.
 
 The profile is what composes the workflow. When a request arrives, the dimensions on it are checked and resolved to the implementations onboarded for that combination, and the workflow is started with those parts already in place. That happens before the run begins, so the workflow itself carries no market logic: it runs the same sequence of business steps everywhere.
 
 <CompositionMap
   apis={[
-    'POST /payments',
-    'PUT /payments/{payment-id}',
-    'DELETE /payment/{payment-id}',
-    'POST /payments/inbound',
-    'POST /refunds',
+    'CreatePayment.v3',
+    'UpdatePayment.v1',
+    'DeletePayment.v1',
+    'CreateInboundPayment.v1',
+    'CreatePaymentIntent.v1',
+    'CreateCreditBalanceRefund.v1',
   ]}
   dims={DIMENSIONS}
-  compose={{
-    note: 'Composed for the profile, then started. The steps are the same in every market.',
-  }}
   run={RUN}
   footnote={
     <>

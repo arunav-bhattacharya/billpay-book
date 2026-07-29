@@ -70,12 +70,11 @@
 
 .rowLabel {
   flex: none;
-  width: 84px;
-  font-size: 0.63rem;
+  width: 132px;
+  font-size: 0.79rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--amex-mut);
+  letter-spacing: 0.02em;
+  color: var(--amex-txt-strong);
 }
 
 .chips {
@@ -84,15 +83,17 @@
   gap: 0.34rem;
 }
 
+/* The One-Data functions are the one thing here worth colouring: they are the
+   market's way in, so they carry the Amex blue. */
 .api {
   font-family: var(--amex-font-mono);
   font-size: 0.72rem;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 6px;
   white-space: nowrap;
-  color: var(--amex-txt);
-  background: color-mix(in srgb, var(--amex-mut) 9%, transparent);
-  border: 1px solid var(--amex-line);
+  color: color-mix(in srgb, var(--amex-blue) 84%, var(--amex-txt-strong));
+  background: color-mix(in srgb, var(--amex-blue) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 30%, transparent);
 }
 
 /* ---- the four dimensions ---- */
@@ -138,6 +139,16 @@
   letter-spacing: 0.01em;
   color: var(--amex-mut);
   white-space: nowrap;
+}
+
+/* both lists are a sample of what a market picks, so each ends in an ellipsis */
+.more {
+  align-self: center;
+  padding: 0 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--amex-mut);
 }
 
 /* ---- connectors ---- */
@@ -187,26 +198,9 @@
 }
 
 /* ---- the composed workflow ---- */
-.rail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.5rem;
-}
-
-.step {
-  padding: 0.4rem 0.85rem;
-  border-radius: 9px;
-  font-size: 0.88rem;
-  font-weight: 550;
-  color: var(--amex-txt);
-  background: color-mix(in srgb, var(--amex-blue) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--amex-blue) 22%, var(--amex-line));
-}
-
-.arrow {
-  font-size: 0.85rem;
-  color: var(--amex-mut);
+/* the last band is a heading only, like the profile band */
+.band:last-of-type .head {
+  margin-bottom: 0;
 }
 
 /* ---- footnote ---- */
@@ -223,9 +217,9 @@
 
 /* ---- dark tuning: the global inline-code rule is more specific in dark ---- */
 :global([data-theme='dark']) .api {
-  color: var(--amex-txt);
-  background: color-mix(in srgb, var(--amex-mut) 14%, transparent);
-  border-color: var(--amex-line);
+  color: var(--amex-cat-vision);
+  background: color-mix(in srgb, var(--amex-cat-vision) 13%, transparent);
+  border-color: color-mix(in srgb, var(--amex-cat-vision) 32%, transparent);
 }
 :global([data-theme='dark']) .no {
   color: var(--amex-cat-vision);

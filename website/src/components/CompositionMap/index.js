@@ -3,20 +3,17 @@ import styles from './styles.module.css';
 
 /**
  * CompositionMap — the high-level path from onboarding a market to a running
- * workflow: the APIs and dimensions someone picks, the profile they add up to,
- * and the workflow that profile composes.
+ * workflow: the One-Data APIs and dimensions someone picks, the profile those
+ * selections create, and the workflows that profile composes.
  *
- * Deliberately quiet: one accent for the whole map, and monospace only where
- * the text really is a literal (API paths and dimension field names).
+ * Deliberately quiet: one accent for the whole map, and monospace only for the
+ * API names, which are literals.
  *
- * apis:  string[]
- * dims:  [{name, ask, answers: string[]}]
- * compose: {note}
- * run:   {workflow, steps: string[]}
+ * apis: string[]
+ * dims: [{name, ask, answers: string[]}]
+ * run:  {title, note}
  */
-export default function CompositionMap({apis = [], dims = [], compose = {}, run = {}, footnote}) {
-  const steps = run.steps || [];
-
+export default function CompositionMap({apis = [], dims = [], run = {}, footnote}) {
   return (
     <div className={styles.wrap}>
       {/* 1 — what onboarding asks for */}
@@ -32,13 +29,17 @@ export default function CompositionMap({apis = [], dims = [], compose = {}, run 
         </div>
 
         <div className={styles.row}>
-          <span className={styles.rowLabel}>APIs</span>
+          <span className={styles.rowLabel}>One-Data APIs</span>
           <div className={styles.chips}>
             {apis.map((a) => (
               <code key={a} className={styles.api}>
                 {a}
               </code>
             ))}
+            {/* the list is a sample, not the full set */}
+            <span className={styles.more} aria-label="and more">
+              &hellip;
+            </span>
           </div>
         </div>
 
@@ -51,6 +52,11 @@ export default function CompositionMap({apis = [], dims = [], compose = {}, run 
                 <span className={styles.answers}>{(d.answers || []).join('  /  ')}</span>
               </li>
             ))}
+            <li className={styles.dim}>
+              <span className={styles.more} aria-label="and more">
+                &hellip;
+              </span>
+            </li>
           </ul>
         </div>
       </section>
@@ -74,29 +80,16 @@ export default function CompositionMap({apis = [], dims = [], compose = {}, run 
 
       <Arrow label="composes" />
 
-      {/* 3 — the composed workflow */}
+      {/* 3 — the composed workflows */}
       <section className={styles.band}>
         <div className={styles.head}>
           <span className={styles.no} aria-hidden="true">
             3
           </span>
           <div>
-            <div className={styles.title}>{run.workflow}</div>
-            {compose.note && <div className={styles.note}>{compose.note}</div>}
+            <div className={styles.title}>{run.title}</div>
+            {run.note && <div className={styles.note}>{run.note}</div>}
           </div>
-        </div>
-
-        <div className={styles.rail}>
-          {steps.map((s, i) => (
-            <React.Fragment key={s}>
-              {i > 0 && (
-                <span className={styles.arrow} aria-hidden="true">
-                  →
-                </span>
-              )}
-              <span className={styles.step}>{s}</span>
-            </React.Fragment>
-          ))}
         </div>
       </section>
 
