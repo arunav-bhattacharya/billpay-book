@@ -29,7 +29,6 @@ export const GROUPS = [
           'ReadPaymentEventsById.v1',
           'CreateCreditBalanceRefund.v1',
           'CreateInboundPayment.v1',
-          'CreatePaymentIntent.v1',
         ],
       },
     ],
