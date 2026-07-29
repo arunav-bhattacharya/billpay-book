@@ -47,11 +47,11 @@ const PANELS = [
     y: 130,
     w: 700,
     h: 780,
-    t: 'Modernisation layer \u2014 added on top of AM',
+    t: 'Modernisation layer, added on top of AM',
     band: true,
     neu: true,
   },
-  {id: 'sf', l: 'facade', x: 456, y: 270, w: 340, h: 168, t: 'Service Facade', key: true},
+  {id: 'sf', l: 'facade', x: 456, y: 270, w: 340, h: 168, t: 'Service Facade', key: true, strong: true},
   {
     id: 'sorc',
     l: 'facade',
@@ -64,7 +64,7 @@ const PANELS = [
     key: true,
     dash: true,
   },
-  {id: 'elig', l: 'facade', x: 880, y: 512, w: 240, h: 212, t: 'Eligibility', s: 'max of GAR and CAS', key: true},
+  {id: 'elig', l: 'facade', x: 880, y: 512, w: 240, h: 212, t: 'Eligibility', s: 'max of GAR and CAS', key: true, strong: true},
   {id: 'p_corp', l: 'am', x: 1180, y: 1040, w: 330, h: 172, t: 'Corporate Allocations', band: true},
 ];
 
@@ -342,12 +342,18 @@ const EDGES = [
   link('apigee', 'r', 'sf', 't', {s: 'svc', bare: true}),
   link('sf', 'rt', 'sorc', 'l', {s: 'svc', bare: true, stub: 8, trunk: 824}),
   link('sf', 'rb', 'pec', 'l', {s: 'svc', p: 'max_amount', dy: -44}),
-  link('pec', 'b', 'elig', 't', {s: 'svc', p: 'on cache miss'}),
+  link('pec', 'b', 'elig', 't', {s: 'svc', p: 'on cache miss', ly: 490}),
   link('elig', 'lb', 'pec', 'lb', {s: 'svc', p: 'insert pre-eligibility data', stub: 8, trunk: 852, ly: 478}),
-  link('sf', 'r', 'elig', 'lt', {s: 'svc', p: '/eligibilities', trunk: 838, lx: 830, ly: 500}),
+  link('sf', 'r', 'elig', 'l', {s: 'svc', p: '/eligibilities', trunk: 838, lx: 830, ly: 500}),
+  /* the facade still hands the request on to AM: it took the routing decision
+     off the channels, it did not replace the app underneath */
+  link('sf', 'r', 'am', 'l', {s: 'svc', p: '/inquiry · /payment', ay: 424, by: 452, trunk: 810, lx: 1000, ly: 452}),
   link('cb', 'b', 'altpay', 't', {s: 'fb', p: '/standin', bx: 547}),
-  link('altpay', 'b', 'boom', 't', {s: 'sdk', p: 'SDK / JRE'}),
-  link('altpay', 'r', 'elig', 'l', {s: 'svc', p: '/eligibilities', trunk: 838, lx: 838, ly: 600}),
+  link('altpay', 'b', 'boom', 't', {s: 'svc', bare: true}),
+  /* dead straight into Eligibility: AlternatePayment sits at the same height.
+     The gap is only 84px, so the call keeps its label on the facade edge above
+     rather than burying the arrow under a second identical pill. */
+  link('altpay', 'r', 'elig', 'l', {s: 'svc', bare: true, by: 545}),
   link('altpay', 'l', 'ghdb', 'l', {s: 'svc', bare: true, via: [[442, 1060], [1150, 1060], [1150, 317]]}),
   link('elig', 'bl', 'gar', 't', {s: 'svc', bare: true, ax: 938}),
   link('elig', 'br', 'lbridge', 't', {s: 'svc', bare: true, ax: 1062}),
@@ -357,14 +363,14 @@ const EDGES = [
 
   /* ---- AM core ---- */
   link('am', 't', 'ghdb', 'b', {s: 'svc', p: 'WS'}),
-  link('ghdb', 't', 'ghdb_e', 'b', {s: 'data', p: 'JDBC', ax: 1265}),
-  link('ghdb', 't', 'ghdb_w', 'b', {s: 'data', p: 'JDBC', ax: 1425}),
+  link('ghdb', 't', 'ghdb_e', 'b', {s: 'data', bare: true, ax: 1265}),
+  link('ghdb', 't', 'ghdb_w', 'b', {s: 'data', bare: true, ax: 1425}),
   link('ghdb_e', 'r', 'ghdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
-  link('am', 'b', 'amdb_e', 't', {s: 'data', p: 'JDBC', ax: 1260}),
-  link('am', 'b', 'amdb_w', 't', {s: 'data', p: 'JDBC', ax: 1430}),
+  link('am', 'b', 'amdb_e', 't', {s: 'data', bare: true, ax: 1260}),
+  link('am', 'b', 'amdb_w', 't', {s: 'data', bare: true, ax: 1430}),
   link('amdb_e', 'r', 'amdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
-  link('wcr', 'b', 'wcrdb_e', 't', {s: 'data', p: 'JDBC', ax: 1880}),
-  link('wcr', 'b', 'wcrdb_w', 't', {s: 'data', p: 'JDBC', ax: 2010}),
+  link('wcr', 'b', 'wcrdb_e', 't', {s: 'data', bare: true, ax: 1880}),
+  link('wcr', 'b', 'wcrdb_w', 't', {s: 'data', bare: true, ax: 2010}),
   link('wcrdb_e', 'r', 'wcrdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
   /* WCR keeps its DB2 in the same two centres, reached over the top */
   /* corporate allocations feed the arrangement they belong to */
@@ -376,7 +382,7 @@ const EDGES = [
   link('am', 'rt', 'instream', 'l', {s: 'svc', p: 'MQ', trunk: 1516}),
   link('am', 'rt', 'firstdata', 't', {s: 'svc', p: 'WSM', via: [[1529, 444], [1529, 145], [1885, 145]]}),
   link('am', 'r', 'gpp', 'l', {s: 'svc', p: 'MQ'}),
-  link('am', 'b', 'gateway', 't', {s: 'svc', p: 'WS', ax: 1345}),
+  link('am', 'b', 'gateway', 't', {s: 'svc', p: 'WS', ax: 1345, dy: -45}),
   link('am', 'rb', 'globestar', 'b', {s: 'svc', p: 'DataPower', via: [[1555, 492], [1555, 812], [1885, 812]]}),
 
   /* ---- processing & clearing ---- */
@@ -384,10 +390,10 @@ const EDGES = [
   link('igor', 'r', 'tl', 'l', {s: 'svc', bare: true}),
   link('gpp', 'tl', 'il', 'b', {s: 'svc', p: 'ControlM', ax: 1643}),
   link('tl', 'b', 'gpp', 'tr', {s: 'svc', p: 'ControlM', bx: 1917}),
-  link('gpp', 'bl', 'gppdb1', 't', {s: 'data', p: 'JDBC', ax: 1675}),
-  link('gpp', 'br', 'gppdb2', 't', {s: 'data', p: 'JDBC', ax: 1885}),
+  link('gpp', 'bl', 'gppdb1', 't', {s: 'data', bare: true, ax: 1675}),
+  link('gpp', 'br', 'gppdb2', 't', {s: 'data', bare: true, ax: 1885}),
   link('gppdb1', 'r', 'gppdb2', 'l', {s: 'repl', p: 'Golden Gate', dy: -48}),
-  link('gppdb2', 'rt', 'webfocus', 'l', {s: 'data', p: 'JDBC', stub: 12, trunk: 1992}),
+  link('gppdb2', 'rt', 'webfocus', 'l', {s: 'data', bare: true, stub: 12, trunk: 1992}),
   link('gpp', 'l', 'bank', 'r', {s: 'file', p: 'SFT', trunk: 1568}),
 
   /* ---- into and out of FTN ---- */
@@ -421,12 +427,15 @@ const EDGES = [
 
   /* ---- FTN back into the history, and out to the reporting estate ---- */
   link('ftn', 't', 'ghdb', 'r', {s: 'file', p: 'Mainframe Batch', via: [[2190, 380], [1555, 380], [1555, 317]], lx: 2160, ly: 380}),
-  link('ftn', 'r', 'rcps', 'l', {s: 'file', bare: true, trunk: 2334}),
-  link('ftn', 'r', 'ccs', 'l', {s: 'file', bare: true, trunk: 2348}),
-  link('ftn', 'r', 'ablm', 'l', {s: 'file', bare: true, trunk: 2362}),
-  link('ftn', 'r', 'payaware', 'l', {s: 'file', bare: true, trunk: 2376}),
-  link('ftn', 'r', 'cornerstone', 'l', {s: 'file', bare: true, trunk: 2390}),
-  link('ftn', 'r', 'idn', 'l', {s: 'file', p: 'Mainframe Batch', trunk: 2404, lx: 2404, ly: 700}),
+  /* one bus rather than six lanes: every feed leaves FTN on the same stub at
+     y=441, runs to a shared spine, and combs off into its own system. The
+     transport is labelled once, above the top of the spine. */
+  link('ftn', 'r', 'cornerstone', 'l', {s: 'file', p: 'Mainframe Batch', ay: 441, trunk: 2370, lx: 2358, ly: 244}),
+  link('ftn', 'r', 'ablm', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'rcps', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'ccs', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'payaware', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'idn', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
 ];
 
 const KIND_LABEL = [
@@ -435,7 +444,6 @@ const KIND_LABEL = [
   {k: 'key', label: 'Payments domain system'},
   {k: 'ext', label: 'Outside the payments domain'},
   {k: 'tp', label: 'Third-party system'},
-  {k: 'bank', label: 'Bank'},
 ];
 
 const EDGE_LABEL = [
@@ -444,7 +452,6 @@ const EDGE_LABEL = [
   {s: 'file', label: 'File or batch transfer'},
   {s: 'repl', label: 'Replication'},
   {s: 'fb', label: 'Fallback / standin'},
-  {s: 'sdk', label: 'SDK / JRE call'},
 ];
 
 function clamp(v, lo, hi) {
@@ -598,6 +605,7 @@ function PanelShape({n, dimmed, showNew}) {
         styles.panel,
         n.band && styles.band,
         n.key && styles.panelKey,
+        n.strong && styles.panelStrong,
         isNew && styles.panelNew,
         dimmed && styles.dim,
       )}>
@@ -609,11 +617,11 @@ function PanelShape({n, dimmed, showNew}) {
         rx={14}
         className={clsx(styles.panelBox, n.dash && styles.dashed)}
       />
-      <text x={n.x + n.w / 2} y={n.y + 22} className={styles.panelT}>
+      <text x={n.x + n.w / 2} y={n.y + (n.strong ? 30 : 22)} className={styles.panelT}>
         {n.t}
       </text>
       {n.s && (
-        <text x={n.x + n.w / 2} y={n.y + 37} className={styles.panelS}>
+        <text x={n.x + n.w / 2} y={n.y + (n.strong ? 48 : 37)} className={styles.panelS}>
           {n.s}
         </text>
       )}
@@ -629,7 +637,7 @@ const PILL_GLYPH = {
 
 /* Transports are set as plain text with a knockout halo. Only the labels that
    say something about the call itself keep a pill. */
-const PLAIN = new Set(['JDBC', 'SDK / JRE', 'MQ', 'WS', 'SFT', 'QREP', 'WSM']);
+const PLAIN = new Set(['MQ', 'WS', 'SFT', 'QREP', 'WSM']);
 
 function Pill({e, dimmed}) {
   if (PLAIN.has(e.p)) {
@@ -778,7 +786,7 @@ export default function LegacyEstateMap({showIncremental = true}) {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        aria-label="The legacy payments landscape. Thirteen frontend systems, among them Voice Response, CSP, WSP/GSP, MYCA and Mobile, ACE, Payment Profile, COP, VPOD, CPM, GCAP, ORMB, CMFA and GSP Refund, reach Arrangement Manager through an integration hop of DataPower, MQ, MQ over REST, Connect Direct, web services and the MYCA NGI converged services. A modernisation layer was later added on top: APIGEE forwards to a Service Facade holding Routing, a CircuitBreaker and a pre-eligibility handler, backed by an SOR cache of geo account and triumph data, a pre-eligibility cache holding the maximum amount and eligibility indicator for five minutes, and an Eligibility service that takes the greater of the GAR and CAS balances, reaching CAS through a Legacy Bridge over MQ. When the circuit breaker opens, the standin path runs AlternatePayment, which calls Boomerang and reads the consolidated history. At the centre sits Arrangement Manager, the legacy billpay application, over DB2, and GPHDB, the consolidated payment history, which writes to WROC DB2 and SROC DB2, themselves replicated to each other by QREP. AM feeds Instream, First Data, IL, IGOR, TL and GPP, the global payment platform, whose primary and secondary databases replicate by Golden Gate and feed WEBFOCUS. Card rails run from AM through Gateway, the Amex firewall and Datacash to the bank. Inbound files run from the bank through the Homebanking Aggregator and WCR into FTN, the file transmission network, which also takes extract files, balancing messages and payment and image files. FTN drives the mainframe batch chain of FINCAP, CARS, TRIUMPH, CRS, Global Billing and DSTO, feeds Corner Stone, ABLM, RCPS, the customer communication system, Payment Awareness, Globestar and IDN ENLIST, and writes back into the consolidated payment history.">
+        aria-label="The legacy payments landscape. Eleven frontend systems, among them Voice Response, CSP, WSP/GSP, MYCA and Mobile, ACE, Payment Profile, VPOD, GCAP, ORMB, CMFA and GSP Refund, reach Arrangement Manager through an integration hop of APIGEE, DataPower, MQ, MQ over REST, Connect Direct and web services. A modernisation layer was later added on top: a Service Facade holding Routing, a CircuitBreaker and a pre-eligibility handler, backed by an SOR cache of geo account and triumph data, a pre-eligibility cache holding the maximum amount and eligibility indicator for five minutes, and an Eligibility service that takes the greater of the GAR and CAS balances, reaching CAS through a Legacy Bridge over MQ. The facade forwards the inquiry and payment calls on to Arrangement Manager rather than replacing it. When the circuit breaker opens, the standin path runs AlternatePayment, which calls Boomerang and reads the consolidated history. At the centre sits Arrangement Manager, the legacy billpay application, and GPHDB, the consolidated payment history. AM, GPHDB and WCR each keep their own DB2 in US-East and US-West, replicated to each other by QREP. AM feeds Instream, First Data, IL, IGOR, TL and GPP, the global payment platform, whose primary and secondary databases replicate by Golden Gate and feed WEBFOCUS. Corporate allocations reach AM from COP, CPM and CARS. Card rails run from AM through Gateway, the Amex firewall and Datacash to the bank. Inbound files run from the bank through the Homebanking Aggregator and WCR into FTN, the file transmission network, which also takes extract files, balancing messages and payment and image files. FTN drives the mainframe batch chain of FINCAP, CARS, TRIUMPH, CRS, Global Billing and DSTO, feeds Corner Stone, ABLM, RCPS, the customer communication system, Payment Awareness, Globestar and IDN ENLIST, and writes back into the consolidated payment history.">
         <defs>
           {EDGE_LABEL.map(({s}) => (
             <marker

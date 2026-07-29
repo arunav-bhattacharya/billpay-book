@@ -40,9 +40,9 @@ Same boundary the [Engineering Vision](./engineering.md) draws around what the p
 
 - Every channel arrived at the same place. **Arrangement Manager**, the legacy billpay app, sat behind Voice Response, MYCA, CSP, ACE, ORMB and a dozen others, each coming in over its own interface: DataPower, MQ, MQ over REST, Connect:Direct, web services.
 - From there one payment fanned out across the estate. **GPP** cleared it and exchanged ACH files with the bank. IL, IGOR and TL turned it into files. **FTN** pushed it into the mainframe batch chain of FINCAP, TRIUMPH, CRS and Global Billing.
-- Payment history was assembled rather than owned. **GPHDB** was fed from AM over JDBC on one side and from FTN by mainframe batch on the other, so both had to agree before anyone could answer what a customer had paid.
-- Traceability broke in the middle of all this. The red markers sit on AM, GPP, GPHDB, IL and the DataPower and APIGEE hops. Once a payment crossed one, following it end to end meant reading logs in several systems.
-- A modernisation layer was later put in front. **APIGEE** and a **Service Facade** took the routing decision off the channels, and an **Eligibility** service with two caches added a check on the requested amount before a payment went through. None of it replaced AM.
+- Payment history was assembled rather than owned. **GPHDB** was fed from AM over a web service on one side and from FTN by mainframe batch on the other, so both had to agree before anyone could answer what a customer had paid.
+- Traceability broke in the middle of all this. AM, GPP, GPHDB, IL and the DataPower and APIGEE hops each dropped the thread. Once a payment crossed one, following it end to end meant reading logs in several systems.
+- A modernisation layer was later put in front. A **Service Facade** took the routing decision off the channels, and an **Eligibility** service with two caches added a check on the requested amount before a payment went through. The facade still handed the request on to AM, so none of it replaced the app underneath.
 
 There was no payments domain to call. There was Arrangement Manager, and behind it an estate of clearing, file and batch systems that each held part of a payment. Answering a question about one payment meant knowing which of them to ask.
 

@@ -15,7 +15,6 @@
   --lem-tp: #a07a12;     /* third parties: gold */
   --lem-db: #e2620b;     /* databases and database access: bright orange */
   --lem-repl: #64748b;   /* replication: slate */
-  --lem-sdk: #0e7c86;    /* SDK / JRE: teal */
   --lem-fail: #c0392b;   /* fallback and traceability: red */
   --lem-bank: #a21caf;   /* the bank: fuchsia, its own colour */
   --lem-new: #6d4aca;    /* added on top: violet, used nowhere else */
@@ -33,7 +32,6 @@
   --lem-tp: #d8c45f;
   --lem-db: #fb923c;
   --lem-repl: #94a3b8;
-  --lem-sdk: #2dd4bf;
   --lem-fail: #e2685c;
   --lem-bank: #e879f9;
   --lem-new: #a78bfa;
@@ -292,6 +290,14 @@
 }
 .panelKey .panelT { fill: var(--amex-txt-strong); }
 .panelKey .panelS { fill: var(--amex-mut); }
+/* the two services the facade story turns on, set to read as peers of the
+   hero boxes: same size, same weight, same title case */
+.panelStrong .panelT {
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: none;
+}
 
 .panelNew .panelBox {
   fill: color-mix(in srgb, var(--lem-new) 7%, transparent);
@@ -318,7 +324,6 @@
 .e_file { --ec: var(--lem-tp); }
 .e_repl { --ec: var(--lem-repl); }
 .e_fb { --ec: var(--lem-fail); }
-.e_sdk { --ec: var(--lem-sdk); }
 
 .edge {
   fill: none;
@@ -330,14 +335,12 @@
 .e_file.edge { stroke-dasharray: 9 5; }
 .e_repl.edge { stroke-dasharray: 1 5; stroke-width: 2.6; stroke-linecap: round; }
 .e_fb.edge { stroke-dasharray: 6 4; }
-.e_sdk.edge { stroke-dasharray: 11 4 2 4; stroke-width: 2; }
 
 .m_svc { fill: var(--lem-chan); }
 .m_data { fill: var(--lem-db); }
 .m_file { fill: var(--lem-tp); }
 .m_repl { fill: var(--lem-repl); }
 .m_fb { fill: var(--lem-fail); }
-.m_sdk { fill: var(--lem-sdk); }
 
 /* ---- protocol pills, drawn on top of the edges ---- */
 .pill { transition: opacity 0.22s ease; }
@@ -428,7 +431,6 @@
 .e_file.swLine { border-top-style: dashed; }
 .e_repl.swLine { border-top-style: dotted; }
 .e_fb.swLine { border-top-style: dashed; }
-.e_sdk.swLine { border-top-style: dotted; }
 
 @media (max-width: 996px) {
   .bar { justify-content: flex-start; }
