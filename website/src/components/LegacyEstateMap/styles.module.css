@@ -17,6 +17,7 @@
   --lem-repl: #64748b;   /* replication: slate */
   --lem-sdk: #0e7c86;    /* SDK / JRE: teal */
   --lem-fail: #c0392b;   /* fallback and traceability: red */
+  --lem-bank: #a21caf;   /* the bank: fuchsia, its own colour */
   --lem-new: #6d4aca;    /* added on top: violet, used nowhere else */
   margin: 1.5rem 0 2.4rem;
   padding: 0.9rem 0.9rem 1.1rem;
@@ -34,6 +35,7 @@
   --lem-repl: #94a3b8;
   --lem-sdk: #2dd4bf;
   --lem-fail: #e2685c;
+  --lem-bank: #e879f9;
   --lem-new: #a78bfa;
 }
 
@@ -129,7 +131,7 @@
 .svg {
   display: block;
   width: 100%;
-  aspect-ratio: 5 / 2;
+  aspect-ratio: 65 / 31;
   height: auto;
   max-height: 74vh;
   min-height: 300px;
@@ -155,8 +157,10 @@
 .k_iface { --kind: var(--lem-iface); }
 .k_key { --kind: var(--lem-key); }
 .k_hero { --kind: var(--lem-key); }
+.k_major { --kind: var(--lem-key); }
 .k_ext { --kind: var(--lem-ext); }
 .k_tp { --kind: var(--lem-tp); }
+.k_bank { --kind: var(--lem-bank); }
 .k_db { --kind: var(--lem-db); }
 .k_note { --kind: var(--amex-mut); }
 .k_sub { --kind: var(--amex-mut); }
@@ -172,6 +176,13 @@
   fill: color-mix(in srgb, var(--kind) 26%, var(--amex-panel));
   stroke: var(--kind);
   stroke-width: 2.4;
+}
+/* one step below hero: still clearly a spine of the estate, but AM and GPHDB
+   are the two boxes the eye should land on first */
+.k_major .box {
+  fill: color-mix(in srgb, var(--kind) 17%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--kind) 72%, transparent);
+  stroke-width: 1.7;
 }
 .k_note .box {
   fill: transparent;
@@ -205,6 +216,8 @@
 }
 .k_hero .t { font-size: 21px; font-weight: 750; }
 .k_hero .s { font-size: 11.5px; }
+.k_major .t { font-size: 16.5px; font-weight: 680; }
+.k_major .s { font-size: 10.5px; }
 .k_sub .t { font-size: 11px; font-weight: 620; }
 .k_sub .s { font-size: 9px; }
 .k_iface .t {
@@ -221,8 +234,14 @@
 }
 /* a store is drawn as its icon and its name, with no box: it is not a
    deployable, and boxing it made every column read as one long wall */
-.k_db .box { fill: none; stroke: none; }
+.k_db .box,
+.k_bank .box { fill: none; stroke: none; }
 .k_db .glyph { stroke-width: 1.7; }
+.k_bank .t {
+  font-size: 14px;
+  font-weight: 750;
+  fill: color-mix(in srgb, var(--kind) 68%, var(--amex-txt-strong));
+}
 
 .glyph {
   fill: none;
@@ -267,11 +286,11 @@
 }
 /* the payments-domain services inside the modernisation band */
 .panelKey .panelBox {
-  fill: color-mix(in srgb, var(--lem-key) 9%, transparent);
-  stroke: color-mix(in srgb, var(--lem-key) 60%, transparent);
-  stroke-width: 1.6;
+  fill: color-mix(in srgb, var(--lem-key) 15%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--lem-key) 62%, transparent);
+  stroke-width: 1.4;
 }
-.panelKey .panelT { fill: color-mix(in srgb, var(--lem-key) 82%, var(--amex-txt-strong)); }
+.panelKey .panelT { fill: var(--amex-txt-strong); }
 .panelKey .panelS { fill: var(--amex-mut); }
 
 .panelNew .panelBox {

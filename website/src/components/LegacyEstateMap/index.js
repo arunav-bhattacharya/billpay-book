@@ -23,7 +23,7 @@ import styles from './styles.module.css';
  * All colour comes from the design tokens, so light and dark both render.
  */
 
-const VB = {w: 2600, h: 1040};
+const VB = {w: 2600, h: 1300};
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 9;
 const STUB = 14;
@@ -39,64 +39,62 @@ const LAYERS = [
 ];
 
 const PANELS = [
-  {id: 'p_hop', l: 'channel', x: 240, y: 118, w: 160, h: 620, t: 'Integration hop', band: true},
+  {id: 'p_hop', l: 'channel', x: 240, y: 130, w: 160, h: 640, t: 'Integration hop', band: true},
   {
     id: 'p_facade',
     l: 'facade',
     x: 440,
-    y: 100,
+    y: 130,
     w: 700,
-    h: 600,
-    t: 'Modernisation layer — added on top of AM',
+    h: 780,
+    t: 'Modernisation layer \u2014 added on top of AM',
     band: true,
     neu: true,
   },
-  {id: 'sf', l: 'facade', x: 470, y: 210, w: 340, h: 140, t: 'Service Facade', key: true},
+  {id: 'sf', l: 'facade', x: 456, y: 270, w: 340, h: 168, t: 'Service Facade', key: true},
   {
     id: 'sorc',
     l: 'facade',
     x: 880,
-    y: 130,
+    y: 168,
     w: 240,
-    h: 130,
+    h: 152,
     t: 'SOR Cache',
     s: 'fallback when the primary path is down',
     key: true,
     dash: true,
   },
-  {id: 'elig', l: 'facade', x: 880, y: 420, w: 240, h: 180, t: 'Eligibility', s: 'max of GAR and CAS', key: true},
+  {id: 'elig', l: 'facade', x: 880, y: 512, w: 240, h: 212, t: 'Eligibility', s: 'max of GAR and CAS', key: true},
+  {id: 'p_corp', l: 'am', x: 1180, y: 1040, w: 330, h: 172, t: 'Corporate Allocations', band: true},
 ];
 
 const NODES = [
   /* ---- channels: one straight line each into the integration hop ---- */
-  {id: 'voice', l: 'channel', k: 'fe', x: 20, y: 130, w: 170, h: 36, t: 'Voice Response'},
-  {id: 'csp', l: 'channel', k: 'fe', x: 20, y: 176, w: 170, h: 36, t: 'CSP'},
-  {id: 'wsp', l: 'channel', k: 'fe', x: 20, y: 222, w: 170, h: 36, t: 'WSP / GSP'},
-  {id: 'myca', l: 'channel', k: 'fe', x: 20, y: 268, w: 170, h: 36, t: 'MYCA / Mobile'},
-  {id: 'ace', l: 'channel', k: 'fe', x: 20, y: 314, w: 170, h: 36, t: 'ACE'},
-  {id: 'payprof', l: 'channel', k: 'fe', x: 20, y: 360, w: 170, h: 36, t: 'Payment Profile'},
-  {id: 'cop', l: 'channel', k: 'fe', x: 20, y: 406, w: 170, h: 36, t: 'COP'},
-  {id: 'vpod', l: 'channel', k: 'fe', x: 20, y: 452, w: 170, h: 36, t: 'VPOD'},
-  {id: 'cpm', l: 'channel', k: 'fe', x: 20, y: 498, w: 170, h: 36, t: 'CPM'},
-  {id: 'gcap', l: 'channel', k: 'fe', x: 20, y: 544, w: 170, h: 36, t: 'GCAP'},
-  {id: 'ormb', l: 'channel', k: 'fe', x: 20, y: 590, w: 170, h: 36, t: 'ORMB'},
-  {id: 'cmfa', l: 'channel', k: 'fe', x: 20, y: 636, w: 170, h: 36, t: 'CMFA'},
-  {id: 'gspref', l: 'channel', k: 'fe', x: 20, y: 682, w: 170, h: 36, t: 'GSP Refund'},
+  {id: 'voice', l: 'channel', k: 'fe', x: 20, y: 150, w: 170, h: 42, t: 'Voice Response'},
+  {id: 'csp', l: 'channel', k: 'fe', x: 20, y: 204, w: 170, h: 42, t: 'CSP'},
+  {id: 'wsp', l: 'channel', k: 'fe', x: 20, y: 258, w: 170, h: 42, t: 'WSP / GSP'},
+  {id: 'myca', l: 'channel', k: 'fe', x: 20, y: 312, w: 170, h: 42, t: 'MYCA / Mobile'},
+  {id: 'ace', l: 'channel', k: 'fe', x: 20, y: 366, w: 170, h: 42, t: 'ACE'},
+  {id: 'payprof', l: 'channel', k: 'fe', x: 20, y: 420, w: 170, h: 42, t: 'Payment Profile'},
+  {id: 'vpod', l: 'channel', k: 'fe', x: 20, y: 474, w: 170, h: 42, t: 'VPOD'},
+  {id: 'gcap', l: 'channel', k: 'fe', x: 20, y: 528, w: 170, h: 42, t: 'GCAP'},
+  {id: 'ormb', l: 'channel', k: 'fe', x: 20, y: 582, w: 170, h: 42, t: 'ORMB'},
+  {id: 'cmfa', l: 'channel', k: 'fe', x: 20, y: 636, w: 170, h: 42, t: 'CMFA'},
+  {id: 'gspref', l: 'channel', k: 'fe', x: 20, y: 690, w: 170, h: 42, t: 'GSP Refund'},
 
-  {id: 'ngi', l: 'channel', k: 'fe', x: 252, y: 154, w: 136, h: 46, t: 'MYCA NGI', s: 'converged services'},
-  {id: 'if_dp', l: 'channel', k: 'iface', x: 252, y: 244, w: 136, h: 46, t: 'DataPower'},
-  {id: 'if_mq', l: 'channel', k: 'iface', x: 252, y: 330, w: 136, h: 46, t: 'MQ'},
-  {id: 'if_mqr', l: 'channel', k: 'iface', x: 252, y: 416, w: 136, h: 46, t: 'MQ / REST'},
-  {id: 'if_cd', l: 'channel', k: 'iface', x: 252, y: 502, w: 136, h: 46, t: 'C:D'},
-  {id: 'if_ws', l: 'channel', k: 'iface', x: 252, y: 588, w: 136, h: 46, t: 'WS'},
+  {id: 'apigee', l: 'channel', k: 'iface', x: 252, y: 168, w: 136, h: 54, t: 'APIGEE', s: 'authenticates, forwards'},
+  {id: 'if_dp', l: 'channel', k: 'iface', x: 252, y: 266, w: 136, h: 54, t: 'DataPower'},
+  {id: 'if_mq', l: 'channel', k: 'iface', x: 252, y: 364, w: 136, h: 54, t: 'MQ'},
+  {id: 'if_mqr', l: 'channel', k: 'iface', x: 252, y: 462, w: 136, h: 54, t: 'MQ / REST'},
+  {id: 'if_cd', l: 'channel', k: 'iface', x: 252, y: 560, w: 136, h: 54, t: 'C:D'},
+  {id: 'if_ws', l: 'channel', k: 'iface', x: 252, y: 658, w: 136, h: 54, t: 'WS'},
 
   /* ---- modernisation layer (Parsec) ---- */
-  {id: 'apigee', l: 'facade', k: 'key', x: 550, y: 130, w: 180, h: 50, t: 'APIGEE', s: 'authenticates, forwards'},
-  {id: 'routing', l: 'facade', k: 'sub', neu: true, x: 486, y: 244, w: 308, h: 44, t: 'Routing', s: 'channel · market · program'},
-  {id: 'cb', l: 'facade', k: 'sub', x: 486, y: 297, w: 150, h: 34, t: 'CircuitBreaker'},
-  {id: 'sfpeh', l: 'facade', k: 'sub', neu: true, x: 644, y: 297, w: 150, h: 34, t: 'PreEligibilityHandler'},
-  {id: 'sorgeo', l: 'facade', k: 'sub', x: 894, y: 176, w: 212, h: 34, t: 'geo account'},
-  {id: 'sortri', l: 'facade', k: 'sub', x: 894, y: 214, w: 212, h: 34, t: 'triumph'},
+  {id: 'routing', l: 'facade', k: 'sub', neu: true, x: 472, y: 312, w: 308, h: 50, t: 'Routing', s: 'channel \u00b7 market \u00b7 program'},
+  {id: 'cb', l: 'facade', k: 'sub', x: 472, y: 372, w: 150, h: 42, t: 'CircuitBreaker'},
+  {id: 'sfpeh', l: 'facade', k: 'sub', neu: true, x: 630, y: 372, w: 150, h: 42, t: 'PreEligibilityHandler'},
+  {id: 'sorgeo', l: 'facade', k: 'sub', x: 894, y: 222, w: 212, h: 42, t: 'geo account'},
+  {id: 'sortri', l: 'facade', k: 'sub', x: 894, y: 268, w: 212, h: 42, t: 'triumph'},
   {
     id: 'pec',
     l: 'facade',
@@ -104,79 +102,82 @@ const NODES = [
     neu: true,
     dash: true,
     x: 880,
-    y: 300,
+    y: 361,
     w: 240,
-    h: 62,
+    h: 70,
     t: 'Pre-Eligibility Cache',
-    s: 'max amount + indicator · 5 min TTL',
+    s: 'max amount + indicator \u00b7 5 min TTL',
   },
-  {id: 'epeh', l: 'facade', k: 'sub', neu: true, x: 894, y: 472, w: 212, h: 34, t: 'PreEligibilityHandler'},
-  {id: 'ecmi', l: 'facade', k: 'sub', x: 894, y: 510, w: 212, h: 34, t: 'CmInfoHandler'},
-  {id: 'ebal', l: 'facade', k: 'sub', neu: true, x: 894, y: 548, w: 212, h: 34, t: 'BalancesHandler'},
-  {id: 'altpay', l: 'facade', k: 'key', x: 456, y: 420, w: 210, h: 58, t: 'AlternatePayment', s: 'fallback for the payment journey'},
-  {id: 'boom', l: 'facade', k: 'key', x: 456, y: 510, w: 210, h: 48, t: 'Boomerang'},
-  {id: 'gar', l: 'facade', k: 'ext', x: 885, y: 740, w: 110, h: 52, t: 'GAR', s: 'balances'},
-  {id: 'lbridge', l: 'facade', k: 'key', x: 1005, y: 640, w: 110, h: 52, t: 'Legacy Bridge'},
-  {id: 'cas', l: 'facade', k: 'ext', x: 1005, y: 740, w: 110, h: 52, t: 'CAS', s: 'balances'},
+  {id: 'epeh', l: 'facade', k: 'sub', neu: true, x: 894, y: 574, w: 212, h: 42, t: 'PreEligibilityHandler'},
+  {id: 'ecmi', l: 'facade', k: 'sub', x: 894, y: 620, w: 212, h: 42, t: 'CmInfoHandler'},
+  {id: 'ebal', l: 'facade', k: 'sub', neu: true, x: 894, y: 666, w: 212, h: 42, t: 'BalancesHandler'},
+  {id: 'altpay', l: 'facade', k: 'key', x: 456, y: 512, w: 340, h: 66, t: 'AlternatePayment', s: 'fallback for the payment journey'},
+  {id: 'boom', l: 'facade', k: 'key', x: 456, y: 616, w: 340, h: 56, t: 'Boomerang'},
+  {id: 'lbridge', l: 'facade', k: 'key', x: 1004, y: 780, w: 116, h: 60, t: 'Legacy Bridge'},
+  {id: 'gar', l: 'facade', k: 'ext', x: 880, y: 960, w: 116, h: 60, t: 'GAR', s: 'balances'},
+  {id: 'cas', l: 'facade', k: 'ext', x: 1004, y: 960, w: 116, h: 60, t: 'CAS', s: 'balances'},
 
   /* ---- AM core ---- */
-  {id: 'wroc', l: 'am', k: 'db', x: 1185, y: 130, w: 130, h: 50, t: 'WROC DB2'},
-  {id: 'sroc', l: 'am', k: 'db', x: 1335, y: 130, w: 130, h: 50, t: 'SROC DB2'},
-  {id: 'ghdb', l: 'am', k: 'key', x: 1180, y: 220, w: 290, h: 62, t: 'GPHDB / GHDB', s: 'consolidated payment history'},
+  {id: 'ghdb_e', l: 'am', k: 'db', x: 1200, y: 168, w: 130, h: 50, t: 'US-East DB2', s: 'GPHDB'},
+  {id: 'ghdb_w', l: 'am', k: 'db', x: 1360, y: 168, w: 130, h: 50, t: 'US-West DB2', s: 'GPHDB'},
+  {id: 'ghdb', l: 'am', k: 'hero', x: 1200, y: 280, w: 290, h: 74, t: 'GPHDB', s: 'consolidated payment history'},
+  {id: 'amdb_e', l: 'am', k: 'db', x: 1200, y: 560, w: 120, h: 50, t: 'US-East DB2', s: 'AM'},
+  {id: 'amdb_w', l: 'am', k: 'db', x: 1370, y: 560, w: 120, h: 50, t: 'US-West DB2', s: 'AM'},
   {
     id: 'am',
     l: 'am',
     k: 'hero',
-    x: 1180,
-    y: 330,
+    x: 1200,
+    y: 420,
     w: 290,
-    h: 84,
+    h: 96,
     t: 'Arrangement Manager',
-    s: 'AM Legacy · the legacy billpay app',
+    s: 'AM Legacy \u00b7 the legacy billpay app',
   },
-  {id: 'db2', l: 'am', k: 'db', x: 1260, y: 460, w: 130, h: 50, t: 'DB2'},
 
   /* ---- processing & clearing ---- */
-  {id: 'instream', l: 'processing', k: 'key', x: 1580, y: 130, w: 190, h: 48, t: 'Instream'},
-  {id: 'firstdata', l: 'processing', k: 'tp', x: 1790, y: 130, w: 190, h: 48, t: 'First Data'},
-  {id: 'il', l: 'processing', k: 'key', x: 1580, y: 200, w: 126, h: 48, t: 'IL'},
-  {id: 'igor', l: 'processing', k: 'key', x: 1717, y: 200, w: 126, h: 48, t: 'IGOR'},
-  {id: 'tl', l: 'processing', k: 'key', x: 1854, y: 200, w: 126, h: 48, t: 'TL'},
-  {id: 'gpp', l: 'processing', k: 'hero', x: 1580, y: 330, w: 400, h: 84, t: 'GPP', s: 'global payment platform'},
-  {id: 'gppdb1', l: 'processing', k: 'db', x: 1580, y: 450, w: 190, h: 52, t: 'GPP Primary DB'},
-  {id: 'gppdb2', l: 'processing', k: 'db', x: 1790, y: 450, w: 190, h: 52, t: 'GPP Secondary DB'},
-  {id: 'extract', l: 'processing', k: 'note', g: 'file', x: 1580, y: 526, w: 190, h: 38, t: 'Extract Files'},
-  {id: 'balmsg', l: 'processing', k: 'note', g: 'msg', x: 1790, y: 526, w: 190, h: 38, t: 'Balancing Msg'},
-  {id: 'bankach', l: 'processing', k: 'tp', x: 1580, y: 586, w: 190, h: 56, t: 'Bank', s: 'ACH, ACK and returns'},
-  {id: 'globestar', l: 'processing', k: 'ext', x: 1790, y: 586, w: 190, h: 48, t: 'Globestar'},
+  {id: 'instream', l: 'processing', k: 'ext', x: 1580, y: 168, w: 190, h: 56, t: 'Instream'},
+  {id: 'firstdata', l: 'processing', k: 'tp', x: 1790, y: 168, w: 190, h: 56, t: 'First Data'},
+  {id: 'il', l: 'processing', k: 'key', x: 1580, y: 260, w: 126, h: 56, t: 'IL'},
+  {id: 'igor', l: 'processing', k: 'ext', x: 1717, y: 260, w: 126, h: 56, t: 'IGOR'},
+  {id: 'tl', l: 'processing', k: 'key', x: 1854, y: 260, w: 126, h: 56, t: 'TL'},
+  {id: 'gpp', l: 'processing', k: 'hero', x: 1580, y: 420, w: 400, h: 96, t: 'GPP', s: 'global payment platform'},
+  {id: 'gppdb1', l: 'processing', k: 'db', x: 1580, y: 570, w: 190, h: 58, t: 'GPP Primary DB'},
+  {id: 'gppdb2', l: 'processing', k: 'db', x: 1790, y: 570, w: 190, h: 58, t: 'GPP Secondary DB'},
+  {id: 'extract', l: 'processing', k: 'note', g: 'file', x: 1580, y: 660, w: 190, h: 46, t: 'Extract Files'},
+  {id: 'balmsg', l: 'processing', k: 'note', g: 'msg', x: 1790, y: 660, w: 190, h: 46, t: 'Balancing Msg'},
+  {id: 'globestar', l: 'processing', k: 'ext', x: 1790, y: 740, w: 190, h: 56, t: 'Globestar'},
 
-  /* ---- files & third parties ---- */
-  {id: 'gateway', l: 'files', k: 'key', x: 1180, y: 560, w: 190, h: 48, t: 'Gateway'},
-  {id: 'firewall', l: 'files', k: 'iface', g: 'shield', x: 1180, y: 630, w: 190, h: 48, t: 'Amex Firewall'},
-  {id: 'datacash', l: 'files', k: 'tp', x: 1180, y: 700, w: 190, h: 48, t: 'Datacash'},
-  {id: 'bankcard', l: 'files', k: 'tp', x: 1180, y: 770, w: 190, h: 56, t: 'Bank', s: 'card rails'},
-  {id: 'infoimage', l: 'files', k: 'tp', x: 1580, y: 690, w: 190, h: 56, t: 'Info Image', s: 'Datamark'},
-  {id: 'payfiles', l: 'files', k: 'note', g: 'file', x: 1580, y: 766, w: 190, h: 38, t: 'Payment Files'},
-  {id: 'imgfiles', l: 'files', k: 'note', g: 'file', x: 1580, y: 824, w: 190, h: 38, t: 'Payment and IMG files'},
-  {id: 'transcentra', l: 'files', k: 'tp', x: 1790, y: 690, w: 190, h: 56, t: 'Transcentra'},
-  {id: 'hba', l: 'files', k: 'tp', x: 1790, y: 766, w: 190, h: 56, t: 'Homebanking', s: 'Aggregator'},
-  {id: 'banksft', l: 'files', k: 'tp', x: 1790, y: 842, w: 190, h: 56, t: 'Bank', s: '3rd-party SFT · ACH / ARC'},
+  /* ---- card rails, files and the one bank ---- */
+  {id: 'gateway', l: 'files', k: 'key', x: 1250, y: 660, w: 190, h: 56, t: 'Gateway'},
+  {id: 'firewall', l: 'files', k: 'iface', g: 'shield', x: 1250, y: 740, w: 190, h: 56, t: 'Amex Firewall'},
+  {id: 'datacash', l: 'files', k: 'tp', x: 1250, y: 820, w: 190, h: 56, t: 'Datacash'},
+  {id: 'bank', l: 'files', k: 'bank', g: 'bank', icon: 54, x: 1250, y: 906, w: 190, h: 92, t: 'Bank'},
+  {id: 'infoimage', l: 'files', k: 'tp', x: 1580, y: 840, w: 190, h: 66, t: 'Info Image', s: 'Datamark'},
+  {id: 'payfiles', l: 'files', k: 'note', g: 'file', x: 1580, y: 930, w: 190, h: 46, t: 'Payment Files'},
+  {id: 'imgfiles', l: 'files', k: 'note', g: 'file', x: 1580, y: 1000, w: 190, h: 46, t: 'Payment and IMG files'},
+  {id: 'hba', l: 'files', k: 'tp', x: 1580, y: 1090, w: 190, h: 66, t: 'Homebanking', s: 'Aggregator'},
+  {id: 'wcr', l: 'files', k: 'hero', x: 1820, y: 1075, w: 230, h: 96, t: 'WCR'},
+  {id: 'wcrdb_e', l: 'files', k: 'db', x: 1820, y: 1195, w: 120, h: 50, t: 'US-East DB2', s: 'WCR'},
+  {id: 'wcrdb_w', l: 'files', k: 'db', x: 1950, y: 1195, w: 120, h: 50, t: 'US-West DB2', s: 'WCR'},
 
   /* ---- mainframe & downstream ---- */
-  {id: 'ftn', l: 'mainframe', k: 'hero', x: 2060, y: 330, w: 260, h: 84, t: 'FTN', s: 'file transmission network'},
-  {id: 'webfocus', l: 'mainframe', k: 'ext', x: 2420, y: 130, w: 150, h: 46, t: 'WEBFOCUS'},
-  {id: 'cornerstone', l: 'mainframe', k: 'ext', x: 2420, y: 186, w: 150, h: 46, t: 'Corner Stone'},
-  {id: 'ablm', l: 'mainframe', k: 'ext', x: 2420, y: 242, w: 150, h: 46, t: 'ABLM'},
-  {id: 'rcps', l: 'mainframe', k: 'ext', x: 2420, y: 298, w: 150, h: 46, t: 'RCPS'},
-  {id: 'ccs', l: 'mainframe', k: 'ext', x: 2420, y: 410, w: 150, h: 46, t: 'Customer Comm.'},
-  {id: 'payaware', l: 'mainframe', k: 'ext', x: 2420, y: 466, w: 150, h: 46, t: 'Payment Awareness'},
-  {id: 'idn', l: 'mainframe', k: 'ext', x: 2420, y: 522, w: 150, h: 46, t: 'IDN / ENLIST'},
-  {id: 'fincap', l: 'mainframe', k: 'ext', x: 2115, y: 660, w: 200, h: 52, t: 'FINCAP'},
-  {id: 'cars', l: 'mainframe', k: 'ext', x: 2380, y: 660, w: 200, h: 52, t: 'CARS'},
-  {id: 'triumph', l: 'mainframe', k: 'ext', x: 2115, y: 732, w: 200, h: 52, t: 'TRIUMPH'},
-  {id: 'crs', l: 'mainframe', k: 'ext', x: 2115, y: 804, w: 200, h: 52, t: 'CRS'},
-  {id: 'gbill', l: 'mainframe', k: 'ext', x: 2115, y: 876, w: 200, h: 52, t: 'Global Billing'},
-  {id: 'dsto', l: 'mainframe', k: 'ext', x: 2380, y: 876, w: 200, h: 52, t: 'DSTO'},
+  {id: 'ftn', l: 'mainframe', k: 'hero', x: 2060, y: 420, w: 260, h: 96, t: 'FTN', s: 'file transmission network'},
+  {id: 'webfocus', l: 'mainframe', k: 'ext', x: 2420, y: 168, w: 150, h: 56, t: 'WEBFOCUS'},
+  {id: 'cornerstone', l: 'mainframe', k: 'ext', x: 2420, y: 238, w: 150, h: 56, t: 'Corner Stone'},
+  {id: 'ablm', l: 'mainframe', k: 'key', x: 2420, y: 308, w: 150, h: 56, t: 'ABLM'},
+  {id: 'rcps', l: 'mainframe', k: 'key', x: 2420, y: 378, w: 150, h: 56, t: 'RCPS'},
+  {id: 'ccs', l: 'mainframe', k: 'ext', x: 2420, y: 448, w: 150, h: 56, t: 'Customer Comm.'},
+  {id: 'payaware', l: 'mainframe', k: 'ext', x: 2420, y: 518, w: 150, h: 56, t: 'Payment Awareness'},
+  {id: 'idn', l: 'mainframe', k: 'ext', x: 2420, y: 588, w: 150, h: 56, t: 'IDN / ENLIST'},
+  {id: 'fincap', l: 'mainframe', k: 'ext', x: 2115, y: 800, w: 200, h: 60, t: 'FINCAP'},
+  {id: 'cop', l: 'am', k: 'ext', x: 1200, y: 1090, w: 140, h: 54, t: 'COP'},
+  {id: 'cpm', l: 'am', k: 'ext', x: 1350, y: 1090, w: 140, h: 54, t: 'CPM'},
+  {id: 'cars', l: 'am', k: 'ext', x: 1275, y: 1152, w: 140, h: 54, t: 'CARS'},
+  {id: 'triumph', l: 'mainframe', k: 'ext', x: 2115, y: 890, w: 200, h: 60, t: 'TRIUMPH'},
+  {id: 'crs', l: 'mainframe', k: 'ext', x: 2115, y: 980, w: 200, h: 60, t: 'CRS'},
+  {id: 'gbill', l: 'mainframe', k: 'ext', x: 2115, y: 1070, w: 200, h: 60, t: 'Global Billing'},
+  {id: 'dsto', l: 'mainframe', k: 'ext', x: 2380, y: 1070, w: 200, h: 60, t: 'DSTO'},
 ];
 
 const AT = {};
@@ -184,12 +185,12 @@ const AT = {};
   AT[n.id] = n;
 });
 
-/* Stores have no box, so their anchors are pulled in to sit against the icon
-   and the label rather than against an invisible rectangle. */
+/* Stores and the bank have no box, so their anchors are pulled in to sit
+   against the icon and the label rather than an invisible rectangle. */
 function pt(id, side) {
   const n = AT[id];
-  const ix = n.k === 'db' ? 10 : 0;
-  const iy = n.k === 'db' ? 7 : 0;
+  const ix = n.k === 'db' ? 10 : n.k === 'bank' ? 60 : 0;
+  const iy = n.k === 'db' ? 7 : n.k === 'bank' ? 10 : 0;
   const cx = n.x + n.w / 2;
   const cy = n.y + n.h / 2;
   switch (side) {
@@ -321,8 +322,8 @@ function link(a, sa, b, sb, o = {}) {
 }
 
 const CHANNEL_IDS = [
-  'voice', 'csp', 'wsp', 'myca', 'ace', 'payprof', 'cop',
-  'vpod', 'cpm', 'gcap', 'ormb', 'cmfa', 'gspref',
+  'voice', 'csp', 'wsp', 'myca', 'ace', 'payprof',
+  'vpod', 'gcap', 'ormb', 'cmfa', 'gspref',
 ];
 
 const EDGES = [
@@ -332,96 +333,100 @@ const EDGES = [
     const y = n.y + n.h / 2;
     return {a: id, b: 'p_hop', s: 'svc', bare: true, d: `M${n.x + n.w},${y} L240,${y}`, mx: 0, my: 0};
   }),
-  link('p_hop', 'r', 'apigee', 'l', {s: 'svc', bare: true, trunk: 420}),
   /* the original path: the interface thicket reaches AM directly, under the
      modernisation layer rather than through it */
-  link('p_hop', 'r', 'am', 'lb', {s: 'svc', p: 'direct to AM', via: [[414, 715], [1166, 715]]}),
+  link('p_hop', 'r', 'am', 'l', {s: 'svc', p: 'direct to AM', via: [[414, 880], [1186, 880]]}),
 
-  /* ---- modernisation layer. Lanes 824 / 838 / 852 / 866 keep the four
-     runs between the facade and the caches side by side. ---- */
-  link('apigee', 'b', 'sf', 't', {s: 'svc', bare: true}),
+  /* ---- modernisation layer. Lanes 824 / 838 / 852 / 866 keep the runs
+     between the facade and the caches side by side. ---- */
+  link('apigee', 'r', 'sf', 't', {s: 'svc', bare: true}),
   link('sf', 'rt', 'sorc', 'l', {s: 'svc', bare: true, stub: 8, trunk: 824}),
-  link('sf', 'rb', 'pec', 'l', {s: 'svc', p: 'max_amount', stub: 8, trunk: 838, dy: -40}),
+  link('sf', 'rb', 'pec', 'l', {s: 'svc', p: 'max_amount', dy: -44}),
   link('pec', 'b', 'elig', 't', {s: 'svc', p: 'on cache miss'}),
-  link('elig', 'lb', 'pec', 'lb', {s: 'svc', p: 'insert pre-eligibility data', stub: 8, trunk: 852, ly: 400}),
-  link('sf', 'br', 'elig', 'lt', {s: 'svc', p: '/eligibilities', dy: -22}),
-  link('cb', 'b', 'altpay', 't', {s: 'fb', p: '/standin'}),
+  link('elig', 'lb', 'pec', 'lb', {s: 'svc', p: 'insert pre-eligibility data', stub: 8, trunk: 852, ly: 478}),
+  link('sf', 'r', 'elig', 'lt', {s: 'svc', p: '/eligibilities', trunk: 838, lx: 830, ly: 500}),
+  link('cb', 'b', 'altpay', 't', {s: 'fb', p: '/standin', bx: 547}),
   link('altpay', 'b', 'boom', 't', {s: 'sdk', p: 'SDK / JRE'}),
-  link('altpay', 'r', 'elig', 'l', {s: 'svc', p: '/eligibilities', trunk: 773, lx: 773, ly: 480}),
-  /* AlternatePayment reads the consolidated history: round the bottom of the
-     facade, then up the lane between the facade and AM */
-  link('altpay', 'l', 'ghdb', 'l', {s: 'svc', bare: true, via: [[442, 880], [1152, 880]]}),
-  link('elig', 'bl', 'gar', 't', {s: 'svc', bare: true}),
-  link('elig', 'br', 'lbridge', 't', {s: 'svc', bare: true}),
+  link('altpay', 'r', 'elig', 'l', {s: 'svc', p: '/eligibilities', trunk: 838, lx: 838, ly: 600}),
+  link('altpay', 'l', 'ghdb', 'l', {s: 'svc', bare: true, via: [[442, 1060], [1150, 1060], [1150, 317]]}),
+  link('elig', 'bl', 'gar', 't', {s: 'svc', bare: true, ax: 938}),
+  link('elig', 'br', 'lbridge', 't', {s: 'svc', bare: true, ax: 1062}),
   link('lbridge', 'b', 'cas', 't', {s: 'svc', p: 'MQ'}),
-  link('elig', 'r', 'sorc', 'r', {s: 'fb', p: 'fallback', trunk: 1134, dy: -80}),
-  link('cas', 'b', 'sorc', 'b', {s: 'fb', bare: true, via: [[1060, 830], [866, 830], [866, 274]]}),
+  link('elig', 'r', 'sorc', 'r', {s: 'fb', p: 'fallback', trunk: 1134, dy: -110}),
+  link('cas', 'b', 'sorc', 'b', {s: 'fb', bare: true, via: [[1062, 1100], [866, 1100], [866, 334]]}),
 
   /* ---- AM core ---- */
   link('am', 't', 'ghdb', 'b', {s: 'svc', p: 'WS'}),
-  link('am', 'l', 'wroc', 'l', {s: 'data', p: 'JDBC', stub: 12, trunk: 1168, ly: 200}),
-  link('am', 'b', 'db2', 't', {s: 'data', p: 'JDBC'}),
-  link('wroc', 'r', 'sroc', 'l', {s: 'repl', p: 'QREP', dy: -40}),
-  link('wroc', 'b', 'ghdb', 't', {s: 'data', p: 'JDBC', bx: 1250}),
-  link('sroc', 'b', 'ghdb', 't', {s: 'data', p: 'JDBC', bx: 1400}),
+  link('ghdb', 't', 'ghdb_e', 'b', {s: 'data', p: 'JDBC', ax: 1265}),
+  link('ghdb', 't', 'ghdb_w', 'b', {s: 'data', p: 'JDBC', ax: 1425}),
+  link('ghdb_e', 'r', 'ghdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
+  link('am', 'b', 'amdb_e', 't', {s: 'data', p: 'JDBC', ax: 1260}),
+  link('am', 'b', 'amdb_w', 't', {s: 'data', p: 'JDBC', ax: 1430}),
+  link('amdb_e', 'r', 'amdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
+  link('wcr', 'b', 'wcrdb_e', 't', {s: 'data', p: 'JDBC', ax: 1880}),
+  link('wcr', 'b', 'wcrdb_w', 't', {s: 'data', p: 'JDBC', ax: 2010}),
+  link('wcrdb_e', 'r', 'wcrdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
+  /* WCR keeps its DB2 in the same two centres, reached over the top */
+  /* corporate allocations feed the arrangement they belong to */
+  link('p_corp', 'l', 'am', 'lb', {s: 'svc', p: 'allocations', stub: 16, via: [[1164, 1126], [1164, 492]], lx: 1155, ly: 898}),
 
-  /* ---- AM out to the estate. Lanes 1484 / 1500 / 1516 / 1532 / 1548 / 1564
+  /* ---- AM out to the estate. Lanes 1503 / 1516 / 1529 / 1542 / 1555 / 1568
      fill the gap between AM and the processing column. ---- */
-  link('am', 'r', 'il', 'l', {s: 'svc', p: 'WS', trunk: 1484}),
-  link('am', 'rt', 'instream', 'l', {s: 'svc', p: 'MQ', trunk: 1500}),
-  link('am', 'rt', 'firstdata', 't', {s: 'svc', p: 'WSM', via: [[1516, 351], [1516, 100], [1885, 100]]}),
+  link('am', 'r', 'il', 'l', {s: 'svc', p: 'WS', trunk: 1503}),
+  link('am', 'rt', 'instream', 'l', {s: 'svc', p: 'MQ', trunk: 1516}),
+  link('am', 'rt', 'firstdata', 't', {s: 'svc', p: 'WSM', via: [[1529, 444], [1529, 145], [1885, 145]]}),
   link('am', 'r', 'gpp', 'l', {s: 'svc', p: 'MQ'}),
-  link('am', 'br', 'gateway', 't', {s: 'svc', p: 'WS', trunk: 535}),
-  link('am', 'rb', 'globestar', 'b', {s: 'svc', p: 'DataPower', via: [[1548, 393], [1548, 648], [1885, 648]], dy: 14}),
+  link('am', 'b', 'gateway', 't', {s: 'svc', p: 'WS', ax: 1345}),
+  link('am', 'rb', 'globestar', 'b', {s: 'svc', p: 'DataPower', via: [[1555, 492], [1555, 812], [1885, 812]]}),
 
   /* ---- processing & clearing ---- */
   link('il', 'r', 'igor', 'l', {s: 'svc', bare: true}),
   link('igor', 'r', 'tl', 'l', {s: 'svc', bare: true}),
-  link('gpp', 'tl', 'il', 'b', {s: 'svc', p: 'ControlM', dx: -46}),
-  link('tl', 'b', 'gpp', 'tr', {s: 'svc', p: 'ControlM', dx: 46}),
+  link('gpp', 'tl', 'il', 'b', {s: 'svc', p: 'ControlM', ax: 1643}),
+  link('tl', 'b', 'gpp', 'tr', {s: 'svc', p: 'ControlM', bx: 1917}),
   link('gpp', 'bl', 'gppdb1', 't', {s: 'data', p: 'JDBC', ax: 1675}),
   link('gpp', 'br', 'gppdb2', 't', {s: 'data', p: 'JDBC', ax: 1885}),
-  link('gppdb1', 'r', 'gppdb2', 'l', {s: 'repl', p: 'Golden Gate', dy: -46}),
+  link('gppdb1', 'r', 'gppdb2', 'l', {s: 'repl', p: 'Golden Gate', dy: -48}),
   link('gppdb2', 'rt', 'webfocus', 'l', {s: 'data', p: 'JDBC', stub: 12, trunk: 1992}),
-  link('gpp', 'l', 'bankach', 'l', {s: 'file', p: 'SFT', trunk: 1564, dx: -34}),
+  link('gpp', 'l', 'bank', 'r', {s: 'file', p: 'SFT', trunk: 1568}),
 
-  /* ---- into and out of FTN. Lanes 1992 / 2006 / 2020 / 2034 / 2048 sit in
-     the gap between the processing column and FTN. ---- */
+  /* ---- into and out of FTN ---- */
   link('tl', 'r', 'ftn', 'lt', {s: 'file', p: 'SFT', trunk: 2006}),
-  link('extract', 't', 'ftn', 'l', {s: 'file', p: 'SFT', via: [[1675, 512], [2020, 512], [2020, 372]]}),
+  link('extract', 't', 'ftn', 'l', {s: 'file', p: 'SFT', via: [[1675, 640], [2020, 640], [2020, 468]]}),
   link('balmsg', 'r', 'ftn', 'br', {s: 'file', bare: true}),
-  link('imgfiles', 'b', 'ftn', 'lb', {s: 'file', p: 'SFT', via: [[1675, 920], [2048, 920], [2048, 393]]}),
-  link('ftn', 'bl', 'globestar', 'r', {s: 'file', p: 'Mainframe Batch', via: [[2125, 610]]}),
-  link('ftn', 'b', 'transcentra', 't', {s: 'file', p: 'SFT', ax: 2160, via: [[2160, 650], [1885, 650]], dx: -80, dy: 8}),
+  link('imgfiles', 'r', 'ftn', 'lb', {s: 'file', p: 'SFT', via: [[2046, 1023], [2046, 492]]}),
+  link('ftn', 'bl', 'globestar', 'r', {s: 'file', p: 'Mainframe Batch', via: [[2125, 768]]}),
 
-  /* ---- files & third parties ---- */
+  /* ---- card rails, and the inbound chain: bank to homebanking to WCR to FTN ---- */
   link('gateway', 'b', 'firewall', 't', {s: 'svc', bare: true}),
   link('firewall', 'b', 'datacash', 't', {s: 'svc', p: 'DataPower'}),
-  link('datacash', 'b', 'bankcard', 't', {s: 'svc', bare: true}),
-  link('il', 'l', 'infoimage', 't', {s: 'svc', p: 'WS', via: [[1532, 224], [1532, 672], [1675, 672]]}),
-  link('igor', 'b', 'infoimage', 'tr', {s: 'svc', bare: true, via: [[2034, 262], [2034, 676]]}),
+  link('datacash', 'b', 'bank', 't', {s: 'svc', bare: true}),
+  link('bank', 'rb', 'hba', 'l', {s: 'file', p: 'SFT', trunk: 1516, dy: -40}),
+  link('hba', 'r', 'wcr', 'l', {s: 'file', p: 'SFT'}),
+  link('wcr', 'r', 'ftn', 'b', {s: 'file', p: 'SFT', bx: 2085, via: [[2085, 1123]]}),
+
+  /* ---- image and payment files ---- */
+  link('il', 'l', 'infoimage', 't', {s: 'svc', p: 'WS', via: [[1542, 288], [1542, 790], [1675, 790]]}),
+  link('igor', 'b', 'infoimage', 'tr', {s: 'svc', bare: true, via: [[2034, 330], [2034, 826]]}),
   link('infoimage', 'b', 'payfiles', 't', {s: 'file', p: 'SFT'}),
   link('payfiles', 'b', 'imgfiles', 't', {s: 'file', bare: true}),
-  link('payfiles', 'r', 'hba', 'l', {s: 'file', bare: true, by: 785}),
-  link('transcentra', 'b', 'hba', 't', {s: 'file', p: 'SFT'}),
-  link('hba', 'b', 'banksft', 't', {s: 'file', p: 'SFT'}),
 
   /* ---- mainframe chain, one straight column under FTN ---- */
-  link('ftn', 'b', 'fincap', 't', {s: 'file', p: 'Mainframe Batch', ax: 2215}),
-  link('fincap', 'r', 'cars', 'l', {s: 'file', p: 'Mainframe Batch', dy: -40}),
+  link('ftn', 'b', 'fincap', 't', {s: 'file', p: 'Mainframe Batch', ax: 2215, dy: 80}),
   link('fincap', 'b', 'triumph', 't', {s: 'file', p: 'Mainframe Batch'}),
   link('triumph', 'b', 'crs', 't', {s: 'file', p: 'Mainframe Batch'}),
   link('crs', 'b', 'gbill', 't', {s: 'file', p: 'Mainframe Batch'}),
-  link('gbill', 'r', 'dsto', 'l', {s: 'file', p: 'C:D', dy: -26}),
+  link('gbill', 'r', 'dsto', 'l', {s: 'file', p: 'C:D', dy: -44}),
+  link('fincap', 'l', 'cars', 'r', {s: 'file', p: 'Mainframe Batch', via: [[1536, 830], [1536, 1179]], ly: 900}),
 
   /* ---- FTN back into the history, and out to the reporting estate ---- */
-  link('ftn', 't', 'ghdb', 'r', {s: 'file', p: 'Mainframe Batch', via: [[2190, 300], [1564, 300], [1564, 251]], lx: 1900, ly: 300}),
-  link('ftn', 'r', 'rcps', 'l', {s: 'file', bare: true, trunk: 2332}),
-  link('ftn', 'r', 'ccs', 'l', {s: 'file', bare: true, trunk: 2340}),
-  link('ftn', 'r', 'ablm', 'l', {s: 'file', bare: true, trunk: 2348}),
-  link('ftn', 'r', 'payaware', 'l', {s: 'file', bare: true, trunk: 2356}),
-  link('ftn', 'r', 'cornerstone', 'l', {s: 'file', bare: true, trunk: 2364}),
-  link('ftn', 'r', 'idn', 'l', {s: 'file', p: 'Mainframe Batch', trunk: 2372, lx: 2372, ly: 596}),
+  link('ftn', 't', 'ghdb', 'r', {s: 'file', p: 'Mainframe Batch', via: [[2190, 380], [1555, 380], [1555, 317]], lx: 2160, ly: 380}),
+  link('ftn', 'r', 'rcps', 'l', {s: 'file', bare: true, trunk: 2334}),
+  link('ftn', 'r', 'ccs', 'l', {s: 'file', bare: true, trunk: 2348}),
+  link('ftn', 'r', 'ablm', 'l', {s: 'file', bare: true, trunk: 2362}),
+  link('ftn', 'r', 'payaware', 'l', {s: 'file', bare: true, trunk: 2376}),
+  link('ftn', 'r', 'cornerstone', 'l', {s: 'file', bare: true, trunk: 2390}),
+  link('ftn', 'r', 'idn', 'l', {s: 'file', p: 'Mainframe Batch', trunk: 2404, lx: 2404, ly: 700}),
 ];
 
 const KIND_LABEL = [
@@ -430,7 +435,7 @@ const KIND_LABEL = [
   {k: 'key', label: 'Payments domain system'},
   {k: 'ext', label: 'Outside the payments domain'},
   {k: 'tp', label: 'Third-party system'},
-  {k: 'db', label: 'Database', g: 'db'},
+  {k: 'bank', label: 'Bank'},
 ];
 
 const EDGE_LABEL = [
@@ -475,6 +480,14 @@ const GLYPHS = {
       <rect className={styles.solid} x="1.4" y="1.8" width="9.4" height="3.3" rx="1" />
       <rect className={styles.solid} x="2.8" y="6.2" width="9.4" height="3.3" rx="1" />
       <rect className={styles.solid} x="4.2" y="10.6" width="9.4" height="3.3" rx="1" />
+    </>
+  ),
+  bank: (
+    <>
+      <path d="M1,5.6 L7,1.9 L13,5.6" />
+      <rect className={styles.solid} x="0.8" y="5.6" width="12.4" height="1.8" rx="0.6" />
+      <path d="M3.2,7.8 V12.2 M7,7.8 V12.2 M10.8,7.8 V12.2" />
+      <rect className={styles.solid} x="0.8" y="12.4" width="12.4" height="1.9" rx="0.6" />
     </>
   ),
   shield: (
@@ -532,23 +545,36 @@ function Shape({n, dimmed, showNew}) {
         className={clsx(styles.box, n.dash && styles.dashed)}
       />
       {glyph && (
-        <Glyph name={glyph} x={runX} y={n.y + n.h / 2 - gw / 2} size={gw} />
+        <Glyph
+          name={glyph}
+          x={n.icon ? n.x + n.w / 2 - n.icon / 2 : runX}
+          y={n.icon ? n.y + 12 : n.y + n.h / 2 - gw / 2}
+          size={n.icon || gw}
+        />
       )}
-      <text
-        x={cx}
-        y={n.y + (hasSub ? n.h / 2 - 3 : n.h / 2 + 5)}
-        style={glyph ? {textAnchor: 'start'} : undefined}
-        className={styles.t}>
-        {n.t}
-      </text>
-      {hasSub && (
-        <text
-          x={cx}
-          y={n.y + n.h / 2 + 13}
-          style={glyph ? {textAnchor: 'start'} : undefined}
-          className={styles.s}>
-          {n.s}
+      {n.icon ? (
+        <text x={n.x + n.w / 2} y={n.y + n.h - 10} className={styles.t}>
+          {n.t}
         </text>
+      ) : (
+        <>
+          <text
+            x={cx}
+            y={n.y + (hasSub ? n.h / 2 - 3 : n.h / 2 + 5)}
+            style={glyph ? {textAnchor: 'start'} : undefined}
+            className={styles.t}>
+            {n.t}
+          </text>
+          {hasSub && (
+            <text
+              x={cx}
+              y={n.y + n.h / 2 + 13}
+              style={glyph ? {textAnchor: 'start'} : undefined}
+              className={styles.s}>
+              {n.s}
+            </text>
+          )}
+        </>
       )}
       {isNew && (
         <rect
@@ -752,7 +778,7 @@ export default function LegacyEstateMap({showIncremental = true}) {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        aria-label="The legacy payments landscape. Thirteen frontend systems, among them Voice Response, CSP, WSP/GSP, MYCA and Mobile, ACE, Payment Profile, COP, VPOD, CPM, GCAP, ORMB, CMFA and GSP Refund, all reach Arrangement Manager through a thicket of interfaces: DataPower, MQ, MQ over REST, Connect Direct, web services and the MYCA NGI converged services. A modernisation layer was later added on top: APIGEE authenticates and forwards to a Service Facade holding Routing, a CircuitBreaker and a pre-eligibility handler, backed by an SOR cache of geo account and triumph data, a pre-eligibility cache holding the maximum amount and eligibility indicator for five minutes, and an Eligibility service that takes the greater of the GAR and CAS balances, reaching CAS through a Legacy Bridge over MQ. When the circuit breaker opens, the standin path runs AlternatePayment, which calls Boomerang and reads the consolidated history. At the centre sits Arrangement Manager, the legacy billpay application, over DB2, WROC DB2 and SROC DB2 replicated to each other by QREP, and GPHDB, the consolidated payment history. AM feeds Instream, First Data, IL, IGOR, TL and GPP, the global payment platform, whose primary and secondary databases replicate by Golden Gate and feed WEBFOCUS. GPP exchanges ACH files, acknowledgements and returns with the bank. Card rails run from AM through Gateway, the Amex firewall and Datacash. File paths run to Info Image and Datamark, Transcentra and the Homebanking Aggregator. FTN, the file transmission network, drives the mainframe batch chain of FINCAP, CARS, TRIUMPH, CRS, Global Billing, DSTO and the e-statement database, feeds Corner Stone, ABLM, RCPS, the customer communication system, Payment Awareness, Globestar and IDN ENLIST, and writes back into the consolidated payment history. Red markers show the systems where traceability breaks.">
+        aria-label="The legacy payments landscape. Thirteen frontend systems, among them Voice Response, CSP, WSP/GSP, MYCA and Mobile, ACE, Payment Profile, COP, VPOD, CPM, GCAP, ORMB, CMFA and GSP Refund, reach Arrangement Manager through an integration hop of DataPower, MQ, MQ over REST, Connect Direct, web services and the MYCA NGI converged services. A modernisation layer was later added on top: APIGEE forwards to a Service Facade holding Routing, a CircuitBreaker and a pre-eligibility handler, backed by an SOR cache of geo account and triumph data, a pre-eligibility cache holding the maximum amount and eligibility indicator for five minutes, and an Eligibility service that takes the greater of the GAR and CAS balances, reaching CAS through a Legacy Bridge over MQ. When the circuit breaker opens, the standin path runs AlternatePayment, which calls Boomerang and reads the consolidated history. At the centre sits Arrangement Manager, the legacy billpay application, over DB2, and GPHDB, the consolidated payment history, which writes to WROC DB2 and SROC DB2, themselves replicated to each other by QREP. AM feeds Instream, First Data, IL, IGOR, TL and GPP, the global payment platform, whose primary and secondary databases replicate by Golden Gate and feed WEBFOCUS. Card rails run from AM through Gateway, the Amex firewall and Datacash to the bank. Inbound files run from the bank through the Homebanking Aggregator and WCR into FTN, the file transmission network, which also takes extract files, balancing messages and payment and image files. FTN drives the mainframe batch chain of FINCAP, CARS, TRIUMPH, CRS, Global Billing and DSTO, feeds Corner Stone, ABLM, RCPS, the customer communication system, Payment Awareness, Globestar and IDN ENLIST, and writes back into the consolidated payment history.">
         <defs>
           {EDGE_LABEL.map(({s}) => (
             <marker
@@ -799,7 +825,7 @@ export default function LegacyEstateMap({showIncremental = true}) {
 
       <div className={styles.legend}>
         <div className={styles.lgroup}>
-          <span className={styles.lhead}>What the boxes are</span>
+          <span className={styles.lhead}>Systems</span>
           <div className={styles.lrow}>
             {KIND_LABEL.map((l) => (
               <span key={l.k} className={styles.li}>
@@ -817,7 +843,7 @@ export default function LegacyEstateMap({showIncremental = true}) {
         </div>
 
         <div className={styles.lgroup}>
-          <span className={styles.lhead}>How they talk to each other</span>
+          <span className={styles.lhead}>Connectivity</span>
           <div className={styles.lrow}>
             {EDGE_LABEL.map((l) => (
               <span key={l.s} className={styles.li}>
@@ -828,29 +854,6 @@ export default function LegacyEstateMap({showIncremental = true}) {
           </div>
         </div>
 
-        <div className={styles.lgroup}>
-          <span className={styles.lhead}>What to look out for</span>
-          <div className={styles.lrow}>
-            {showIncremental && (
-              <span className={styles.li}>
-                <i className={clsx(styles.sw, styles.swNew)} />
-                Added on top of the legacy estate
-              </span>
-            )}
-            <span className={styles.li}>
-              <svg viewBox="0 0 14 16" className={clsx(styles.swIcon, styles.k_note)} aria-hidden="true">
-                <g className={styles.glyph}>{GLYPHS.file}</g>
-              </svg>
-              File payload
-            </span>
-            <span className={styles.li}>
-              <svg viewBox="0 0 14 16" className={clsx(styles.swIcon, styles.k_note)} aria-hidden="true">
-                <g className={styles.glyph}>{GLYPHS.msg}</g>
-              </svg>
-              Message payload
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

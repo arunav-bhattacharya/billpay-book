@@ -231,3 +231,40 @@ the violet "added on top of the legacy estate" treatment.
 
 `## Legacy vs modern` rewritten as a three-column table with a named **What changed**
 aspect column, styled by `.compareTable` (section 14 of `src/css/custom.css`).
+
+
+## Phase G addendum — the estate map after review (2026-07-28)
+
+`LegacyEstateMap` was reworked over several rounds of review. **The two Confluence
+screenshots are no longer the only source**, so record what came from where before
+treating anything here as transcribed:
+
+**From the screenshots.** The channel list, the interface thicket, Arrangement Manager,
+GPHDB, GPP, IL/IGOR/TL, Instream, First Data, FTN, the card rails (Gateway, Amex
+Firewall, Datacash), the file paths, the mainframe batch chain, the reporting estate,
+and the whole Parsec facade (APIGEE, Service Facade, SOR Cache, Pre-Eligibility Cache,
+Eligibility, GAR, Legacy Bridge, CAS, AlternatePayment, Boomerang).
+
+**From the user directly, not on either screenshot:**
+- **WCR**, a payments-domain system, replacing Transcentra in the inbound chain.
+- The chain direction **Bank to Homebanking Aggregator to WCR to FTN**.
+- **Corporate Allocations**: COP and CPM are not channels. They group with CARS and
+  interact with AM. CARS therefore no longer hangs off FINCAP on the batch chain,
+  though FINCAP still feeds it.
+- **AM, GPHDB and WCR each keep their own DB2 pair** in **US-East** and **US-West**,
+  QREP-replicated per pair. This replaces the shared WROC / SROC pair the screenshots
+  show, and the standalone `DB2` node, which was AM's store under another name.
+- **AM to GPHDB is WS**, not JDBC.
+- One **Bank**, not the three the customer-journey map draws.
+- The payments-domain / outside-the-domain split, which is an ownership judgement the
+  screenshots do not encode: **inside** are AM, GPHDB, GPP, FTN, WCR, IL, TL, Gateway,
+  APIGEE, the facade components, ABLM and RCPS; **outside** are Instream, IGOR,
+  Globestar, GAR, CAS, WEBFOCUS, Corner Stone, Customer Comm, Payment Awareness,
+  IDN/ENLIST, FINCAP, TRIUMPH, CRS, Global Billing, DSTO, COP, CPM and CARS.
+- **Dropped on instruction:** the red traceability markers, MYCA NGI, and E-Statement DB.
+
+**Still inferred, never confirmed:** Globestar and CAS each appear twice across the
+screenshots and are drawn once with both sets of edges.
+
+Every layout change is verified by a geometry checker run against the live DOM: zero
+edges through boxes, zero node overlaps, zero label collisions.
