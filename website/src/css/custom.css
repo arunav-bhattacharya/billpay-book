@@ -805,3 +805,106 @@ table thead tr {
   background: transparent;
 }
 .compareTable table th:first-child::before { background: none; }
+
+/* ---------------------------------------------------------------------------
+   15. Worker table — the Online/Offline split under Architecture ▸ Overview.
+   Two rows, and the row's colour carries the meaning: Online takes the Billpay
+   Core violet from the system map, Offline the architecture accent it shares
+   with the async band that feeds it. The rows are addressed by position
+   because the table is a fixed pair, not a list that grows.
+--------------------------------------------------------------------------- */
+.workerTable {
+  margin: 0.85rem 0 1.15rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 14px;
+  overflow-x: auto;
+  box-shadow: var(--amex-sh-sm);
+  background: var(--amex-panel);
+}
+.workerTable table {
+  width: 100%;
+  display: table;
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+}
+.workerTable table th,
+.workerTable table td {
+  border: 0;
+  border-bottom: 1px solid var(--amex-line);
+  background: transparent;
+  vertical-align: top;
+}
+.workerTable table thead tr,
+.workerTable table tbody tr:nth-child(2n) {
+  background: transparent;
+}
+.workerTable table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.workerTable table th {
+  padding: 0.68rem 0.95rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+}
+.workerTable table td {
+  padding: 0.9rem 0.95rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.workerTable table tbody tr:nth-child(1) { --wk-row: var(--amex-temporal); }
+.workerTable table tbody tr:nth-child(2) { --wk-row: var(--amex-cat-architecture); }
+
+/* the name column reads as a row header, on its own rail */
+.workerTable table td:first-child {
+  position: relative;
+  width: 8rem;
+  padding-left: 1.2rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--wk-row) 62%, var(--amex-txt-strong));
+  background: color-mix(in srgb, var(--wk-row) 8%, transparent);
+}
+[data-theme='dark'] .workerTable table td:first-child {
+  color: color-mix(in srgb, var(--wk-row) 55%, #ffffff);
+  background: color-mix(in srgb, var(--wk-row) 14%, transparent);
+}
+.workerTable table td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--wk-row),
+    color-mix(in srgb, var(--wk-row) 30%, transparent)
+  );
+}
+
+/* workflow names pick up their row's colour instead of the global code blue */
+.workerTable table td:last-child code {
+  background: color-mix(in srgb, var(--wk-row) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wk-row) 30%, var(--amex-line));
+  color: var(--amex-txt-strong);
+  white-space: nowrap;
+}
+[data-theme='dark'] .workerTable table td:last-child code {
+  background: color-mix(in srgb, var(--wk-row) 22%, transparent);
+  color: #e8f0fb;
+}
+
+@media (max-width: 620px) {
+  .workerTable table td:first-child {
+    width: auto;
+  }
+  .workerTable table td,
+  .workerTable table th {
+    padding: 0.7rem;
+  }
+}

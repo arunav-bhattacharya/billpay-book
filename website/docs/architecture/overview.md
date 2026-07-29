@@ -103,10 +103,14 @@ export const ASIDE = {
 - It also fetches the stages that match the market's dimensions and passes them into the workflow it starts.
 - Workflows are the durable part. Each one runs on one of two Temporal workers:
 
-| Worker | Trigger | Examples |
-| --- | --- | --- |
-| **Online** | An end user is awaiting a response | `CreateImmediatePaymentWF`, `UpdatePaymentWF`, `CancelPaymentWF`, `CreatePaymentIntentWF` |
-| **Offline** | Async: events, async systems (RTF), or a scheduler | `ExecuteScheduledPaymentWF`, `ProcessInboundPaymentWF`, `ProcessReturnedPaymentWF`, the periodic workflows |
+  <div className="workerTable">
+
+  | Worker | Trigger | Examples |
+  | --- | --- | --- |
+  | Online | An end user is awaiting a response | `CreateImmediatePaymentWF`, `UpdatePaymentWF`, `CancelPaymentWF`, `CreatePaymentIntentWF` |
+  | Offline | Async: events, async systems (RTF), or a scheduler | `ExecuteScheduledPaymentWF`, `ProcessInboundPaymentWF`, `ProcessReturnedPaymentWF`, the periodic workflows |
+
+  </div>
 
 - A workflow never calls an external system itself. It composes components instead: Stages take the payment from one state to the next, ActivityGroups hold a set of related business actions, Activities are single retryable actions, and Clients adapt to one external system each.
 - Which implementations a workflow gets comes from the market's dimensions. The call rules are covered in the Design section.
