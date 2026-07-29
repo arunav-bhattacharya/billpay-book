@@ -7,7 +7,6 @@ import Lead from '@site/src/components/Lead';
 import Highlights from '@site/src/components/Highlights';
 import CompositionMap from '@site/src/components/CompositionMap';
 import Principles from '@site/src/components/Principles';
-import WorkerSplit from '@site/src/components/WorkerSplit';
 
 export const DIMENSIONS = [
   {
@@ -36,54 +35,6 @@ export const RUN = {
   title: 'Workflows',
   note: 'Composed for the profile, then started. Each journey has one workflow, and it is the same one in every market.',
 };
-
-export const WORKERS = [
-  {
-    name: 'Online worker',
-    tone: 'online',
-    waiting: 'someone is waiting',
-    desc: 'Runs the workflows a person is sitting in front of, where the answer goes straight back to the caller.',
-    items: [
-      'Create Immediate Payment',
-      'Update Payment',
-      'Cancel Payment',
-      'Create Payment Intent',
-    ],
-  },
-  {
-    name: 'Offline worker',
-    tone: 'offline',
-    waiting: 'nobody is blocked',
-    desc: 'Runs everything triggered asynchronously. Work arrives through events, for example from RTF (the Reliable Transaction Framework), or through a scheduler.',
-    items: [
-      'Execute Scheduled Payment',
-      'Process Inbound Payment',
-      'Process Returned Payment',
-      'Process Representment',
-      'Get Corporate Payment Allocations',
-    ],
-  },
-];
-
-export const STRIPS = [
-  {
-    label: 'Either worker',
-    text: 'A few workflows run on both, depending on where in the journey they are called.',
-    items: ['Create Schedule Payment', 'Execute Split Payment', 'Create Balance Refund'],
-  },
-  {
-    label: 'On a schedule',
-    text: 'The offline worker also carries the periodic work, driven by Temporal Schedules.',
-    items: [
-      'Scheduled payment executor',
-      'Corporate allocations processor',
-      'Representment executor',
-      'Paid events processor',
-      'Missing paid events processor',
-      'Data purger',
-    ],
-  },
-];
 
 # Engineering Vision
 
@@ -186,12 +137,6 @@ The profile is what composes the workflow. When a request arrives, the dimension
 />
 
 A new variant is a new implementation behind one combination. The workflow keeps its shape, and no market ends up as a branch inside it.
-
-## Where it runs
-
-Workflows execute on one of two Temporal workers, divided by whether someone is waiting for the answer.
-
-<WorkerSplit workers={WORKERS} strips={STRIPS} />
 
 ## Optimize for
 

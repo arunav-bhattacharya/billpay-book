@@ -1,0 +1,214 @@
+/* ApiTable — gateway function on the left, the core API it delegates to in the
+   middle, what it is for on the right. Follows the RouteMap table treatment:
+   a rounded panel, tracked small-caps headers, no zebra striping, and colour
+   used only where it carries meaning (the HTTP verb). */
+
+.wrap {
+  margin: 1.4rem 0 2rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 15px;
+  background: var(--amex-panel);
+  box-shadow: var(--amex-sh-sm);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  display: table;
+  font-size: 0.92rem;
+}
+
+.table thead tr {
+  background: none;
+  border: none;
+}
+
+.table th,
+.table td {
+  border: none;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table thead th {
+  padding: 0.85rem 1rem 0.6rem;
+  font-size: 0.63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--amex-mut);
+  border-bottom: 1px solid var(--amex-line);
+}
+
+.table tbody tr {
+  border-top: 1px solid var(--amex-line);
+  background: none;
+  transition: background-color 0.15s ease;
+}
+
+.table tbody tr:first-child {
+  border-top: none;
+}
+
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--amex-blue) 4%, transparent);
+}
+
+.table tbody th,
+.table tbody td {
+  padding: 0.7rem 1rem;
+  font-weight: 400;
+}
+
+.thFn {
+  width: 32%;
+}
+.thApi {
+  width: 30%;
+}
+
+/* ---- the function, linked to its contract ---- */
+.fnCell {
+  white-space: nowrap;
+}
+
+.fn {
+  font-family: var(--amex-font-mono);
+  font-size: 0.79rem;
+  font-weight: 500;
+  color: var(--amex-blue);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--amex-blue) 35%, transparent);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.fn:hover {
+  color: var(--amex-blue-deep);
+  border-bottom-color: currentColor;
+}
+
+.out {
+  font-size: 0.7em;
+  margin-left: 0.25em;
+  opacity: 0.75;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+  background: color-mix(in srgb, var(--amex-mut) 10%, transparent);
+  border: 1px solid var(--amex-line);
+}
+
+/* ---- the core API ---- */
+.apiCell {
+  white-space: nowrap;
+}
+
+.verb {
+  display: inline-block;
+  min-width: 56px;
+  margin-right: 0.5rem;
+  padding: 1px 7px;
+  border-radius: 6px;
+  text-align: center;
+  font-family: var(--amex-font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.post {
+  color: #0159ad;
+  background: color-mix(in srgb, #0159ad 12%, transparent);
+  border: 1px solid color-mix(in srgb, #0159ad 30%, transparent);
+}
+.put {
+  color: #97600c;
+  background: color-mix(in srgb, #97600c 12%, transparent);
+  border: 1px solid color-mix(in srgb, #97600c 30%, transparent);
+}
+.del {
+  color: #5f6f86;
+  background: color-mix(in srgb, #5f6f86 14%, transparent);
+  border: 1px solid color-mix(in srgb, #5f6f86 32%, transparent);
+}
+.get {
+  color: #2f7d54;
+  background: color-mix(in srgb, #2f7d54 12%, transparent);
+  border: 1px solid color-mix(in srgb, #2f7d54 30%, transparent);
+}
+
+.path {
+  font-family: var(--amex-font-mono);
+  font-size: 0.76rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--amex-txt);
+}
+
+.whatCell {
+  color: var(--amex-mut);
+  line-height: 1.5;
+  font-size: 0.88rem;
+}
+
+/* ---- dark ---- */
+:global([data-theme='dark']) .fn {
+  color: var(--amex-blue-bright);
+}
+:global([data-theme='dark']) .fn:hover {
+  color: #7fd1f5;
+}
+:global([data-theme='dark']) .path {
+  background: none;
+  border: none;
+  color: var(--amex-txt);
+}
+:global([data-theme='dark']) .post {
+  color: #6ba6e6;
+  background: color-mix(in srgb, #6ba6e6 15%, transparent);
+  border-color: color-mix(in srgb, #6ba6e6 34%, transparent);
+}
+:global([data-theme='dark']) .put {
+  color: #e0b34e;
+  background: color-mix(in srgb, #e0b34e 15%, transparent);
+  border-color: color-mix(in srgb, #e0b34e 34%, transparent);
+}
+:global([data-theme='dark']) .del {
+  color: #93a3bb;
+  background: color-mix(in srgb, #93a3bb 15%, transparent);
+  border-color: color-mix(in srgb, #93a3bb 32%, transparent);
+}
+:global([data-theme='dark']) .get {
+  color: #57b483;
+  background: color-mix(in srgb, #57b483 15%, transparent);
+  border-color: color-mix(in srgb, #57b483 32%, transparent);
+}
+:global([data-theme='dark']) .table tbody tr:hover {
+  background: color-mix(in srgb, var(--amex-blue-bright) 7%, transparent);
+}
+
+@media (max-width: 700px) {
+  .table {
+    font-size: 0.86rem;
+  }
+  .table thead th,
+  .table tbody th,
+  .table tbody td {
+    padding: 0.6rem 0.7rem;
+  }
+  .whatCell {
+    min-width: 220px;
+  }
+}

@@ -6,27 +6,115 @@ sidebar_label: A Closer Look
 import Lead from '@site/src/components/Lead';
 import Highlights from '@site/src/components/Highlights';
 import RouteMap from '@site/src/components/RouteMap';
+import ApiTable from '@site/src/components/ApiTable';
+import WorkerSplit from '@site/src/components/WorkerSplit';
+
+export const FUNCTIONS = [
+  {
+    fn: 'CreatePayment.v3',
+    method: 'POST',
+    path: '/payments',
+    purpose: 'Pay now or on a future date, with one instruction or several',
+  },
+  {
+    fn: 'UpdatePayment.v1',
+    method: 'PUT',
+    path: '/payments/{payment-id}',
+    purpose: 'Change a payment that is still scheduled',
+  },
+  {
+    fn: 'DeletePayment.v1',
+    method: 'DELETE',
+    path: '/payments/{payment-id}',
+    purpose: 'Cancel a scheduled or accepted payment',
+  },
+  {
+    fn: 'CreateInboundPayment.v1',
+    method: 'POST',
+    path: '/payments/inbound',
+    purpose: 'Take in a payment a third party started',
+  },
+  {
+    fn: 'CreatePaymentIntent.v1',
+    method: 'POST',
+    path: '/payments/intent',
+    purpose: 'Register an intent, processed once the customer FI confirms it',
+  },
+  {
+    fn: 'CreateCreditBalanceRefund.v1',
+    method: 'POST',
+    path: '/refunds',
+    purpose: 'Send a credit balance back to the customer',
+  },
+  {
+    fn: 'CreatePaymentInstallment.v1',
+    method: 'POST',
+    path: '/payment-installments',
+    purpose: 'A payment plus the installment plan behind it',
+    tag: 'Composite',
+  },
+  {
+    fn: 'ReadPayments.v1',
+    method: 'GET',
+    path: '/payments/account/{account-id}',
+    purpose: "List a card account's payments",
+  },
+  {
+    fn: 'ReadPaymentEventsById.v1',
+    method: 'GET',
+    path: '/payments/{payment-id}',
+    purpose: 'Read the lifecycle events of one payment',
+  },
+];
+
+export const WORKERS = [
+  {
+    name: 'Online worker',
+    tone: 'online',
+    waiting: 'someone is waiting',
+    desc: 'Request-path workflows, where an end user is waiting for the answer.',
+    items: [
+      'Create Immediate Payment',
+      'Update Payment',
+      'Cancel Payment',
+      'Create Payment Intent',
+    ],
+  },
+  {
+    name: 'Offline worker',
+    tone: 'offline',
+    waiting: 'nobody is blocked',
+    desc: 'Everything triggered asynchronously, by events, by async systems such as RTF, or by a scheduler.',
+    items: [
+      'Execute Scheduled Payment',
+      'Process Inbound Payment',
+      'Process Returned Payment',
+      'Process Representment',
+      'Get Corporate Payment Allocations',
+      'Periodic sweeps',
+    ],
+  },
+];
+
+export const STRIPS = [
+  {
+    label: 'Either worker',
+    text: 'A few workflows run on both, depending on where in the journey they are invoked.',
+    items: ['Create Schedule Payment', 'Execute Split Payment', 'Create Balance Refund'],
+  },
+];
 
 # A Closer Look
 
-<Lead>The blocks the [overview](./overview.md) introduced, one at a time: the gateway and the core APIs, the router, the two worker pools, the component model, and the async edges.</Lead>
+<Lead>The blocks the [overview](./overview.md) introduced, one at a time: the gateway and the core APIs, the router, the two worker pools, the building blocks inside a workflow, and the async edges.</Lead>
 
-## One-Data Functions → core APIs
+## How a request gets in
 
-Upstream channels integrate with **One-Data Functions** — versioned, stable contracts — which delegate to the Billpay **core REST APIs**:
+Upstream channels never call Billpay directly. They call **One-Data Functions**, versioned contracts that stay stable while the implementation behind them moves, and each function delegates to one Billpay **core REST API**. Every function name below links to its contract in the One-Data explorer.
 
-| One-Data Function | Core API | Purpose |
-| --- | --- | --- |
-| `CreatePayment.v3` | `POST /payments` | Immediate or scheduled payment (single or multi-instruction) |
-| `UpdatePayment.v1` | `PUT /payments/{payment-id}` | Update a scheduled payment |
-| `DeletePayment.v1` | `DELETE /payments/{payment-id}` | Cancel a scheduled or accepted payment |
-| `CreateInboundPayment.v1` | `POST /payments/inbound` | Third-party-initiated payment |
-| `CreatePaymentIntent.v1` | `POST /payments/intent` | Register a payment intent |
-| `CreateCreditBalanceRefund.v1` | `POST /refunds` | Credit-balance refund |
-| `CreatePaymentInstallment.v1` | `POST /payment-installments` | Composite — payment + installments |
-| `ReadPayments.v1` · `ReadPaymentEventsById.v1` | `GET /payments/account/{account-id}` · `GET /payments/{payment-id}` | Read payments / lifecycle events |
+<ApiTable rows={FUNCTIONS} />
 
-Event-driven functions (for example `MoneyMovementEventHandler`) bring async outcomes back in — see [Async edges](#async-edges).
+Event-driven functions such as `MoneyMovementEventHandler` bring async outcomes back in. Those are covered under [Async edges](#async-edges).
 
 ## Billpay Router
 
@@ -76,60 +164,40 @@ The router sits between the core APIs and the workflows and decides **which work
 
 The tagged, indented rows are the **child workflows** a route triggers once the payment is accepted, and the tag is the `accountType` dimension that selects them: a consumer split runs one `ExecuteSplitPaymentWF` per leg, while a corporate payment first runs `GetCorporatePaymentAllocationsWF` to fetch its allocation breakdown, then an `ExecuteSplitPaymentWF` per allocation.
 
-## The two workers
+## Where workflows run
 
-Workflows run on two Temporal worker pools, split on purpose:
+Workflows run on two Temporal worker pools, divided by whether someone is waiting for the answer.
 
-<Highlights
-  accent="var(--amex-cat-architecture)"
-  items={[
-    {
-      term: 'Online worker',
-      desc: (
-        <>
-          Runs request-path workflows where an end user is <strong>awaiting a response</strong> — create, update, cancel, intent.
-        </>
-      ),
-    },
-    {
-      term: 'Offline worker',
-      desc: (
-        <>
-          Runs workflows triggered <strong>asynchronously</strong> — by events, async systems (RTF), or a scheduler — with no user waiting: scheduled execution, inbound, returns, and all periodic work.
-        </>
-      ),
-    },
-  ]}
-/>
+<WorkerSplit workers={WORKERS} strips={STRIPS} />
 
-Keeping synchronous and asynchronous work on separate workers means a burst of async work — say a settlement sweep draining a backlog — can't hold up the customer-facing path: each worker pool polls its own task queues with its own tuning. Both worker pools ship together in a single JVM — the [Worker App](../deployment/deployables/worker-app.md) — so the isolation is logical rather than deployment-level. A few workflows (Create Schedule Payment, Execute Split Payment, Create Balance Refund) can run on either, depending on where in the journey they're invoked.
+Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level. The periodic work the Offline worker carries is fired by Temporal Schedules, listed under [Async edges](#async-edges).
 
-## The component model
+## Workflow Building Blocks
 
-Inside a workflow, work is layered so each concern lives in exactly one place — and a workflow never calls an external system directly:
+Inside a workflow, work is layered so each concern lives in exactly one place, and a workflow never calls an external system directly.
 
 <Highlights
   accent="var(--amex-cat-architecture)"
   items={[
     {
       term: 'Workflow',
-      desc: `Orchestrates a complete journey — a payment, a refund, a return — sequencing the business decision points.`,
+      desc: `Orchestrates a complete journey, a payment, a refund, or a return, sequencing the business decision points.`,
     },
     {
       term: 'Stage',
       desc: (
         <>
-          A single state-transition decision point (e.g. <code>InitiatedToPendingStage</code>) — consumes one payment state, emits the next.
+          A single state-transition decision point (for example <code>InitiatedToPendingStage</code>). It consumes one payment state and emits the next.
         </>
       ),
     },
     {
       term: 'ActivityGroup',
-      desc: `Coordinates a cohesive set of business actions — validation, lifecycle-event publication, balance updates.`,
+      desc: `Coordinates a cohesive set of business actions: validation, lifecycle-event publication, balance updates.`,
     },
     {
       term: 'Activity',
-      desc: `One retryable action — publish an event, persist a record, update a downstream balance.`,
+      desc: `One retryable action, such as publishing an event, persisting a record, or updating a downstream balance.`,
     },
     {
       term: 'Client',
@@ -138,7 +206,7 @@ Inside a workflow, work is layered so each concern lives in exactly one place �
   ]}
 />
 
-The call direction is strict — **Workflow → Stage → ActivityGroup → Activity → Client → external system** — and it is **composition, not inheritance**: there is one workflow per journey, and market or account-type variation comes from swapping stage and activity-group implementations. The full call rules, code locations, and naming conventions live in the Design section.
+The call direction is strict: **Workflow → Stage → ActivityGroup → Activity → Client → external system**. It is **composition, not inheritance**, so there is one workflow per journey, and market or account-type variation comes from swapping stage and activity-group implementations. The full call rules, code locations, and naming conventions live in the Design section.
 
 ## Async edges
 
