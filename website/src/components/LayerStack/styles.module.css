@@ -82,24 +82,28 @@
    connectors that run between blocks inside a group. */
 .divider {
   position: relative;
-  height: 26px;
-  margin: 1.15rem 0 0.5rem;
+  /* the rule is centred in the box with no margin, so the gap it leaves above
+     and below is the same */
+  height: 52px;
+  margin: 0;
   --ly-rule: color-mix(in srgb, var(--amex-line-strong) 72%, var(--amex-txt-strong));
   /* a gradient rather than border-style: dashed, so the dash and the gap
      between dashes are both under our control */
   background-image: repeating-linear-gradient(
     to right,
     var(--ly-rule) 0 10px,
-    transparent 10px 22px
+    transparent 10px 17px
   );
   background-repeat: no-repeat;
   background-size: 100% 2px;
+  background-position: left center;
 }
 .divider::after {
   content: '▾';
   position: absolute;
   left: calc(34px + 0.95rem + 23px);
-  top: 5px;
+  top: 50%;
+  margin-top: 3px;
   transform: translateX(-50%);
   color: var(--ly-rule);
   font-size: 0.85rem;

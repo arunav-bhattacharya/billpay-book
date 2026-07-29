@@ -136,4 +136,4 @@ Billpay is built on Temporal. We looked at several of the durable execution engi
 - **Native retries, timers, signals, queries.** Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues. All of that is a Temporal primitive.
 - **Determinism as discipline.** Temporal requires deterministic workflow code, which is exactly why work is factored into stages and activities: workflows orchestrate, activities do the I/O.
 
-Continue to [Components](./components.md) for a closer look at each block.
+Continue to [A Closer Look](./components.md) for each block in turn.

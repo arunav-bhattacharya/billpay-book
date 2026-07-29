@@ -1,15 +1,15 @@
 ---
-title: Components
-sidebar_label: Components
+title: A Closer Look
+sidebar_label: A Closer Look
 ---
 
 import Lead from '@site/src/components/Lead';
 import Highlights from '@site/src/components/Highlights';
 import RouteMap from '@site/src/components/RouteMap';
 
-# Components
+# A Closer Look
 
-<Lead>A closer look at the blocks the [overview](./overview.md) introduced — the gateway, the router, the two worker pools, the component model, and the async edges.</Lead>
+<Lead>The blocks the [overview](./overview.md) introduced, one at a time: the gateway and the core APIs, the router, the two worker pools, the component model, and the async edges.</Lead>
 
 ## One-Data Functions → core APIs
 
