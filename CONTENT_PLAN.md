@@ -99,8 +99,8 @@ Spec-grounding / corrections vs. reference:
 - **Workers renamed** to **Online / Offline Temporal Workers** (spec §Billpay Workflows) —
   reference's "Realtime / Batch workers" is stale. Online = end-user-triggered, awaits a
   response; Offline = async (events / RTF / scheduler), no user waiting.
-- Account types now include **Small Business** (`accountType`: CONSUMER, CORPORATE,
-  SMALL_BUSINESS).
+- Account types now include **Business Travel** (`accountType`: CONSUMER, CORPORATE,
+  BUSINESS_TRAVEL).
 - Removed non-spec embellishments carried over from the reference: voice-servicing /
   mobile channels, hardship plans, "wait hours / batch cycles", market "cutoffs /
   settlement windows / regulators", and "recurring" as a core frequency.

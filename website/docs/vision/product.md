@@ -44,7 +44,7 @@ A dimension is a processing variant, a yes/no or either/or choice that changes *
       term: 'Account type',
       desc: (
         <>
-          Whether the payment is for a <strong>Consumer</strong>, <strong>Corporate</strong>, or <strong>Small Business</strong> account (<code>accountType</code>). This shapes more of the processing than any other dimension — corporate payments, for instance, are the ones that split into allocations.
+          Whether the payment is for a <strong>Consumer</strong>, <strong>Corporate</strong>, or <strong>Business Travel</strong> account (<code>accountType</code>). This shapes more of the processing than any other dimension — corporate payments, for instance, are the ones that split into allocations.
         </>
       ),
     },

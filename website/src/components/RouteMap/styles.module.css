@@ -152,7 +152,7 @@
   color: #7c3aed;
   background: color-mix(in srgb, #7c3aed 14%, transparent);
 }
-.smb {
+.travel {
   color: #97600c;
   background: color-mix(in srgb, #97600c 14%, transparent);
 }
@@ -186,7 +186,7 @@
   color: #c4b5fd;
   background: color-mix(in srgb, #a78bfa 20%, transparent);
 }
-:global([data-theme='dark']) .smb {
+:global([data-theme='dark']) .travel {
   color: #e6c060;
   background: color-mix(in srgb, #e0b34e 18%, transparent);
 }

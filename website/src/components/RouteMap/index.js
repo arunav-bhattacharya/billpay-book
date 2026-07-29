@@ -17,7 +17,7 @@ function AccountTag({account}) {
   if (!account) return null;
   const key = account.toLowerCase();
   const tone =
-    key === 'corporate' ? styles.corporate : key.includes('small') ? styles.smb : styles.consumer;
+    key === 'corporate' ? styles.corporate : key.includes('travel') ? styles.travel : styles.consumer;
   return <span className={clsx(styles.acct, tone)}>{account}</span>;
 }
 
@@ -50,7 +50,7 @@ function Pipeline({workflows}) {
  * routes: [{
  *   trigger, condition,
  *   workflows: [{name, worker: 'Online'|'Offline'}],
- *   children?: [{when, account?: 'Consumer'|'Corporate'|'Small Business', workflows: [...]}]
+ *   children?: [{when, account?: 'Consumer'|'Corporate'|'Business Travel', workflows: [...]}]
  * }]
  */
 export default function RouteMap({routes = []}) {

@@ -176,7 +176,7 @@ Consumer and Corporate Payments have almost a similar set of lifecycle states, e
 - Billpay will provide an onboarding UI for bringing in more markets into the platform. As a part of the onboarding journey the user can select which Billpay APIs will be onboarded for the market in concern.
 - Apart from this the user will be asked questions about the dimensions, which are essentially the processing variants, for the said market.
 - The possible dimensions for a Payment in billpay payment processing journey are -
-  - `accountType` - Possible values are `CONSUMER`, `CORPORATE` and `SMALL_BUSINESS`
+  - `accountType` - Possible values are `CONSUMER`, `CORPORATE` and `BUSINESS_TRAVEL`
   - `requiresArPosting` - A boolean flag that indicates if the processed payment needs to be notified to AR
   - `requiresRealtimeClearing` - Again this is a boolean flag, that determines if clearing is Realtime or Non-Realtime.
   - `requiresMandateAuthorization` - This is again a boolean flag, that checks if mandate verification needs to be done while processing a payment.
