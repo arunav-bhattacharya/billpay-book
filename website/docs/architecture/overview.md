@@ -84,7 +84,7 @@ export const ASIDE = {
 
 <Lead>Billpay sits in three tiers: what callers talk to, what Billpay runs, and what sits outside it. A request travels down the stack. Async outcomes and scheduled sweeps come back in at the workflow layer.</Lead>
 
-## The system map
+## A layered architecture
 
 <LayerStack groups={GROUPS} aside={ASIDE} />
 
@@ -129,11 +129,11 @@ export const ASIDE = {
 
 ## Why Temporal
 
-Billpay is intentionally **Temporal-first** — the layering above leans on Temporal's guarantees:
+Billpay is built on Temporal. We looked at several of the durable execution engines on the market and picked Temporal: for orchestrating long-running business processes it is among the best available. The layering above leans on its guarantees:
 
-- **Durability & replay.** Money movement must not lose state across restarts, deploys, or downstream outages. A workflow replays from its event history to a deterministic state — no hand-rolled checkpoint tables.
-- **Long-running flows are first-class.** A payment scheduled months out is just a workflow waiting on a timer — no cron-plus-poll glue.
-- **Native retries, timers, signals, queries.** Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues — all Temporal primitives.
+- **Durability & replay.** Money movement must not lose state across restarts, deploys, or downstream outages. A workflow replays from its event history to a deterministic state, so there are no hand-rolled checkpoint tables.
+- **Long-running flows are first-class.** A payment scheduled months out is just a workflow waiting on a timer, with no cron-plus-poll glue around it.
+- **Native retries, timers, signals, queries.** Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues. All of that is a Temporal primitive.
 - **Determinism as discipline.** Temporal requires deterministic workflow code, which is exactly why work is factored into stages and activities: workflows orchestrate, activities do the I/O.
 
 Continue to [Components](./components.md) for a closer look at each block.

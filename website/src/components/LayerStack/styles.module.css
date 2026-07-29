@@ -77,13 +77,23 @@
   line-height: 1;
 }
 
-/* a dotted rule separates the tiers; the chevron on it keeps the flow reading
-   downward */
+/* A dashed rule separates the tiers, and the chevron on it keeps the flow
+   reading downward. Dashes and a stronger ink set it apart from the dotted
+   connectors that run between blocks inside a group. */
 .divider {
   position: relative;
   height: 26px;
   margin: 1.15rem 0 0.5rem;
-  border-top: 2px dotted var(--amex-line-strong);
+  --ly-rule: color-mix(in srgb, var(--amex-line-strong) 72%, var(--amex-txt-strong));
+  /* a gradient rather than border-style: dashed, so the dash and the gap
+     between dashes are both under our control */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--ly-rule) 0 10px,
+    transparent 10px 22px
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
 }
 .divider::after {
   content: '▾';
@@ -91,7 +101,7 @@
   left: calc(34px + 0.95rem + 23px);
   top: 5px;
   transform: translateX(-50%);
-  color: var(--amex-line-strong);
+  color: var(--ly-rule);
   font-size: 0.85rem;
   line-height: 1;
 }
