@@ -1,31 +1,118 @@
+/* The group owns the colour. Every surface inside a group mixes that one
+   accent into a neutral base, so a tier reads as a tier before any individual
+   block does. --ly-d (0–1, set per block from JS) walks the card tint from
+   --ly-lo to --ly-hi down the group. */
 .map {
   margin: 1.6rem 0 2.4rem;
   display: flex;
   flex-direction: column;
-  /* Single-hue box ramp — lightest at the top layer, deepest at the bottom. */
-  --ly-top: #eef3fc;
-  --ly-bottom: #aec3e8;
-  --ly-border: #cbd7ee;
+
+  --ly-surface: #f2f6fd;
+  --ly-chip: #ffffff;
+  --ly-chip-mix: 12%;
+  --ly-lo: 5;
+  --ly-hi: 11;
 }
 :global([data-theme='dark']) .map {
-  --ly-top: #1d4278;
-  --ly-bottom: #0a1a38;
-  --ly-border: #23446f;
+  --ly-surface: #0a1c3b;
+  --ly-chip: #0b2246;
+  --ly-chip-mix: 28%;
+  --ly-lo: 12;
+  --ly-hi: 27;
 }
 
-/* ---- a layer band ---- */
+/* ---- group shells ---- */
+.group {
+  position: relative;
+}
+
+.groupBody {
+  display: flex;
+  flex-direction: column;
+}
+
+/* the accent still reads in the label, but the ink is pulled toward the body
+   colour so 11px caps clear AA on the page background in both themes */
+.groupLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ly-accent) 42%, var(--amex-txt-strong));
+}
+:global([data-theme='dark']) .groupLabel {
+  color: color-mix(in srgb, var(--ly-accent) 68%, var(--amex-txt-strong));
+}
+
+/* a rail down the left, with the group name set along it */
+.group {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 0.95rem;
+  align-items: stretch;
+}
+.group > .groupLabel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.group > .groupLabel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--ly-accent),
+    color-mix(in srgb, var(--ly-accent) 28%, transparent)
+  );
+}
+.group > .groupLabel span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  line-height: 1;
+}
+
+/* a dotted rule separates the tiers; the chevron on it keeps the flow reading
+   downward */
+.divider {
+  position: relative;
+  height: 26px;
+  margin: 1.15rem 0 0.5rem;
+  border-top: 2px dotted var(--amex-line-strong);
+}
+.divider::after {
+  content: '▾';
+  position: absolute;
+  left: calc(34px + 0.95rem + 23px);
+  top: 5px;
+  transform: translateX(-50%);
+  color: var(--amex-line-strong);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* ---- a block ---- */
 .layer {
   position: relative;
   display: grid;
   grid-template-columns: 46px 1fr;
   gap: 0.95rem;
-  align-items: center;
-  padding: 0.95rem 1.15rem;
-  border: 1px solid var(--ly-border);
+  /* the badge and icon sit with the title, not floating in the middle of a
+     tall card */
+  align-items: start;
+  padding: 1.05rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--ly-accent) 26%, var(--amex-line));
   border-radius: 15px;
-  /* Depth ramp: --ly-depth runs 0% (top) → 100% (bottom), mixing toward the
-     deepest shade. One rule serves both themes via the --ly-* tokens. */
-  background: color-mix(in srgb, var(--ly-bottom) var(--ly-depth, 0%), var(--ly-top));
+  background: color-mix(
+    in srgb,
+    var(--ly-accent) calc((var(--ly-lo) + var(--ly-d, 0) * (var(--ly-hi) - var(--ly-lo))) * 1%),
+    var(--ly-surface)
+  );
   box-shadow: var(--amex-sh-sm);
   overflow: hidden;
 }
@@ -45,15 +132,14 @@
   );
 }
 
-/* number badge — gradient fill in the layer accent */
-.badge {
+/* the glyph tile marks the block: a solid gradient chip in the group accent,
+   with the line art knocked out in white */
+.icon {
   display: grid;
   place-items: center;
   width: 46px;
   height: 46px;
   border-radius: 13px;
-  font-weight: 700;
-  font-size: 1rem;
   color: #fff;
   background: linear-gradient(
     140deg,
@@ -61,6 +147,16 @@
     color-mix(in srgb, var(--ly-accent) 55%, #05132b)
   );
   box-shadow: 0 4px 13px color-mix(in srgb, var(--ly-accent) 42%, transparent);
+}
+
+.glyph {
+  width: 27px;
+  height: 27px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .body {
@@ -74,8 +170,10 @@
   color: var(--amex-txt-strong);
 }
 
+/* the card tint costs the muted token about 0.2 of contrast, so pull the
+   sub-line a little toward the body ink to keep it clear of AA */
 .role {
-  color: var(--amex-mut);
+  color: color-mix(in srgb, var(--amex-mut) 80%, var(--amex-txt-strong));
   font-size: 0.85rem;
   margin: 0.08rem 0 0.55rem;
 }
@@ -93,14 +191,12 @@
   padding: 0.22rem 0.58rem;
   border-radius: 8px;
   color: var(--amex-txt);
-  background: color-mix(in srgb, var(--ly-accent) 13%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--ly-accent) 34%, #d7deea);
+  background: color-mix(in srgb, var(--ly-accent) var(--ly-chip-mix), var(--ly-chip));
+  border: 1px solid color-mix(in srgb, var(--ly-accent) 34%, var(--amex-line));
   white-space: nowrap;
 }
 :global([data-theme='dark']) .chip {
   color: #e8f0fb;
-  background: color-mix(in srgb, var(--ly-accent) 30%, #0b2246);
-  border-color: color-mix(in srgb, var(--ly-accent) 45%, #1c355f);
 }
 
 .code {
@@ -108,11 +204,11 @@
   font-size: 0.71rem;
 }
 
-/* ---- dotted flow connector between layers ---- */
+/* ---- dotted flow connector ---- */
 .connector {
   height: 26px;
   width: 0;
-  margin-left: 23px; /* centers under the 46px badge (padding + half badge) */
+  margin-left: 23px; /* centres under the 46px badge */
   border-left: 2px dotted var(--amex-line-strong);
   position: relative;
 }
@@ -127,16 +223,25 @@
   line-height: 1;
 }
 
-/* ---- dashed "loops back" connector before the async band ---- */
-.loopConnector {
-  margin: 0.35rem 0;
-  padding: 0.4rem 0 0.4rem 0.9rem;
+/* inside a group the connector sits under the badge, which is offset by the
+   rail column */
+.groupBody > .connector {
   margin-left: 23px;
-  border-left: 2px dashed var(--amex-cat-architecture);
+}
+
+/* ---- the async return path ---- */
+.asideWrap {
+  margin-top: 2.4rem;
+}
+
+.loopConnector {
+  margin: 0 0 0.35rem 23px;
+  padding: 0.4rem 0 0.4rem 0.9rem;
+  border-left: 2px dashed var(--ly-accent);
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  color: var(--amex-cat-architecture);
+  color: var(--ly-accent);
   font-size: 0.78rem;
   font-weight: 600;
 }
@@ -145,31 +250,62 @@
   font-size: 1.05rem;
   line-height: 1;
 }
-
-/* the async return band reads as an aside — its own colour + dashed border */
-.layerLoop {
-  border-style: dashed;
-  border-color: #b7dbd8;
-  background: linear-gradient(162deg, #e6f3f1 0%, #d6ebe8 100%);
+:global([data-theme='dark']) .loopConnector {
+  color: color-mix(in srgb, var(--ly-accent) 45%, #ffffff);
 }
-:global([data-theme='dark']) .layerLoop {
-  border-color: #1c5a62;
-  background: linear-gradient(162deg, #0e3038 0%, #0a2329 100%);
+
+/* the async band reads as an aside: dashed, and outside every group */
+.layerAside {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ly-accent) 42%, var(--amex-line));
+  background: color-mix(in srgb, var(--ly-accent) 9%, var(--ly-surface));
+}
+:global([data-theme='dark']) .layerAside {
+  background: color-mix(in srgb, var(--ly-accent) 18%, var(--ly-surface));
 }
 
 @media (max-width: 560px) {
   .layer {
     grid-template-columns: 40px 1fr;
     gap: 0.7rem;
-    padding: 0.85rem 0.9rem;
+    padding: 0.85rem 0.8rem;
   }
-  .badge {
+  .icon {
     width: 40px;
     height: 40px;
     border-radius: 11px;
   }
-  .connector,
+  .glyph {
+    width: 23px;
+    height: 23px;
+  }
+  .groupBody > .connector,
   .loopConnector {
     margin-left: 20px;
+  }
+
+  /* vertical type is unreadable at phone widths, so the label lies down */
+  .group {
+    display: block;
+  }
+  .group > .groupLabel {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    margin-bottom: 0.7rem;
+  }
+  .group > .groupLabel::before {
+    position: static;
+    width: 20px;
+    height: 3px;
+    background: var(--ly-accent);
+  }
+  .group > .groupLabel span {
+    writing-mode: horizontal-tb;
+    transform: none;
+  }
+  .divider::after {
+    left: 20px;
   }
 }
