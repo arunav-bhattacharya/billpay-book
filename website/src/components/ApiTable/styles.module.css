@@ -9,6 +9,7 @@
   border-radius: 15px;
   background: var(--amex-panel);
   box-shadow: var(--amex-sh-sm);
+  overflow: hidden;
   overflow-x: auto;
 }
 
@@ -20,8 +21,10 @@
   font-size: 0.92rem;
 }
 
+/* Header band: solid Amex blue, white type, a shade larger than the old
+   small-caps so the columns are legible rather than whispered. */
 .table thead tr {
-  background: none;
+  background: var(--amex-blue);
   border: none;
 }
 
@@ -33,13 +36,14 @@
 }
 
 .table thead th {
-  padding: 0.85rem 1rem 0.6rem;
-  font-size: 0.63rem;
+  padding: 0.72rem 1rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--amex-mut);
-  border-bottom: 1px solid var(--amex-line);
+  letter-spacing: 0.07em;
+  color: #ffffff;
+  border: none;
+  white-space: nowrap;
 }
 
 .table tbody tr {

@@ -2,9 +2,11 @@
 
 .wrap {
   margin: 1.4rem 0 2rem;
+  overflow: hidden;
   overflow-x: auto;
-  border: 1px solid var(--amex-line-strong);
-  border-radius: 12px;
+  border: 1px solid var(--amex-line);
+  border-radius: 15px;
+  background: var(--amex-panel);
   box-shadow: var(--amex-sh-sm);
 }
 
@@ -12,21 +14,25 @@
   width: 100%;
   min-width: 660px;
   border-collapse: collapse;
-  font-size: 0.9rem;
-  background: var(--ifm-background-color);
+  font-size: 0.92rem;
+  background: var(--amex-panel);
 }
 
-/* ---- header ---- */
+/* ---- header: the Amex-blue band the page's other tables carry ---- */
+.table thead tr {
+  background: var(--amex-blue);
+}
+
 .table thead th {
   text-align: left;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--amex-mut);
-  padding: 0.7rem 0.95rem;
-  background: color-mix(in srgb, var(--amex-cat-architecture) 7%, var(--ifm-background-color));
-  border-bottom: 1px solid var(--amex-line-strong);
+  letter-spacing: 0.07em;
+  color: #ffffff;
+  padding: 0.72rem 0.95rem;
+  background: none;
+  border: none;
   white-space: nowrap;
 }
 .thTrigger { width: 1%; }

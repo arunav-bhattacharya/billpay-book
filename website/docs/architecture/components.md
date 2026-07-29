@@ -8,6 +8,7 @@ import Highlights from '@site/src/components/Highlights';
 import RouteMap from '@site/src/components/RouteMap';
 import ApiTable from '@site/src/components/ApiTable';
 import WorkerSplit from '@site/src/components/WorkerSplit';
+import ScheduleTable from '@site/src/components/ScheduleTable';
 
 export const FUNCTIONS = [
   {
@@ -102,6 +103,14 @@ export const STRIPS = [
     text: 'A few workflows run on both, depending on where in the journey they are invoked.',
     items: ['Create Schedule Payment', 'Execute Split Payment', 'Create Balance Refund'],
   },
+];
+
+export const SCHEDULES = [
+  {schedule: 'Scheduled Payment Executor', workflow: 'ExecuteScheduledPaymentWF'},
+  {schedule: 'Corporate Allocations Processor', workflow: 'ExecuteSplitPaymentWF'},
+  {schedule: 'Paid Events Processor', workflow: 'PaidEventsProcessingWF'},
+  {schedule: 'Missing Paid Events Processor', workflow: 'MissingPaidEventsProcessingWF'},
+  {schedule: 'Data Purge', workflow: 'DataPurgingWF'},
 ];
 
 # A Closer Look
@@ -210,13 +219,8 @@ The call direction is strict: **Workflow → Stage → ActivityGroup → Activit
 
 ## Async edges
 
-- **Event handlers** — event-driven One-Data functions that consume async outcomes (money movement for returns/settlement, Accounts-Receivable posting, Open-To-Buy updates) and record them in the external-events tracker, so a workflow can advance or a payment can close out to `PAID`.
-- **Temporal Schedules** — fire the periodic Offline workflows in waves:
+**Event handlers** are the event-driven One-Data functions that take async outcomes in: money movement for returns and settlement, Accounts-Receivable posting, and Open-To-Buy updates. Each one is recorded in the external-events tracker, so a workflow can advance or a payment can close out to `PAID`.
 
-  | Schedule | Workflow |
-  | --- | --- |
-  | Scheduled Payment Executor | `ExecuteScheduledPaymentWF` |
-  | Corporate Allocations Processor | `ExecuteSplitPaymentWF` |
-  | Paid Events Processor | `PaidEventsProcessingWF` |
-  | Missing Paid Events Processor | `MissingPaidEventsProcessingWF` |
-  | Data Purge | `DataPurgingWF` |
+**Temporal Schedules** fire the periodic Offline workflows in waves.
+
+<ScheduleTable rows={SCHEDULES} />
