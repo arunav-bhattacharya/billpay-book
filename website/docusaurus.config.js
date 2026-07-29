@@ -12,7 +12,7 @@ const REPO_NAME = 'billpay-book';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Billpay Wiki',
-  tagline: "American Express's platform for credit-card bill payments and refunds",
+  tagline: "American Express's platform for processing credit-card bill payments and refunds",
   favicon: 'img/amex-logo.png',
 
   future: {
@@ -30,8 +30,8 @@ const config = {
 
   onBrokenLinks: 'throw',
 
-  // Text uses SF Pro Rounded, code uses SF Mono — Apple system fonts, so no
-  // external webfont (Google Fonts) load is needed.
+  // Text uses Benton Sans (the Amex corporate face), falling back to SF Pro
+  // Rounded and the system stack where it is not installed. Code uses SF Mono.
 
   markdown: {
     mermaid: true,

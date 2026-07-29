@@ -1,0 +1,20 @@
+/* Positioning only. The button's look comes from the shared `.rail-toggle`
+   class in custom.css, which the collapse control uses too. */
+
+/* The viewport this sits in starts behind the fixed navbar, so clear it by the
+   navbar height. That lands the button on exactly the same line as the
+   collapse control, which sits under the sidebar's own top padding. */
+.expand {
+  position: absolute;
+  top: calc(var(--ifm-navbar-height) + 1rem);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.expand:hover {
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.expand:active {
+  transform: translateX(-50%);
+}

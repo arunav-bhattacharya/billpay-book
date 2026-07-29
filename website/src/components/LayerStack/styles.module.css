@@ -98,6 +98,12 @@
   background-size: 100% 2px;
   background-position: left center;
 }
+/* the rule above the async aside: no direction marker, since that band loops
+   back into the workflows rather than carrying the request onward */
+.dividerPlain::after {
+  content: none;
+}
+
 .divider::after {
   content: '▾';
   position: absolute;
@@ -244,8 +250,9 @@
 }
 
 /* ---- the async return path ---- */
+/* the divider above the aside carries the gap, so the wrap adds none */
 .asideWrap {
-  margin-top: 2.4rem;
+  margin-top: 0;
 }
 
 .loopConnector {

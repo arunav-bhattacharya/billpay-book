@@ -160,14 +160,19 @@ export default function LayerStack({groups = [], aside}) {
       })}
 
       {aside && (
-        <div className={styles.asideWrap} style={{'--ly-accent': aside.accent}}>
-          {aside.connectorLabel && (
-            <div className={styles.loopConnector}>
-              <span>{aside.connectorLabel}</span>
-            </div>
-          )}
-          <Block block={aside} aside />
-        </div>
+        <>
+          {/* the same rule that separates the groups, minus the ▾: the aside
+              feeds work back up rather than continuing the flow down */}
+          <div className={clsx(styles.divider, styles.dividerPlain)} aria-hidden="true" />
+          <div className={styles.asideWrap} style={{'--ly-accent': aside.accent}}>
+            {aside.connectorLabel && (
+              <div className={styles.loopConnector}>
+                <span>{aside.connectorLabel}</span>
+              </div>
+            )}
+            <Block block={aside} aside />
+          </div>
+        </>
       )}
     </div>
   );

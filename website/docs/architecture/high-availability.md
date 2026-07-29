@@ -8,33 +8,50 @@ import HADiagram from '@site/src/components/HADiagram';
 
 # High Availability
 
-<Lead>Billpay runs across **two on-prem Hydra sites and two AWS regions**, and every component answers the same question differently: what happens when your half of the world goes away? The entry layer is active-active, the core and the databases are active-passive — and a Redis buffer makes sure a billpay-core outage delays processing rather than losing it.</Lead>
+<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against a **single self-hosted Temporal cluster** in AWS us-east-1. The front half of the platform is live in both sites at once. The write side of the database is deliberately not. And when billpay-core can't be reached, One-Data parks the request in Redis rather than turning the caller away.</Lead>
 
-## The topology
+## Topology
 
 <HADiagram />
 
-## The entry layer: active-active, with a buffer
+## Front door
 
-**One-Data Functions run active on both sites** — the on-prem Hydra servers in US East (IPC2) and US West (IPC1) — so the front door survives the loss of either site. Both route requests to the active billpay-core on the East.
+- One-Data Functions run active in both sites, so losing a site doesn't close the front door.
+- Each site's One-Data calls the billpay-core in the same site. Traffic stays local.
+- Each site also has a Redis store that sits empty most of the time. It's there for one case: billpay-core is unreachable.
+- When that happens, One-Data writes the request into Redis instead of failing the caller, then replays it into billpay-core once the core is healthy again.
+- The two Redis instances are one active-active database (Redis calls this a CRDB), so a request parked on one site is visible from the other.
+- The trade is on purpose. The caller gets an answer now and the payment processes a little later. A core outage becomes a delay instead of a dropped payment.
 
-The interesting piece is the **Redis instance the gateway shares** — active-active across both sites, and empty in normal operation. It exists for exactly one scenario: **billpay-core is down.** When the gateway can't reach the core — for whatever reason — it writes the request into Redis instead of failing the caller, and **One-Data replays** the buffered requests into billpay-core once it's healthy again. The trade is deliberate: availability now, processing eventually. A core outage becomes a processing delay instead of a dropped payment.
+## Core
 
-## The core: active on East, passive on West
+- billpay-core is the REST APIs, the [Billpay Router](./components.md), and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools. An instance runs in each site.
+- Both instances read from the Oracle in their own site, which keeps read latency close to the caller.
+- Writes only land in IPC2, because that's where the Oracle primary lives.
+- Both instances talk to the same Temporal cluster in us-east-1.
 
-**billpay-core** — the REST APIs, the Billpay Router, and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools — runs **active on the East Hydra site (IPC2)** and holds a **passive on the West (IPC1)**, promoted if the East is lost. The active core connects to the Temporal cluster in **us-east-1** by default.
+## Oracle
 
-## The data: replicated, promoted on failure
+- The payments schema is active-passive. The read/write primary is in IPC2, with two read-only replicas next to it carrying read and reporting traffic.
+- IPC1 holds the Data Guard standby plus one more read-only replica. The standby stays read-only until someone promotes it.
+- Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
+- This is the [same Oracle setup](../build/principles/tech-stack/database.md) the DBO team runs day to day.
 
-- **Oracle** — the payments schema is **active-passive with Data Guard replication**: primary on the East (IPC2), standby on the West (IPC1). This is the [same Oracle setup](../build/principles/tech-stack/database.md) whose operations the DBO team runs.
-- **Temporal** — **self-hosted on AWS with PostgreSQL persistence**: the active cluster in **us-east-1**, a passive standby in **us-west-1** with replicated Postgres. Failover is a **manual promotion**; billpay-core reconnects to the west cluster, and because every workflow's state lives in the replicated persistence — not in worker memory — in-flight payments resume from their event histories. Deployment detail is on the [Temporal Server](../deployment/temporal-server.md) page.
+## Temporal
 
-## How failures play out
+- Temporal is self-hosted on an EKS cluster in AWS us-east-1. The frontend, history, matching and worker services all run as pods there.
+- Persistence is PostgreSQL: one writer with two read replicas. This is Temporal's own database, not Billpay's Oracle.
+- Both billpay-core instances connect to that cluster over gRPC to start workflows and poll for work.
+- Workflow state lives in that Postgres, never in worker memory. Restart the workers and in-flight payments carry on from their event histories.
+- Cluster detail is on the [Temporal Server](../deployment/temporal-server.md) page.
 
-| Failure | What happens |
+## When things break
+
+| What fails | What happens |
 | --- | --- |
-| **billpay-core down** (either instance state) | One-Data keeps accepting requests and buffers them in Redis. When the core is back, One-Data replays the buffer — every request eventually processes. |
-| **East site (IPC2) lost** | West One-Data keeps the front door open; the passive billpay-core on IPC1 is promoted; Oracle's Data Guard standby on the West is promoted. Requests buffered in Redis during the switch replay afterwards. |
-| **Temporal us-east-1 lost** | An operator promotes the us-west-1 standby; billpay-core reconnects; workflows replay from their persisted histories and carry on. No workflow state is lost — durability is the platform's [founding bet](./overview.md). |
+| **billpay-core in one site** | One-Data on that site keeps answering callers and parks their requests in Redis, then replays them when the core is back. Nothing is dropped, it just processes late. |
+| **A whole site** | The other site keeps taking traffic on its own One-Data and core. If the lost site was IPC2, an operator promotes the Data Guard standby in IPC1 so writes have somewhere to land again. |
+| **Oracle primary** | The standby in IPC1 is promoted. Until it is, reads still work off the read-only replicas, but nothing new can be written. |
+| **Temporal in us-east-1** | No workflow can start or advance while the cluster is down. Because every history is in Postgres and not in a worker, workflows resume exactly where they stopped once it's back. Durability is the platform's [founding bet](./overview.md). |
 
-The pattern across all three: the **front door stays open** (active-active gateway + buffer), while the **stateful tiers fail over deliberately** (promotion, not split-brain) — availability at the edge, consistency at the core.
+Two ideas hold this together. The front door stays open on both sites, and there is only ever one place where writes land. Moving that place is a call someone makes, not something that happens by itself.

@@ -4,8 +4,8 @@
  * Grounded in Amex's brand identity:
  *   - Signature "Blue Box" blue  #016FD0
  *   - Midnight Blue              #002663
- *   - Typeface: SF Pro Rounded (Apple system rounded face) for text and
- *     SF Mono for code — both system fonts, no webfont load.
+ *   - Typeface: Benton Sans (the Amex corporate face) for text, falling back
+ *     to SF Pro Rounded / the system stack. SF Mono for code.
  *
  * Design language: deep-navy → electric-blue → cyan multi-tone gradients,
  * premium metallic (gold / platinum) secondary accents, subtle layered depth.
@@ -55,8 +55,14 @@
  * 3. Typography
  * ==================================================================== */
 :root {
-  --amex-font-sans: ui-rounded, 'SF Pro Rounded', 'SF Pro Text', -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Benton Sans is the Amex corporate typeface. It is a licensed face, so it
+     renders only where it is installed (or served, see the webfont link in
+     docusaurus.config.js). Everywhere else the stack falls back to the
+     previous SF Pro Rounded / system stack, which is metrically close enough
+     that the tracking and weights below hold in both cases. */
+  --amex-font-sans: 'Benton Sans', 'BentonSans', 'Benton Sans Book', ui-rounded,
+    'SF Pro Rounded', 'SF Pro Text', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --amex-font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
     'Liberation Mono', monospace;
 
@@ -361,6 +367,109 @@ table thead tr {
   font-weight: 600;
 }
 
+/* ---- rail toggles ------------------------------------------------------ */
+/* Shared look for the two swizzled sidebar controls: DocSidebar/Desktop/
+   CollapseButton and DocRoot/Layout/Sidebar/ExpandButton. Each component's
+   own module only positions it. */
+.rail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--amex-line);
+  border-radius: 10px;
+  background: var(--amex-card);
+  color: var(--amex-mut);
+  cursor: pointer;
+  box-shadow:
+    var(--amex-sh-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.rail-toggle:hover {
+  color: var(--amex-blue);
+  border-color: color-mix(in srgb, var(--amex-blue) 45%, var(--amex-line));
+  background: var(--amex-card-hover);
+  box-shadow:
+    var(--amex-sh),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
+}
+
+.rail-toggle:active {
+  transform: translateY(0);
+  box-shadow: var(--amex-sh-sm);
+}
+
+.rail-toggle:focus-visible {
+  outline: 2px solid var(--amex-blue);
+  outline-offset: 2px;
+}
+
+[data-theme='dark'] .rail-toggle {
+  box-shadow:
+    var(--amex-sh-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+[data-theme='dark'] .rail-toggle:hover {
+  color: var(--amex-blue-bright);
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 42%, var(--amex-line));
+  box-shadow:
+    var(--amex-sh),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Give the collapsed rail enough room for the button to sit in. */
+@media (min-width: 997px) {
+  :root {
+    --doc-sidebar-hidden-width: 52px;
+  }
+}
+
+/* ---- sidebar scrollbar ------------------------------------------------- */
+/* Keep the gutter reserved so nothing reflows, but only ink the thumb once
+   the pointer is over the rail. */
+.theme-doc-sidebar-container .menu {
+  scrollbar-color: transparent transparent;
+}
+
+.theme-doc-sidebar-container .menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.theme-doc-sidebar-container .menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.theme-doc-sidebar-container .menu::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background 0.18s ease;
+}
+
+.theme-doc-sidebar-container:hover .menu,
+.theme-doc-sidebar-container .menu:focus-within {
+  scrollbar-color: var(--amex-line-strong) transparent;
+}
+
+.theme-doc-sidebar-container:hover .menu::-webkit-scrollbar-thumb,
+.theme-doc-sidebar-container .menu:focus-within::-webkit-scrollbar-thumb {
+  background: var(--amex-line-strong);
+}
+
+.theme-doc-sidebar-container .menu::-webkit-scrollbar-thumb:hover {
+  background: var(--amex-mut);
+}
+
 /* Numbered top-level sidebar sections — mirrors the homepage card indices
    (zero-padded, in each section's accent colour). The section label text
    picks up the same accent as its number. */
@@ -563,19 +672,7 @@ table thead tr {
 }
 
 /* ==================================================================== *
- * 14. "How it runs" callout note (Engineering Vision) — a distinct tint,
- * with its left edge aligned to the bulleted worker list above it.
- * ==================================================================== */
-.runs-note {
-  margin-left: 1.5rem;
-}
-.runs-note .theme-admonition {
-  background-color: color-mix(in srgb, #006fcf 8%, var(--amex-panel));
-  border-color: color-mix(in srgb, #006fcf 32%, transparent);
-}
-
-/* ==================================================================== *
- * 15. Sequence diagrams — Amex-branded, theme-aware.
+ * 14. Sequence diagrams — Amex-branded, theme-aware.
  *
  * The mermaid source carries light-tuned rgba() "sentinel" fills on its
  * box / rect regions; every role uses a unique RGB triple, so dark mode
@@ -816,7 +913,8 @@ table thead tr {
 .workerTable {
   margin: 0.85rem 0 1.15rem;
   border: 1px solid var(--amex-line);
-  border-radius: 14px;
+  border-radius: 15px;
+  overflow: hidden;
   overflow-x: auto;
   box-shadow: var(--amex-sh-sm);
   background: var(--amex-panel);
@@ -835,7 +933,10 @@ table thead tr {
   background: transparent;
   vertical-align: top;
 }
-.workerTable table thead tr,
+/* Header band: the Amex-blue treatment the tables on A Closer Look carry. */
+.workerTable table thead tr {
+  background: var(--amex-blue);
+}
 .workerTable table tbody tr:nth-child(2n) {
   background: transparent;
 }
@@ -843,12 +944,13 @@ table thead tr {
   border-bottom: 0;
 }
 .workerTable table th {
-  padding: 0.68rem 0.95rem;
-  font-size: 0.68rem;
+  padding: 0.72rem 0.95rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--amex-mut);
+  color: #ffffff;
+  border-bottom: 0;
 }
 .workerTable table td {
   padding: 0.9rem 0.95rem;

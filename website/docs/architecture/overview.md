@@ -8,7 +8,7 @@ import LayerStack from '@site/src/components/LayerStack';
 
 export const GROUPS = [
   {
-    label: 'UI & API Layer',
+    label: 'Entry',
     accent: 'var(--amex-blue)',
     layers: [
       {
@@ -34,7 +34,7 @@ export const GROUPS = [
     ],
   },
   {
-    label: 'Billpay Core Layer',
+    label: 'Core',
     accent: 'var(--amex-temporal)',
     layers: [
       {

@@ -1,0 +1,12 @@
+/* Positioning only. The button's look comes from the shared `.rail-toggle`
+   class in custom.css, which the expand control uses too.
+
+   The theme renders this last, so `order` lifts it above the menu and
+   `align-self` parks it in the top-right corner of the rail. */
+
+.collapse {
+  order: -1;
+  align-self: flex-end;
+  flex: 0 0 auto;
+  margin: 1rem 1rem 0.35rem;
+}
