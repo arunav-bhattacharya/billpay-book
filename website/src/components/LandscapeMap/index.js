@@ -11,9 +11,10 @@ import styles from './styles.module.css';
  * Colour follows the deck's four families (payments domain, supporting domain,
  * supporting tech platform, external), with Bill Pay Core lifted out of the
  * blue family into the signature gradient. The Type-A pill marks every domain
- * that exposes one; who calls which is prose, not geometry.
+ * that exposes one; who calls which is prose, not geometry. Only the payments
+ * domain is numbered, Bill Pay Core first.
  *
- * CSS Grid rather than SVG: 18 boxes plus their capabilities in a fixed viewBox
+ * CSS Grid rather than SVG: every box plus its capabilities in a fixed viewBox
  * would force horizontal scroll everywhere but a wide desktop. Sizing is driven
  * by container queries, not the viewport, because the board sits in a doc
  * column whose width changes when the sidebar or the contents is collapsed.
@@ -73,7 +74,7 @@ const CHANNELS = [
 ];
 
 const CORE = {
-  n: 2,
+  n: 1,
   title: 'Bill Pay Core',
   typeA: true,
   tier: 'domain',
@@ -97,7 +98,7 @@ const CORE = {
 /* the rest of the Billpay platform, in the column beside Bill Pay Core */
 const PLATFORM = [
   {
-    n: 3,
+    n: 2,
     title: 'Plans',
     typeA: true,
     tier: 'domain',
@@ -105,14 +106,14 @@ const PLATFORM = [
     store: 'Plan Data',
   },
   {
-    n: 4,
+    n: 3,
     title: 'Bill Pay Inbound Processor',
     typeA: true,
     tier: 'domain',
     caps: ['Validation', 'STP / Non-STP Decisioning', 'Enrichment', 'AML/Sanctions'],
   },
   {
-    n: 5,
+    n: 4,
     title: 'Allocation Manager',
     typeA: true,
     tier: 'domain',
@@ -124,7 +125,7 @@ const PLATFORM = [
 /* the shared services every payment product draws on */
 const SHARED = [
   {
-    n: 6,
+    n: 5,
     title: 'Payment Instruments',
     typeA: true,
     tier: 'domain',
@@ -140,7 +141,7 @@ const SHARED = [
     store: 'Instrument Data',
   },
   {
-    n: 7,
+    n: 6,
     title: 'Mandates',
     typeA: true,
     tier: 'domain',
@@ -152,17 +153,17 @@ const SHARED = [
 /* the plumbing: the switch a payment leaves on, and the desk that repairs it */
 const PLUMBING = [
   {
-    n: 8,
+    n: 7,
     title: 'Multirail Gateway',
     typeA: true,
     tier: 'tech',
     caps: ['Core Switch', 'Web Proxy', 'Accounting', 'Routing'],
   },
-  {n: 9, title: 'Control Tower', tier: 'domain', caps: ['Research', 'Repair/Replay']},
+  {n: 8, title: 'Control Tower', tier: 'domain', caps: ['Research', 'Repair/Replay']},
 ];
 
 const CLEARING = {
-  n: 10,
+  n: 9,
   title: 'Payments Clearing',
   typeA: true,
   tier: 'domain',
@@ -179,20 +180,20 @@ const CLEARING = {
   ],
 };
 
+/* Numbering is reserved for the payments domain, so the supporting estate
+   carries none. */
 const SUPPORTING = [
   {
-    n: 11,
     title: 'Accounts Receivable',
     caps: ['Product Library', 'Product Arrangement', 'Account Balance', 'Account Posting'],
   },
-  {n: 12, title: 'Customer Info & Relationship Management', caps: ['Data Enrichment']},
-  {n: 13, title: 'Loyalty & Benefits', caps: ['Redemption', 'Eligibility']},
-  {n: 14, title: 'Fraud & Risk', caps: ['RDE', 'AMP']},
-  {n: 15, title: 'Finance', caps: ['Report, Invoice Generation', 'Financial Engine']},
-  {n: 16, title: 'Lumi', caps: ['Reporting', 'Analytics'], tier: 'tech'},
-  {n: 17, title: 'Raven', caps: ['Customer Notifications'], tier: 'tech'},
+  {title: 'Customer Info & Relationship Management', caps: ['Data Enrichment']},
+  {title: 'Loyalty & Benefits', caps: ['Redemption', 'Eligibility']},
+  {title: 'Fraud & Risk', caps: ['RDE', 'AMP']},
+  {title: 'Finance', caps: ['Report, Invoice Generation', 'Financial Engine']},
+  {title: 'Lumi', caps: ['Reporting', 'Analytics'], tier: 'tech'},
+  {title: 'Raven', caps: ['Customer Notifications'], tier: 'tech'},
   {
-    n: 18,
     title: 'Commercial Card Services',
     caps: ['Control Account', 'Corporate Hierarchy'],
   },
@@ -229,7 +230,7 @@ function Card({n, title, caps, store, typeA, tier = 'domain', hero, compact}) {
         typeA && styles.hasApi,
       )}>
       <header className={styles.head}>
-        <span className={styles.num}>{n}</span>
+        {n && <span className={styles.num}>{n}</span>}
         <div className={styles.headText}>
           {/* floated, so it holds the top right corner and the title wraps
               under it instead of being squeezed into a narrow column */}
@@ -275,10 +276,7 @@ export default function LandscapeMap() {
           <div className={styles.main}>
             {/* ---- group 1: channels, on the left ---- */}
             <section className={clsx(styles.group, styles.groupChannels)}>
-              <h4 className={styles.groupTitle}>
-                <span className={styles.groupNum}>1</span>
-                Channels
-              </h4>
+              <h4 className={styles.groupTitle}>Channels</h4>
               <div className={styles.chanRow}>
                 {CHANNELS.map((c) => (
                   <span key={c.label} className={styles.chan}>
@@ -334,7 +332,7 @@ export default function LandscapeMap() {
               <h4 className={styles.groupTitle}>Supporting domains &amp; tech platforms</h4>
               <div className={styles.supportStack}>
                 {SUPPORTING.map((d) => (
-                  <Card key={d.n} {...d} tier={d.tier || 'support'} compact />
+                  <Card key={d.title} {...d} tier={d.tier || 'support'} compact />
                 ))}
               </div>
             </section>

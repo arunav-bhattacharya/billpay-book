@@ -120,24 +120,6 @@
   color: color-mix(in srgb, var(--tier) 62%, var(--amex-txt-strong));
 }
 
-.groupNum {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
-  font-size: 0.63rem;
-  font-weight: 750;
-  letter-spacing: 0;
-  color: #fff;
-  background: linear-gradient(
-    140deg,
-    var(--tier),
-    color-mix(in srgb, var(--tier) 55%, #05132b)
-  );
-}
-
 .groupChannels {
   --tier: var(--amex-cat-deployment);
 }
