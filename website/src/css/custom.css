@@ -54,13 +54,105 @@
 /* ==================================================================== *
  * 3. Typography
  * ==================================================================== */
+
+/* Benton Sans face mapping.
+ *
+ * Two things made the page read heavier once Benton Sans was installed.
+ *
+ * 1. Face selection. Benton Sans installs as separate faces (Thin, Book,
+ *    Regular, Medium, Bold). Asking the OS for the family by name alone
+ *    lets it settle on whichever face it treats as the family default, and
+ *    a 600 heading then lands on Bold. The rules below pin each CSS weight
+ *    to one named face instead: 400 and 500 are the true Regular, 600 steps
+ *    down to Medium, and only 700 reaches Bold.
+ *
+ * 2. Apparent size. Measured against SF Pro Rounded at the same pixel size,
+ *    Benton Sans Regular sits 2.2% taller at the x-height, 4.0% taller at
+ *    the cap-height, and 8.9% wider. That is more ink per line, which is
+ *    most of what looked bold. size-adjust: 97% scales the outlines back so
+ *    both faces land on the same x-height and cap-height, which thins the
+ *    stems in proportion. It must be repeated on every rule below, or the
+ *    weights would render at different sizes.
+ *
+ * Nothing here loads over the network. local() matches only fonts already
+ * on the machine, so where Benton Sans is absent the family resolves to
+ * nothing and the stack drops through to SF Pro Rounded as before. Every
+ * font-weight and letter-spacing value elsewhere in this file is unchanged,
+ * so that fallback rendering is untouched.
+ */
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-Regular'), local('BentonSans Regular'),
+    local('Benton Sans Regular'), local('BentonSansRegular'),
+    local('Benton Sans'), local('BentonSans');
+}
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-Regular'), local('BentonSans Regular'),
+    local('Benton Sans Regular'), local('BentonSansRegular'),
+    local('Benton Sans'), local('BentonSans');
+}
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-Medium'), local('BentonSans Medium'),
+    local('Benton Sans Medium'), local('BentonSansMedium');
+}
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-Bold'), local('BentonSans Bold'),
+    local('Benton Sans Bold'), local('BentonSansBold');
+}
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-RegularItalic'), local('BentonSans Regular Italic'),
+    local('Benton Sans Regular Italic'), local('BentonSans-Italic'),
+    local('BentonSans Italic'), local('Benton Sans Italic');
+}
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-MediumItalic'), local('BentonSans Medium Italic'),
+    local('Benton Sans Medium Italic');
+}
+@font-face {
+  font-family: 'BentonSansUI';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 97%;
+  src: local('BentonSans-BoldItalic'), local('BentonSans Bold Italic'),
+    local('Benton Sans Bold Italic');
+}
+
 :root {
-  /* Benton Sans is the Amex corporate typeface. It is a licensed face, so it
-     renders only where it is installed (or served, see the webfont link in
-     docusaurus.config.js). Everywhere else the stack falls back to the
-     previous SF Pro Rounded / system stack, which is metrically close enough
-     that the tracking and weights below hold in both cases. */
-  --amex-font-sans: 'Benton Sans', 'BentonSans', 'Benton Sans Book', ui-rounded,
+  /* 'BentonSansUI' is the weight-mapped family declared above. Plain
+     'Benton Sans' stays behind it so a machine whose faces carry names the
+     local() list does not cover still gets the real typeface, then the
+     previous SF Pro Rounded / system stack for everyone else. */
+  --amex-font-sans: 'BentonSansUI', 'Benton Sans', 'BentonSans', ui-rounded,
     'SF Pro Rounded', 'SF Pro Text', -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --amex-font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
@@ -82,6 +174,11 @@
 /* Slightly looser body tracking for an airier, less heavy feel. */
 body {
   letter-spacing: 0.012em;
+  /* Never fake a heavier face. If a weight has no matching Benton Sans cut
+     installed, use the nearest real one rather than smearing the outlines,
+     which is the other way the page can end up looking too bold. Italic
+     synthesis stays on, since the italic cuts are often not installed. */
+  font-synthesis-weight: none;
 }
 
 /* When the left sidebar is collapsed (Docusaurus' native hide button), let the
