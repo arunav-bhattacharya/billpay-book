@@ -5,8 +5,8 @@ import styles from './styles.module.css';
 /**
  * LandscapeMap — the Amex payments estate, read left to right the way the
  * architecture deck draws it: channels, the payments domain, then the external
- * parties. Everything the estate leans on but does not own sits under the
- * dotted line.
+ * systems. The supporting domains the estate leans on but does not own sit in
+ * their own panel beneath the payments domain.
  *
  * Colour follows the deck's four families (payments domain, supporting domain,
  * supporting tech platform, external), with Bill Pay Core lifted out of the
@@ -150,35 +150,38 @@ const SHARED = [
   },
 ];
 
-/* the plumbing: the switch a payment leaves on, and the desk that repairs it */
-const PLUMBING = [
+/* the desk that researches and repairs a payment that went wrong */
+const CONTROL_TOWER = [
+  {n: 7, title: 'Control Tower', tier: 'domain', caps: ['Research', 'Repair/Replay']},
+];
+
+/* the rails a payment leaves on, the switch above the clearing it feeds */
+const RAILS = [
   {
-    n: 7,
+    n: 8,
     title: 'Multirail Gateway',
     typeA: true,
     tier: 'tech',
     caps: ['Core Switch', 'Web Proxy', 'Accounting', 'Routing'],
   },
-  {n: 8, title: 'Control Tower', tier: 'domain', caps: ['Research', 'Repair/Replay']},
+  {
+    n: 9,
+    title: 'Payments Clearing',
+    typeA: true,
+    tier: 'domain',
+    caps: [
+      'Payment Routes',
+      'Scheme Adapters',
+      'Orchestration',
+      'Bank Connectors',
+      'Authorization',
+      'Reconciliation',
+      'Liquidity Management',
+      'Batch Gateway',
+      'Migration Splitter',
+    ],
+  },
 ];
-
-const CLEARING = {
-  n: 9,
-  title: 'Payments Clearing',
-  typeA: true,
-  tier: 'domain',
-  caps: [
-    'Payment Routes',
-    'Scheme Adapters',
-    'Orchestration',
-    'Bank Connectors',
-    'Authorization',
-    'Reconciliation',
-    'Liquidity Management',
-    'Batch Gateway',
-    'Migration Splitter',
-  ],
-};
 
 /* Numbering is reserved for the payments domain, so the supporting estate
    carries none. */
@@ -191,8 +194,8 @@ const SUPPORTING = [
   {title: 'Loyalty & Benefits', caps: ['Redemption', 'Eligibility']},
   {title: 'Fraud & Risk', caps: ['RDE', 'AMP']},
   {title: 'Finance', caps: ['Report, Invoice Generation', 'Financial Engine']},
-  {title: 'Lumi', caps: ['Reporting', 'Analytics'], tier: 'tech'},
-  {title: 'Raven', caps: ['Customer Notifications'], tier: 'tech'},
+  {title: 'Lumi', caps: ['Reporting', 'Analytics']},
+  {title: 'Raven', caps: ['Customer Notifications']},
   {
     title: 'Commercial Card Services',
     caps: ['Control Account', 'Corporate Hierarchy'],
@@ -270,7 +273,7 @@ export default function LandscapeMap() {
     <div
       className={styles.wrap}
       role="img"
-      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway with Control Tower, then Payments Clearing. Every one of those exposes a Type-A API except Control Tower. Payments Clearing is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks. Under the dotted line sit the supporting domains and tech platforms: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
+      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then Control Tower, then the Multirail Gateway above Payments Clearing. Every one of those exposes a Type-A API except Control Tower. Payments Clearing is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
       <div className={styles.board}>
         <div className={styles.flowScroll}>
           <div className={styles.main}>
@@ -305,12 +308,14 @@ export default function LandscapeMap() {
                   ))}
                 </div>
                 <div className={styles.col}>
-                  {PLUMBING.map((d) => (
+                  {CONTROL_TOWER.map((d) => (
                     <Card key={d.n} {...d} />
                   ))}
                 </div>
                 <div className={styles.col}>
-                  <Card {...CLEARING} />
+                  {RAILS.map((d) => (
+                    <Card key={d.n} {...d} />
+                  ))}
                 </div>
               </div>
             </section>
@@ -329,7 +334,7 @@ export default function LandscapeMap() {
 
             {/* ---- group 4: what the domain leans on, underneath it ---- */}
             <section className={clsx(styles.group, styles.groupSupport)}>
-              <h4 className={styles.groupTitle}>Supporting domains &amp; tech platforms</h4>
+              <h4 className={styles.groupTitle}>Supporting domains</h4>
               <div className={styles.supportStack}>
                 {SUPPORTING.map((d) => (
                   <Card key={d.title} {...d} tier={d.tier || 'support'} compact />
