@@ -6,7 +6,7 @@ import Lead from '@site/src/components/Lead';
 
 # Stages
 
-<Lead>A stage is one state-transition decision point — a Kotlin class with a single function that does the validation, persistence, and event publication for that transition. It consumes one payment state and emits the next. Workflows call stages; a stage never calls a workflow or an external system directly.</Lead>
+<Lead>A stage is one state-transition decision point: a Kotlin class with a single function that does the validation, persistence, and event publication for that transition. It consumes one payment state and emits the next. Workflows call stages, and a stage never calls a workflow or an external system directly.</Lead>
 
 The same stage can appear in more than one workflow, and which implementation runs is chosen from the market's dimensions. This page groups the stages by the workflow that runs them, in the order each workflow calls them. **Create Immediate Payment** carries the fullest description of the shared stages; where another workflow runs one of them it behaves the same way, with any workflow-specific detail called out in that section.
 
@@ -30,7 +30,7 @@ The same stage can appear in more than one workflow, and which implementation ru
 - Sends it to Authorizations (AMP) to increase Open-To-Buy.
 - In the generic case these three run in parallel, but this varies by `accountType` and `requiresRealtimeClearing`.
 - Updates the transaction to `PROCESSING` (enriching it as it goes) and publishes a `PROCESSING` event to Lumi via RTF.
-- **Note:** the logic can differ for RTP versus non-RTP payments. For corporate payments, AR and AMP are **not** notified in this stage — that happens per allocation in Execute Split Payment.
+- The logic can differ for RTP versus non-RTP payments. For corporate payments, AR and AMP are **not** notified in this stage. That happens per allocation in Execute Split Payment.
 
 ### ProcessingToProcessedStage
 
@@ -40,12 +40,12 @@ The same stage can appear in more than one workflow, and which implementation ru
 - Accounting makes sure the payment is matched across Amex's payment-processing platforms.
 - Risk keeps the customer's risk rules updated with every payment.
 - Updates the transaction to `PROCESSED` (enriching it) and publishes a `PROCESSED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may notify a different set of systems.
+- Account-type-specific implementations may notify a different set of systems.
 
 ### PendingToDeclinedStage
 
 - Updates the transaction to `DECLINED` (enriching it) and publishes a `DECLINED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may add a notification to AR or other systems.
+- Account-type-specific implementations may add a notification to AR or other systems.
 
 ## Create Schedule Payment
 
@@ -65,13 +65,13 @@ The same stage can appear in more than one workflow, and which implementation ru
 
 - Records a payment that failed validation, so it is never scheduled.
 - Updates the transaction to `DECLINED` (enriching it) and publishes a `DECLINED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may add a notification to AR or other systems, via `PaymentDeclinedNotificationActivityGroup`.
+- Account-type-specific implementations may add a notification to AR or other systems, via `PaymentDeclinedNotificationActivityGroup`.
 
 ## Execute Scheduled Payment
 
 ### ScheduledToAcceptedStage
 
-- Runs on the payment's scheduled date. Before this stage, `PaymentValidationOnExecutionActivityGroup` re-validates the payment — fetching the current information it needs from external systems, sometimes one call after another — to confirm the scheduled payment is still valid.
+- Runs on the payment's scheduled date. Before this stage, `PaymentValidationOnExecutionActivityGroup` re-validates the payment, fetching the current information it needs from external systems, sometimes one call after another, to confirm the scheduled payment is still valid.
 - Moves the payment from `SCHEDULED` to `ACCEPTED`, enriching the attributes an accepted payment needs.
 - Updates the transaction to `ACCEPTED`: the transaction-detail row is updated and a new row is added to the transaction-lifecycle-event table.
 - Publishes an `ACCEPTED` event, with the enriched data, to Lumi via RTF.
@@ -83,20 +83,20 @@ The same stage can appear in more than one workflow, and which implementation ru
 - Sends it to Authorizations (AMP) to increase Open-To-Buy.
 - In the generic case these three run in parallel, but this varies by `accountType` and `requiresRealtimeClearing`.
 - Updates the transaction to `PROCESSING` (enriching it as it goes) and publishes a `PROCESSING` event to Lumi via RTF.
-- **Note:** the logic can differ for RTP versus non-RTP payments. For corporate payments, AR and AMP are **not** notified in this stage — that happens per allocation in Execute Split Payment.
+- The logic can differ for RTP versus non-RTP payments. For corporate payments, AR and AMP are **not** notified in this stage. That happens per allocation in Execute Split Payment.
 
 ### ProcessingToProcessedStage
 
 - Sends the payment to the downstream systems that fulfill it: accounting, audit (Balance & Control / eBNC), risk, and communications (Raven).
 - Communications comes last; the other notifications can run in parallel, and once they all complete the customer communication is triggered.
 - Updates the transaction to `PROCESSED` (enriching it) and publishes a `PROCESSED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may notify a different set of systems.
+- Account-type-specific implementations may notify a different set of systems.
 
 ### PendingToDeclinedStage
 
 - When the run-date re-validation does not pass, the workflow routes here to decline the payment instead of processing it.
 - Updates the transaction to `DECLINED` (enriching it) and publishes a `DECLINED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may add a notification to AR or other systems.
+- Account-type-specific implementations may add a notification to AR or other systems.
 
 ## Execute Split Payment
 
@@ -109,7 +109,7 @@ The same stage can appear in more than one workflow, and which implementation ru
 
 ### ProcessingToProcessedStage
 
-- Fulfills the allocation by notifying the downstream systems — accounting, audit (Balance & Control / eBNC), risk — and communications last, the same shape as Create Immediate Payment but at the split level.
+- Fulfills the allocation by notifying accounting, audit (Balance & Control / eBNC), and risk, with communications last. Same shape as Create Immediate Payment, but at the split level.
 - Updates the split to `PROCESSED` in the split transaction-detail and split transaction-lifecycle-event tables, and publishes a `PROCESSED` event for the split to Lumi via RTF.
 
 ## Cancel Payment
@@ -123,7 +123,7 @@ The same stage can appear in more than one workflow, and which implementation ru
 
 ### AcceptedToCancelledStage
 
-- The same as ScheduledToCancelledStage, for a payment that has already been accepted — validated and ready to process — rather than merely scheduled.
+- The same as ScheduledToCancelledStage, for a payment that has already been accepted (validated and ready to process) rather than merely scheduled.
 - Updates the transaction to `CANCELLED` (the transaction-detail row is updated and a new transaction-lifecycle-event row is added) and notifies downstream systems via `PaymentCancellationActivityGroup`.
 - Publishes a `CANCELLED` event to Lumi via RTF.
 
@@ -137,7 +137,7 @@ The same stage can appear in more than one workflow, and which implementation ru
 
 ### PendingToScheduledStage
 
-- Schedules the replacement payment — built with a new payment id but the same confirmation number and the updated details — once `PaymentValidationActivityGroup` confirms it is valid.
+- Schedules the replacement payment once `PaymentValidationActivityGroup` confirms it is valid. The replacement carries a new payment id, the same confirmation number, and the updated details.
 - Updates the transaction to `SCHEDULED` (the transaction-detail row is updated and a new transaction-lifecycle-event row is added) and notifies the systems that need to know a payment is booked, via `PaymentScheduledNotificationActivityGroup`.
 - Publishes a `SCHEDULED` event to Lumi via RTF.
 
@@ -145,22 +145,22 @@ The same stage can appear in more than one workflow, and which implementation ru
 
 - Declines the replacement if `PaymentValidationActivityGroup` finds it invalid; the original payment stays cancelled.
 - Updates the transaction to `DECLINED` (enriching it) and publishes a `DECLINED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may add a notification to AR or other systems.
+- Account-type-specific implementations may add a notification to AR or other systems.
 
 ## Process Returned Payment
 
 ### ToReturnedStage
 
-- Records that a payment the bank had taken on has come back — the funds did not settle. The payment's current state selects the concrete stage: `PaidToReturnedStage`, `ProcessingToReturnedStage`, or `ProcessedToReturnedStage`.
-- Beforehand the workflow confirms the request is unique (`IdempotencyCheckActivity`) and looks up the payment — full or split — and its current state (`PaymentReturnValidationActivity`); only `PAID`, `PROCESSING`, and `PROCESSED` payments can be returned.
+- Records that a payment the bank had taken on has come back, meaning the funds did not settle. The payment's current state selects the concrete stage: `PaidToReturnedStage`, `ProcessingToReturnedStage`, or `ProcessedToReturnedStage`.
+- Beforehand the workflow confirms the request is unique (`IdempotencyCheckActivity`) and looks up the payment, full or split, along with its current state (`PaymentReturnValidationActivity`). Only `PAID`, `PROCESSING`, and `PROCESSED` payments can be returned.
 - Updates the transaction to `RETURNED` (the transaction-detail row is updated and a new transaction-lifecycle-event row is added) and notifies the downstream systems that the payment was returned, via `PaymentReturnExecutionActivityGroup`.
 - Publishes a `RETURNED` event to Lumi via RTF.
 
 ### ReturnedToRepresentingStage
 
-- Runs only when the return can be re-attempted — `PaymentRepresentmentEligibilityActivityGroup` checks that in the workflow before this stage.
+- Runs only when the return can be re-attempted. `PaymentRepresentmentEligibilityActivityGroup` checks that in the workflow before this stage.
 - Enriches the representment details, such as the next date the payment can be re-presented.
-- Creates a new `REPRESENTING` transaction for the re-attempt, via `PaymentRepresentmentCreationActivityGroup` — a fresh transaction-detail and transaction-lifecycle-event entry for the next presentment attempt.
+- Creates a new `REPRESENTING` transaction for the re-attempt, via `PaymentRepresentmentCreationActivityGroup`: a fresh transaction-detail and transaction-lifecycle-event entry for the next presentment attempt.
 - Publishes a `REPRESENTING` event to Lumi via RTF.
 
 ## Process Representment
@@ -168,7 +168,7 @@ The same stage can appear in more than one workflow, and which implementation ru
 ### RepresentingToRepresentedStage
 
 - Runs on the day the representment is processed. Before this stage, `PaymentRepresentmentValidationActivityGroup` re-checks that the representment is still valid to execute.
-- Sends the re-attempted payment for clearing and, in parallel, notifies the downstream systems once it is re-presented — via `PaymentRepresentmentExecutionActivityGroup`.
+- Sends the re-attempted payment for clearing and, in parallel, notifies the downstream systems once it is re-presented, via `PaymentRepresentmentExecutionActivityGroup`.
 - Updates the transaction to `REPRESENTED` (the transaction-detail row is updated and a new transaction-lifecycle-event row is added) and publishes a `REPRESENTED` event to Lumi via RTF.
 
 ### RepresentingToDeclinedStage
@@ -212,14 +212,14 @@ The same stage can appear in more than one workflow, and which implementation ru
 - Sends it to Authorizations (AMP) to increase Open-To-Buy.
 - In the generic case these three run in parallel, but this varies by `accountType` and `requiresRealtimeClearing`.
 - Updates the transaction to `PROCESSING` (enriching it as it goes) and publishes a `PROCESSING` event to Lumi via RTF.
-- **Note:** the logic can differ for RTP versus non-RTP payments.
+- The logic can differ for RTP versus non-RTP payments.
 
 ### ProcessingToProcessedStage
 
 - Sends the payment to the downstream systems that fulfill it: accounting, audit (Balance & Control / eBNC), risk, and communications (Raven).
 - Communications comes last; the other notifications can run in parallel, and once they all complete the customer communication is triggered.
 - Updates the transaction to `PROCESSED` (enriching it) and publishes a `PROCESSED` event to Lumi via RTF.
-- **Note:** account-type-specific implementations may notify a different set of systems.
+- Account-type-specific implementations may notify a different set of systems.
 
 ### PendingToDisallowedStage
 

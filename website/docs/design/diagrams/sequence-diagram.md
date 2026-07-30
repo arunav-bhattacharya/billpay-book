@@ -5,24 +5,24 @@ sidebar_label: Sequence Diagram
 
 # Sequence Diagrams
 
-End-to-end traces from a caller's perspective. Each diagram follows one complete Billpay flow — **caller → Core API → Billpay Router → Workflows → the ActivityGroups and Activities that do the work**.
+End-to-end traces from a caller's perspective. Each diagram follows one complete Billpay flow: **caller → Core API → Billpay Router → Workflows → the ActivityGroups and Activities that do the work**.
 
 Most diagrams show two groups at the top:
 
-- **Caller** — the client and the request contract it calls, e.g. `CreatePayment.v3` (soft slate).
-- **Billpay Platform** — everything past the contract: the Core API endpoint, the Billpay Router, the Workflows, and the ActivityGroups/Activities they invoke (light blue).
+- **Caller**, in soft slate, is the client and the request contract it calls, such as `CreatePayment.v3`.
+- **Billpay Platform**, in light blue, is everything past the contract: the Core API endpoint, the Billpay Router, the Workflows, and the ActivityGroups and Activities they invoke.
 
 Internal reconciliation flows (event handlers + schedules) show only the Billpay Platform group.
 
 Inside the body:
 
-- **Deep-blue rectangles** wrap the messages that belong to a single workflow (the workflow name is labeled at the top of the block); a sub-workflow invoked from inside another shows as a lighter **cyan** rectangle.
+- **Deep-blue rectangles** wrap the messages that belong to a single workflow, with the workflow name at the top of the block. A sub-workflow invoked from inside another shows as a lighter **cyan** rectangle.
 - **Gold-tinted rectangles** mark async work that happens *after* the caller has been responded to.
-- **State-transition chips** pop out the moments where the payment moves from one lifecycle state to another, color-coded by outcome to match the [state diagram](./state-diagram.md): **green** when the payment advances or completes (`→ ACCEPTED`, `→ PROCESSED`, `→ PAID`), **red** for terminal failures (`→ DECLINED`, `→ CANCELLED`, `→ DISALLOWED`), and **indigo** while the payment is still in flight or the outcome isn't settled yet (`→ PENDING`, `→ PROCESSING`).
+- **State-transition chips** pop out the moments where the payment moves from one lifecycle state to another, colour-coded by outcome to match the [state diagram](./state-diagram.md). Green means the payment advances or completes (`→ ACCEPTED`, `→ PROCESSED`, `→ PAID`), red is a terminal failure (`→ DECLINED`, `→ CANCELLED`, `→ DISALLOWED`), and indigo means the payment is still in flight or the outcome is not settled yet (`→ PENDING`, `→ PROCESSING`).
 
-Each ActivityGroup or Activity appears as its **own participant**. To keep the diagrams readable the participant label is short — `Execution` stands for `PaymentExecutionActivityGroup`, `Idempotency` for `IdempotencyCheckActivity`, `Validation` for `PaymentValidationActivityGroup` — and each diagram's intro names the full classes it uses. External systems and infrastructure (clearing, Accounts Receivable, Open-To-Buy, accounting, the database, the event bus) are intentionally omitted — they're internal details of the groups that own them.
+Each ActivityGroup or Activity appears as its **own participant**. To keep the diagrams readable the participant labels are short: `Execution` stands for `PaymentExecutionActivityGroup`, `Idempotency` for `IdempotencyCheckActivity`, `Validation` for `PaymentValidationActivityGroup`. Each diagram's intro names the full classes it uses. External systems and infrastructure (clearing, Accounts Receivable, Open-To-Buy, accounting, the database, the event bus) are left off on purpose, because they are internal details of the groups that own them.
 
-## 1. Immediate payment — single instruction
+## 1. Immediate payment, single instruction
 
 `CreatePayment.v3` → `POST /payments` (today, single instruction) →
 `CreateImmediatePaymentWF`. The workflow checks idempotency
@@ -57,7 +57,7 @@ sequenceDiagram
   R->>WF: invoke(workflow-key)
 
   rect rgba(1,91,179,0.10)
-    Note over WF,PDN: Online · Immediate WF — validates inline, accepts or declines
+    Note over WF,PDN: Online · Immediate WF validates inline, then accepts or declines
     WF->>IDEMP: check idempotency
     rect rgba(52,81,158,0.15)
       IDEMP-->>WF: state → PENDING
@@ -75,13 +75,13 @@ sequenceDiagram
     end
   end
 
-  Note over C,WF: 201 · ACCEPTED or DECLINED — only ACCEPTED proceeds to background fulfillment
+  Note over C,WF: 201 · ACCEPTED or DECLINED. Only ACCEPTED proceeds to background fulfillment
   WF-->>API: success (payment-id, ACCEPTED or DECLINED)
   API-->>ODF: 201 Created
   ODF-->>C: payment-id, status
 
   rect rgba(198,146,20,0.12)
-    Note over WF,PFL: Online · Immediate WF — async execution and fulfillment run only on ACCEPTED
+    Note over WF,PFL: Online · Immediate WF runs async execution and fulfillment only on ACCEPTED
     WF->>PEX: execute
     rect rgba(52,81,158,0.15)
       PEX-->>WF: state → PROCESSING
@@ -93,7 +93,7 @@ sequenceDiagram
   end
 ```
 
-## 2. Scheduled payment — created today, executed later
+## 2. Scheduled payment, created today and executed later
 
 `CreatePayment.v3` → `POST /payments` (future date) →
 `CreateSchedulePaymentWF`, which validates the schedule
@@ -132,7 +132,7 @@ sequenceDiagram
   R->>CSP: invoke(workflow-key)
 
   rect rgba(1,91,179,0.10)
-    Note over CSP,PDN: Online · Schedule WF — validates the schedule, schedules or declines
+    Note over CSP,PDN: Online · Schedule WF validates the schedule, then schedules or declines
     CSP->>IDEMP: check idempotency
     rect rgba(52,81,158,0.15)
       IDEMP-->>CSP: state → PENDING
@@ -154,10 +154,10 @@ sequenceDiagram
   CSP-->>API: SCHEDULED or DECLINED
   API-->>C: 201 Created (status)
 
-  Note over SCH,ESP: On payment date · Sched. Executor fires (2,500/min) — only SCHEDULED
+  Note over SCH,ESP: On payment date · Sched. Executor fires (2,500/min), only SCHEDULED
 
   rect rgba(198,146,20,0.12)
-    Note over SCH,PFL: Offline · Exec Scheduled WF — re-validates, executes and fulfills or declines
+    Note over SCH,PFL: Offline · Exec Scheduled WF re-validates, then executes and fulfills or declines
     SCH->>ESP: pick up SCHEDULED payments (batches of 2,500/min)
     ESP->>PVX: validate
     alt validation passes
@@ -182,7 +182,7 @@ sequenceDiagram
 ```
 
 :::note[After PROCESSED]
-`PAID` is reached separately by the **Paid Events Processor reconciliation** — see [diagram #10](#10-paid-events-reconciliation).
+`PAID` is reached separately by the **Paid Events Processor reconciliation**. See [diagram #10](#10-paid-events-reconciliation).
 :::
 
 ## 3. Immediate Corporate Payment
@@ -223,7 +223,7 @@ sequenceDiagram
   R->>CIP: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over CIP,PDN: Online · Immediate WF — validates inline, accepts or declines
+    Note over CIP,PDN: Online · Immediate WF validates inline, then accepts or declines
     CIP->>IDEMP: check idempotency
     rect rgba(52,81,158,0.15)
       IDEMP-->>CIP: state → PENDING
@@ -241,15 +241,15 @@ sequenceDiagram
     end
   end
 
-  Note over C,CIP: 201 · ACCEPTED or DECLINED — only ACCEPTED proceeds to allocations and splits
+  Note over C,CIP: 201 · ACCEPTED or DECLINED. Only ACCEPTED proceeds to allocations and splits
   CIP-->>API: success (payment-id, ACCEPTED or DECLINED)
   API-->>C: 201 Created
 
   rect rgba(198,146,20,0.12)
-    Note over CIP,PFL: Async — corporate allocations fetched, then per-split execution runs in waves
+    Note over CIP,PFL: Async. Corporate allocations fetched, then per-split execution runs in waves
 
     rect rgba(1,91,179,0.10)
-      Note over GPA,PSC: Offline · Allocations WF — fetches the split breakdown
+      Note over GPA,PSC: Offline · Allocations WF fetches the split breakdown
       CIP->>GPA: trigger allocations workflow
       GPA->>ARQ: request allocations
       rect rgba(52,81,158,0.15)
@@ -263,7 +263,7 @@ sequenceDiagram
     end
 
     rect rgba(1,91,179,0.10)
-      Note over ESP,PFL: Offline · Split WF — drained by Allocations Sched.
+      Note over ESP,PFL: Offline · Split WF, drained by Allocations Sched.
       GPA->>ESP: trigger split execution
       ESP->>PEX: execute split
       rect rgba(52,81,158,0.15)
@@ -318,7 +318,7 @@ sequenceDiagram
   R->>CSP: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over CSP,PDN: Online · Schedule WF — validates the schedule, schedules or declines
+    Note over CSP,PDN: Online · Schedule WF validates the schedule, then schedules or declines
     CSP->>IDEMP: check idempotency
     rect rgba(52,81,158,0.15)
       IDEMP-->>CSP: state → PENDING
@@ -340,10 +340,10 @@ sequenceDiagram
   API-->>C: 201 Created (status)
 
   rect rgba(198,146,20,0.12)
-    Note over CSP,PSC: Async (today) — allocations fetched up front, ready on payment date
+    Note over CSP,PSC: Async (today). Allocations fetched up front, ready on payment date
 
     rect rgba(1,91,179,0.10)
-      Note over GPA,PSC: Offline · Allocations WF — fetches the split breakdown
+      Note over GPA,PSC: Offline · Allocations WF fetches the split breakdown
       CSP->>GPA: trigger allocations workflow
       GPA->>ARQ: request allocations
       rect rgba(52,81,158,0.15)
@@ -360,10 +360,10 @@ sequenceDiagram
   Note over SCH,ESPS: On payment date · Sched. Executor fires (2,500/min)
 
   rect rgba(198,146,20,0.12)
-    Note over SCH,PFL: Offline chain — re-validate, then execute and fulfill each split
+    Note over SCH,PFL: Offline chain. Re-validate, then execute and fulfill each split
 
     rect rgba(1,91,179,0.10)
-      Note over SCH,PDNE: Offline · Exec Scheduled WF — re-validates, accepts or declines
+      Note over SCH,PDNE: Offline · Exec Scheduled WF re-validates, then accepts or declines
       SCH->>ESPS: pick up ALLOCATED payments
       ESPS->>PVX: validate
       alt validation passes
@@ -379,7 +379,7 @@ sequenceDiagram
     end
 
     rect rgba(1,91,179,0.10)
-      Note over ESP,PFL: Offline · Split WF — only on ACCEPTED, drained by Allocations Sched.
+      Note over ESP,PFL: Offline · Split WF, only on ACCEPTED, drained by Allocations Sched.
       ESPS->>ESP: trigger split execution
       ESP->>PEX: execute split
       rect rgba(52,81,158,0.15)
@@ -396,9 +396,9 @@ sequenceDiagram
 ## 5. Update a scheduled payment
 
 `PUT /payments/:id` → `UpdatePaymentWF`. It cancels the original through
-`CancelPaymentWF` — cancel-eligibility check
-(`PaymentCancelValidationActivityGroup`) then cancellation
-(`PaymentCancellationActivityGroup`) — creates a replacement via
+`CancelPaymentWF`, which runs the cancel-eligibility check
+(`PaymentCancelValidationActivityGroup`) then the cancellation
+(`PaymentCancellationActivityGroup`). It then creates a replacement via
 `CreateSchedulePaymentWF`, and maps the new payment id back to the original for
 the audit trail (`MapNewPaymentIdToPreviousIdActivity`).
 
@@ -425,7 +425,7 @@ sequenceDiagram
   API->>U: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over U,MAP: Online · Update WF — cancels original, creates replacement, maps old → new
+    Note over U,MAP: Online · Update WF cancels the original, creates the replacement, maps old → new
     U->>IDEMP: check idempotency
     rect rgba(52,81,158,0.15)
       IDEMP-->>U: state → PENDING
@@ -482,7 +482,7 @@ sequenceDiagram
   API->>CWF: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over CWF,PCN: Online · Cancel WF — checks eligibility, transitions to CANCELLED
+    Note over CWF,PCN: Online · Cancel WF checks eligibility, then transitions to CANCELLED
     CWF->>IDEMP: check idempotency
     CWF->>PCV: validate cancel
     alt eligible
@@ -501,7 +501,7 @@ sequenceDiagram
 
 ## 7. Return Processing + Representment Eligibility Check
 
-`ProcessReturnedPaymentWF` — triggered by Money Movement return events. It
+`ProcessReturnedPaymentWF` is triggered by Money Movement return events. It
 validates the return (`PaymentReturnValidationActivity`), transitions the
 payment to `RETURNED` (`PaymentReturnExecutionActivityGroup`), then checks
 representment eligibility (`PaymentRepresentmentEligibilityActivityGroup`). If
@@ -532,7 +532,7 @@ sequenceDiagram
   API->>PR: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over PR,PRC: Offline · Returned WF — handles return, then checks representment eligibility
+    Note over PR,PRC: Offline · Returned WF handles the return, then checks representment eligibility
     PR->>IDEMP: check idempotency
     PR->>PRV: validate return
     alt valid return
@@ -548,18 +548,18 @@ sequenceDiagram
         end
         PR->>PRP: hand off to ProcessRepresentmentWF
       else not representable
-        Note over PR: payment stays in RETURNED — representment workflow not invoked
+        Note over PR: payment stays in RETURNED, representment workflow not invoked
       end
     else invalid return
       PR->>PIRN: notify invalid return
-      Note over PR,PIRN: no state transition — payment stays in its current state
+      Note over PR,PIRN: no state transition, payment stays in its current state
     end
   end
 ```
 
 ## 8. Representment Workflow
 
-`ProcessRepresentmentWF` — picked up from the `REPRESENTING` state set by
+`ProcessRepresentmentWF` is picked up from the `REPRESENTING` state set by
 [diagram #7](#7-return-processing--representment-eligibility-check). It
 re-checks eligibility on the representment day
 (`PaymentRepresentmentValidationActivityGroup`) and, if valid, re-clears the
@@ -580,7 +580,7 @@ sequenceDiagram
   PR->>PRP: hand off (state = REPRESENTING)
 
   rect rgba(1,91,179,0.10)
-    Note over PRP,PRRX: Offline · Representment WF — re-clears a returned transaction on the representment day
+    Note over PRP,PRRX: Offline · Representment WF re-clears a returned transaction on the representment day
     PRP->>PRRV: validate representment
     alt valid representment
       PRP->>PRRX: execute representment
@@ -597,13 +597,13 @@ sequenceDiagram
 
 ## 9. Inbound payment
 
-`ProcessInboundPaymentWF` — an upstream (third-party) payment enters through
+`ProcessInboundPaymentWF` handles an upstream (third-party) payment entering through
 the Unstructured Payment Handler and `POST /payments/inbound`. It checks
 idempotency, validates the posting (`PaymentValidationActivityGroup`), then
 posts and fulfils (`PaymentExecutionActivityGroup`,
 `PaymentFulfillmentActivityGroup`), fans out consumer splits
-(`PaymentSplitsCreationActivity`), or — if Amex doesn't accept it — moves the
-payment to `DISALLOWED` (`PendingToDisallowedStage`).
+(`PaymentSplitsCreationActivity`). If Amex does not accept it, the payment
+moves to `DISALLOWED` (`PendingToDisallowedStage`) instead.
 
 ```mermaid
 sequenceDiagram
@@ -626,7 +626,7 @@ sequenceDiagram
   API->>IB: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over IB,PRJ: Offline · Inbound WF — posts an upstream-originated payment into Billpay
+    Note over IB,PRJ: Offline · Inbound WF posts an upstream-originated payment into Billpay
     IB->>IDEMP: check idempotency
     rect rgba(52,81,158,0.15)
       IDEMP-->>IB: state → PENDING
@@ -654,7 +654,7 @@ sequenceDiagram
 
 ## 10. Paid Events reconciliation
 
-`PaidEventsProcessingWF` — the continuous sweep that closes a payment out.
+`PaidEventsProcessingWF` is the continuous sweep that closes a payment out.
 AR-Posted and Settled events arrive independently and are tracked in the
 External Transaction Events Tracker; once both are present for a payment it
 moves to `PAID`.
@@ -672,7 +672,7 @@ sequenceDiagram
   end
 
   rect rgba(148,163,184,0.10)
-    Note over PPH,TRK: Async event ingestion — AR-Posted and Settled events arrive independently
+    Note over PPH,TRK: Async event ingestion. AR-Posted and Settled events arrive independently
     Note over PPH: receives AR Posted event
     PPH->>TRK: insert AR-Posted row
     Note over MMH: receives Settled event
@@ -680,7 +680,7 @@ sequenceDiagram
   end
 
   rect rgba(1,91,179,0.10)
-    Note over SCH,PEP: Offline · Paid Events WF — closes the payment to PAID once both events arrive
+    Note over SCH,PEP: Offline · Paid Events WF closes the payment to PAID once both events arrive
     SCH->>PEP: tick (continuous batch)
     PEP->>TRK: find pairs (AR-Posted + Settled)
     PEP->>TRK: mark Picked-up-for-processing
@@ -692,7 +692,7 @@ sequenceDiagram
 
 ## 11. Missing Paid Events reconciliation
 
-`MissingPaidEventsProcessingWF` — an hourly probe. For payments still missing
+`MissingPaidEventsProcessingWF` is an hourly probe. For payments still missing
 an AR-Posted or Settled event after 48 hours, it queries Accounts Receivable or
 Clearing directly; if the event is found it is recorded, otherwise it raises an
 alert.
@@ -708,7 +708,7 @@ sequenceDiagram
   end
 
   rect rgba(1,91,179,0.10)
-    Note over SCH,TRK: Offline · Missing Paid WF — hourly probe for AR-Posted or Settled missing over 48h
+    Note over SCH,TRK: Offline · Missing Paid WF, hourly probe for AR-Posted or Settled missing over 48h
     SCH->>MPE: tick (hourly / configurable)
     MPE->>TRK: find payments missing AR-Posted or Settled > 48h
   end
@@ -733,10 +733,10 @@ sequenceDiagram
 
 ## 12. Create Payment + Installments (composite)
 
-`CreatePaymentInstallmentWF` — a composite. It runs `CreateImmediatePaymentWF`;
+`CreatePaymentInstallmentWF` is a composite. It runs `CreateImmediatePaymentWF`,
 on `ACCEPTED` it creates the installment plan and, if the autopay flag is set,
-updates autopay. On `DECLINED` it short-circuits — no installment plan, no
-autopay.
+updates autopay. On `DECLINED` it short-circuits, so no installment plan is
+created and autopay is left alone.
 
 ```mermaid
 sequenceDiagram
@@ -758,7 +758,7 @@ sequenceDiagram
   API->>CWF: invoke composite
 
   rect rgba(1,91,179,0.10)
-    Note over CWF,CIP: Online · Installment WF — composite: payment + installment plan + optional autopay
+    Note over CWF,CIP: Online · Installment WF composite: payment + installment plan + optional autopay
 
     rect rgba(0,163,224,0.10)
       CWF->>CIP: invoke CreateImmediatePaymentWF
@@ -774,7 +774,7 @@ sequenceDiagram
         rect rgba(192,57,43,0.14)
           CIP-->>CWF: payment-id (state → DECLINED)
         end
-        Note over CWF: composite short-circuits — no installment plan created, no autopay
+        Note over CWF: composite short-circuits, no installment plan created, no autopay
       end
     end
   end

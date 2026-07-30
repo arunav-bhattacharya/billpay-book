@@ -7,11 +7,11 @@ import Lead from '@site/src/components/Lead';
 
 # Payment Options
 
-<Lead>A payment option is <em>what the customer chose to pay</em> — the minimum due, the full statement balance, an amount they typed in. The type system tracks one crucial fact about it: whether the system of record has confirmed it yet.</Lead>
+<Lead>A payment option is <em>what the customer chose to pay</em>: the minimum due, the full statement balance, an amount they typed in. The type system tracks one fact about it, and it is the one that matters. Has the system of record confirmed it yet?</Lead>
 
 ## Two phases, one hierarchy
 
-Every option starts as a **reference** — the customer named an option, but nothing is confirmed — and validation resolves it into a **verified** option with an id and amount the system of record stands behind:
+Every option starts as a **reference**. The customer named an option, but nothing is confirmed. Validation then resolves it into a **verified** option, with an id and amount the system of record stands behind.
 
 ```kotlin
 sealed interface PaymentOption {
@@ -28,7 +28,7 @@ sealed interface VerifiedPaymentOption : PaymentOption {         // post-lookup
 }
 ```
 
-The nullability *is* the state: a `PaymentOptionReference` may hold nothing but the option type; a `VerifiedPaymentOption` cannot exist without a confirmed id and amount. That's why the [Verified payment states](./payment.md) can demand a `VerifiedPaymentOption` and know — at compile time — that an amount exists.
+The nullability *is* the state. A `PaymentOptionReference` may hold nothing but the option type, and a `VerifiedPaymentOption` cannot exist without a confirmed id and amount. That is why the [Verified payment states](./payment.md) can demand a `VerifiedPaymentOption` and know at compile time that an amount exists.
 
 ## The eight option types
 
@@ -36,7 +36,7 @@ The nullability *is* the state: a `PaymentOptionReference` may hold nothing but 
 | --- | --- |
 | `MINIMUM_DUE` | The minimum payment the account requires. |
 | `OUTSTANDING_BALANCE` | Everything currently owed on the account. |
-| `REMAINING_STATEMENT_BALANCE` | What's left of the statement after partial payments. |
+| `REMAINING_STATEMENT_BALANCE` | What is left of the statement after partial payments. |
 | `INITIAL_PAYMENT_AMOUNT` | The up-front payment on a deferred payment plan. |
 | `OTHER_AMOUNT` | A custom, user-specified amount. |
 | `ADJUSTED_BALANCE` | The balance after credits and adjustments. |
@@ -63,9 +63,9 @@ data class VerifiedMinimumDuePaymentOption(
 
 ## The one asymmetry worth remembering
 
-Six of the eight references take an optional `value` — the amount is the *system's* to compute (what **is** the minimum due? Billpay looks it up). Two require it at construction:
+Six of the eight references take an optional `value`, because the amount is the *system's* to compute. What is the minimum due? Billpay looks it up. Two require the value at construction.
 
 - `OtherAmountPaymentOptionReference(value: MonetaryAmount)`
 - `InitialPaymentAmountPaymentOptionReference(value: MonetaryAmount)`
 
-Those are the user-specified amounts — there is nothing to look up, so a reference without a value would be meaningless. This is also exactly the rule `PendingFullPayment` enforces in its [init guard](./payment.md#one-guarded-doorway): amount present for user-specified options, amount absent for computed ones.
+Those are the user-specified amounts. There is nothing to look up, so a reference without a value would be meaningless. This is also exactly the rule `PendingFullPayment` enforces in its [init guard](./payment.md#one-guarded-doorway): amount present for user-specified options, amount absent for computed ones.

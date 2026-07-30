@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * ApiTable — the One-Data functions and the core API each one delegates to.
+ * ApiTable: the One-Data functions and the core API each one delegates to.
  *
  * The function name links to its contract in the One-Data explorer. The HTTP
  * verb is a badge rather than part of the path string, so the set of methods

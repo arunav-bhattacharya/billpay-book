@@ -5,7 +5,7 @@ sidebar_label: State Diagram
 
 # State Diagrams
 
-The [payment state model](../payment-state-model.md) shows the whole lifecycle. This page takes it apart one workflow at a time — the states each workflow drives and how it hands off to the next. A `<<choice>>` diamond is a routing decision, not a state.
+The [payment state model](../payment-state-model.md) shows the whole lifecycle. This page takes it apart one workflow at a time: the states each workflow drives and how it hands off to the next. A `<<choice>>` diamond is a routing decision, not a state.
 
 ## Create Immediate Payment WF
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 ## Execute Split Payment WF
 
-Processes one split leg — the same clearing, posting, and fulfilment as a full payment, at the leg level.
+Processes one split leg, with the same clearing, posting, and fulfilment as a full payment, at the leg level.
 
 ```mermaid
 stateDiagram-v2
@@ -75,7 +75,7 @@ stateDiagram-v2
 
 ## Cancel Payment WF
 
-Cancels a payment that hasn't processed yet — either scheduled or accepted.
+Cancels a payment that has not processed yet, either scheduled or accepted.
 
 ```mermaid
 stateDiagram-v2

@@ -129,11 +129,11 @@ export const ASIDE = {
 
 ## Why Temporal
 
-Billpay is built on Temporal. We looked at several of the durable execution engines on the market and picked Temporal: for orchestrating long-running business processes it is among the best available. The layering above leans on its guarantees:
+We looked at several durable execution engines and picked Temporal, because it was the best fit for orchestrating long-running business processes. The layering above leans on four of its guarantees.
 
-- **Durability & replay.** Money movement must not lose state across restarts, deploys, or downstream outages. A workflow replays from its event history to a deterministic state, so there are no hand-rolled checkpoint tables.
-- **Long-running flows are first-class.** A payment scheduled months out is just a workflow waiting on a timer, with no cron-plus-poll glue around it.
-- **Native retries, timers, signals, queries.** Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues. All of that is a Temporal primitive.
-- **Determinism as discipline.** Temporal requires deterministic workflow code, which is exactly why work is factored into stages and activities: workflows orchestrate, activities do the I/O.
+- Money movement must not lose state across restarts, deploys, or downstream outages. A workflow replays from its event history back to a deterministic state, so we never hand-rolled a checkpoint table.
+- A payment scheduled months out is a workflow waiting on a timer. There is no cron plus poll glue around it.
+- Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues. Retries, timers, signals, and queries are all Temporal primitives, so none of that is ours to build.
+- Temporal requires deterministic workflow code. That constraint is why the work is factored the way it is: workflows orchestrate, activities do the I/O.
 
 Continue to [A Closer Look](./components.md) for each block in turn.

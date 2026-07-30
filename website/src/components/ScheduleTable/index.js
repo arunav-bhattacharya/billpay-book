@@ -2,7 +2,7 @@ import React from 'react';
 import styles from './styles.module.css';
 
 /**
- * ScheduleTable — the Temporal Schedules and the workflow each one fires.
+ * ScheduleTable: the Temporal Schedules and the workflow each one fires.
  *
  * Every one of these runs on the Offline worker, so the workflow names carry
  * the same gold the Offline card uses rather than the global code blue.

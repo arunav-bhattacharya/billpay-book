@@ -17,23 +17,23 @@ import Highlights from '@site/src/components/Highlights';
   items={[
     {
       term: 'Workflow',
-      desc: 'Orchestrates a complete journey — a payment, refund, or return — sequencing the business decision points. It owns no external-system mapping.',
+      desc: 'Orchestrates one complete journey: a payment, a refund, or a return. It sequences the business decision points and owns no external-system mapping.',
     },
     {
       term: 'Stage',
       desc: (
         <>
-          A single state-transition decision point (e.g. <code>InitiatedToPendingStage</code>) — a Kotlin class with one function doing the validation, persistence, and publication for that transition. Consumes one state, emits the next.
+          A single state-transition decision point such as <code>InitiatedToPendingStage</code>. It is a Kotlin class with one function that does the validation, persistence, and publication for that transition. It consumes one state and emits the next.
         </>
       ),
     },
     {
       term: 'ActivityGroup',
-      desc: 'Coordinates a cohesive set of related business actions — validation, lifecycle-event publication, balance updates. Named for the concern, not the mechanism.',
+      desc: 'Coordinates a set of related business actions: validation, lifecycle-event publication, balance updates. Named for the concern, not the mechanism.',
     },
     {
       term: 'Activity',
-      desc: 'One retryable business action — publish an event, persist a record, read an option, update a downstream balance. Thin; delegates protocol mapping to Clients.',
+      desc: 'One retryable business action, such as publishing an event, persisting a record, reading an option, or updating a downstream balance. It stays thin and leaves protocol mapping to Clients.',
     },
     {
       term: 'Client',
@@ -44,7 +44,7 @@ import Highlights from '@site/src/components/Highlights';
 
 ## Call rules
 
-Work flows in one direction — **Workflow → Stage → ActivityGroup → Activity → Client → external system** — and each layer may only call the layer(s) beneath it:
+Work flows in one direction, **Workflow → Stage → ActivityGroup → Activity → Client → external system**, and each layer may only call the layers beneath it.
 
 | Component | May call | Must **not** call |
 | --- | --- | --- |
@@ -59,14 +59,14 @@ Work flows in one direction — **Workflow → Stage → ActivityGroup → Activ
 | Component | Naming |
 | --- | --- |
 | **Workflow** | `{Market}InitiatePaymentWorkflow` |
-| **Stage** | `{From}To{To}Stage` — e.g. `InitiatedToPendingStage` |
+| **Stage** | `{From}To{To}Stage`, for example `InitiatedToPendingStage` |
 | **ActivityGroup** | `{Responsibility}ActivityGroup` |
 | **Activity** | `{Action}Activity` / `{Action}ActivityImpl` |
 | **Client** | `{System}Client` |
 
 ## Composition, not inheritance
 
-- **One workflow per journey.** There are no alternate implementations of a workflow — a workflow is composed from different **Stage** and **ActivityGroup** implementations, never subclassed. Workflows and Stages are never `abstract`.
-- **Dimensions select the implementation.** A market's profile — its combination of dimensions (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) — maps automatically at runtime to the right Stage / ActivityGroup implementation. Every Stage and ActivityGroup has a default implementation per dimension combination; a combination a market hasn't onboarded simply has no implementation, and the workflow is rejected before it starts.
-- **Behaviour-driven naming.** Implementations are named for the behaviour they encode, not the market — so a rule shared across markets is written once.
-- **Activities are shared and thin.** The same Activity is reused across markets; callers pass only the fields it needs — never the full `Payment` object — and set the retry and timeout options per call.
+- There is **one workflow per journey** and no alternate implementations of it. A workflow is composed from different **Stage** and **ActivityGroup** implementations, never subclassed. Workflows and Stages are never `abstract`.
+- **Dimensions select the implementation.** A market's profile is its combination of `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, and `requiresMandateAuthorization`. At runtime that combination maps to the right Stage and ActivityGroup implementations. Every Stage and ActivityGroup has a default implementation per combination. A combination a market has not onboarded has no implementation at all, so the workflow is rejected before it starts.
+- Implementations are **named for the behaviour they encode, not the market**, so a rule several markets share is written once.
+- **Activities stay shared and thin.** The same Activity is reused across markets. Callers pass only the fields it needs, never the full `Payment` object, and set the retry and timeout options per call.

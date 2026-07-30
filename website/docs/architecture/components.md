@@ -127,7 +127,7 @@ Event-driven functions such as `MoneyMovementEventHandler` bring async outcomes 
 
 ## Billpay Router
 
-The router sits between the core APIs and the workflows and decides **which workflow to invoke** — then fetches the stages for the market's dimensions and passes them in.
+The router sits between the core APIs and the workflows and decides **which workflow to invoke**. It then fetches the stages for the market's dimensions and passes them in.
 
 <RouteMap
   routes={[
@@ -191,7 +191,7 @@ Inside a workflow, work is layered so each concern lives in exactly one place, a
   items={[
     {
       term: 'Workflow',
-      desc: `Orchestrates a complete journey, a payment, a refund, or a return, sequencing the business decision points.`,
+      desc: `Orchestrates one complete journey: a payment, a refund, or a return. It sequences the business decision points and nothing else.`,
     },
     {
       term: 'Stage',

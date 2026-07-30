@@ -2,7 +2,7 @@ import React from 'react';
 import styles from './styles.module.css';
 
 /**
- * Principles — numbered rules, one card each.
+ * Principles: numbered rules, one card each.
  *
  * The numeral is set large and low-contrast behind the text, so the cards read
  * as an ordered set without a list marker competing with the rule itself.

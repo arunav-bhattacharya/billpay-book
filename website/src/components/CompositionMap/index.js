@@ -2,7 +2,7 @@ import React from 'react';
 import styles from './styles.module.css';
 
 /**
- * CompositionMap — the high-level path from onboarding a market to a running
+ * CompositionMap: the high-level path from onboarding a market to a running
  * workflow: the One-Data APIs and dimensions someone picks, the profile those
  * selections create, and the workflows that profile composes.
  *
@@ -16,7 +16,7 @@ import styles from './styles.module.css';
 export default function CompositionMap({apis = [], dims = [], run = {}, footnote}) {
   return (
     <div className={styles.wrap}>
-      {/* 1 — what onboarding asks for */}
+      {/* 1. what onboarding asks for */}
       <section className={styles.band}>
         <div className={styles.head}>
           <span className={styles.no} aria-hidden="true">
@@ -63,7 +63,7 @@ export default function CompositionMap({apis = [], dims = [], run = {}, footnote
 
       <Arrow label="creates" />
 
-      {/* 2 — the profile */}
+      {/* 2. the profile */}
       <section className={styles.profile}>
         <div className={styles.head}>
           <span className={styles.no} aria-hidden="true">
@@ -80,7 +80,7 @@ export default function CompositionMap({apis = [], dims = [], run = {}, footnote
 
       <Arrow label="composes" />
 
-      {/* 3 — the composed workflows */}
+      {/* 3. the composed workflows */}
       <section className={styles.band}>
         <div className={styles.head}>
           <span className={styles.no} aria-hidden="true">

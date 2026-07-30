@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * Lead — a prominent thesis statement for the top of a page.
+ * Lead: a prominent thesis statement for the top of a page.
  * Carries the "one larger message"; **bold** spans stand out further.
  * Pass `highlight` to colour the whole statement in the accent.
  */

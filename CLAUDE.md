@@ -23,7 +23,8 @@ Repo currently contains only `docs/Wiki_Spec.md`. Everything else — reference 
 - Diagrams: Mermaid via Docusaurus's built-in mermaid support, for every sequence/state diagram the spec calls out
 
 ## Writing style — applies to every page
-- **Run the `humanizer` skill before writing page prose.** Load it at the start of any content task, not as a cleanup pass at the end.
+- **Run the `tone-of-voice` skill before writing page prose.** It lives at `.claude/skills/tone-of-voice/SKILL.md` and defines the house voice: approachable, sophisticated, professional, aspirational, authentic, supportive, trustworthy. Never overly casual, trendy, formal, out of reach, humorous, or pretentious.
+- **Run the `humanizer` skill alongside it.** Load both at the start of any content task, not as a cleanup pass at the end. The humanizer strips the machine tells; `tone-of-voice` sets what goes in their place.
 - **No em dashes or en dashes.** Use a period, comma, colon, or parentheses. This is the most reliable AI tell and it is a hard rule.
 - **Prefer short bulleted points to paragraphs.** Verbosity is the problem, not page length.
 - **Avoid `**Bold header:** explanation` bullet lists.** Write the point directly.

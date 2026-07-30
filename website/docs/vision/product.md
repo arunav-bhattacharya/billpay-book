@@ -8,7 +8,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Product Vision
 
-<Lead highlight>Billpay is where American Express processes **credit-card bill payments, and the refunds that send money back the other way**. It carries a payment from the moment a customer submits it to the moment it settles, and it does so the same way in every market Amex operates in — however much the local rules differ.</Lead>
+<Lead highlight>Billpay is where American Express processes **credit card bill payments, and the refunds that send money back the other way**. It carries a payment from the moment a customer submits it to the moment it settles, and it works the same way in every market Amex operates in, however much the local rules differ.</Lead>
 
 ## What Billpay is
 
@@ -44,7 +44,7 @@ A dimension is a processing variant, a yes/no or either/or choice that changes *
       term: 'Account type',
       desc: (
         <>
-          Whether the payment is for a <strong>Consumer</strong>, <strong>Corporate</strong>, or <strong>Business Travel</strong> account (<code>accountType</code>). This shapes more of the processing than any other dimension — corporate payments, for instance, are the ones that split into allocations.
+          Whether the payment is for a <strong>Consumer</strong>, <strong>Corporate</strong>, or <strong>Business Travel</strong> account (<code>accountType</code>). This shapes more of the processing than any other dimension. Corporate payments, for instance, are the ones that split into allocations.
         </>
       ),
     },
@@ -68,14 +68,14 @@ A dimension is a processing variant, a yes/no or either/or choice that changes *
       term: 'Mandate authorization',
       desc: (
         <>
-          Whether a <strong>mandate</strong> — a standing authorization to collect the payment — has to be verified while the payment is processed (<code>requiresMandateAuthorization</code>).
+          Whether a <strong>mandate</strong>, a standing authorization to collect the payment, has to be verified while the payment is processed (<code>requiresMandateAuthorization</code>).
         </>
       ),
     },
   ]}
 />
 
-The team captures a market as one or more **profiles**: specific combinations of these dimensions. When a payment arrives, its profile decides which version of each processing step runs. Nothing is branched by hand in code; the behaviour is looked up from the market's configuration. And a combination a market never onboarded simply cannot run. If a market is live only for consumer payments and a corporate request shows up, Billpay rejects it before any processing starts.
+The team captures a market as one or more **profiles**: specific combinations of these dimensions. When a payment arrives, its profile decides which version of each processing step runs. Nothing is branched by hand in code. Billpay looks the behaviour up from the market's configuration, and a combination a market never onboarded cannot run at all. If a market is live only for consumer payments and a corporate request shows up, Billpay rejects it before any processing starts.
 
 ## The same lifecycle, every time
 
@@ -87,10 +87,10 @@ The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `
 
 Handling a payment is a sequence of steps. Validation comes first; the downstream steps then run together wherever they can.
 
-- **Validation** — confirm the payment is good before any money moves. This can mean calling other Amex systems to check the account and the request. A payment that fails validation is declined, not processed.
-- **Clearing** — send the payment to the customer's bank so the funds actually move. Depending on the market's rule, clearing happens in realtime or in a batch.
-- **Accounts Receivable (AR)** — reduce the cardmember's statement balance, the amount they owe on the card.
-- **Authorization (Open-To-Buy)** — restore the customer's spendable credit. *Open-To-Buy* is how much room is left to spend on the card; paying the bill frees it up again.
-- **Fulfillment** — once the payment is processed, notify the systems that need to know: accounting, balance-and-control (audit), risk, and customer communications.
+- **Validation** confirms the payment is good before any money moves. That can mean calling other Amex systems to check the account and the request. A payment that fails validation is declined, not processed.
+- **Clearing** sends the payment to the customer's bank so the funds actually move. Depending on the market's rule, clearing happens in realtime or in a batch.
+- **Accounts Receivable (AR)** posting reduces the cardmember's statement balance, the amount they owe on the card.
+- **Authorization** restores the customer's *Open-To-Buy*, the room left to spend on the card. Paying the bill frees it up again.
+- **Fulfillment** tells the systems that need to know once the payment is processed: accounting, balance and control (audit), risk, and customer communications.
 
 A payment only reaches the final `PAID` state once Billpay has seen **both** confirmations come back: that the bank settled the funds, and that AR posted the payment. Until both arrive it is not called paid, so "paid" always means genuinely settled and booked.

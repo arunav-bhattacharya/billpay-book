@@ -13,8 +13,8 @@ const ALL = [
 
 /**
  * Meta block for a workflow, in two labelled rows:
- *   Worker      — which Temporal worker(s) it runs on
- *   Dimensions  — the dimensions that select its stage / activity-group impls
+ *   Worker      the Temporal worker(s) it runs on
+ *   Dimensions  the dimensions that select its stage / activity-group impls
  *
  * Props:
  *   worker      'Online' | 'Offline' | 'Online / Offline'
@@ -50,7 +50,7 @@ export default function WorkflowMeta({worker = 'Online', dimensions = []}) {
         <span className={styles.label}>Dimensions</span>
         <div className={styles.values}>
           {dims.length === 0 ? (
-            <span className={styles.generic}>Generic — no dimensions</span>
+            <span className={styles.generic}>Generic, no dimensions</span>
           ) : (
             dims.map((d) => (
               <code key={d} className={styles.dim}>

@@ -7,7 +7,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Architecture
 
-<Lead>Billpay is **layered so each tier has one responsibility** — a request flows top-to-bottom from the API gateway down to the systems that move the money, and async events loop back in through event handlers.</Lead>
+<Lead>Billpay is **layered so each tier has one responsibility**. A request travels from the API gateway at the top down to the systems that move the money, and async outcomes loop back in through event handlers.</Lead>
 
 ## The Big Picture
 
@@ -24,7 +24,7 @@ import Highlights from '@site/src/components/Highlights';
     },
     {
       term: 'Temporal at the core',
-      desc: `Every payment is a durable Temporal workflow, run on an Online worker (an end user is waiting) or an Offline worker (async — event- or schedule-driven).`,
+      desc: `Every payment is a durable Temporal workflow. It runs on an Online worker when an end user is waiting, and on an Offline worker when an event or a schedule drives it.`,
     },
     {
       term: 'Composed, not branched',
@@ -36,11 +36,11 @@ import Highlights from '@site/src/components/Highlights';
     },
     {
       term: 'Events loop back',
-      desc: `Downstream outcomes — money movement, AR posting, Open-To-Buy updates — return as events through handlers, and Temporal Schedules drive the periodic work.`,
+      desc: `Downstream outcomes come back as events through handlers: money movement, AR posting, Open-To-Buy updates. Temporal Schedules drive the periodic work.`,
     },
   ]}
 />
 
-- **[Overview](./overview.md)** — the system map from One-Data Functions to workflows to downstream systems, and why the platform is Temporal-first.
-- **[A Closer Look](./components.md)** — each block in turn: the router, the Online/Offline workers, the component model, event handlers, and schedules.
-- **[High Availability](./high-availability.md)** — where everything physically runs: the two on-prem sites, the two AWS regions, and what fails over to what.
+- [Overview](./overview.md) maps the system from One-Data Functions through the workflows to the downstream systems, and says why the platform is built on Temporal.
+- [A Closer Look](./components.md) takes each block in turn: the router, the Online and Offline workers, the component model, event handlers, and schedules.
+- [High Availability](./high-availability.md) covers where everything physically runs, across two on-prem sites and two AWS regions, and what fails over to what.

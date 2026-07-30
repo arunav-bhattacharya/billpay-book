@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * LayerStack — a vertical, layered architecture map.
+ * LayerStack: a vertical, layered architecture map.
  *
  * Blocks are gathered into groups, and the group owns the colour: every block
  * inside it shares one accent, and the card tint deepens slightly down the

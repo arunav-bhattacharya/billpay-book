@@ -7,18 +7,18 @@ import Lead from '@site/src/components/Lead';
 
 # Payment
 
-<Lead>One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions. This page walks the hierarchy top-down — read it against the sources under `docs/domainModel` once, and the naming does the rest.</Lead>
+<Lead>One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions. This page walks the hierarchy top down. Read it once against the sources under `docs/domainModel`, and the naming does the rest.</Lead>
 
 ## The roots
 
-`Transaction` is the platform root — anything that moves value. `Payment` is its (currently only) family:
+`Transaction` is the platform root, meaning anything that moves value. `Payment` is its only family so far.
 
 ```kotlin
 @JsonTypeInfo(use = JsonTypeInfo.Id.SIMPLE_NAME, include = JsonTypeInfo.As.PROPERTY, property = Transaction.PROPERTY_NAME)
 sealed interface Transaction {
     val id: String
     val account: Account
-    val amount: MonetaryAmount?   // nullable — PENDING may not know it yet
+    val amount: MonetaryAmount?   // nullable, since PENDING may not know it yet
 }
 ```
 
@@ -39,7 +39,7 @@ sealed interface Payment : Transaction {
 }
 ```
 
-Amounts are `javax.money.MonetaryAmount` throughout. `confirmationCode` is the customer-stable key — it survives an update (which issues a new `paymentId`) and representment. `presentmentSequence` counts settlement attempts: `1` for the original presentment, bumped when a return is re-presented. `planDetailData` carries the installment-plan linkage for *Pay & Plan* flows.
+Amounts are `javax.money.MonetaryAmount` throughout. `confirmationCode` is the customer-stable key, and it survives both an update (which issues a new `paymentId`) and a representment. `presentmentSequence` counts settlement attempts: `1` for the original presentment, bumped when a return is re-presented. `planDetailData` carries the installment-plan linkage for *Pay & Plan* flows.
 
 ## The Verified narrowing
 
@@ -47,13 +47,13 @@ A file-private interface does the model's sharpest work:
 
 ```kotlin
 private interface VerifiedPayment {
-    val amount: MonetaryAmount          // non-null — narrows Transaction.amount
+    val amount: MonetaryAmount          // non-null, narrows Transaction.amount
     val option: VerifiedPaymentOption   // narrows PaymentOption
     val instrument: VerifiedInstrument  // narrows Instrument
 }
 ```
 
-Every in-flight status type mixes it in; the entry and terminal-failure types don't. That single choice encodes the business rule "nothing moves money until validation has resolved the amount, the option, and the instrument" — as a compile error, not a runtime check.
+Every in-flight status type mixes it in, and the entry and terminal-failure types do not. That single choice encodes the business rule that nothing moves money until validation has resolved the amount, the option, and the instrument. It is a compile error, not a runtime check.
 
 ## The eleven status types
 
@@ -61,7 +61,7 @@ Each status is a `sealed class` that pins `status` to one constant:
 
 | Status type | `status` | Verified? | Notes |
 | --- | --- | --- | --- |
-| `PendingPayment` | `PENDING` | — | May carry a null amount and unverified directives. |
+| `PendingPayment` | `PENDING` | No | May carry a null amount and unverified directives. |
 | `ScheduledPayment` | `SCHEDULED` | ✓ | |
 | `AcceptedPayment` | `ACCEPTED` | ✓ | |
 | `ProcessingPayment` | `PROCESSING` | ✓ | |
@@ -70,12 +70,12 @@ Each status is a `sealed class` that pins `status` to one constant:
 | `ReturnedPayment` | `RETURNED` | ✓ | |
 | `RepresentingPayment` | `REPRESENTING` | ✓ | |
 | `RepresentedPayment` | `REPRESENTED` | ✓ | |
-| `CancelledPayment` | `CANCELLED` | — | |
-| `DeclinedPayment` | `DECLINED` | — | Adds `abstract val declineCode` — a decline always says why. |
+| `CancelledPayment` | `CANCELLED` | No | |
+| `DeclinedPayment` | `DECLINED` | No | Adds `abstract val declineCode`, because a decline always says why. |
 
 ## Shape: Full and Split
 
-Two marker interfaces cut across the statuses. `FullPayment` adds nothing — it's the "settles as one amount" marker. `SplitPayment` carries the linkage back to its parent:
+Two marker interfaces cut across the statuses. `FullPayment` adds nothing. It is the marker for a payment that settles as one amount. `SplitPayment` carries the linkage back to its parent.
 
 ```kotlin
 sealed interface SplitPayment : Payment {
@@ -84,12 +84,12 @@ sealed interface SplitPayment : Payment {
 }
 ```
 
-The concrete classes are the cross-product — 18 immutable `data class`es:
+The concrete classes are the cross-product: 18 immutable `data class`es.
 
 | Status | Full | Split |
 | --- | --- | --- |
-| `PENDING` | ✓ | — |
-| `SCHEDULED` | ✓ | — |
+| `PENDING` | ✓ | |
+| `SCHEDULED` | ✓ | |
 | `ACCEPTED` | ✓ | ✓ |
 | `PROCESSING` | ✓ | ✓ |
 | `PROCESSED` | ✓ | ✓ |
@@ -97,10 +97,10 @@ The concrete classes are the cross-product — 18 immutable `data class`es:
 | `RETURNED` | ✓ | ✓ |
 | `REPRESENTING` | ✓ | ✓ |
 | `REPRESENTED` | ✓ | ✓ |
-| `CANCELLED` | ✓ | — |
-| `DECLINED` | ✓ | — |
+| `CANCELLED` | ✓ | |
+| `DECLINED` | ✓ | |
 
-The gaps in the Split column are deliberate: **splitting begins at `ACCEPTED`.** A split leg is born from an already-accepted parent (`SplitSlice` in hand), so a pending, scheduled, cancelled, or declined split can't exist — and therefore doesn't compile.
+The gaps in the Split column are deliberate, because **splitting begins at `ACCEPTED`.** A split leg is born from an already-accepted parent, with a `SplitSlice` in hand, so a pending, scheduled, cancelled, or declined split cannot exist. It does not compile.
 
 ```kotlin
 data class SplitSlice(
@@ -113,7 +113,7 @@ A leg's identity is derived, not invented: `paymentId = "${parent.paymentId}_$se
 
 ## One guarded doorway
 
-`PendingFullPayment` — the type every API-created payment starts as — checks its own consistency at construction:
+`PendingFullPayment`, the type every API-created payment starts as, checks its own consistency at construction.
 
 ```kotlin
 init { checkAmountAgainstPaymentOption() }
@@ -128,25 +128,25 @@ private fun checkAmountAgainstPaymentOption() {
 }
 ```
 
-In words: if the customer named the amount (`OTHER_AMOUNT`, `INITIAL_PAYMENT_AMOUNT`) or the option is already verified, an amount must be present; for every other option the amount is *computed later* by the system of record, so supplying one up front is an error. Defaults on this type: `presentmentSequence = 1`, `hasMoneyMovement = true`, `planDetailData = null`.
+In words: if the customer named the amount (`OTHER_AMOUNT`, `INITIAL_PAYMENT_AMOUNT`) or the option is already verified, an amount must be present. For every other option the amount is *computed later* by the system of record, so supplying one up front is an error. The defaults on this type are `presentmentSequence = 1`, `hasMoneyMovement = true`, and `planDetailData = null`.
 
 ## Timelines
 
-Dates and times live in their own small hierarchy rather than as loose fields:
+Dates and times live in their own small hierarchy rather than as loose fields.
 
 | Type | Adds | Used by |
 | --- | --- | --- |
-| `Timeline` *(sealed)* | `captureTimestamp` · `transactionDate` · `transactionTimestamp` | the base — `PENDING`, `DECLINED` |
+| `Timeline` *(sealed)* | `captureTimestamp` · `transactionDate` · `transactionTimestamp` | the base, used by `PENDING` and `DECLINED` |
 | `ExecutableTimeline` *(sealed)* | `clearingDate` · `executionTimestamp` · `cancelCutoffTimestamp` · `frequency` (`ONCE` / `RECURRING`) | every state that can move money |
-| `InitialTimeline` | — | the plain concrete base |
+| `InitialTimeline` | nothing | the plain concrete base |
 | `ImmediateTimeline` | `frequency` fixed to `ONCE` | pay-today payments |
 | `ScheduledTimeline` | `scheduleDate` | future-dated payments (`SCHEDULED` requires it) |
 
-Same trick as the Verified narrowing: a payment can't reach an executable state without a timeline that knows its clearing date and cancel cutoff, because the types won't line up otherwise.
+Same trick as the Verified narrowing. A payment cannot reach an executable state without a timeline that knows its clearing date and cancel cutoff, because the types will not line up otherwise.
 
 ## Transitions: the state machine as functions
 
-There's no `setStatus`. Each legal edge is a top-level extension function that consumes one immutable type and returns the next — 26 of them:
+There is no `setStatus`. Each legal edge is a top-level extension function that consumes one immutable type and returns the next. There are 26 of them.
 
 | From | To |
 | --- | --- |
@@ -164,10 +164,10 @@ There's no `setStatus`. Each legal edge is a top-level extension function that c
 | `ProcessedSplitPayment` | `toPaidSplitPayment()` · `toReturnedSplitPayment()` |
 | `PaidSplitPayment` / `ReturnedSplitPayment` / `RepresentingSplitPayment` / `RepresentedSplitPayment` | mirror the Full edges at the split level |
 
-Notice the pending→accepted edge *demands* the verified pieces as arguments — validation's outputs are the transition's inputs. And note `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)`: that's the corporate fan-out edge, where an already-processing parent spawns `ACCEPTED` split legs once its allocations arrive.
+Notice that the pending to accepted edge *demands* the verified pieces as arguments. Validation's outputs are the transition's inputs. Note `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)` too. That is the corporate fan-out edge, where an already-processing parent spawns `ACCEPTED` split legs once its allocations arrive.
 
-A [stage](../principles/core-build/stages.md) is essentially one of these functions plus the persistence and event publication around it — which is why stage signatures are so clean.
+A [stage](../principles/core-build/stages.md) is essentially one of these functions plus the persistence and event publication around it, which is why stage signatures are so clean.
 
 :::note[Still to be modelled]
-No types yet for `DISALLOWED`, `ALLOCATING`, or `ALLOCATED`; no first-class Allocation entity (splits + `SplitSlice` carry that today); the processing dimensions ride in the routing context, not on these types. The [spec's state model](../../design/payment-state-model.md) remains the target picture.
+There are no types yet for `DISALLOWED`, `ALLOCATING`, or `ALLOCATED`, and no first-class Allocation entity, since splits plus `SplitSlice` carry that today. The processing dimensions ride in the routing context, not on these types. The [spec's state model](../../design/payment-state-model.md) remains the target picture.
 :::

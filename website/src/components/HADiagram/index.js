@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * HADiagram — the high-availability topology in three layers: the API layer and
+ * HADiagram: the high-availability topology in three layers: the API layer and
  * the billpay-core + Oracle layer side by side across the two on-prem regions
  * (IPC2 east, IPC1 west), then the Temporal + Postgres layer underneath.
  * Hand-authored SVG so the product marks carry their own colours; everything
@@ -136,7 +136,7 @@ function K8sMark({cx, cy, size = 34}) {
   );
 }
 
-/* A database drum. No boxes for data — the shape does the labelling. */
+/* A database drum. No boxes for data, since the shape does the labelling. */
 function Drum({cx, cy, rx = 34, h = 44, grad, dim, glossCls}) {
   const ry = rx * 0.35;
   const top = cy - h / 2;
@@ -287,7 +287,7 @@ export default function HADiagram() {
         <Site x={68} y={56} w={700} h={336} label="US EAST · IPC2" note="on-prem Hydra · write site" />
         <Site x={68} y={430} w={700} h={336} label="US WEST · IPC1" note="on-prem Hydra · read site" />
 
-        {/* ================= layer 1 — API ================= */}
+        {/* ================= layer 1: API ================= */}
 
         <Icon name="user" x={12} y={159} size={26} cls={styles.userIcon} />
         <text x={25} y={205} textAnchor="middle" className={styles.userLabel}>caller</text>
@@ -320,7 +320,7 @@ export default function HADiagram() {
         <path d="M258,326 V496" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
         <Chip x={258} y={411} label="CRDB · active-active" tone="chipBuf" />
 
-        {/* ================= layer 2 — billpay-core + Oracle ================= */}
+        {/* ================= layer 2: billpay-core + Oracle ================= */}
 
         <path d="M348,172 H430" className={styles.req} markerEnd="url(#ha-m-req)" />
         <Chip x={391} y={172} label="/payments" tone="chipReq" />
@@ -354,7 +354,7 @@ export default function HADiagram() {
         <path d="M666,180 H626 V642 H662" className={styles.rep} markerEnd="url(#ha-m-rep)" />
         <Chip x={626} y={470} label="Data Guard" tone="chipRep" />
 
-        {/* ================= layer 3 — Temporal on AWS ================= */}
+        {/* ================= layer 3: Temporal on AWS ================= */}
 
         {/* both cores call the same cluster; the bus hops the Data Guard line */}
         <path

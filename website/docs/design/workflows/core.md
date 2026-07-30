@@ -18,14 +18,14 @@ The steps below follow the workflow logic in the spec. [Stages](../stages.md) ex
 
 Runs when a payment is submitted to go out today. It records the request, validates it, replies to the caller as soon as the outcome is known, and then completes the money movement in the background.
 
-1. **InitiatedToPendingStage** — turn the input into a `PENDING` payment by persisting it together with its idempotency record.
+1. **InitiatedToPendingStage** turns the input into a `PENDING` payment, persisting it together with its idempotency record.
 2. If the request is not idempotent (a duplicate has already been seen), return the existing payment and stop.
 3. Validate the pending payment (`PaymentValidationActivityGroup`). If it fails, run **PendingToDeclinedStage** (`PENDING` → `DECLINED`) and return the declined payment.
-4. **PendingToAcceptedStage** — move the payment to `ACCEPTED` and **return early to the caller**. Everything below runs in the background.
-5. Finish processing, by account type and full-vs-split:
-   - **Corporate** — **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`); trigger Get Corporate Payment Allocations; wait for the *AllocationsReceived* signal; then run Execute Split Payment for each allocation.
-   - **Full consumer** — **AcceptedToProcessingStage**, then **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
-   - **Split consumer** — create the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), then run Execute Split Payment for each leg.
+4. **PendingToAcceptedStage** moves the payment to `ACCEPTED`, and the workflow **returns early to the caller**. Everything below runs in the background.
+5. Finish processing, by account type and by whether the payment is full or split.
+   - A **corporate** payment runs **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`), triggers Get Corporate Payment Allocations, waits for the *AllocationsReceived* signal, then runs Execute Split Payment for each allocation.
+   - A **full consumer** payment runs **AcceptedToProcessingStage**, then **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
+   - A **split consumer** payment creates the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), then runs Execute Split Payment for each leg.
 
 ## Create Schedule Payment
 
@@ -33,10 +33,10 @@ Runs when a payment is submitted to go out today. It records the request, valida
 
 Runs when a payment is booked for a future date. It validates the request now and parks the payment until its run date.
 
-1. **InitiatedToPendingStage** — persist the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
-2. Validate the pending payment (`PaymentValidationActivityGroup`):
-   - **Valid** — **PendingToScheduledStage** (`PENDING` → `SCHEDULED`) and return early. If the payment is **corporate**, trigger Get Corporate Payment Allocations now, so the allocation breakdown is ready before the run date.
-   - **Invalid** — **PendingToDeclinedStage** (`PENDING` → `DECLINED`).
+1. **InitiatedToPendingStage** persists the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
+2. Validate the pending payment (`PaymentValidationActivityGroup`).
+   - If it is valid, run **PendingToScheduledStage** (`PENDING` → `SCHEDULED`) and return early. A **corporate** payment also triggers Get Corporate Payment Allocations now, so the allocation breakdown is ready before the run date.
+   - If it is not, run **PendingToDeclinedStage** (`PENDING` → `DECLINED`).
 
 ## Execute Scheduled Payment
 
@@ -44,12 +44,12 @@ Runs when a payment is booked for a future date. It validates the request now an
 
 Runs on the payment's execution date, picked up in batches by the Scheduled Payments Executor. It re-checks the payment before moving any money, because time has passed since it was scheduled.
 
-1. Re-validate the scheduled (or already-allocated) payment (`PaymentValidationOnExecutionActivityGroup`):
-   - **Valid** — **ScheduledToAcceptedStage** (`SCHEDULED` → `ACCEPTED`), then finish processing:
-     - **Full** — **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
-     - **Corporate split** — **AcceptedToProcessingStage**; trigger Get Corporate Payment Allocations; wait for the *AllocationsReceived* signal; run Execute Split Payment per split.
-     - **Consumer split** — create the split legs (`PaymentSplitsCreationActivity`), then run Execute Split Payment per leg.
-   - **Invalid** — **PendingToDeclinedStage** (→ `DECLINED`).
+1. Re-validate the scheduled (or already-allocated) payment (`PaymentValidationOnExecutionActivityGroup`).
+   - If it is valid, run **ScheduledToAcceptedStage** (`SCHEDULED` → `ACCEPTED`), then finish processing:
+     - A **full** payment runs **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
+     - A **corporate split** runs **AcceptedToProcessingStage**, triggers Get Corporate Payment Allocations, waits for the *AllocationsReceived* signal, then runs Execute Split Payment per split.
+     - A **consumer split** creates the split legs (`PaymentSplitsCreationActivity`), then runs Execute Split Payment per leg.
+   - If it is not, run **PendingToDeclinedStage** (→ `DECLINED`).
 
 ## Execute Split Payment
 
@@ -60,7 +60,7 @@ Processes a single leg of a split payment. It runs the same two stages as a full
 1. **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`).
 2. **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
 
-The first stage varies by account type: for a **corporate** leg it only updates balances and Open-To-Buy; for a **consumer** leg it also clears the payment at the bank.
+The first stage varies by account type. A **corporate** leg only updates balances and Open-To-Buy. A **consumer** leg also clears the payment at the bank.
 
 ## Cancel Payment
 
@@ -71,8 +71,8 @@ Withdraws a payment that has not yet gone out.
 1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
 2. Validate the cancellation and read the payment's current state (`PaymentCancelValidationActivityGroup`).
 3. If the payment is eligible to cancel:
-   - Currently `SCHEDULED` — **ScheduledToCancelledStage** (→ `CANCELLED`).
-   - Currently `ACCEPTED` — **AcceptedToCancelledStage** (→ `CANCELLED`).
+   - A payment currently `SCHEDULED` runs **ScheduledToCancelledStage** (→ `CANCELLED`).
+   - A payment currently `ACCEPTED` runs **AcceptedToCancelledStage** (→ `CANCELLED`).
 
 ## Update Payment
 
@@ -81,7 +81,7 @@ Withdraws a payment that has not yet gone out.
 Changes a scheduled payment. Rather than editing it in place, Billpay cancels the original and creates a replacement, so the history stays clean.
 
 1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
-2. **ScheduledToCancelledStage** — cancel the original payment (`SCHEDULED` → `CANCELLED`). This can be done by invoking Cancel Payment.
+2. **ScheduledToCancelledStage** cancels the original payment (`SCHEDULED` → `CANCELLED`). This can be done by invoking Cancel Payment.
 3. Build a new pending payment with a new payment id, the **same confirmation number**, and the updated details.
 4. Invoke Create Schedule Payment for the replacement, which validates it and then runs **PendingToScheduledStage** (→ `SCHEDULED`) if valid, or **PendingToDeclinedStage** (→ `DECLINED`) if not.
 5. Map the new payment to the original in the database for audit (`MapNewPaymentIdToPreviousIdActivity`).
@@ -93,11 +93,11 @@ Changes a scheduled payment. Rather than editing it in place, Billpay cancels th
 Handles a payment the bank sends back after it was processed, and decides whether it can be re-attempted.
 
 1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
-2. Validate the return by looking up the payment (full or split) and its current status; the eligible statuses are `PAID`, `PROCESSING`, and `PROCESSED`.
+2. Validate the return by looking up the payment (full or split) and its current status. The eligible statuses are `PAID`, `PROCESSING`, and `PROCESSED`.
 3. If the return is valid:
-   - **ToReturnedStage** — move the payment to `RETURNED` (from `PAID`, `PROCESSING`, or `PROCESSED`).
+   - **ToReturnedStage** moves the payment to `RETURNED` (from `PAID`, `PROCESSING`, or `PROCESSED`).
    - Check whether the return can be re-presented (`PaymentRepresentmentEligibilityActivityGroup`).
-   - If it is representable, run **ReturnedToRepresentingStage** — enrich the representment details (such as the next representable date) and create a new `REPRESENTING` transaction (`PaymentRepresentmentCreationActivityGroup`).
+   - If it is representable, run **ReturnedToRepresentingStage**, which enriches the representment details (such as the next representable date) and creates a new `REPRESENTING` transaction (`PaymentRepresentmentCreationActivityGroup`).
 
 ## Process Representment
 
@@ -105,9 +105,9 @@ Handles a payment the bank sends back after it was processed, and decides whethe
 
 Re-attempts a returned payment on its representment date.
 
-1. Validate the representment (`PaymentRepresentmentValidationActivityGroup`):
-   - **Valid** — **RepresentingToRepresentedStage** (`REPRESENTING` → `REPRESENTED`).
-   - **Invalid** — **RepresentingToDeclinedStage** (`REPRESENTING` → `DECLINED`).
+1. Validate the representment (`PaymentRepresentmentValidationActivityGroup`).
+   - If it is valid, run **RepresentingToRepresentedStage** (`REPRESENTING` → `REPRESENTED`).
+   - If it is not, run **RepresentingToDeclinedStage** (`REPRESENTING` → `DECLINED`).
 
 ## Get Corporate Payment Allocations
 
@@ -115,9 +115,9 @@ Re-attempts a returned payment on its representment date.
 
 Fetches how a corporate payment splits across the accounts it covers, then kicks off the per-allocation execution. It waits on a signal, because the breakdown comes back asynchronously from the allocation-processing system.
 
-1. **ToAllocatingStage** — ask the appropriate allocations manager for the breakdown and move the payment to `ALLOCATING`.
+1. **ToAllocatingStage** asks the appropriate allocations manager for the breakdown and moves the payment to `ALLOCATING`.
 2. Wait for the *AllocationsReady* signal.
-3. **AllocatingToAllocatedStage** — move the parent payment to `ALLOCATED`; create the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`); run Execute Split Payment for each.
+3. **AllocatingToAllocatedStage** moves the parent payment to `ALLOCATED`, creates the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), and runs Execute Split Payment for each.
 
 ## Process Inbound Payment
 
@@ -125,12 +125,12 @@ Fetches how a corporate payment splits across the accounts it covers, then kicks
 
 Posts a payment that a third party initiated on the customer's behalf into Billpay.
 
-1. **InitiatedToPendingStage** — persist the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
-2. Validate the pending payment (`PaymentValidationActivityGroup`):
-   - **Valid** — **PendingToAcceptedStage** (`PENDING` → `ACCEPTED`) and return early, then:
-     - **Full** — **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
-     - **Consumer split** — create the split legs (`PaymentSplitsCreationActivity`), then run Execute Split Payment per leg.
-   - **Invalid** — **PendingToDisallowedStage** (`PENDING` → `DISALLOWED`). This is the inbound-only outcome for a payment Amex does not accept.
+1. **InitiatedToPendingStage** persists the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
+2. Validate the pending payment (`PaymentValidationActivityGroup`).
+   - If it is valid, run **PendingToAcceptedStage** (`PENDING` → `ACCEPTED`) and return early, then:
+     - A **full** payment runs **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
+     - A **consumer split** creates the split legs (`PaymentSplitsCreationActivity`), then runs Execute Split Payment per leg.
+   - If it is not, run **PendingToDisallowedStage** (`PENDING` → `DISALLOWED`). This is the inbound-only outcome for a payment Amex does not accept.
 
 ## Create Payment Intent
 

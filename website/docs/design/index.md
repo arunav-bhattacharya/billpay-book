@@ -7,7 +7,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Design
 
-<Lead>Design turns the platform's shape into a **precise model** — the components a workflow composes, the canonical states a payment moves through, and the logic that drives every transition.</Lead>
+<Lead>Design turns the platform's shape into a **precise model**: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.</Lead>
 
 ## What Design covers
 
@@ -18,7 +18,7 @@ import Highlights from '@site/src/components/Highlights';
       term: 'A layered component model',
       desc: (
         <>
-          Five components — <strong>Workflow → Stage → ActivityGroup → Activity → Client</strong> — each with one responsibility and a strict rule about what it may call.
+          Five components (<strong>Workflow → Stage → ActivityGroup → Activity → Client</strong>), each with one responsibility and a strict rule about what it may call.
         </>
       ),
     },
@@ -39,11 +39,11 @@ import Highlights from '@site/src/components/Highlights';
 
 ## Explore
 
-- **[Principles](./principles.md)** — the component model and its call, naming, and composition rules.
-- **[Payment state model](./payment-state-model.md)** — the canonical lifecycle states and what each means.
-- **[Journeys](./journeys/index.md)** — each payment end to end, from the channel a customer starts in to the money settling.
-- **[Workflows](./workflows/index.md)** — the per-workflow logic (core, composite, periodic).
-- **[Stages](./stages.md)** — the state-transition steps a workflow composes.
-- **[ActivityGroups & Activities](./activities.md)** — the retryable actions the stages call.
-- **[Database](./database.md)** — the tables that hold payment state and its audit trail.
-- **[Diagrams](./diagrams/index.md)** — the state and sequence diagrams.
+- [Principles](./principles.md) sets out the component model and its call, naming, and composition rules.
+- [Payment state model](./payment-state-model.md) lists the canonical lifecycle states and what each one means.
+- [Journeys](./journeys/index.md) follows each payment end to end, from the channel a customer starts in to the money settling.
+- [Workflows](./workflows/index.md) covers the logic inside each workflow (core, composite, periodic).
+- [Stages](./stages.md) covers the state-transition steps a workflow composes.
+- [ActivityGroups & Activities](./activities.md) covers the retryable actions the stages call.
+- [Database](./database.md) describes the tables that hold payment state and its audit trail.
+- [Diagrams](./diagrams/index.md) collects the state and sequence diagrams.

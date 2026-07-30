@@ -7,33 +7,33 @@ import Lead from '@site/src/components/Lead';
 
 # Building Workflows
 
-<Lead>A workflow is the durable spine of one payment journey. It sequences stages, fans out child workflows, waits on signals — and does nothing else. If you remember one thing from this page: workflow code orchestrates; it never does the work.</Lead>
+<Lead>A workflow is the durable spine of one payment journey. It sequences stages, fans out child workflows, and waits on signals. It does nothing else. If you remember one thing from this page, it is that workflow code orchestrates and never does the work.</Lead>
 
 ## Determinism is the contract
 
 Temporal recovers a workflow after any failure by **replaying** its code against the event history it already recorded. That only works if the code takes the same path every time. So inside a workflow: no direct I/O, no wall clocks, no random numbers, no reaching for the database. Anything non-deterministic happens inside an [activity](./activities.md), whose *result* is recorded and replayed.
 
-You don't have to police this alone — the [module layout](./code-layout.md) keeps activity implementations and clients out of the workflow's compile-time reach. But the discipline still matters when you're tempted to "just compute a date" inline. Don't; ask an activity.
+You do not have to police this alone. The [module layout](./code-layout.md) keeps activity implementations and clients out of the workflow's compile-time reach. The discipline still matters when you are tempted to compute a date inline. Do not. Ask an activity.
 
 ## The rules
 
-- **One workflow per journey.** Create Immediate Payment, Execute Scheduled Payment, Process Returned Payment — one each, ever. There are no per-market workflow implementations.
-- **Never `abstract`.** Variation comes from composition: the same workflow is handed different stage and activity-group implementations, selected by the market's dimensions. If you're adding a per-market `if` to workflow code, you're in the wrong layer — the branch belongs in a stage.
-- **Dimensions come first.** All four dimensions (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) must be present in the payment context *before* the workflow starts — they're what select the implementations. A combination the market never onboarded has no implementations, and the request is rejected before any workflow begins.
+- **One workflow per journey.** Create Immediate Payment, Execute Scheduled Payment, Process Returned Payment: one each, ever. There are no per-market workflow implementations.
+- **Never `abstract`.** Variation comes from composition: the same workflow is handed different stage and activity-group implementations, selected by the market's dimensions. If you are adding a per-market `if` to workflow code, you are in the wrong layer. The branch belongs in a stage.
+- **Dimensions come first.** All four dimensions (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) must be present in the payment context *before* the workflow starts, because they are what select the implementations. A combination the market never onboarded has no implementations, and the request is rejected before any workflow begins.
 - **Composite workflows call child workflows.** They never inline another workflow's body.
-- **Treat a running workflow's shape as a contract.** In-flight executions replay against the code that exists when they resume. Renaming or restructuring a workflow with live executions is a breaking change — use Temporal's workflow-versioning facilities to branch behaviour, and remove the old path only when the last old execution has drained.
+- **Treat a running workflow's shape as a contract.** In-flight executions replay against the code that exists when they resume. Renaming or restructuring a workflow with live executions is a breaking change. Use Temporal's workflow-versioning facilities to branch behaviour, and remove the old path only when the last old execution has drained.
 
 ## The Temporal toolkit we actually use
 
-- **Child workflows** — `newChildWorkflowStub<T>()`. Create Immediate Payment fans out to Get Corporate Payment Allocations, then one Execute Split Payment per allocation.
-- **Signals** — a corporate payment waits on *AllocationsReceived* (and Get Corporate Payment Allocations waits on *AllocationsReady*) instead of polling.
-- **Timed waits** — `Workflow.await(duration) { condition }` parks the workflow durably until the condition or the deadline.
-- **Async fan-out** — `asyncFunction { }` / `asyncProcedure { }` return promises; `Promise.allOf(...)` joins them.
-- **Early return** — once a payment is `ACCEPTED`, the caller gets its response and the workflow keeps processing in the background.
+- **Child workflows** come from `newChildWorkflowStub<T>()`. Create Immediate Payment fans out to Get Corporate Payment Allocations, then one Execute Split Payment per allocation.
+- **Signals** replace polling. A corporate payment waits on *AllocationsReceived*, and Get Corporate Payment Allocations waits on *AllocationsReady*.
+- **Timed waits** use `Workflow.await(duration) { condition }`, which parks the workflow durably until the condition or the deadline.
+- **Async fan-out** uses `asyncFunction { }` and `asyncProcedure { }`, which return promises. `Promise.allOf(...)` joins them.
+- **Early return** answers the caller once a payment is `ACCEPTED`, and the workflow keeps processing in the background.
 
 ## The worked example
 
-This is the spec's own sketch of Create Immediate Payment — worth reading line by line, because every rule above is visible in it:
+This is the spec's own sketch of Create Immediate Payment. It is worth reading line by line, because every rule above is visible in it.
 
 ```kotlin
     // Check if the incoming payment is idempotent
@@ -96,8 +96,8 @@ This is the spec's own sketch of Create Immediate Payment — worth reading line
     }
 ```
 
-Walk it once: the idempotency check happens before anything else; every state move is a **stage**; validation is an **activity group**; the caller is answered at `ACCEPTED` via early return; and the corporate branch runs processing and the allocations child workflow *in parallel*, then waits on the signal before fanning out the splits. Nothing in the method touches a database, a clock, or a wire — the stages and activities behind it do.
+Walk it once. The idempotency check happens before anything else. Every state move is a **stage**, validation is an **activity group**, and the caller is answered at `ACCEPTED` via early return. The corporate branch runs processing and the allocations child workflow *in parallel*, then waits on the signal before fanning out the splits. Nothing in the method touches a database, a clock, or a wire. The stages and activities behind it do.
 
 ## Which worker runs it
 
-Every workflow is pinned to a Temporal worker by one question — is a person waiting? **Online** runs the request path (create, update, cancel, intent). **Offline** runs everything event- or scheduler-driven (scheduled execution, inbound, returns, representment, allocations, the periodic sweeps). A few — Create Schedule Payment, Execute Split Payment, Create Balance Refund — run on either, depending on where in the journey they're invoked. The catalogue with per-workflow worker and dimensions is in [Design → Workflows](../../../design/workflows/index.md).
+Every workflow is pinned to a Temporal worker by one question: is a person waiting? **Online** runs the request path (create, update, cancel, intent). **Offline** runs everything driven by an event or a scheduler (scheduled execution, inbound, returns, representment, allocations, the periodic sweeps). Three run on either, depending on where in the journey they are invoked: Create Schedule Payment, Execute Split Payment, and Create Balance Refund. The catalogue with per-workflow worker and dimensions is in [Design → Workflows](../../../design/workflows/index.md).

@@ -1,5 +1,5 @@
 // @ts-check
-// Docusaurus config — Billpay Wiki
+// Docusaurus config for the Billpay Wiki
 // A wiki documenting Amex's Billpay payment platform. Structure mirrors the
 // reference billpay-wiki; facts come from docs/Wiki_Spec.md. See ../CLAUDE.md.
 
@@ -104,7 +104,7 @@ const config = {
       navbar: {
         title: 'Billpay Wiki',
         logo: {
-          alt: 'American Express — Billpay Wiki',
+          alt: 'American Express Billpay Wiki',
           src: 'img/amex-logo.png',
         },
         items: [
@@ -156,7 +156,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Billpay Wiki — © ${new Date().getFullYear()}`,
+        copyright: `Billpay Wiki · © ${new Date().getFullYear()}`,
       },
       prism: {
         theme: prismThemes.github,

@@ -7,7 +7,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Build
 
-<Lead>[Design](../design/index.md) describes what the platform does — the lifecycle, the workflows, the component model. This section is how we actually build it: the stack we bet on and why, how the code is organised, and how you write each kind of component. Read it as a guide from the people who set the conventions, not as reference trivia.</Lead>
+<Lead>[Design](../design/index.md) describes what the platform does: the lifecycle, the workflows, the component model. This section is how we actually build it. The stack we bet on and why, how the code is organised, and how you write each kind of component. Read it as a guide from the people who set the conventions, not as reference trivia.</Lead>
 
 ## The stack at a glance
 
@@ -16,7 +16,7 @@ import Highlights from '@site/src/components/Highlights';
   items={[
     {
       term: 'Kotlin on the JVM',
-      desc: 'The whole platform is Kotlin — workflows, stages, activities, domain model. Sealed types and null-safety do real work for us: most illegal payment states simply don’t compile.',
+      desc: "The whole platform is Kotlin: workflows, stages, activities, domain model. Sealed types and null-safety do real work for us, and most illegal payment states simply don't compile.",
     },
     {
       term: 'Temporal',
@@ -24,7 +24,7 @@ import Highlights from '@site/src/components/Highlights';
     },
     {
       term: 'Quarkus, kept light',
-      desc: 'Quarkus (ArC/CDI) wires the services and workers. We deliberately stay framework-light at the worker layer — no Spring, no reactive stack, small focused JARs.',
+      desc: 'Quarkus (ArC/CDI) wires the services and workers. We deliberately stay framework-light at the worker layer, so no Spring, no reactive stack, and small focused JARs.',
     },
     {
       term: 'Oracle · Agroal · Exposed',
@@ -32,7 +32,7 @@ import Highlights from '@site/src/components/Highlights';
     },
     {
       term: 'OkHttp at the edges',
-      desc: 'Every outbound call — clearing, AR, Open-To-Buy, validation — goes through a shared OkHttp client with timeouts tuned to the Temporal activity deadline above it.',
+      desc: 'Every outbound call goes through a shared OkHttp client: clearing, AR, Open-To-Buy, validation. Its timeouts are tuned to the Temporal activity deadline above it.',
     },
     {
       term: 'One Gradle monorepo',
@@ -43,9 +43,9 @@ import Highlights from '@site/src/components/Highlights';
 
 ## How this section is organised
 
-- **[Principles](./principles/index.md)** — the load-bearing decisions. [Tech Stack](./principles/tech-stack/index.md) covers what we buy and why; [Core Build](./principles/core-build/index.md) covers how you write workflows, stages, activities, and clients.
-- **[API Spec](./api-spec/index.md)** — the contracts: One-Data Functions at the edge, and the core REST APIs behind them.
-- **[Data Model](./data-model/index.md)** — the Kotlin domain model (payments, options, instruments) and the Oracle tables underneath it.
-- **[Schedules](./schedules.md)** — the Temporal Schedules that drive the periodic workflows.
+- [Principles](./principles/index.md) holds the load-bearing decisions. [Tech Stack](./principles/tech-stack/index.md) covers what we buy and why. [Core Build](./principles/core-build/index.md) covers how you write workflows, stages, activities, and clients.
+- [API Spec](./api-spec/index.md) covers the contracts: One-Data Functions at the edge, and the core REST APIs behind them.
+- [Data Model](./data-model/index.md) covers the Kotlin domain model (payments, options, instruments) and the Oracle tables underneath it.
+- [Schedules](./schedules.md) covers the Temporal Schedules that drive the periodic workflows.
 
-The artifacts we ship — the worker app, codec server, mocks — live under [Deployment](../deployment/index.md).
+The artifacts we ship, meaning the worker app, the codec server, and the mocks, live under [Deployment](../deployment/index.md).

@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * LandscapeMap — the Amex payments estate, read left to right the way the
+ * LandscapeMap: the Amex payments estate, read left to right the way the
  * architecture deck draws it: channels, the payments domain, then the external
  * systems. The supporting domains the estate leans on but does not own sit in
  * their own panel beneath the payments domain.

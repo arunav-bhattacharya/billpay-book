@@ -14,7 +14,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Create Payment
 
-**One-Data Function** · `CreatePayment.v3` — SLA availability: **99.95%**
+**One-Data Function** · `CreatePayment.v3` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Update Payment
 
-**One-Data Function** · `UpdatePayment.v1` — SLA availability: **99.95%**
+**One-Data Function** · `UpdatePayment.v1` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Delete Payment
 
-**One-Data Function** · `DeletePayment.v1` — SLA availability: **99.95%**
+**One-Data Function** · `DeletePayment.v1` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -44,7 +44,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Read Payments
 
-**One-Data Function** · `ReadPayments.v1` — SLA availability: **99.99%**
+**One-Data Function** · `ReadPayments.v1` · SLA availability: **99.99%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -54,7 +54,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Read Payment Events By Id
 
-**One-Data Function** · `ReadPaymentEventsById.v1` — SLA availability: **99.99%**
+**One-Data Function** · `ReadPaymentEventsById.v1` · SLA availability: **99.99%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -64,7 +64,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Create Credit Balance Refund
 
-**One-Data Function** · `CreateCreditBalanceRefund.v1` — SLA availability: **99.95%**
+**One-Data Function** · `CreateCreditBalanceRefund.v1` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -74,10 +74,10 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Create Payment Installment
 
-**One-Data Function (composite)** · `CreatePaymentInstallment.v1` — SLA availability: **99.9%**
+**One-Data Function (composite)** · `CreatePaymentInstallment.v1` · SLA availability: **99.9%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
 | 240 ms | 480 ms | 950 ms | 1.7 s | 2.5 s |
 
-**SLI:** end-to-end latency for the composite — the child `CreateImmediatePaymentWF`, the installment plan, and optional autopay. **Error budget:** 0.1% / 30-day window.
+**SLI:** end-to-end latency for the composite, covering the child `CreateImmediatePaymentWF`, the installment plan, and optional autopay. **Error budget:** 0.1% / 30-day window.

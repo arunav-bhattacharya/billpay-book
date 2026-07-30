@@ -12,7 +12,7 @@ function WfChip({name, worker}) {
   );
 }
 
-/** An account-type tag on a split/allocation branch — the routing dimension. */
+/** An account-type tag on a split/allocation branch, which is the routing dimension. */
 function AccountTag({account}) {
   if (!account) return null;
   const key = account.toLowerCase();
@@ -21,7 +21,7 @@ function AccountTag({account}) {
   return <span className={clsx(styles.acct, tone)}>{account}</span>;
 }
 
-/** A workflow pipeline — one or more chips joined by "→" to show sequence. */
+/** A workflow pipeline: one or more chips joined by "→" to show sequence. */
 function Pipeline({workflows}) {
   return (
     <div className={styles.pipeline}>
@@ -40,7 +40,7 @@ function Pipeline({workflows}) {
 }
 
 /**
- * RouteMap — how the Billpay Router turns a request into workflow(s), as a
+ * RouteMap: how the Billpay Router turns a request into workflow(s), as a
  * grouped table. Consecutive routes that share a `trigger` collapse into one
  * trigger cell (rowspan); each route's `condition` is a row, and any
  * conditional `children` (splits / corporate allocations) render as indented

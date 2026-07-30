@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * LegacyEstateMap — the payments estate as it actually runs, drawn from the two
+ * LegacyEstateMap: the payments estate as it actually runs, drawn from the two
  * source diagrams: the customer-journey traceability map (channels through
  * Arrangement Manager, GPP, FTN and the mainframe chain) and the Parsec
  * eligibility design (the facade, the caches and the standin path layered on

@@ -126,7 +126,7 @@ A customer picks an amount and a way to pay it, and wants it to count today. Bil
       text: 'The payment holds at PROCESSED until the bank confirms it settled and Accounts Receivable confirms it posted. If either is still missing after 48 hours, Billpay asks the system that owes it, or raises an alert.',
     },
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#1-immediate-payment--single-instruction', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/diagrams/sequence-diagram#1-immediate-payment-single-instruction', label: 'Sequence diagram'}}
 />
 
 ## Pay on a future date
@@ -211,7 +211,7 @@ The customer picks a date. Billpay checks the payment now so they hear straight 
     {step: 4, text: 'The Scheduled Payments Executor picks up due payments in waves, roughly 2,500 a minute, and checks them again. A payment valid last week can fail today, so this second check is not a formality.'},
     {text: 'From here the journey is identical to [Pay my bill today](#pay-my-bill-today): the money moves, everyone downstream is told, and the payment closes once the bank and Accounts Receivable both confirm it.'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#2-scheduled-payment--created-today-executed-later', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/diagrams/sequence-diagram#2-scheduled-payment-created-today-and-executed-later', label: 'Sequence diagram'}}
 />
 
 ## Pay with Points & Money

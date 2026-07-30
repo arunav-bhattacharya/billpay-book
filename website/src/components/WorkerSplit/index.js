@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * WorkerSplit — the two Temporal workers side by side, split by whether anyone
+ * WorkerSplit: the two Temporal workers side by side, split by whether anyone
  * is waiting for the answer, with the workflows each one carries.
  *
  * The strips below hold what does not belong to one side: workflows that run on

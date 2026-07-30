@@ -23,7 +23,7 @@ import styles from './styles.module.css';
 
 const TOC_STORAGE_KEY = 'billpay:toc-collapsed';
 
-/* Top-level section order — the source of truth for section numbering, shared
+/* Top-level section order: the source of truth for section numbering, shared
    in spirit with the homepage cards and the numbered sidebar. */
 const SECTION_ORDER = [
   'vision',
@@ -78,7 +78,7 @@ function useTOCCollapsed() {
     try {
       setCollapsed(localStorage.getItem(TOC_STORAGE_KEY) === 'true');
     } catch {
-      // localStorage unavailable — keep default
+      // localStorage unavailable, keep default
     }
   }, []);
   const toggle = useCallback(() => {

@@ -7,7 +7,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Vision
 
-<Lead>American Express's platform for credit card **bill payments and refunds** — one core that processes every payment the same way across markets, while absorbing how markets, account types, and processing rules differ.</Lead>
+<Lead>American Express's platform for credit card **bill payments and refunds**. One core processes every payment the same way in every market, and absorbs the differences between markets, account types, and processing rules.</Lead>
 
 ## The Big Picture
 
@@ -15,11 +15,11 @@ import Highlights from '@site/src/components/Highlights';
   items={[
     {
       term: 'What it is',
-      desc: `Billpay runs the full life of a credit-card bill payment, and its reversal as a refund, from the moment it is initiated to the moment it settles — in every market Amex operates in.`,
+      desc: `Billpay runs the full life of a credit card bill payment, and its reversal as a refund, from the moment it is initiated to the moment it settles, in every market Amex operates in.`,
     },
     {
       term: 'The core idea',
-      desc: `The lifecycle of a payment is the same everywhere. What changes between markets — account type, clearing, posting rules — is configuration on a shared core, not a new codebase per market.`,
+      desc: `The lifecycle of a payment is the same everywhere. What changes between markets (account type, clearing, posting rules) is configuration on a shared core, not a new codebase per market.`,
     },
     {
       term: 'One lifecycle, everywhere',
@@ -39,7 +39,7 @@ import Highlights from '@site/src/components/Highlights';
     },
     {
       term: 'What it coordinates',
-      desc: `Validation, clearing at the bank, the statement balance (Accounts Receivable), Open-To-Buy, and fulfillment — accounting, audit, risk, and communications. A payment counts as paid only once settlement and posting are both confirmed.`,
+      desc: `Validation, clearing at the bank, the statement balance (Accounts Receivable), Open-To-Buy, and fulfillment out to accounting, audit, risk, and communications. A payment counts as paid only once settlement and posting are both confirmed.`,
     },
   ]}
 />

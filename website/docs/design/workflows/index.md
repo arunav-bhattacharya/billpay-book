@@ -10,13 +10,13 @@ import Lead from '@site/src/components/Lead';
 
 ## The two workers
 
-- **Online worker** — runs workflows an end user is waiting on: an immediate payment, an update, a cancellation, a payment intent.
-- **Offline worker** — runs everything triggered asynchronously: scheduled execution, inbound payments, returns, and the periodic sweeps.
+- The **Online worker** runs workflows an end user is waiting on: an immediate payment, an update, a cancellation, a payment intent.
+- The **Offline worker** runs everything triggered asynchronously: scheduled execution, inbound payments, returns, and the periodic sweeps.
 
-A few workflows — Create Schedule Payment, Execute Split Payment, Create Balance Refund — run on either worker, depending on where in the journey they're called.
+Three workflows run on either worker, depending on where in the journey they are called: Create Schedule Payment, Execute Split Payment, and Create Balance Refund.
 
 ## Three kinds
 
-- **[Core](./core.md)** — the business workflows triggered per request: create, update, cancel, execute, return, represent, allocate.
-- **[Composite](./composite.md)** — workflows that wrap one or more core workflows and add cross-domain logic, such as installments or multi-instruction payments.
-- **[Periodic](./periodic.md)** — scheduler-driven workflows that run in waves: executing scheduled payments, processing allocations and representments, closing out paid events, and purging old data.
+- [Core](./core.md) workflows are triggered per request: create, update, cancel, execute, return, represent, allocate.
+- [Composite](./composite.md) workflows wrap one or more core workflows and add logic that spans domains, such as installments or multi-instruction payments.
+- [Periodic](./periodic.md) workflows are scheduler driven and run in waves: executing scheduled payments, processing allocations and representments, closing out paid events, and purging old data.

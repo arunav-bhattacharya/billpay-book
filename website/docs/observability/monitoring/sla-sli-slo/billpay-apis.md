@@ -14,7 +14,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Create Payment
 
-**Billpay Core API** · `POST /payments` — SLA availability: **99.95%**
+**Billpay Core API** · `POST /payments` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Update Payment
 
-**Billpay Core API** · `PUT /payments/{payment-id}` — SLA availability: **99.95%**
+**Billpay Core API** · `PUT /payments/{payment-id}` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Cancel Payment
 
-**Billpay Core API** · `DELETE /payments/{payment-id}` — SLA availability: **99.95%**
+**Billpay Core API** · `DELETE /payments/{payment-id}` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -44,17 +44,17 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Record Return
 
-**Billpay Core API** · `POST /payments/returns` — SLA availability: **99.9%** (async)
+**Billpay Core API** · `POST /payments/returns` · SLA availability: **99.9%** (async)
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
 | 80 ms | 180 ms | 380 ms | 700 ms | 1.2 s |
 
-**SLI:** handler ack latency — measured from event receipt to workflow enqueue. `ProcessReturnedPaymentWF` runs asynchronously after this. **Error budget:** 0.1% / 30-day window.
+**SLI:** handler ack latency, measured from event receipt to workflow enqueue. `ProcessReturnedPaymentWF` runs asynchronously after this. **Error budget:** 0.1% / 30-day window.
 
 ## Inbound Payment
 
-**Billpay Core API** · `POST /payments/inbound` — SLA availability: **99.9%** (async)
+**Billpay Core API** · `POST /payments/inbound` · SLA availability: **99.9%** (async)
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -64,7 +64,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Credit Balance Refund
 
-**Billpay Core API** · `POST /refunds` — SLA availability: **99.95%**
+**Billpay Core API** · `POST /refunds` · SLA availability: **99.95%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -74,7 +74,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## List Payments by Account
 
-**Billpay Core API** · `GET /payments/account/{account-id}` — SLA availability: **99.99%**
+**Billpay Core API** · `GET /payments/account/{account-id}` · SLA availability: **99.99%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -84,7 +84,7 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Read Payment
 
-**Billpay Core API** · `GET /payments/{payment-id}` — SLA availability: **99.99%**
+**Billpay Core API** · `GET /payments/{payment-id}` · SLA availability: **99.99%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
@@ -94,10 +94,10 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 
 ## Payment Installments
 
-**Billpay Core API (composite)** · `POST /payment-installments` — SLA availability: **99.9%**
+**Billpay Core API (composite)** · `POST /payment-installments` · SLA availability: **99.9%**
 
 | P50 | P90 | P99 | P99.9 | P99.99 |
 | --- | --- | --- | --- | --- |
 | 220 ms | 450 ms | 900 ms | 1.6 s | 2.4 s |
 
-**SLI:** end-to-end latency for the composite — the child `CreateImmediatePaymentWF`, the installment plan, and optional autopay. **Error budget:** 0.1% / 30-day window.
+**SLI:** end-to-end latency for the composite, covering the child `CreateImmediatePaymentWF`, the installment plan, and optional autopay. **Error budget:** 0.1% / 30-day window.

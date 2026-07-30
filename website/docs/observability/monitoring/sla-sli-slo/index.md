@@ -15,41 +15,41 @@ import Highlights from '@site/src/components/Highlights';
   accent="var(--amex-cat-observability)"
   items={[
     {
-      term: 'SLA — Service Level Agreement',
-      desc: 'The external commitment to consumers. If breached, it’s incident-grade and contractually visible.',
+      term: 'SLA, the Service Level Agreement',
+      desc: "The external commitment to consumers. A breach is incident-grade and contractually visible.",
     },
     {
-      term: 'SLO — Service Level Objective',
-      desc: 'The internal target engineering steers to. Tighter than the SLA by design — gives us headroom before customers notice.',
+      term: 'SLO, the Service Level Objective',
+      desc: 'The internal target engineering steers to. It is tighter than the SLA by design, which gives us headroom before customers notice.',
     },
     {
-      term: 'SLI — Service Level Indicator',
-      desc: 'The signal we actually measure — the metric that proves whether we’re meeting the SLO.',
+      term: 'SLI, the Service Level Indicator',
+      desc: "The signal we actually measure: the metric that proves whether we are meeting the SLO.",
     },
   ]}
 />
 
 :::info[Quick reference]
 - **SLA** is the promise. **SLO** is the goal. **SLI** is the measurement.
-- Latency cells in the sub-pages are **SLO targets** — internal numbers.
-- The availability figure on each entry is the **SLA** — the external commitment.
+- Latency cells in the sub-pages are **SLO targets**, which are internal numbers.
+- The availability figure on each entry is the **SLA**, which is the external commitment.
 - The "SLI" line under each entry describes what we measure to produce these numbers.
-- Numbers are **indicative targets** — confirm the latest contracted values with the Billpay team before quoting externally.
+- Numbers are **indicative targets**. Confirm the latest contracted values with the Billpay team before quoting externally.
 :::
 
 ## How to read an entry
 
 Each entry on the two sub-pages has:
 
-1. **Title** — the function or API name, with the endpoint underneath as a smaller note.
-2. **SLA availability** — the contractual uptime.
-3. **A five-cell latency row** — SLO targets at P50, P90, P99, P99.9, P99.99.
-4. **The SLI** — the metric, plus the error budget.
+1. A **title**, the function or API name, with the endpoint underneath as a smaller note.
+2. The **SLA availability**, the contractual uptime.
+3. A **five-cell latency row** carrying the SLO targets at P50, P90, P99, P99.9, and P99.99.
+4. The **SLI**, the metric, plus the error budget.
 
 ## Pick a surface
 
-- **[One-Data Functions](./one-data-functions.md)** — SLA / SLI / SLO for the 7 versioned, contract-level functions (`CreatePayment.v3`, `UpdatePayment.v1`, …). Tighter SLAs because they're the visible surface.
-- **[Billpay Core APIs](./billpay-apis.md)** — SLA / SLI / SLO for the 9 REST endpoints (`POST /payments`, `PUT /payments/{payment-id}`, …). Slightly tighter latency targets — no function-edge overhead.
+- [One-Data Functions](./one-data-functions.md) carries the SLA, SLI, and SLO for the 7 versioned, contract-level functions (`CreatePayment.v3`, `UpdatePayment.v1`, and the rest). The SLAs are tighter because these are the visible surface.
+- [Billpay Core APIs](./billpay-apis.md) carries the same for the 9 REST endpoints (`POST /payments`, `PUT /payments/{payment-id}`, and the rest). Latency targets are slightly tighter, because there is no function-edge overhead.
 
 ## Error budget at a glance
 
@@ -60,5 +60,5 @@ Each entry on the two sub-pages has:
 | **99.9%**  | ~43.2 minutes | ~8.8 hours |
 
 :::tip[Operationally]
-The **SLO** is what engineering steers to. The **SLA** is what the platform commits to externally. We deliberately leave headroom — if our SLO is being breached but our SLA isn't, that's the cue to fix things **before** customers notice.
+The **SLO** is what engineering steers to. The **SLA** is what the platform commits to externally. We deliberately leave headroom, so an SLO breach with the SLA still intact is the cue to fix things **before** customers notice.
 :::

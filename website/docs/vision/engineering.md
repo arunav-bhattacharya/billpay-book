@@ -97,7 +97,7 @@ A workflow is assembled from four kinds of part. A **stage** carries out one sta
     },
     {
       title: 'Durable execution',
-      body: 'Every payment is a Temporal workflow, and its progress is saved as it goes. It survives process restarts, host failures, and long waits, since a scheduled payment may sit for weeks, and it always resumes exactly where it left off. Nothing is lost, and nothing runs twice.',
+      body: 'Every payment is a Temporal workflow, and Temporal saves its progress as it goes. It survives process restarts, host failures, and long waits, since a scheduled payment may sit for weeks, and it resumes exactly where it left off. No step is lost and no step runs twice.',
     },
     {
       title: 'Idempotent entry points',
@@ -114,7 +114,7 @@ A workflow is assembled from four kinds of part. A **stage** carries out one sta
 
 Markets come onto the platform through configuration. Someone picks the One-Data APIs the market will use, then answers a few questions about how it processes payments. Those selections build a profile for that market and account type, held as one combination of dimensions.
 
-The profile is what composes the workflow. When a request arrives, the dimensions on it are checked and resolved to the implementations onboarded for that combination, and the workflow is started with those parts already in place. That happens before the run begins, so the workflow itself carries no market logic: it runs the same sequence of business steps everywhere.
+The profile is what composes the workflow. When a request arrives, Billpay reads the dimensions on it, resolves them to the implementations onboarded for that combination, and starts the workflow with those parts already in place. All of that happens before the run begins, so the workflow itself carries no market logic. It runs the same sequence of business steps everywhere.
 
 <CompositionMap
   apis={[

@@ -5,7 +5,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './styles.module.css';
 
 /**
- * JourneyMap — one payment journey as a business process flow.
+ * JourneyMap: one payment journey as a business process flow.
  *
  * The diagram splits into two banded layers. The top band is what the customer
  * touches: the person, the Amex channels, and the One-Data function the
@@ -86,7 +86,7 @@ const MODE_NOTE = {
 };
 
 /* ------------------------------------------------------------------ *
- * Icons — monoline, 24-unit grid, stroke inherits the surrounding ink
+ * Icons: monoline, 24-unit grid, stroke inherits the surrounding ink
  * ------------------------------------------------------------------ */
 
 const PATHS = {
@@ -573,7 +573,7 @@ export default function JourneyMap({
 }
 
 /* ------------------------------------------------------------------ *
- * JourneyLegend — how to read a diagram, in one compact block.
+ * JourneyLegend: how to read a diagram, in one compact block.
  * ------------------------------------------------------------------ */
 
 export function JourneyLegend({channelNote}) {

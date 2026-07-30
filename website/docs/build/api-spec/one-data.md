@@ -7,13 +7,13 @@ import Lead from '@site/src/components/Lead';
 
 # One-Data Functions
 
-<Lead>One-Data Functions are the platform's front door. They are versioned, stable contracts — a channel integrates against <code>CreatePayment.v3</code> and keeps working while everything behind it evolves. Each function is thin: it validates the contract and delegates to one Billpay core REST API.</Lead>
+<Lead>One-Data Functions are the platform's front door. They are versioned, stable contracts, so a channel integrates against <code>CreatePayment.v3</code> and keeps working while everything behind it evolves. Each function is thin: it validates the contract and delegates to one Billpay core REST API.</Lead>
 
 ## Core functions
 
 | Function | Delegates to | What it's for |
 | --- | --- | --- |
-| `CreatePayment.v3` | `POST /payments` | Initiate a payment — immediately, or scheduled for a future date. |
+| `CreatePayment.v3` | `POST /payments` | Initiate a payment, either immediately or scheduled for a future date. |
 | `UpdatePayment.v1` | `PUT /payments/{payment-id}` | Update a scheduled payment (cancel-and-recreate under the hood). |
 | `DeletePayment.v1` | `DELETE /payments/{payment-id}` | Cancel a scheduled or accepted payment. |
 | `ReadPayments.v1` | `GET /payments/account/{account-id}` | List the payments on an account. |
@@ -31,14 +31,14 @@ import Lead from '@site/src/components/Lead';
 
 ## Event handlers
 
-Not every function answers a caller. Three are event-driven — they consume the asynchronous outcomes a payment depends on and record them (in the external-events tracker) so the owning workflow can move forward:
+Not every function answers a caller. Three are event-driven. They consume the asynchronous outcomes a payment depends on and record them in the external-events tracker, so the owning workflow can move forward.
 
 | Handler | Brings in |
 | --- | --- |
-| `MoneyMovementEventHandler.v1` | Money-movement events from the clearing rail (MR/M3) — returns and settlement. |
+| `MoneyMovementEventHandler.v1` | Money-movement events from the clearing rail (MR/M3), covering returns and settlement. |
 | `AccountsReceivableTransactionEventHandler.v1` | Accounts Receivable (GAR) posting events. |
-| `OpentoBuyUpdatePaymentEventHandler.v1` | Open-To-Buy (AMP) update events — still being defined. |
+| `OpentoBuyUpdatePaymentEventHandler.v1` | Open-To-Buy (AMP) update events. Still being defined. |
 
-The settlement and AR-posted events these record are what eventually close a payment out to `PAID` — the [Paid Events Processing](../../design/workflows/periodic.md) sweep needs both before it will call anything paid.
+The settlement and AR-posted events these record are what eventually close a payment out to `PAID`. The [Paid Events Processing](../../design/workflows/periodic.md) sweep needs both before it will call anything paid.
 
-Adding a function? It follows the pattern above: a versioned contract, one delegation target, no business logic at the edge. Breaking changes ship as a new version (`CreatePayment.v3` exists because `.v2` couldn't stretch), and the old version keeps serving until its callers migrate.
+A new function follows the pattern above: a versioned contract, one delegation target, no business logic at the edge. Breaking changes ship as a new version, which is why `CreatePayment.v3` exists at all, and the old version keeps serving until its callers migrate.
