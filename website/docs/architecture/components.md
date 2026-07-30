@@ -181,12 +181,13 @@ Workflows run on two Temporal worker pools, divided by whether someone is waitin
 
 Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level. The periodic work the Offline worker carries is fired by Temporal Schedules, listed under [Async edges](#async-edges).
 
-## Workflow Building Blocks
+## Building Blocks
 
 Inside a workflow, work is layered so each concern lives in exactly one place, and a workflow never calls an external system directly.
 
 <Highlights
   accent="var(--amex-cat-architecture)"
+  variant="solid"
   items={[
     {
       term: 'Workflow',

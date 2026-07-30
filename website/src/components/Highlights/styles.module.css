@@ -53,3 +53,63 @@
 .desc code {
   font-size: 0.82em;
 }
+
+/* Solid variant — the same signature blue as the table headers, warmed into
+   a subtle gradient and lifted with a tinted shadow so the block pops
+   instead of blending into the page. The bevels and the pair of studs give
+   each card the read of a moulded brick without turning it into a toy. */
+.itemSolid {
+  --stud: color-mix(in srgb, var(--amex-blue) 88%, #ffffff);
+  background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-deep) 100%);
+  border-color: transparent;
+  border-radius: 12px;
+  padding-bottom: 1.55rem;
+  overflow: visible;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 1px 0 0 rgba(255, 255, 255, 0.1),
+    inset -2px 0 0 rgba(0, 26, 69, 0.16),
+    inset 0 -4px 0 rgba(0, 26, 69, 0.22),
+    0 10px 24px color-mix(in srgb, var(--amex-blue-deep) 38%, transparent),
+    var(--amex-sh-sm);
+}
+
+/* Two studs rising off the top edge, in the card's own blue, so the card reads
+   as a moulded brick that another one could stack onto. */
+.itemSolid::before {
+  top: -7px;
+  left: 1.5rem;
+  right: auto;
+  height: 8px;
+  width: 56px;
+  border-radius: 0;
+  background:
+    radial-gradient(9px 9px at 12px 9px, var(--stud) 8.7px, transparent 9.2px),
+    radial-gradient(9px 9px at 44px 9px, var(--stud) 8.7px, transparent 9.2px);
+}
+
+.itemSolid:hover {
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset -2px 0 0 rgba(0, 26, 69, 0.18),
+    inset 0 -4px 0 rgba(0, 26, 69, 0.24),
+    0 14px 32px color-mix(in srgb, var(--amex-blue-deep) 46%, transparent),
+    var(--amex-sh);
+}
+
+.itemSolid .term,
+.itemSolid .desc {
+  color: #ffffff;
+}
+
+.itemSolid .desc {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.itemSolid .desc code {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+}
