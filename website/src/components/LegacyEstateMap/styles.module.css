@@ -100,7 +100,11 @@
 }
 
 .tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 30px;
+  height: 28px;
   padding: 0.28rem 0.6rem;
   border-radius: 8px;
   border: 1px solid var(--amex-line-strong);
@@ -109,12 +113,22 @@
   font-family: inherit;
   font-size: 0.76rem;
   font-weight: 650;
-  line-height: 1.4;
+  line-height: 1;
   cursor: pointer;
 }
 .tool:hover {
   color: var(--amex-txt-strong);
   border-color: var(--amex-mut);
+}
+
+.toolIcon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .hint {

@@ -6,6 +6,7 @@ sidebar_label: Payments Overview
 import Lead from '@site/src/components/Lead';
 import LandscapeMap from '@site/src/components/LandscapeMap';
 import LegacyEstateMap from '@site/src/components/LegacyEstateMap';
+import CompareTable from '@site/src/components/CompareTable';
 
 # Payments Overview
 
@@ -20,19 +21,6 @@ import LegacyEstateMap from '@site/src/components/LegacyEstateMap';
 - Channels reach **four domains and no others**: Bill Pay Core, Plans, Payment Instruments and Mandates. Each exposes a **Type-A API**, the house standard for what a domain's interface looks like.
 - **Multirail Gateway** and **Payments Clearing** expose Type-A APIs as well, but their only caller is **Bill Pay Core**. No channel touches them.
 - Everything outside Amex is reached through **Payments Clearing**: partner banks, TPSPs, P2P networks and the payment networks.
-- **3rd Party Account Verification** is the exception. It answers to Payments Clearing and to Payment Instruments.
-
-### What Billpay owns
-
-| Billpay | A neighbour |
-|---|---|
-| The payment lifecycle and its states | The instruments a payment draws on (Payment Instruments) |
-| Recurring and autopay schedules (Plans) | The standing authorization behind a collection (Mandates) |
-| Third-party payments, on the same lifecycle (Inbound Processor) | Splitting a corporate payment across accounts (Allocation Manager) |
-| A payment's own history | Rails, clearing and settlement (Multirail Gateway, Payments Clearing) |
-| Operational state for a payment in flight | The statement balance and the ledger (Accounts Receivable, Finance) |
-
-Same boundary the [Engineering Vision](./engineering.md) draws around what the platform is not building.
 
 ## Legacy Payments Landscape
 
@@ -60,18 +48,52 @@ There was no payments domain to call. There was Arrangement Manager, and behind 
 
 ## Legacy vs modern
 
-<div className="compareTable">
-
-| What changed | Legacy | Modern |
-|---|---|---|
-| Channel contract | **Five interfaces** into one app | **One Type-A API**, learned once |
-| Ownership | AM starts it, GPP clears it, FTN files it, the mainframe bills it. **Nobody owns it** | **Bill Pay Core owns the payment** end to end |
-| History | **Merged** from an AM feed and an FTN batch | **One owner, one source** |
-| Deployables | One app, one schema, **one release train** | **Three domains, three release trains** |
-| Blast radius | Shared schema, so **a defect crosses domains** | **Own store per domain**, contract is the only coupling |
-| Scaling | **Everything scales together** | **Each domain to its own load shape** |
-| Third-party payments | Arrive as **files**, on their own path | **Same lifecycle**, validated on the way in |
-| Latency | FINCAP to TRIUMPH to CRS to Global Billing: **a full batch cycle** | **Events**, not a nightly chain |
-| Traceability | **Breaks** at AM, GPP, GPHDB, IL and the DataPower and APIGEE hops | **One lifecycle, one set of states** |
-
-</div>
+<CompareTable
+  rows={[
+    {
+      what: 'Channel contract',
+      legacy: '**Multiple customer journey interfaces are exposed from a single app**',
+      modern: '**One set of Type-A APIs per domain**',
+    },
+    {
+      what: 'Ownership',
+      legacy: 'AM starts it, GPP clears it, FTN files it, the mainframe bills it. **Ownership is shared across systems, and nobody owns tracing a payment end to end**',
+      modern: '**Bill Pay Core owns the payment** end to end',
+    },
+    {
+      what: 'History',
+      legacy: '**Merged** from an AM feed and an FTN batch',
+      modern: '**One owner, one source**',
+    },
+    {
+      what: 'Deployables',
+      legacy: 'One app, one schema, **one release train**',
+      modern: '**Three domains, three release trains**',
+    },
+    {
+      what: 'Blast radius',
+      legacy: 'Shared schema, so **a defect crosses domains**',
+      modern: '**Own store per domain**, contract is the only coupling',
+    },
+    {
+      what: 'Scaling',
+      legacy: '**Everything scales together**',
+      modern: '**Each domain to its own load shape**',
+    },
+    {
+      what: 'Third-party payments',
+      legacy: 'Arrive as **files**, on their own path',
+      modern: '**Same lifecycle**, validated on the way in',
+    },
+    {
+      what: 'Latency',
+      legacy: 'FINCAP to TRIUMPH to CRS to Global Billing: **a full batch cycle**',
+      modern: '**Events**, not a nightly chain',
+    },
+    {
+      what: 'Traceability',
+      legacy: '**Breaks** at AM, GPP, GPHDB, IL and the DataPower and APIGEE hops',
+      modern: '**One lifecycle, one set of states**',
+    },
+  ]}
+/>

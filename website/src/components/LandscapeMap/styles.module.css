@@ -1,90 +1,211 @@
-/* LandscapeMap — the payments domain at the centre, flanked by the supporting
-   domains and the external parties, with channels entering from the top.
-   Ownership is carried by the two bands; the interface a domain exposes is
-   carried by the Type-A badges and rails. Every card sets --tier and the
-   border, fill, chips and number badge all mix off that one hue. */
+/* LandscapeMap — four groups: channels on the left, the payments domain at the
+   centre with most of the weight, the external systems on the right, and the
+   supporting estate underneath the domain and the same width as it.
+
+   Colour follows the deck's four families. Every card sets --tier and the
+   border, fill, chips and number badge all mix off that one hue, so the whole
+   map is four hues and one gradient rather than a bag of colours.
+
+   Sizing is driven by container queries, not the viewport, because the board
+   sits in a doc column whose width changes when the sidebar or the table of
+   contents is collapsed. */
 
 .wrap {
+  container-type: inline-size;
   margin: 1.8rem 0 2.6rem;
-  padding: 1.75rem 1.5rem 1.4rem;
+  padding: 1.5rem 1.25rem 1.15rem;
   border: 1px solid var(--amex-line);
   border-radius: 18px;
   background: var(--amex-panel);
   box-shadow: var(--amex-sh-sm);
 }
 
-/* ---- tier hues ---- */
-.billpay {
-  --tier: var(--amex-blue-bright);
+/* Claim back the article's side padding. The map needs every pixel of the
+   column it is given, and the page container still supplies the outer margin. */
+@media (min-width: 997px) {
+  .wrap {
+    margin-inline: calc(-1 * clamp(1rem, 3vw, 2.5rem));
+  }
 }
-.shared {
-  --tier: var(--amex-indigo);
+
+/* ---- the four families ---- */
+.domain {
+  --tier: var(--amex-blue);
+  --fill: 14%;
 }
 .support {
   --tier: var(--amex-cat-build);
+  --fill: 17%;
 }
 .tech {
-  --tier: var(--amex-cat-operations);
+  --tier: var(--amex-cat-observability);
+  --fill: 17%;
 }
 .external {
   --tier: var(--amex-cat-testing);
+  --fill: 20%;
 }
 .channels {
-  --tier: var(--amex-platinum);
-}
-:global([data-theme='dark']) .shared {
-  --tier: var(--amex-cat-observability);
-}
-:global([data-theme='dark']) .channels {
   --tier: var(--amex-cat-deployment);
+  --fill: 15%;
 }
 
 /* ---- the board ---- */
 .board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Each column keeps a floor width so the boxes stay legible; below that the
+   row scrolls sideways rather than folding into a stack. */
+.flowScroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.25rem;
+}
+
+.main {
   display: grid;
-  grid-template-columns: 0.74fr 1.9fr 0.66fr;
+  grid-template-columns:
+    minmax(132px, 0.8fr)
+    minmax(min-content, 7.4fr)
+    minmax(140px, 0.9fr);
   grid-template-rows: auto auto;
-  gap: 1.5rem 1.35rem;
+  gap: 1.15rem 1.45rem;
   align-items: start;
 }
 
-.channelSlot {
+.groupChannels {
+  grid-column: 1;
+  grid-row: 1;
+}
+.groupDomain {
   grid-column: 2;
   grid-row: 1;
 }
-
-.flank:first-of-type {
-  grid-column: 1;
-  grid-row: 2;
+.groupExternal {
+  grid-column: 3;
+  grid-row: 1;
 }
-.centre {
+.groupSupport {
   grid-column: 2;
   grid-row: 2;
 }
-.flank:last-of-type {
-  grid-column: 3;
-  grid-row: 2;
+
+/* ---- the group panels ---- */
+.group {
+  --tier: var(--amex-platinum);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.7rem 0.7rem 0.75rem;
+  border-radius: 16px;
+  border: 1.5px solid color-mix(in srgb, var(--tier) 38%, var(--amex-line));
+  background: color-mix(in srgb, var(--tier) 7%, var(--amex-panel));
+}
+
+.groupTitle {
+  margin: 0 0 0.1rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.45rem;
+  padding-inline: 0.15rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--tier) 62%, var(--amex-txt-strong));
+}
+
+.groupNum {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  font-size: 0.63rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  color: #fff;
+  background: linear-gradient(
+    140deg,
+    var(--tier),
+    color-mix(in srgb, var(--tier) 55%, #05132b)
+  );
+}
+
+.groupChannels {
+  --tier: var(--amex-cat-deployment);
+}
+.groupExternal {
+  --tier: var(--amex-cat-testing);
+}
+.groupSupport {
+  --tier: var(--amex-cat-build);
+}
+
+/* The centre of the diagram, so it carries a heavier rule and a deeper field
+   than the three groups around it. */
+.groupDomain {
+  --tier: var(--amex-blue);
+  padding: 0.8rem 0.8rem 0.85rem;
+  border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
+  background: color-mix(in srgb, var(--amex-blue) 9%, var(--amex-panel));
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--amex-blue) 14%, transparent);
+}
+.groupDomain .groupTitle {
+  color: var(--amex-blue);
+}
+:global([data-theme='dark']) .groupDomain {
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
+  background: color-mix(in srgb, var(--amex-blue-bright) 10%, var(--amex-panel));
+}
+:global([data-theme='dark']) .groupDomain .groupTitle {
+  color: var(--amex-blue-bright);
+}
+
+.domainGrid {
+  display: grid;
+  grid-template-columns:
+    minmax(176px, 1.44fr) /* Bill Pay Core */
+    minmax(150px, 1.14fr) /* Plans, Inbound Processor, Allocation Manager */
+    minmax(154px, 1.18fr) /* Payment Instruments, Mandates */
+    minmax(142px, 0.98fr) /* Multirail Gateway, Control Tower */
+    minmax(154px, 1.18fr); /* Payments Clearing */
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 /* ---- channels ---- */
 .chanRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  display: grid;
+  grid-auto-rows: minmax(32px, auto);
+  gap: 0.42rem;
 }
 
 .chan {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.38rem;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 550;
   line-height: 1.3;
-  padding: 0.34rem 0.62rem 0.34rem 0.5rem;
-  border-radius: 9px;
+  padding: 0.28rem 0.5rem 0.28rem 0.44rem;
+  border-radius: 8px;
   color: var(--amex-txt);
-  background: color-mix(in srgb, var(--tier) 12%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--tier) 32%, #d7deea);
+  background: color-mix(in srgb, var(--tier) 14%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--tier) 34%, #d7deea);
 }
 :global([data-theme='dark']) .chan {
   background: color-mix(in srgb, var(--tier) 26%, #0b2246);
@@ -93,8 +214,8 @@
 
 .icon {
   flex: none;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: color-mix(in srgb, var(--tier) 78%, var(--amex-txt-strong));
   stroke-width: 1.7;
@@ -102,195 +223,63 @@
   stroke-linejoin: round;
 }
 
-/* ---- interface rails ---- */
-.rail {
-  margin: 1.1rem 0 0;
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  border: 1px dashed color-mix(in srgb, var(--amex-blue) 50%, transparent);
-  background: color-mix(in srgb, var(--amex-blue) 9%, var(--amex-panel));
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.65rem;
-  position: relative;
-  text-align: center;
-}
-.rail span {
-  font-weight: 750;
-  font-size: 0.84rem;
-  letter-spacing: 0.01em;
-  color: var(--amex-blue);
-}
-.rail em {
-  font-style: normal;
-  font-size: 0.76rem;
-  color: var(--amex-mut);
-}
-/* dotted stubs so a rail reads as a seam between two things */
-.rail::before,
-.rail::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  width: 0;
-  height: 11px;
-  border-left: 2px dotted color-mix(in srgb, var(--amex-blue) 55%, transparent);
-}
-.rail::before {
-  top: -12px;
-}
-.rail::after {
-  bottom: -12px;
-}
-:global([data-theme='dark']) .rail span {
-  color: var(--amex-blue-bright);
-}
-
-/* the core-facing rail is quieter, and sits inside the shared band */
-.railCore {
-  margin: 1.35rem 0 1.25rem;
-  border-color: color-mix(in srgb, var(--amex-mut) 55%, transparent);
-  background: color-mix(in srgb, var(--amex-mut) 8%, var(--amex-panel));
-}
-.railCore span,
-:global([data-theme='dark']) .railCore span {
-  color: var(--amex-mut);
-}
-.railCore::before,
-.railCore::after {
-  border-left-color: color-mix(in srgb, var(--amex-mut) 60%, transparent);
-}
-
-/* ---- the centre: the payments domain ---- */
-.centre {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 1.55rem;
-  padding: 2rem 1.15rem 1.3rem;
-  border: 1.5px solid var(--amex-line-strong);
-  border-radius: 19px;
-  background: color-mix(in srgb, var(--amex-blue) 4%, var(--amex-panel));
-}
-
-.centreLabel {
-  position: absolute;
-  top: -0.72rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.2rem 0.85rem;
-  border-radius: 9px;
-  white-space: nowrap;
-  font-size: 0.73rem;
-  font-weight: 750;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--amex-txt-strong);
-  background: var(--amex-panel);
-  border: 1.5px solid var(--amex-line-strong);
-}
-
-/* ---- the two ownership bands ---- */
-.groupBillpay,
-.groupShared {
-  position: relative;
-  padding: 1.85rem 1rem 1.1rem;
-  border-radius: 16px;
-}
-
-/* Billpay gets a saturated field of its own so it never reads as one more box
-   in the row. */
-.groupBillpay {
-  border: 1.5px solid var(--amex-blue-bright);
-  background: linear-gradient(
-    155deg,
-    color-mix(in srgb, var(--amex-blue-bright) 17%, var(--amex-panel)) 0%,
-    color-mix(in srgb, var(--amex-blue) 15%, var(--amex-panel)) 100%
-  );
-  box-shadow: var(--amex-glow);
-}
-
-.groupShared {
-  border: 1px dashed color-mix(in srgb, var(--amex-indigo) 50%, transparent);
-  background: color-mix(in srgb, var(--amex-indigo) 5%, transparent);
-}
-:global([data-theme='dark']) .groupShared {
-  border-color: color-mix(in srgb, var(--amex-cat-observability) 45%, transparent);
-  background: color-mix(in srgb, var(--amex-cat-observability) 7%, transparent);
-}
-
-.groupTag {
-  position: absolute;
-  top: -0.64rem;
-  left: 1.05rem;
-  padding: 0.14rem 0.65rem;
-  border-radius: 8px;
-  font-size: 0.69rem;
-  font-weight: 750;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--amex-mut);
-  background: var(--amex-panel);
-  border: 1px solid var(--amex-line-strong);
-}
-
-.groupTagBillpay {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-bright) 100%);
-  box-shadow: 0 3px 11px color-mix(in srgb, var(--amex-blue-bright) 45%, transparent);
-}
-
-.grid {
+/* ---- external systems ---- */
+.extStack {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
-  gap: 0.95rem;
-  align-items: start;
+  grid-auto-rows: minmax(46px, auto);
+  gap: 0.5rem;
+}
+
+.ext {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  font-size: 0.79rem;
+  font-weight: 700;
+  line-height: 1.3;
+  border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--amex-line));
+  background: color-mix(in srgb, var(--tier) var(--fill), var(--amex-panel));
+  color: color-mix(in srgb, var(--tier) 55%, var(--amex-txt-strong));
+  box-shadow: var(--amex-sh-sm);
+}
+:global([data-theme='dark']) .ext {
+  color: color-mix(in srgb, var(--tier) 40%, var(--amex-txt-strong));
 }
 
 /* ---- cards ---- */
 .card {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.85rem 0.9rem 0.9rem;
+  gap: 0.45rem;
+  padding: 0.6rem 0.62rem 0.64rem;
   border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--amex-line));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--tier) 13%, var(--amex-panel));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tier) var(--fill, 12%), var(--amex-panel));
   box-shadow: var(--amex-sh-sm);
 }
 
-/* a domain that exposes a Type-A API gets a solid top edge; the core-facing
-   ones get a dashed edge, so the two kinds are separable at a glance */
+/* a domain that exposes a Type-A API gets a solid top edge to go with the pill */
 .hasApi {
   border-top-width: 3px;
-  border-top-color: var(--amex-blue);
-}
-:global([data-theme='dark']) .hasApi {
-  border-top-color: var(--amex-blue-bright);
-}
-.hasApiCore {
-  border-top-style: dashed;
-  border-top-color: var(--amex-mut);
-}
-:global([data-theme='dark']) .hasApiCore {
-  border-top-color: var(--amex-mut);
+  border-top-color: color-mix(in srgb, var(--tier) 85%, var(--amex-panel));
 }
 
 /* Bill Pay Core — the one box the page is about. Signature gradient, white
    type, its own glow. Nothing else on the map is treated this way. */
 .hero {
-  grid-column: 1 / -1;
   border: none;
-  border-top: 3px solid rgba(255, 255, 255, 0.75);
+  border-top: 3px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  padding: 0.72rem 0.7rem 0.75rem;
   background: var(--amex-grad-btn);
-  box-shadow: 0 12px 34px color-mix(in srgb, var(--amex-blue-bright) 45%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--amex-blue-bright) 45%, transparent);
 }
 .hero .title {
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 .hero .num {
@@ -299,11 +288,12 @@
 }
 .hero .cap {
   color: #fff;
-  background: rgba(255, 255, 255, 0.17);
-  border-color: rgba(255, 255, 255, 0.4);
+  font-weight: 550;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.42);
 }
 .hero .store {
-  color: rgba(255, 255, 255, 0.86);
+  color: rgba(255, 255, 255, 0.88);
 }
 .hero .storeGlyph {
   stroke: rgba(255, 255, 255, 0.8);
@@ -314,77 +304,57 @@
 .hero .api {
   color: var(--amex-blue-deep);
   background: #fff;
-  border-color: transparent;
+  border-color: #fff;
+  box-shadow: 0 3px 12px rgba(2, 20, 48, 0.32), inset 0 -1px 0 rgba(2, 20, 48, 0.12);
 }
 
-/* flank cards are tighter — same content, a third of the room */
+/* the supporting estate is context, so its cards run a size down */
 .compact {
-  padding: 0.68rem 0.72rem 0.72rem;
-  gap: 0.45rem;
+  padding: 0.52rem 0.55rem 0.55rem;
+  gap: 0.3rem;
 }
 .compact .title {
-  font-size: 0.84rem;
-}
-.compact .cap {
-  font-size: 0.68rem;
-  padding: 0.16rem 0.4rem;
+  font-size: 0.78rem;
 }
 .compact .num {
-  width: 20px;
-  height: 20px;
-  font-size: 0.64rem;
+  width: 18px;
+  height: 18px;
+  font-size: 0.61rem;
 }
 
-/* External parties carry no capability chips, so the card does the work. */
-.ext {
-  position: relative;
-  gap: 0.3rem;
-  padding-left: 1rem;
-  min-height: 62px;
-  justify-content: center;
-  background: color-mix(in srgb, var(--tier) 20%, var(--amex-panel));
-  overflow: hidden;
-}
-.ext::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--tier);
-}
-.ext .title {
-  font-size: 0.85rem;
-}
-
-.via {
+.capLine {
+  margin: 0;
   font-size: 0.67rem;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--amex-mut);
 }
-.viaBoth {
-  font-weight: 650;
-  color: color-mix(in srgb, var(--amex-cat-testing) 70%, var(--amex-txt-strong));
-}
-:global([data-theme='dark']) .viaBoth {
-  color: var(--amex-cat-testing);
-}
 
+/* ---- card head ---- */
 .head {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.headText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.headText::after {
+  content: '';
+  display: block;
+  clear: both;
 }
 
 .num {
   flex: none;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  margin-top: 1px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  font-size: 0.69rem;
+  font-size: 0.65rem;
   font-weight: 750;
   color: #fff;
   background: linear-gradient(
@@ -394,57 +364,79 @@
   );
 }
 
+/* never split a domain name mid-word: it drops to the next line instead, which
+   below the floated pill is the full width of the card */
 .title {
   margin: 0;
-  font-size: 0.95rem;
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  font-size: 0.87rem;
   font-weight: 650;
   line-height: 1.3;
   letter-spacing: -0.004em;
   color: var(--amex-txt-strong);
 }
 
-/* ---- the Type-A badge ---- */
+/* ---- the Type-A pill ----
+   The one thing on the map a reader is meant to spot from across the room, so
+   it is a filled pill with its own lift rather than a tinted outline. */
 .api {
-  margin-left: auto;
-  flex: none;
-  padding: 0.12rem 0.42rem;
-  border-radius: 6px;
-  font-size: 0.62rem;
-  font-weight: 750;
+  float: right;
+  margin-left: 0.4rem;
+  padding: 0.17rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--amex-blue);
-  background: color-mix(in srgb, var(--amex-blue) 13%, var(--amex-panel));
-  border: 1px solid color-mix(in srgb, var(--amex-blue) 50%, transparent);
+  white-space: nowrap;
+  color: #fff;
+  background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-bright) 100%);
+  border: 1px solid color-mix(in srgb, var(--amex-blue-bright) 62%, #ffffff);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--amex-blue-bright) 52%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 :global([data-theme='dark']) .api {
-  color: var(--amex-blue-bright);
-  border-color: color-mix(in srgb, var(--amex-blue-bright) 55%, transparent);
-}
-.apiCore {
-  color: var(--amex-mut);
-  background: color-mix(in srgb, var(--amex-mut) 13%, var(--amex-panel));
-  border: 1px dashed color-mix(in srgb, var(--amex-mut) 55%, transparent);
-}
-:global([data-theme='dark']) .apiCore {
-  color: var(--amex-mut);
-  border-color: color-mix(in srgb, var(--amex-mut) 60%, transparent);
+  color: #04122a;
+  background: linear-gradient(
+    135deg,
+    var(--amex-blue-bright) 0%,
+    color-mix(in srgb, var(--amex-blue-bright) 65%, #ffffff) 100%
+  );
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 75%, #ffffff);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--amex-blue-bright) 55%, transparent);
 }
 
+/* Capabilities sit two-up the way the deck draws them, and fall to one column
+   in the narrow boxes. Every chip is the same size in every box; an odd last
+   chip takes the whole row rather than leaving a hole beside it, which is also
+   what keeps a single long capability on one line. */
 .caps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.34rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  grid-auto-rows: minmax(26px, auto);
+  gap: 0.3rem;
 }
 
 .cap {
-  font-size: 0.72rem;
-  line-height: 1.35;
-  padding: 0.2rem 0.48rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow-wrap: break-word;
+  font-size: 0.68rem;
+  line-height: 1.28;
+  padding: 0.16rem 0.42rem;
   border-radius: 7px;
   color: var(--amex-txt);
   background: color-mix(in srgb, var(--tier) 11%, #ffffff);
   border: 1px solid color-mix(in srgb, var(--tier) 30%, #d7deea);
+}
+.cap:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 :global([data-theme='dark']) .cap {
   background: color-mix(in srgb, var(--tier) 26%, #0b2246);
@@ -454,10 +446,11 @@
 /* ---- data store glyph ---- */
 .store {
   margin-top: auto;
+  padding-top: 0.1rem;
   display: flex;
   align-items: center;
-  gap: 0.34rem;
-  font-size: 0.7rem;
+  gap: 0.3rem;
+  font-size: 0.67rem;
   font-weight: 600;
   color: var(--amex-mut);
 }
@@ -474,50 +467,31 @@
   fill: color-mix(in srgb, var(--tier) 18%, var(--amex-panel));
 }
 
-/* ---- flanks ---- */
-.flank {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding-top: 0.5rem;
+/* ---- the supporting estate ---- */
+.supportStack {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
+  gap: 0.5rem;
+  align-items: stretch;
 }
 
-.flankLabel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.28rem;
-  font-size: 0.68rem;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+/* Only worth saying when the row is actually cut off. */
+.hint {
+  display: none;
+  margin: 0;
+  font-size: 0.72rem;
   color: var(--amex-mut);
-  line-height: 1.4;
-}
-.flankLabel em {
-  font-style: normal;
-  font-weight: 500;
-  font-size: 0.7rem;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--amex-mut);
-  opacity: 0.85;
-}
-
-.flankStack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
 }
 
 /* ---- legend ---- */
 .legend {
-  margin-top: 1.8rem;
-  padding-top: 1.05rem;
+  margin-top: 1.25rem;
+  padding-top: 0.85rem;
   border-top: 1px solid var(--amex-line);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.55rem 1.3rem;
+  gap: 0.5rem 1.2rem;
 }
 
 .legendItem {
@@ -545,41 +519,57 @@
 }
 
 .legendApi {
+  float: none;
   margin-left: 0;
   font-style: normal;
 }
 
-/* ---- narrow: unwind the three columns into one stack ---- */
-@media (max-width: 996px) {
-  .board {
-    grid-template-columns: 1fr;
+/* just under the row's own minimum, so the hint appears only once it is cut off */
+@container (max-width: 1170px) {
+  .hint {
+    display: block;
   }
-  .channelSlot,
-  .centre,
-  .flank:first-of-type,
-  .flank:last-of-type {
+}
+
+/* ---- narrow: a sideways scroll is no use on a phone, so the groups unfold
+   into the same left-to-right order read top to bottom ---- */
+@container (max-width: 760px) {
+  .flowScroll {
+    overflow-x: visible;
+  }
+  .hint {
+    display: none;
+  }
+  .main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 0.85rem;
+  }
+  .groupChannels,
+  .groupDomain,
+  .groupExternal,
+  .groupSupport {
     grid-column: 1;
     grid-row: auto;
   }
-  .flankStack {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  .domainGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .chanRow,
+  .extStack {
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  }
+}
+
+@container (max-width: 430px) {
+  .domainGrid,
+  .caps {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
   .wrap {
-    padding: 1.25rem 0.85rem 1.05rem;
-  }
-  .grid,
-  .flankStack {
-    grid-template-columns: 1fr;
-  }
-  .centre {
-    padding: 1.9rem 0.7rem 1rem;
-  }
-  .groupBillpay,
-  .groupShared {
-    padding: 1.75rem 0.6rem 0.9rem;
+    padding: 1.15rem 0.8rem 1rem;
   }
 }

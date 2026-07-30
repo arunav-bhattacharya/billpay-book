@@ -951,56 +951,6 @@ table thead tr {
 }
 
 /* ---------------------------------------------------------------------------
-   14. Comparison tables — a named first column that reads as a row header.
-   Used by Vision ▸ Payments Overview ("Legacy vs modern"). The aspect column
-   is deliberately NOT blue: the two columns it introduces carry the page's
-   blue, so the rail uses the gold end of the brand rule instead and leans on
-   type rather than fill.
---------------------------------------------------------------------------- */
-.compareTable table {
-  width: 100%;
-  display: table;
-}
-.compareTable table th:first-child,
-.compareTable table td:first-child {
-  width: 14%;
-  position: relative;
-  padding-left: 1.05rem;
-  font-weight: 700;
-  font-size: 0.82rem;
-  line-height: 1.35;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--amex-txt-strong);
-  background: color-mix(in srgb, var(--amex-gold) 7%, var(--ifm-table-background));
-}
-.compareTable table th:first-child::before,
-.compareTable table td:first-child::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--amex-grad-gold);
-}
-[data-theme='dark'] .compareTable table th:first-child,
-[data-theme='dark'] .compareTable table td:first-child {
-  background: color-mix(in srgb, var(--amex-gold-bright) 10%, transparent);
-  color: var(--amex-gold-bright);
-}
-.compareTable table th:first-child {
-  font-size: 0.7rem;
-  color: var(--amex-mut);
-  background: transparent;
-}
-[data-theme='dark'] .compareTable table th:first-child {
-  color: var(--amex-mut);
-  background: transparent;
-}
-.compareTable table th:first-child::before { background: none; }
-
-/* ---------------------------------------------------------------------------
    15. Worker table — the Online/Offline split under Architecture ▸ Overview.
    Two rows, and the row's colour carries the meaning: Online takes the Billpay
    Core violet from the system map, Offline the architecture accent it shares

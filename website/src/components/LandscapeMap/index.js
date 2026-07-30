@@ -3,14 +3,20 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * LandscapeMap — the Amex payments estate with the payments domain at the
- * centre. Ownership is shown by the two bands (Billpay platform / shared
- * payments services); the interface each domain exposes is shown by the Type-A
- * badges and the two rails, since the two cut across each other.
+ * LandscapeMap — the Amex payments estate, read left to right the way the
+ * architecture deck draws it: channels, the payments domain, then the external
+ * parties. Everything the estate leans on but does not own sits under the
+ * dotted line.
+ *
+ * Colour follows the deck's four families (payments domain, supporting domain,
+ * supporting tech platform, external), with Bill Pay Core lifted out of the
+ * blue family into the signature gradient. The Type-A pill marks every domain
+ * that exposes one; who calls which is prose, not geometry.
  *
  * CSS Grid rather than SVG: 18 boxes plus their capabilities in a fixed viewBox
- * would force horizontal scroll everywhere but a wide desktop. Colour comes
- * from the design tokens, so light and dark both render.
+ * would force horizontal scroll everywhere but a wide desktop. Sizing is driven
+ * by container queries, not the viewport, because the board sits in a doc
+ * column whose width changes when the sidebar or the contents is collapsed.
  */
 
 const ICONS = {
@@ -63,49 +69,65 @@ const CHANNELS = [
   {label: 'Mobile', icon: 'phone'},
   {label: 'IVR', icon: 'voice'},
   {label: 'ISP', icon: 'browser'},
-  {label: 'and more', icon: 'more'},
+  {label: '. . .', icon: 'more'},
 ];
 
-const BILLPAY = [
-  {
-    n: 2,
-    title: 'Bill Pay Core',
-    typeA: 'channels',
-    caps: [
-      'Execute Payment',
-      'Options',
-      'Validate/Auth',
-      'History',
-      'Balance Updates',
-      'Schedule',
-      'Accounting',
-      'Exception Mgmnt / Servicing',
-      'Stop Payment',
-      'Reporting',
-      'AML',
-    ],
-    store: 'Bill Pay Data',
-    hero: true,
-  },
+const CORE = {
+  n: 2,
+  title: 'Bill Pay Core',
+  typeA: true,
+  tier: 'domain',
+  hero: true,
+  caps: [
+    'Execute Payment',
+    'Options',
+    'Validate/Auth',
+    'History',
+    'Balance Updates',
+    'Schedule',
+    'Accounting',
+    'Exception Mgmnt / Servicing',
+    'Stop Payment',
+    'Reporting',
+    'AML',
+  ],
+  store: 'Bill Pay Data',
+};
+
+/* the rest of the Billpay platform, in the column beside Bill Pay Core */
+const PLATFORM = [
   {
     n: 3,
     title: 'Plans',
-    typeA: 'channels',
+    typeA: true,
+    tier: 'domain',
     caps: ['Recurring/Autopay'],
     store: 'Plan Data',
   },
   {
     n: 4,
     title: 'Bill Pay Inbound Processor',
+    typeA: true,
+    tier: 'domain',
     caps: ['Validation', 'STP / Non-STP Decisioning', 'Enrichment', 'AML/Sanctions'],
+  },
+  {
+    n: 5,
+    title: 'Allocation Manager',
+    typeA: true,
+    tier: 'domain',
+    caps: ['Validation', 'Lifecycle'],
+    store: 'Allocation Data',
   },
 ];
 
+/* the shared services every payment product draws on */
 const SHARED = [
   {
     n: 6,
     title: 'Payment Instruments',
-    typeA: 'channels',
+    typeA: true,
+    tier: 'domain',
     caps: [
       'Instrument Management',
       'Tokenization',
@@ -120,44 +142,42 @@ const SHARED = [
   {
     n: 7,
     title: 'Mandates',
-    typeA: 'channels',
+    typeA: true,
+    tier: 'domain',
     caps: ['Authorization', 'Mandate Management', 'Mandate Lifecycle'],
     store: 'Mandate Data',
   },
-  {
-    n: 5,
-    title: 'Allocation Manager',
-    caps: ['Validation', 'Lifecycle'],
-    store: 'Allocation Data',
-  },
-  {n: 9, title: 'Control Tower', caps: ['Research', 'Repair/Replay']},
 ];
 
-const RAILS = [
+/* the plumbing: the switch a payment leaves on, and the desk that repairs it */
+const PLUMBING = [
   {
     n: 8,
     title: 'Multirail Gateway',
-    typeA: 'core',
-    caps: ['Core Switch', 'Web Proxy', 'Accounting', 'Routing'],
+    typeA: true,
     tier: 'tech',
+    caps: ['Core Switch', 'Web Proxy', 'Accounting', 'Routing'],
   },
-  {
-    n: 10,
-    title: 'Payments Clearing',
-    typeA: 'core',
-    caps: [
-      'Payment Routes',
-      'Scheme Adapters',
-      'Orchestration',
-      'Bank Connectors',
-      'Authorization',
-      'Reconciliation',
-      'Liquidity Management',
-      'Batch Gateway',
-      'Migration Splitter',
-    ],
-  },
+  {n: 9, title: 'Control Tower', tier: 'domain', caps: ['Research', 'Repair/Replay']},
 ];
+
+const CLEARING = {
+  n: 10,
+  title: 'Payments Clearing',
+  typeA: true,
+  tier: 'domain',
+  caps: [
+    'Payment Routes',
+    'Scheme Adapters',
+    'Orchestration',
+    'Bank Connectors',
+    'Authorization',
+    'Reconciliation',
+    'Liquidity Management',
+    'Batch Gateway',
+    'Migration Splitter',
+  ],
+};
 
 const SUPPORTING = [
   {
@@ -179,15 +199,11 @@ const SUPPORTING = [
 ];
 
 const EXTERNAL = [
-  {label: 'Partner Banks', via: 'Payments Clearing'},
-  {label: 'TPSPs', via: 'Payments Clearing'},
-  {label: 'P2P Networks', via: 'Payments Clearing'},
-  {label: 'Payment Networks', via: 'Payments Clearing'},
-  {
-    label: '3rd Party Account Verification',
-    via: 'Payments Clearing and Payment Instruments',
-    both: true,
-  },
+  'Partner Banks',
+  'TPSPs',
+  'P2P Networks',
+  '3rd Party Account Verification',
+  'Payment Networks',
 ];
 
 function Store({label}) {
@@ -202,7 +218,7 @@ function Store({label}) {
   );
 }
 
-function Card({n, title, caps, store, typeA, tier = 'shared', hero, compact}) {
+function Card({n, title, caps, store, typeA, tier = 'domain', hero, compact}) {
   return (
     <article
       className={clsx(
@@ -211,42 +227,38 @@ function Card({n, title, caps, store, typeA, tier = 'shared', hero, compact}) {
         hero && styles.hero,
         compact && styles.compact,
         typeA && styles.hasApi,
-        typeA === 'core' && styles.hasApiCore,
       )}>
       <header className={styles.head}>
         <span className={styles.num}>{n}</span>
-        <h4 className={styles.title}>{title}</h4>
-        {typeA && (
-          <span className={clsx(styles.api, typeA === 'core' && styles.apiCore)}>
-            Type-A
-          </span>
-        )}
+        <div className={styles.headText}>
+          {/* floated, so it holds the top right corner and the title wraps
+              under it instead of being squeezed into a narrow column */}
+          {typeA && <span className={styles.api}>Type-A</span>}
+          <h4 className={styles.title}>{title}</h4>
+        </div>
       </header>
-      <div className={styles.caps}>
-        {caps.map((c) => (
-          <span key={c} className={styles.cap}>
-            {c}
-          </span>
-        ))}
-      </div>
+      {compact ? (
+        /* the supporting estate is context, so its capabilities run as one line
+           instead of a grid of chips */
+        <p className={styles.capLine}>{caps.join(' · ')}</p>
+      ) : (
+        <div className={styles.caps}>
+          {caps.map((c) => (
+            <span key={c} className={styles.cap}>
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
       {store && <Store label={store} />}
     </article>
   );
 }
 
-function Rail({title, note, core}) {
-  return (
-    <div className={clsx(styles.rail, core && styles.railCore)}>
-      <span>{title}</span>
-      <em>{note}</em>
-    </div>
-  );
-}
-
 const LEGEND = [
   {cls: 'heroSwatch', label: 'Bill Pay Core'},
-  {cls: 'billpay', label: 'Billpay platform'},
-  {cls: 'shared', label: 'Shared payments services'},
+  {cls: 'domain', label: 'Payments domain'},
+  {cls: 'channels', label: 'Channel'},
   {cls: 'support', label: 'Supporting domain'},
   {cls: 'tech', label: 'Supporting tech platform'},
   {cls: 'external', label: 'External'},
@@ -257,90 +269,82 @@ export default function LandscapeMap() {
     <div
       className={styles.wrap}
       role="img"
-      aria-label="The Amex payments estate with the payments domain at the centre. Channels (Myca, Mobile, IVR, ISP and others) call Type-A APIs on four domains only: Bill Pay Core, Plans, Payment Instruments and Mandates. Ownership splits into the Billpay platform (Bill Pay Core, Plans and the Bill Pay Inbound Processor) and the shared payments services every payment product draws on (Payment Instruments, Mandates, Allocation Manager, Control Tower, Multirail Gateway and Payments Clearing). Multirail Gateway and Payments Clearing also expose Type-A APIs, but only Bill Pay Core calls them. Payments Clearing is the route to every external party: partner banks, TPSPs, P2P networks and the payment networks. Third-party account verification is reached from both Payments Clearing and Payment Instruments. To the left sit the supporting domains and tech platforms: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
+      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway with Control Tower, then Payments Clearing. Every one of those exposes a Type-A API except Control Tower. Payments Clearing is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks. Under the dotted line sit the supporting domains and tech platforms: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
       <div className={styles.board}>
-        {/* ---- channels, directly above the centre column ---- */}
-        <div className={styles.channelSlot}>
-          <div className={clsx(styles.card, styles.channels)}>
-            <header className={styles.head}>
-              <span className={styles.num}>1</span>
-              <h4 className={styles.title}>Channels</h4>
-            </header>
-            <div className={styles.chanRow}>
-              {CHANNELS.map((c) => (
-                <span key={c.label} className={styles.chan}>
-                  <Icon name={c.icon} />
-                  {c.label}
-                </span>
-              ))}
-            </div>
+        <div className={styles.flowScroll}>
+          <div className={styles.main}>
+            {/* ---- group 1: channels, on the left ---- */}
+            <section className={clsx(styles.group, styles.groupChannels)}>
+              <h4 className={styles.groupTitle}>
+                <span className={styles.groupNum}>1</span>
+                Channels
+              </h4>
+              <div className={styles.chanRow}>
+                {CHANNELS.map((c) => (
+                  <span key={c.label} className={styles.chan}>
+                    <Icon name={c.icon} />
+                    {c.label}
+                  </span>
+                ))}
+              </div>
+            </section>
+
+            {/* ---- group 2: the payments domain, at the centre ---- */}
+            <section className={clsx(styles.group, styles.groupDomain)}>
+              <h4 className={styles.groupTitle}>Payments domain</h4>
+              <div className={styles.domainGrid}>
+                <div className={clsx(styles.col, styles.colCore)}>
+                  <Card {...CORE} />
+                </div>
+                <div className={styles.col}>
+                  {PLATFORM.map((d) => (
+                    <Card key={d.n} {...d} />
+                  ))}
+                </div>
+                <div className={styles.col}>
+                  {SHARED.map((d) => (
+                    <Card key={d.n} {...d} />
+                  ))}
+                </div>
+                <div className={styles.col}>
+                  {PLUMBING.map((d) => (
+                    <Card key={d.n} {...d} />
+                  ))}
+                </div>
+                <div className={styles.col}>
+                  <Card {...CLEARING} />
+                </div>
+              </div>
+            </section>
+
+            {/* ---- group 3: outside Amex, on the right ---- */}
+            <section className={clsx(styles.group, styles.groupExternal)}>
+              <h4 className={styles.groupTitle}>External systems</h4>
+              <div className={styles.extStack}>
+                {EXTERNAL.map((label) => (
+                  <div key={label} className={clsx(styles.external, styles.ext)}>
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ---- group 4: what the domain leans on, underneath it ---- */}
+            <section className={clsx(styles.group, styles.groupSupport)}>
+              <h4 className={styles.groupTitle}>Supporting domains &amp; tech platforms</h4>
+              <div className={styles.supportStack}>
+                {SUPPORTING.map((d) => (
+                  <Card key={d.n} {...d} tier={d.tier || 'support'} compact />
+                ))}
+              </div>
+            </section>
           </div>
-          <Rail
-            title="Type-A APIs"
-            note="channels call Bill Pay Core, Plans, Payment Instruments and Mandates"
-          />
         </div>
 
-        {/* ---- left flank ---- */}
-        <aside className={styles.flank}>
-          <div className={styles.flankLabel}>Supporting domains &amp; tech platforms</div>
-          <div className={styles.flankStack}>
-            {SUPPORTING.map((d) => (
-              <Card key={d.n} {...d} tier={d.tier || 'support'} compact />
-            ))}
-          </div>
-        </aside>
-
-        {/* ---- the centre ---- */}
-        <section className={styles.centre}>
-          <div className={styles.centreLabel}>Payments domain</div>
-
-          <div className={styles.groupBillpay}>
-            <span className={clsx(styles.groupTag, styles.groupTagBillpay)}>
-              Billpay platform
-            </span>
-            <div className={styles.grid}>
-              {BILLPAY.map((d) => (
-                <Card key={d.n} {...d} tier="billpay" />
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.groupShared}>
-            <span className={styles.groupTag}>Shared payments services</span>
-            <div className={styles.grid}>
-              {SHARED.map((d) => (
-                <Card key={d.n} {...d} />
-              ))}
-            </div>
-            <Rail title="Type-A APIs" note="Bill Pay Core is the only caller" core />
-            <div className={styles.grid}>
-              {RAILS.map((d) => (
-                <Card key={d.n} {...d} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ---- right flank ---- */}
-        <aside className={styles.flank}>
-          <div className={styles.flankLabel}>
-            External
-            <em>every one of these is reached through Payments Clearing</em>
-          </div>
-          <div className={styles.flankStack}>
-            {EXTERNAL.map((e) => (
-              <div
-                key={e.label}
-                className={clsx(styles.card, styles.external, styles.ext)}>
-                <h4 className={styles.title}>{e.label}</h4>
-                <span className={clsx(styles.via, e.both && styles.viaBoth)}>
-                  via {e.via}
-                </span>
-              </div>
-            ))}
-          </div>
-        </aside>
+        <p className={styles.hint}>
+          Scroll the row sideways for the rest of it, or collapse the contents panel to
+          see the whole estate at once.
+        </p>
       </div>
 
       <div className={styles.legend}>

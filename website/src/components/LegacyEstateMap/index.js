@@ -664,6 +664,41 @@ function Pill({e, dimmed}) {
   );
 }
 
+/* Toolbar glyphs. Drawn rather than typed so they sit on the same optical
+   weight as the + and − buttons beside them. */
+const TOOL_ICONS = {
+  reset: (
+    <>
+      <path d="M3.2 8a4.8 4.8 0 1 1 1.5 3.5" />
+      <path d="M3 4.4V8h3.6" />
+    </>
+  ),
+  expand: (
+    <>
+      <path d="M6.2 2.3H2.3v3.9" />
+      <path d="M9.8 2.3h3.9v3.9" />
+      <path d="M13.7 9.8v3.9H9.8" />
+      <path d="M2.3 9.8v3.9h3.9" />
+    </>
+  ),
+  collapse: (
+    <>
+      <path d="M2.3 6.2h3.9V2.3" />
+      <path d="M13.7 6.2H9.8V2.3" />
+      <path d="M9.8 13.7V9.8h3.9" />
+      <path d="M6.2 13.7V9.8H2.3" />
+    </>
+  ),
+};
+
+function ToolIcon({name}) {
+  return (
+    <svg viewBox="0 0 16 16" className={styles.toolIcon} aria-hidden="true">
+      {TOOL_ICONS[name]}
+    </svg>
+  );
+}
+
 export default function LegacyEstateMap({showIncremental = true}) {
   const [layer, setLayer] = useState(null);
   const [view, setView] = useState({k: 1, x: 0, y: 0});
@@ -764,11 +799,21 @@ export default function LegacyEstateMap({showIncremental = true}) {
           <button type="button" className={styles.tool} onClick={() => zoomAt(VB.w / 2, VB.h / 2, 1 / 1.35)} aria-label="Zoom out">
             −
           </button>
-          <button type="button" className={styles.tool} onClick={() => setView({k: 1, x: 0, y: 0})} aria-label="Reset zoom">
-            Reset
+          <button
+            type="button"
+            className={styles.tool}
+            onClick={() => setView({k: 1, x: 0, y: 0})}
+            aria-label="Reset zoom"
+            title="Reset zoom">
+            <ToolIcon name="reset" />
           </button>
-          <button type="button" className={styles.tool} onClick={() => setExpanded((v) => !v)}>
-            {expanded ? 'Close' : 'Expand'}
+          <button
+            type="button"
+            className={styles.tool}
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={expanded ? 'Leave full screen' : 'Full screen'}
+            title={expanded ? 'Leave full screen' : 'Full screen'}>
+            <ToolIcon name={expanded ? 'collapse' : 'expand'} />
           </button>
         </div>
       </div>

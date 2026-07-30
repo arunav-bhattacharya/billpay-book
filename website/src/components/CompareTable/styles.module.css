@@ -1,0 +1,135 @@
+/* CompareTable — the dimension on the left, the legacy estate in the middle,
+   the modern platform on the right. Follows the ApiTable treatment: a rounded
+   panel, a solid blue header band with tracked small-caps, no zebra striping,
+   and colour used only where it carries meaning (which side a phrase is on). */
+
+.wrap {
+  margin: 1.4rem 0 2rem;
+  border: 1px solid var(--amex-line);
+  border-radius: 15px;
+  background: var(--amex-panel);
+  box-shadow: var(--amex-sh-sm);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  display: table;
+  font-size: 0.92rem;
+}
+
+.table thead tr {
+  background: var(--amex-blue);
+  border: none;
+}
+
+.table th,
+.table td {
+  border: none;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  padding: 0.72rem 1rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #ffffff;
+  border: none;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  border-top: 1px solid var(--amex-line);
+  background: none;
+  transition: background-color 0.15s ease;
+}
+
+.table tbody tr:first-child {
+  border-top: none;
+}
+
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--amex-blue) 4%, transparent);
+}
+
+.table tbody th,
+.table tbody td {
+  padding: 0.7rem 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.thWhat {
+  width: 17%;
+}
+.thLegacy,
+.thModern {
+  width: 41.5%;
+}
+
+/* ---- the dimension. The selector carries the table so it outweighs the
+   `tbody th` reset above, which would otherwise flatten it back to regular. ---- */
+.table tbody th.whatCell {
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.35;
+  color: var(--amex-txt-strong);
+}
+
+/* ---- the two sides ---- */
+.legacyCell {
+  color: var(--amex-mut);
+  font-size: 0.88rem;
+}
+
+/* a hairline between the two sides, so the row reads as a before and after */
+.modernCell {
+  position: relative;
+  color: var(--amex-txt);
+  font-size: 0.88rem;
+  border-left: 1px solid var(--amex-line);
+}
+
+.hiLegacy {
+  font-weight: 650;
+  color: color-mix(in srgb, var(--amex-mut) 62%, var(--amex-txt-strong));
+}
+
+.hiModern {
+  font-weight: 650;
+  color: var(--amex-blue);
+}
+
+/* ---- dark ---- */
+:global([data-theme='dark']) .hiLegacy {
+  color: color-mix(in srgb, var(--amex-mut) 45%, var(--amex-txt-strong));
+}
+:global([data-theme='dark']) .hiModern {
+  color: var(--amex-blue-bright);
+}
+:global([data-theme='dark']) .table tbody tr:hover {
+  background: color-mix(in srgb, var(--amex-blue-bright) 7%, transparent);
+}
+
+@media (max-width: 700px) {
+  .table {
+    font-size: 0.86rem;
+  }
+  .table thead th,
+  .table tbody th,
+  .table tbody td {
+    padding: 0.6rem 0.7rem;
+  }
+  .legacyCell,
+  .modernCell {
+    min-width: 190px;
+  }
+}
