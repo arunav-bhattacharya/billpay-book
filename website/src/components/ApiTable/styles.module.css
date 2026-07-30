@@ -1,7 +1,17 @@
 /* ApiTable — gateway function on the left, the core API it delegates to in the
    middle, what it is for on the right. Follows the RouteMap table treatment:
    a rounded panel, tracked small-caps headers, no zebra striping, and colour
-   used only where it carries meaning (the HTTP verb). */
+   used only where it carries meaning (the HTTP verb).
+
+   All three columns set in the body sans. The function name and path were
+   monospaced, but nothing here needs column alignment, and mono at these
+   sizes read smaller and greyer than the prose around it.
+
+   Every cell, header included, is one size: --api-fs. The column headers,
+   function name, verb badge, path and description each used to carry their
+   own font-size, spanning 0.66rem to 0.92rem, which made a single row read
+   as four different tiers. Emphasis comes from weight, colour and the badge
+   instead. Change the token below to resize the whole table. */
 
 .wrap {
   margin: 1.4rem 0 2rem;
@@ -11,6 +21,12 @@
   box-shadow: var(--amex-sh-sm);
   overflow: hidden;
   overflow-x: auto;
+
+  --api-fs: 0.88rem;
+  /* Chips (the verb badge, the tag) sit a step below the text. They are
+     uppercase and tracked, so matching --api-fs made them read larger than
+     the prose beside them rather than equal to it. */
+  --api-chip: 0.72rem;
 }
 
 .table {
@@ -18,7 +34,7 @@
   margin: 0;
   border-collapse: collapse;
   display: table;
-  font-size: 0.92rem;
+  font-size: var(--api-fs);
 }
 
 /* Header band: solid Amex blue, white type, a shade larger than the old
@@ -37,7 +53,7 @@
 
 .table thead th {
   padding: 0.72rem 1rem;
-  font-size: 0.76rem;
+  font-size: var(--api-fs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -66,21 +82,24 @@
   font-weight: 400;
 }
 
-.thFn {
-  width: 32%;
-}
-.thApi {
-  width: 30%;
-}
+/* No explicit column widths. The first two columns are nowrap, so auto
+   layout sizes them to exactly what they need and gives the remainder to
+   the description, which is the only column that can wrap. Pinning them to
+   percentages instead let the browser inflate both and starved the
+   description to 150px. */
 
 /* ---- the function, linked to its contract ---- */
+/* The cell wraps but the name itself does not, so a row carrying a tag lets
+   the tag drop below the name instead of forcing the column ~95px wider and
+   taking that width out of the description. */
 .fnCell {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .fn {
-  font-family: var(--amex-font-mono);
-  font-size: 0.79rem;
+  white-space: nowrap;
+  font-family: var(--amex-font-sans);
+  font-size: var(--api-fs);
   font-weight: 500;
   color: var(--amex-blue);
   text-decoration: none;
@@ -104,7 +123,7 @@
   margin-left: 0.45rem;
   padding: 1px 7px;
   border-radius: 999px;
-  font-size: 0.62rem;
+  font-size: var(--api-chip);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -120,13 +139,13 @@
 
 .verb {
   display: inline-block;
-  min-width: 56px;
+  min-width: 62px;
   margin-right: 0.5rem;
   padding: 1px 7px;
   border-radius: 6px;
   text-align: center;
-  font-family: var(--amex-font-mono);
-  font-size: 0.66rem;
+  font-family: var(--amex-font-sans);
+  font-size: var(--api-chip);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -153,8 +172,8 @@
 }
 
 .path {
-  font-family: var(--amex-font-mono);
-  font-size: 0.76rem;
+  font-family: var(--amex-font-sans);
+  font-size: var(--api-fs);
   padding: 0;
   border: none;
   background: none;
@@ -164,7 +183,7 @@
 .whatCell {
   color: var(--amex-mut);
   line-height: 1.5;
-  font-size: 0.88rem;
+  font-size: var(--api-fs);
 }
 
 /* ---- dark ---- */
@@ -204,8 +223,10 @@
 }
 
 @media (max-width: 700px) {
-  .table {
-    font-size: 0.86rem;
+  /* Retune the token, not .table, so every cell shrinks together and the
+     row stays one size. */
+  .wrap {
+    --api-fs: 0.82rem;
   }
   .table thead th,
   .table tbody th,

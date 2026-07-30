@@ -1,4 +1,11 @@
-/* RouteMap — the Billpay Router as a grouped, scannable table. */
+/* RouteMap — the Billpay Router as a grouped, scannable table.
+
+   Set in the body sans throughout, at one size: --rm-fs. The trigger,
+   condition, workflow name, sequence arrow and the two pill labels each used
+   to carry their own font-size, spanning 0.56rem to 0.95rem, and the
+   workflow name was monospaced. Emphasis comes from weight, colour and the
+   pill fills instead. Matches the ApiTable token above it on the page.
+   Change the token to resize the whole table. */
 
 .wrap {
   margin: 1.4rem 0 2rem;
@@ -8,13 +15,19 @@
   border-radius: 15px;
   background: var(--amex-panel);
   box-shadow: var(--amex-sh-sm);
+
+  --rm-fs: 0.88rem;
+  /* Chips (the Online/Offline worker pill, the account tag) sit a step below
+     the text. They are uppercase and tracked, so matching --rm-fs made them
+     read larger than the prose beside them rather than equal to it. */
+  --rm-chip: 0.72rem;
 }
 
 .table {
   width: 100%;
   min-width: 660px;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: var(--rm-fs);
   background: var(--amex-panel);
 }
 
@@ -25,7 +38,7 @@
 
 .table thead th {
   text-align: left;
-  font-size: 0.76rem;
+  font-size: var(--rm-fs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -51,7 +64,7 @@
   vertical-align: middle;
   text-align: left;
   font-weight: 650;
-  font-size: 0.95rem;
+  font-size: var(--rm-fs);
   color: var(--amex-txt-strong);
   white-space: nowrap;
   background: color-mix(in srgb, var(--amex-cat-architecture) 5%, var(--ifm-background-color));
@@ -73,13 +86,13 @@
 /* Condition column. */
 .condCell {
   color: var(--amex-txt);
-  font-size: 0.86rem;
+  font-size: var(--rm-fs);
   white-space: nowrap;
 }
 .condChild {
   padding-left: 1.6rem;
   color: var(--amex-mut);
-  font-size: 0.82rem;
+  font-size: var(--rm-fs);
 }
 .branch {
   margin-right: 0.35rem;
@@ -106,8 +119,8 @@
   gap: 0.4rem;
 }
 .wfName {
-  font-family: var(--amex-font-mono);
-  font-size: 0.75rem;
+  font-family: var(--amex-font-sans);
+  font-size: var(--rm-fs);
   color: var(--amex-txt);
   background: none;
   border: none;
@@ -116,12 +129,12 @@
 .seq {
   color: var(--amex-mut);
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: var(--rm-fs);
 }
 
 /* Online / Offline — calm tinted pills (blue vs amber) rather than solid fills. */
 .worker {
-  font-size: 0.56rem;
+  font-size: var(--rm-chip);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -144,7 +157,7 @@
   margin-right: 0.45rem;
   padding: 0.05rem 0.42rem;
   border-radius: 5px;
-  font-size: 0.6rem;
+  font-size: var(--rm-chip);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -198,7 +211,9 @@
 }
 
 @media (max-width: 640px) {
-  .table {
-    font-size: 0.84rem;
+  /* Retune the token, not .table, so every cell shrinks together and the
+     row stays one size. */
+  .wrap {
+    --rm-fs: 0.82rem;
   }
 }
