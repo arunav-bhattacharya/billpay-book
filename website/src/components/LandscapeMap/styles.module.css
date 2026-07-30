@@ -156,8 +156,8 @@
     minmax(176px, 1.44fr) /* Bill Pay Core */
     minmax(150px, 1.14fr) /* Plans, Inbound Processor, Allocation Manager */
     minmax(154px, 1.18fr) /* Payment Instruments, Mandates */
-    minmax(142px, 0.98fr) /* Multirail Gateway, Control Tower */
-    minmax(154px, 1.18fr); /* Payments Clearing */
+    minmax(128px, 0.82fr) /* Control Tower */
+    minmax(158px, 1.3fr); /* Multirail Gateway, Payments Clearing */
   gap: 0.5rem;
   align-items: start;
 }
