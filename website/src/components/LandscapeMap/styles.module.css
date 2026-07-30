@@ -475,6 +475,14 @@
   align-items: stretch;
 }
 
+/* eight supporting domains, one row, whenever the field is wide enough to hold
+   them: two ragged rows under the payments domain read as an afterthought */
+@container (min-width: 1000px) {
+  .supportStack {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
 /* Only worth saying when the row is actually cut off. */
 .hint {
   display: none;
