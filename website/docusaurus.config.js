@@ -30,8 +30,9 @@ const config = {
 
   onBrokenLinks: 'throw',
 
-  // Text uses Benton Sans (the Amex corporate face), falling back to SF Pro
-  // Rounded and the system stack where it is not installed. Code uses SF Mono.
+  // Text uses Benton Sans (the Amex corporate face), self-hosted as WOFF2
+  // from src/css/fonts so every browser renders it the same. Code uses SF
+  // Mono. See the @font-face block in src/css/custom.css.
 
   markdown: {
     mermaid: true,

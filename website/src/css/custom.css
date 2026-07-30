@@ -55,106 +55,74 @@
  * 3. Typography
  * ==================================================================== */
 
-/* Benton Sans face mapping.
+/* Benton Sans, self-hosted.
  *
- * Two things made the page read heavier once Benton Sans was installed.
+ * These faces are served from ./fonts as WOFF2 rather than picked up from
+ * the machine with local(). local() looked simpler but rendered
+ * inconsistently: Safari refuses local() lookups for non-system faces as an
+ * anti-fingerprinting measure and silently fell through to SF Pro Rounded,
+ * a machine carrying several overlapping Benton installs resolved the
+ * family differently from one load to the next, and nobody visiting without
+ * the font installed saw it at all. Serving the bytes ourselves is the only
+ * way every browser gets the same rendering.
  *
- * 1. Face selection. Benton Sans installs as separate faces (Thin, Book,
- *    Regular, Medium, Bold). Asking the OS for the family by name alone
- *    lets it settle on whichever face it treats as the family default, and
- *    a 600 heading then lands on Bold. The rules below pin each CSS weight
- *    to one named face instead: 400 and 500 are the true Regular, 600 steps
- *    down to Medium, and only 700 reaches Bold.
+ * Two details carried over from the earlier tuning:
  *
- * 2. Apparent size. Measured against SF Pro Rounded at the same pixel size,
- *    Benton Sans Regular sits 2.2% taller at the x-height, 4.0% taller at
- *    the cap-height, and 8.9% wider. That is more ink per line, which is
- *    most of what looked bold. size-adjust: 97% scales the outlines back so
- *    both faces land on the same x-height and cap-height, which thins the
- *    stems in proportion. It must be repeated on every rule below, or the
- *    weights would render at different sizes.
+ * 1. Each face claims a weight range, rather than a single weight. Two
+ *    static faces have to cover a design that asks for 450, 550, 600, 620,
+ *    640, 650, 680, 700, 750 and 800. Declaring single weights left gaps,
+ *    and CSS resolves a gap by rounding up, which is how the page ended up
+ *    heavy. The ranges below bucket it deliberately instead.
  *
- * Nothing here loads over the network. local() matches only fonts already
- * on the machine, so where Benton Sans is absent the family resolves to
- * nothing and the stack drops through to SF Pro Rounded as before. Every
- * font-weight and letter-spacing value elsewhere in this file is unchanged,
- * so that fallback rendering is untouched.
+ *      400 to 500   Regular   body copy
+ *      501 to 900   Medium    everything the design marks as bold
+ *
+ *    The Bold cut is deliberately not shipped. Medium is the heaviest face
+ *    the site uses, so every emphasis tier, from a 550 table header to an
+ *    800 diagram label, resolves to it. Emphasis above body weight then
+ *    comes from size, colour and letter-spacing rather than from a second
+ *    step of weight. To reintroduce Bold, cap this range at 700 and add a
+ *    701 to 900 rule pointing at a BentonSans-Bold.woff2.
+ *
+ * 2. size-adjust: 97%. Measured against SF Pro Rounded at the same pixel
+ *    size, Benton Sans Regular sits 2.2% taller at the x-height, 4.0%
+ *    taller at the cap-height and 8.9% wider. That is more ink per line,
+ *    which is most of what read as bold. Scaling the outlines back lands
+ *    both faces on the same x-height and cap-height and thins the stems in
+ *    proportion. It must be repeated on every rule, or the weights would
+ *    render at different sizes.
+ *
+ * No italic cut ships with this family, so the browser obliques Regular.
+ * The url() paths are relative on purpose: the bundler rewrites them with
+ * the site baseUrl and a content hash, so they survive the /billpay-book/
+ * prefix on GitHub Pages.
  */
 @font-face {
   font-family: 'BentonSansUI';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 500;
   font-display: swap;
   size-adjust: 97%;
-  src: local('BentonSans-Regular'), local('BentonSans Regular'),
-    local('Benton Sans Regular'), local('BentonSansRegular'),
-    local('Benton Sans'), local('BentonSans');
+  src: url('./fonts/BentonSans-Regular.woff2') format('woff2');
 }
 @font-face {
   font-family: 'BentonSansUI';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 501 900;
   font-display: swap;
   size-adjust: 97%;
-  src: local('BentonSans-Regular'), local('BentonSans Regular'),
-    local('Benton Sans Regular'), local('BentonSansRegular'),
-    local('Benton Sans'), local('BentonSans');
-}
-@font-face {
-  font-family: 'BentonSansUI';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  size-adjust: 97%;
-  src: local('BentonSans-Medium'), local('BentonSans Medium'),
-    local('Benton Sans Medium'), local('BentonSansMedium');
-}
-@font-face {
-  font-family: 'BentonSansUI';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  size-adjust: 97%;
-  src: local('BentonSans-Bold'), local('BentonSans Bold'),
-    local('Benton Sans Bold'), local('BentonSansBold');
-}
-@font-face {
-  font-family: 'BentonSansUI';
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  size-adjust: 97%;
-  src: local('BentonSans-RegularItalic'), local('BentonSans Regular Italic'),
-    local('Benton Sans Regular Italic'), local('BentonSans-Italic'),
-    local('BentonSans Italic'), local('Benton Sans Italic');
-}
-@font-face {
-  font-family: 'BentonSansUI';
-  font-style: italic;
-  font-weight: 600;
-  font-display: swap;
-  size-adjust: 97%;
-  src: local('BentonSans-MediumItalic'), local('BentonSans Medium Italic'),
-    local('Benton Sans Medium Italic');
-}
-@font-face {
-  font-family: 'BentonSansUI';
-  font-style: italic;
-  font-weight: 700;
-  font-display: swap;
-  size-adjust: 97%;
-  src: local('BentonSans-BoldItalic'), local('BentonSans Bold Italic'),
-    local('Benton Sans Bold Italic');
+  src: url('./fonts/BentonSans-Medium.woff2') format('woff2');
 }
 
 :root {
-  /* 'BentonSansUI' is the weight-mapped family declared above. Plain
-     'Benton Sans' stays behind it so a machine whose faces carry names the
-     local() list does not cover still gets the real typeface, then the
-     previous SF Pro Rounded / system stack for everyone else. */
-  --amex-font-sans: 'BentonSansUI', 'Benton Sans', 'BentonSans', ui-rounded,
-    'SF Pro Rounded', 'SF Pro Text', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* 'BentonSansUI' is the self-hosted family declared above, and it is the
+     only Benton entry on purpose. Listing the OS family names behind it
+     would reintroduce the inconsistency, since a machine with its own
+     Benton install would resolve those differently from the served files.
+     Everything after it is the fallback for a failed font load. */
+  --amex-font-sans: 'BentonSansUI', ui-rounded, 'SF Pro Rounded', 'SF Pro Text',
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
   --amex-font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
     'Liberation Mono', monospace;
 
@@ -456,6 +424,19 @@ table thead tr {
 .theme-admonition {
   border-radius: 12px;
   box-shadow: var(--amex-sh-sm);
+}
+
+/* Sidebar weight tiers. Docusaurus ships every .menu__link at semibold,
+   which flattens the tree into one texture. A foldable section header keeps
+   Medium, and the page links inside drop to Regular, so the two read as
+   different kinds of thing. The active item below is the deliberate
+   exception: it stays Medium so the current page still stands out from its
+   siblings. */
+.theme-doc-sidebar-menu .menu__link {
+  font-weight: 400;
+}
+.theme-doc-sidebar-menu .menu__link--sublist {
+  font-weight: 600;
 }
 
 /* Sidebar active item gets an Amex-blue left rail. */
