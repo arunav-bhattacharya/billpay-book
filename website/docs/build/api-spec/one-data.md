@@ -39,6 +39,6 @@ Not every function answers a caller. Three are event-driven. They consume the as
 | `AccountsReceivableTransactionEventHandler.v1` | Accounts Receivable (GAR) posting events. |
 | `OpentoBuyUpdatePaymentEventHandler.v1` | Open-To-Buy (AMP) update events. Still being defined. |
 
-The settlement and AR-posted events these record are what eventually close a payment out to `PAID`. The [Paid Events Processing](../../design/workflows/periodic.md) sweep needs both before it will call anything paid.
+The settlement and AR-posted events these record are what eventually close a payment out to `PAID`. The [Paid Events Processing](../../design/component-model/workflows/periodic.md) sweep needs both before it will call anything paid.
 
 A new function follows the pattern above: a versioned contract, one delegation target, no business logic at the edge. Breaking changes ship as a new version, which is why `CreatePayment.v3` exists at all, and the old version keeps serving until its callers migrate.

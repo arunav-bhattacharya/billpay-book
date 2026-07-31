@@ -44,4 +44,4 @@ class PendingToAcceptedStage(
 
 ## Where they live
 
-Defaults in `core/lib/stages/impl/`, market overrides in `market/{m}/stages/`. The per-workflow catalogue of stages, showing which workflow runs which and in what order, is in [Design → Stages](../../../design/stages.md).
+Defaults in `core/lib/stages/impl/`, market overrides in `market/{m}/stages/`. The per-workflow catalogue of stages, showing which workflow runs which and in what order, is in [Design → Stages](../../../design/component-model/stages.md).

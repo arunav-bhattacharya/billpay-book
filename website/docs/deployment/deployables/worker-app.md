@@ -10,4 +10,4 @@ import Lead from '@site/src/components/Lead';
 
 The Online/Offline split is **logical, not physical**: the two worker pools run side by side in the same JVM, each polling its own task queues, sharing the app's [Agroal connection pool](../../build/principles/tech-stack/datasource.md). Deploying, scaling, and restarting happen at the level of this single app.
 
-Deployment detail for the app is still to come. Which workflows run on which worker, and why, is covered in [Design › Workflows](../../design/workflows/index.md). How the app reaches Temporal, and what happens when a region fails, is on the [High Availability](../../architecture/high-availability.md) page.
+Deployment detail for the app is still to come. Which workflows run on which worker, and why, is covered in [Design › Workflows](../../design/component-model/workflows/index.md). How the app reaches Temporal, and what happens when a region fails, is on the [High Availability](../../architecture/high-availability.md) page.

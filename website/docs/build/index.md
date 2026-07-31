@@ -9,43 +9,32 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>[Design](../design/index.md) describes what the platform does: the lifecycle, the workflows, the component model. This section is how we build it. It covers the stack we chose and why, how the code is organised, and how to write each kind of component.</Lead>
 
-## The stack at a glance
+## Pages in this section
 
 <Highlights
   accent="var(--amex-cat-build)"
   items={[
     {
-      term: 'Kotlin on the JVM',
-      desc: "The whole platform is Kotlin: workflows, stages, activities, domain model. Sealed types and null-safety do real work for us, and most illegal payment states simply don't compile.",
+      term: 'Principles',
+      to: '/docs/build/principles',
+      desc: `The load-bearing decisions: the stack we buy and why (Kotlin, Temporal, Quarkus, Oracle, OkHttp), and how you write a workflow, a stage, an activity, and a client.`,
     },
     {
-      term: 'Temporal',
-      desc: 'Every payment runs as a durable Temporal workflow on one of two workers (Online / Offline). Retries, timers, signals, and replay come from the platform, not from hand-rolled state tables.',
+      term: 'API Spec',
+      to: '/docs/build/api-spec',
+      desc: `The contracts: the One-Data Functions at the edge, and the core REST APIs behind them, with the router branching and the idempotency rules at the boundary.`,
     },
     {
-      term: 'Quarkus, kept light',
-      desc: 'Quarkus (ArC/CDI) wires the services and workers. We deliberately stay framework-light at the worker layer, so no Spring, no reactive stack, and small focused JARs.',
+      term: 'Data Model',
+      to: '/docs/build/data-model',
+      desc: `The Kotlin domain model (payments, options, instruments) and the Oracle tables underneath it, including how the code maps onto them.`,
     },
     {
-      term: 'Oracle · Agroal · Exposed',
-      desc: 'One Oracle schema holds every payment, event, and tracker row. AgroalDataSource pools the connections; the Exposed DSL is the only path from code to SQL.',
-    },
-    {
-      term: 'OkHttp at the edges',
-      desc: 'Every outbound call goes through a shared OkHttp client: clearing, AR, Open-To-Buy, validation. Its timeouts are tuned to the Temporal activity deadline above it.',
-    },
-    {
-      term: 'One Gradle monorepo',
-      desc: 'billpay-core is a multi-module Gradle build: shared defaults in core/lib, market overrides in market/{m}, and a build-enforced rule that keeps workflow code deterministic.',
+      term: 'Schedules',
+      to: '/docs/build/schedules',
+      desc: `The Temporal Schedules that drive the periodic workflows, and why a cadence change is a versioned code change rather than a console edit.`,
     },
   ]}
 />
-
-## How this section is organised
-
-- [Principles](./principles/index.md) holds the load-bearing decisions. [Tech Stack](./principles/tech-stack/index.md) covers what we buy and why. [Core Build](./principles/core-build/index.md) covers how you write workflows, stages, activities, and clients.
-- [API Spec](./api-spec/index.md) covers the contracts: One-Data Functions at the edge, and the core REST APIs behind them.
-- [Data Model](./data-model/index.md) covers the Kotlin domain model (payments, options, instruments) and the Oracle tables underneath it.
-- [Schedules](./schedules.md) covers the Temporal Schedules that drive the periodic workflows.
 
 The artifacts we ship, meaning the worker app, the codec server, and the mocks, live under [Deployment](../deployment/index.md).

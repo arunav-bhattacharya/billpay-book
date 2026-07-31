@@ -268,3 +268,13 @@ screenshots and are drawn once with both sets of edges.
 
 Every layout change is verified by a geometry checker run against the live DOM: zero
 edges through boxes, zero node overlaps, zero label collisions.
+
+## Design ▸ Component Model (2026-07-30)
+
+**Restructure, no content rewrite.** `design/workflows/*`, `design/stages` and
+`design/activities` moved under a new `design/component-model/` category with its own
+landing page. Paths are now `design/component-model/workflows/{index,core,composite,periodic}`,
+`design/component-model/stages`, `design/component-model/activities`; the page bodies are
+unchanged apart from relative links. `design/principles` stays where it is and keeps the
+call, naming and composition rules: Principles is the *rules*, Component Model is the
+*catalogue* of what exists at each layer.

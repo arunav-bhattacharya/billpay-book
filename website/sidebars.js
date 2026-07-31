@@ -53,17 +53,25 @@ const sidebars = {
         },
         {
           type: 'category',
-          label: 'Workflows',
+          label: 'Component Model',
           collapsed: true,
-          link: {type: 'doc', id: 'design/workflows/index'},
+          link: {type: 'doc', id: 'design/component-model/index'},
           items: [
-            'design/workflows/core',
-            'design/workflows/composite',
-            'design/workflows/periodic',
+            {
+              type: 'category',
+              label: 'Workflows',
+              collapsed: true,
+              link: {type: 'doc', id: 'design/component-model/workflows/index'},
+              items: [
+                'design/component-model/workflows/core',
+                'design/component-model/workflows/composite',
+                'design/component-model/workflows/periodic',
+              ],
+            },
+            'design/component-model/stages',
+            'design/component-model/activities',
           ],
         },
-        'design/stages',
-        'design/activities',
         'design/database',
         {
           type: 'category',

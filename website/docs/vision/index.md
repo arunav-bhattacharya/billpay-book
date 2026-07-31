@@ -9,37 +9,24 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>American Express's platform for credit card **bill payments and refunds**. One core processes every payment the same way in every market, and absorbs the differences between markets, account types, and processing rules.</Lead>
 
-## What Billpay does
+## Pages in this section
 
 <Highlights
   items={[
     {
-      term: 'What it is',
-      desc: `Billpay runs the full life of a credit card bill payment, and its reversal as a refund, from the moment it is initiated to the moment it settles, in every market Amex operates in.`,
+      term: 'Payments Overview',
+      to: '/docs/vision/payments-overview',
+      desc: `Where Billpay sits in the payments estate, the domains it calls to finish a payment, and how the modern platform compares with the legacy systems it replaces.`,
     },
     {
-      term: 'One core, every market',
-      desc: `The lifecycle of a payment is the same everywhere. What changes between markets (account type, clearing, posting rules) is configuration on a shared core, not a new codebase per market.`,
+      term: 'Product Vision',
+      to: '/docs/vision/product',
+      desc: `What a payment can be, the markets and dimensions the platform absorbs, and what actually happens between a customer submitting a payment and the money settling.`,
     },
     {
-      term: 'One lifecycle, everywhere',
-      desc: (
-        <>
-          Every payment moves through the same states (<code>PENDING</code> → <code>ACCEPTED</code> → <code>PROCESSING</code> → <code>PROCESSED</code> → <code>PAID</code>, plus the return and terminal states), so it is described identically in every market.
-        </>
-      ),
-    },
-    {
-      term: 'Durable processing',
-      desc: `Each payment runs as a durable, resumable process. It survives failures and long waits, retries safely, and never loses its place. Correctness comes before speed.`,
-    },
-    {
-      term: 'Traceable end to end',
-      desc: `Every state transition is persisted and published as an event, so any payment can be followed from its entry point, through its workflow and stages, to each downstream system.`,
-    },
-    {
-      term: 'What it coordinates',
-      desc: `Validation, clearing at the bank, the statement balance (Accounts Receivable), Open-To-Buy, and fulfillment out to accounting, audit, risk, and communications. A payment counts as paid only once settlement and posting are both confirmed.`,
+      term: 'Engineering Vision',
+      to: '/docs/vision/engineering',
+      desc: `The three parts the platform is built from, the principles behind them, and how a workflow is composed from stages and activities rather than branched per market.`,
     },
   ]}
 />

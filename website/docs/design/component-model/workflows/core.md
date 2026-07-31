@@ -10,7 +10,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 <Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle. The row under each heading shows the Temporal worker it runs on and the dimensions that select its stage and activity-group implementations.</Lead>
 
-The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, and the [state diagrams](../diagrams/state-diagram.md) show the transitions.
+The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, and the [state diagrams](../../diagrams/state-diagram.md) show the transitions.
 
 ## Create Immediate Payment
 

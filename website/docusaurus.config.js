@@ -147,12 +147,11 @@ const config = {
           src: 'img/amex-logo.png',
         },
         items: [
+          {to: '/docs/intro', label: 'Introduction', position: 'left'},
           {to: '/docs/vision', label: 'Vision', position: 'left'},
           {to: '/docs/architecture', label: 'Architecture', position: 'left'},
           {to: '/docs/design', label: 'Design', position: 'left'},
           {to: '/docs/build', label: 'Build', position: 'left'},
-          {to: '/docs/testing', label: 'Testing', position: 'left'},
-          {to: '/docs/observability', label: 'Observability', position: 'left'},
           {
             href: `https://github.com/${GH_USER}/${REPO_NAME}`,
             label: 'GitHub',
@@ -169,7 +168,7 @@ const config = {
               {label: 'Vision', to: '/docs/vision'},
               {label: 'Architecture Overview', to: '/docs/architecture/overview'},
               {label: 'APIs', to: '/docs/build/api-spec/billpay-core'},
-              {label: 'Workflows', to: '/docs/design/workflows/core'},
+              {label: 'Workflows', to: '/docs/design/component-model/workflows/core'},
             ],
           },
           {

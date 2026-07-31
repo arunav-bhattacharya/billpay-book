@@ -15,9 +15,9 @@ The site is organised around the layers a payment passes through:
 | **One-Data Functions** | The public, contract-level entry points (e.g. `CreatePayment.v3`) | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Billpay Core APIs** | The REST endpoints behind the gateway (`POST /payments`, …) | [API Spec › Billpay Core](build/api-spec/billpay-core.md) |
 | **Billpay Router** | Picks the right workflow from the request's date, instructions, and dimensions | [Architecture › Components in Detail](architecture/components.md) |
-| **Temporal Workflows** | Long-running, durable orchestrations on the Online and Offline workers | [Design › Workflows](design/workflows/index.md) |
-| **Stages** | One state transition each, the decision points a workflow sequences | [Design › Stages](design/stages.md) |
-| **ActivityGroups & Activities** | The reusable I/O units: clearing calls, AR posting, DB writes, notifications | [Design › ActivityGroups & Activities](design/activities.md) |
+| **Temporal Workflows** | Long-running, durable orchestrations on the Online and Offline workers | [Design › Workflows](design/component-model/workflows/index.md) |
+| **Stages** | One state transition each, the decision points a workflow sequences | [Design › Stages](design/component-model/stages.md) |
+| **ActivityGroups & Activities** | The reusable I/O units: clearing calls, AR posting, DB writes, notifications | [Design › ActivityGroups & Activities](design/component-model/activities.md) |
 | **Event Handlers** | Async consumers of money-movement, AR-posted, and Open-To-Buy events | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Schedules** | Temporal Schedules that drive the periodic executors | [Build › Schedules](build/schedules.md) |
 
@@ -28,7 +28,7 @@ Start with [Vision](vision/index.md). It covers why the platform exists and how 
 After that, the path depends on what you need.
 
 - If you work on the product, read the [Payment Journeys](design/journeys/index.md). They follow a payment from the channel a customer starts in to the money settling. Then read the [Architecture Overview](architecture/overview.md) for the shape of the system around it.
-- If you write the code, start with the same [Payment Journeys](design/journeys/index.md), then go into the [Workflows](design/workflows/core.md) and the [Build section](build/index.md).
+- If you write the code, start with the same [Payment Journeys](design/journeys/index.md), then go into the [Workflows](design/component-model/workflows/core.md) and the [Build section](build/index.md).
 
 ## Conventions
 

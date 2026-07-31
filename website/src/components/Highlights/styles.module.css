@@ -34,6 +34,30 @@
   box-shadow: var(--card-sh-hover);
 }
 
+/* A card that is itself a link. The whole surface is the target, and the arrow
+   after the title is the only thing that marks it as one. */
+.itemLink,
+.itemLink:hover {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Stays inline (not inline-block) so a title that wraps never leaves the arrow
+   stranded on a line of its own; relative offset gives it the nudge on hover. */
+.cue {
+  margin-left: 0.4rem;
+  color: var(--hl-accent);
+  font-weight: 500;
+  position: relative;
+  left: 0;
+  transition: left 0.17s ease;
+}
+
+.itemLink:hover .cue {
+  left: 3px;
+}
+
 /* The prominent message — this is what the eye lands on. */
 .term {
   font-size: 1.2rem;

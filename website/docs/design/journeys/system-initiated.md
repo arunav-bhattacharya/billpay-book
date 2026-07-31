@@ -17,6 +17,13 @@ import JourneyMap from '@site/src/components/JourneyMap';
 - [A Third Party pushes a Payment](#a-third-party-pushes-a-payment), where someone other than the cardmember pays the bill
 - [Accounts Receivable initiates a payment](#accounts-receivable-initiates-a-payment), raised inside Amex rather than by a customer
 
+## How to read the diagrams
+
+These use the same diagram as the [customer initiated](./customer-initiated.md) journeys, so a step means the same thing on either page: what happens, which systems it calls, and the state the payment holds when it is done.
+
+- Each one opens with the event or the schedule that sets it off, rather than a person and a channel.
+- No step is marked as a customer waiting, and there is no shaded region, because none of this is a request.
+
 ## A payment is Posted
 
 This is where every payment on the [customer journeys](./customer-initiated.md) ends. Billpay does not mark a payment paid just because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted. The two confirmations arrive at their own pace, and a timer matches them up.

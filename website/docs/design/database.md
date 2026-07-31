@@ -29,4 +29,4 @@ import Lead from '@site/src/components/Lead';
 
 ## Where the detail lives
 
-Column-level schemas, the Oracle conventions (partition-based purging, the unique index that does the idempotency check), and how the code maps onto these tables through Exposed are covered in [Build → Data Model → Database](../build/data-model/database.md). Which activity writes which table is in [ActivityGroups & Activities](./activities.md).
+Column-level schemas, the Oracle conventions (partition-based purging, the unique index that does the idempotency check), and how the code maps onto these tables through Exposed are covered in [Build → Data Model → Database](../build/data-model/database.md). Which activity writes which table is in [ActivityGroups & Activities](./component-model/activities.md).

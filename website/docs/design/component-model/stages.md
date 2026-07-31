@@ -229,4 +229,4 @@ The same stage can appear in more than one workflow, and which implementation ru
 
 ---
 
-See the [component model](./principles.md) for how stages sit between workflows and activity groups, and the [state model](./payment-state-model.md) for the states themselves.
+See the [design principles](../principles.md) for the rules that govern how stages sit between workflows and activity groups, and the [state model](../payment-state-model.md) for the states themselves.

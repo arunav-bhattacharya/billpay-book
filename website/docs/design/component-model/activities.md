@@ -36,4 +36,4 @@ Groups whose behaviour varies by market carry their dimensions in the second col
 | `PaymentRepresentmentExecutionActivityGroup` | `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization` | `REPRESENTING` → `REPRESENTED` | • Sends the payment to the clearing system.<br />• Then notifies the various downstream systems in parallel once it has been re-presented (`REPRESENTED`).<br />• Invoked from `RepresentingToRepresentedStage`. |
 | `MapNewPaymentIdToPreviousIdActivity` | Generic | None | • Writes a row into the `ORIG_TRANS_REFER_MAP` table linking the old and new payment ids.<br />• Preserves the audit trail when a scheduled payment is replaced by an updated one.<br />• Invoked from `UpdatePaymentWF`. |
 
-For the layering that governs what may call what, see the [component model](./principles.md).
+For the layering that governs what may call what, see the [design principles](../principles.md).

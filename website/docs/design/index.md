@@ -9,41 +9,40 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>Design sets out the **precise model** behind the platform: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.</Lead>
 
-## What this section covers
+## Pages in this section
 
 <Highlights
   accent="var(--amex-cat-design)"
   items={[
     {
-      term: 'A layered component model',
-      desc: (
-        <>
-          Five components (<strong>Workflow → Stage → ActivityGroup → Activity → Client</strong>), each with one responsibility and a strict rule about what it may call.
-        </>
-      ),
+      term: 'Principles',
+      to: '/docs/design/principles',
+      desc: `The five layered components, what each one is responsible for, and the call, naming, and composition rules that keep business decisions apart from transport.`,
     },
     {
-      term: 'One canonical state model',
-      desc: 'The lifecycle states every payment moves through, whatever the market or account type.',
+      term: 'Payment State Model',
+      to: '/docs/design/payment-state-model',
+      desc: `The canonical lifecycle states a payment moves through, what each one means, and which states a consumer or corporate payment can reach.`,
     },
     {
-      term: 'Composition over branching',
-      desc: 'One workflow per journey; market and account-type variation comes from swapping stage and activity-group implementations, selected by dimensions.',
+      term: 'Journeys',
+      to: '/docs/design/journeys',
+      desc: `Each payment followed end to end, from the channel a customer starts in, or the event that fires, to the money settling.`,
     },
     {
-      term: 'Diagrams from the spec',
-      desc: 'State and sequence diagrams generated from the lifecycle states and the end-to-end flows.',
+      term: 'Component Model',
+      to: '/docs/design/component-model',
+      desc: `What exists at each layer: every workflow, the stages those workflows sequence, and the activity groups the stages call.`,
+    },
+    {
+      term: 'Database',
+      to: '/docs/design/database',
+      desc: `The tables that hold payment state and its audit trail, and which of them each part of the lifecycle writes to.`,
+    },
+    {
+      term: 'Diagrams',
+      to: '/docs/design/diagrams',
+      desc: `The state diagrams per workflow and the sequence diagrams for the end-to-end flows, drawn from the spec.`,
     },
   ]}
 />
-
-## Pages in this section
-
-- [Principles](./principles.md) sets out the component model and its call, naming, and composition rules.
-- [Payment state model](./payment-state-model.md) lists the canonical lifecycle states and what each one means.
-- [Journeys](./journeys/index.md) follows each payment end to end, from the channel a customer starts in to the money settling.
-- [Workflows](./workflows/index.md) covers the logic inside each workflow (core, composite, periodic).
-- [Stages](./stages.md) covers the state-transition steps a workflow composes.
-- [ActivityGroups & Activities](./activities.md) covers the retryable actions the stages call.
-- [Database](./database.md) describes the tables that hold payment state and its audit trail.
-- [Diagrams](./diagrams/index.md) collects the state and sequence diagrams.

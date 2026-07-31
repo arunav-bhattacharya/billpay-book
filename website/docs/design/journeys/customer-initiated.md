@@ -39,6 +39,16 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 Journeys nobody starts by hand, such as returns, third-party pushes and the settlement that closes every payment out, are on [System Initiated](./system-initiated.md).
 
+## How to read the diagrams
+
+Every journey below uses the same diagram, so a step means the same thing throughout: what happens, which systems it calls, and the state the payment holds when it is done.
+
+- Each one opens with the person and the Amex channels they came in through.
+- The early steps are marked as the customer waiting.
+- The shaded region shows where the caller already has its answer and the rest runs unwatched.
+
+The [system initiated](./system-initiated.md) journeys use the same diagram without those three marks, because nothing on that page is a request.
+
 ## Pay my bill today
 
 A customer picks an amount and a way to pay it, and wants it to count today. Billpay answers as soon as it accepts the payment. The money moves after that, and the payment is not finished until both the bank and Accounts Receivable confirm it.
@@ -535,7 +545,7 @@ One payment, and every state it moved through on the way. This is what a servici
 ## Where to go deeper
 
 - [Payment state model](../payment-state-model.md), what each state means and which ones are final
-- [Workflows](../workflows/core.md), the step-by-step logic behind each journey
-- [Stages](../stages.md), the state-transition units the workflows compose
+- [Workflows](../component-model/workflows/core.md), the step-by-step logic behind each journey
+- [Stages](../component-model/stages.md), the state-transition units the workflows compose
 - [Sequence diagrams](../diagrams/sequence-diagram.md), the same journeys at engineering resolution
 - [Architecture › Components in Detail](../../architecture/components.md), the full router table with every trigger and child workflow
