@@ -4,30 +4,37 @@ sidebar_label: One-Data
 ---
 
 import Lead from '@site/src/components/Lead';
+import ApiTable from '@site/src/components/ApiTable';
+
+export const CORE = [
+  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Initiate a payment, either immediately or scheduled for a future date.'},
+  {fn: 'UpdatePayment.v1', method: 'PUT', path: '/payments/{payment-id}', purpose: 'Update a scheduled payment (cancel-and-recreate under the hood).'},
+  {fn: 'DeletePayment.v1', method: 'DELETE', path: '/payments/{payment-id}', purpose: 'Cancel a scheduled or accepted payment.'},
+  {fn: 'ReadPayments.v1', method: 'GET', path: '/payments/account/{account-id}', purpose: 'List the payments on an account.'},
+  {fn: 'ReadPaymentEventsById.v1', method: 'GET', path: '/payments/{payment-id}', purpose: 'Read a payment and its lifecycle events.'},
+  {fn: 'CreateCreditBalanceRefund.v1', method: 'POST', path: '/refunds', purpose: 'Send money back to the customer from a credit balance.'},
+  {fn: 'CreateInboundPayment.v1', method: 'POST', path: '/payments/inbound', purpose: 'Post a payment a third party initiated or confirmed.'},
+  {fn: 'CreatePaymentIntent.v1', method: 'POST', path: '/payments/intent', purpose: "Register an intent that becomes a payment when the customer's bank confirms it."},
+];
+
+export const COMPOSITE = [
+  {fn: 'CreatePaymentInstallment.v1', method: 'POST', path: '/payment-installments', purpose: 'A payment plus a future installment plan in one call.', tag: 'Composite'},
+  {fn: 'CreateBillpayTransactionFromAccountsReceivable.v1', method: 'POST', path: '/payments', purpose: 'A future-dated payment originated by the Accounts Receivable platform.', tag: 'Composite'},
+];
 
 # One-Data Functions
 
 <Lead>One-Data Functions are the platform's front door. They are versioned, stable contracts, so a channel integrates against <code>CreatePayment.v3</code> and keeps working while everything behind it evolves. Each function is thin: it validates the contract and delegates to one Billpay core REST API.</Lead>
 
+This is the full set. Every function name links to its contract in the One-Data explorer.
+
 ## Core functions
 
-| Function | Delegates to | What it's for |
-| --- | --- | --- |
-| `CreatePayment.v3` | `POST /payments` | Initiate a payment, either immediately or scheduled for a future date. |
-| `UpdatePayment.v1` | `PUT /payments/{payment-id}` | Update a scheduled payment (cancel-and-recreate under the hood). |
-| `DeletePayment.v1` | `DELETE /payments/{payment-id}` | Cancel a scheduled or accepted payment. |
-| `ReadPayments.v1` | `GET /payments/account/{account-id}` | List the payments on an account. |
-| `ReadPaymentEventsById.v1` | `GET /payments/{payment-id}` | Read a payment and its lifecycle events. |
-| `CreateCreditBalanceRefund.v1` | `POST /refunds` | Send money back to the customer from a credit balance. |
-| `CreateInboundPayment.v1` | `POST /payments/inbound` | Post a payment a third party initiated or confirmed. |
-| `CreatePaymentIntent.v1` | `POST /payments/intent` | Register an intent that becomes a payment when the customer's bank confirms it. |
+<ApiTable rows={CORE} />
 
 ## Composite functions
 
-| Function | Delegates to | What it's for |
-| --- | --- | --- |
-| `CreatePaymentInstallment.v1` | `POST /payment-installments` | A payment plus a future installment plan in one call. |
-| `CreateBillpayTransactionFromAccountsReceivable.v1` | `POST /payments` | A future-dated payment originated by the Accounts Receivable platform. |
+<ApiTable rows={COMPOSITE} />
 
 ## Event handlers
 

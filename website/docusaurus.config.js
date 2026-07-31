@@ -42,6 +42,33 @@ const config = {
   },
   themes: ['@docusaurus/theme-mermaid'],
 
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        // Pages that moved when the wiki was de-duplicated: each fact now has
+        // one home, so several pages were merged away. These keep old links
+        // and bookmarks working. Paths are written without the baseUrl, which
+        // the plugin adds. Redirect files are emitted by `build`, not by the
+        // dev server, so test them with `npm run build && npm run serve`.
+        redirects: [
+          {from: '/docs/design/journeys/api', to: '/docs/design/routing'},
+          {from: '/docs/design/diagrams', to: '/docs/design/sequence-diagrams'},
+          {
+            from: '/docs/design/diagrams/sequence-diagram',
+            to: '/docs/design/sequence-diagrams',
+          },
+          {
+            from: '/docs/design/diagrams/state-diagram',
+            to: '/docs/design/payment-state-model',
+          },
+          {from: '/docs/design/database', to: '/docs/build/data-model/database'},
+          {from: '/docs/architecture/components', to: '/docs/architecture/overview'},
+        ],
+      },
+    ],
+  ],
+
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -174,8 +201,8 @@ const config = {
           {
             title: 'Diagrams',
             items: [
-              {label: 'State Diagram', to: '/docs/design/diagrams/state-diagram'},
-              {label: 'Sequence Diagram', to: '/docs/design/diagrams/sequence-diagram'},
+              {label: 'Payment State Model', to: '/docs/design/payment-state-model'},
+              {label: 'Sequence Diagrams', to: '/docs/design/sequence-diagrams'},
             ],
           },
           {

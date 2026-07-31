@@ -31,11 +31,8 @@ Two conventions to keep:
 
 ## Under evaluation
 
-The reflection-based approach has a known ceiling. It is the main obstacle between us and GraalVM native-image workers, and polymorphic config is manual work Jackson cannot check at compile time. Four things are under evaluation and clearly **not adopted yet**.
+The reflection-based approach has a known ceiling. It is the main obstacle between us and GraalVM native-image workers, and polymorphic config is manual work Jackson cannot check at compile time.
 
-- **kotlinx.serialization** generates codecs for the sealed hierarchies at compile time. No reflection, native-image friendly, and the sealed-subtype registry comes from the compiler instead of annotations.
-- **KSP** (Kotlin Symbol Processing) does build-time code generation and validation, so conventions become compile errors instead of review comments.
-- **Konsist** writes architecture tests in Kotlin. Naming rules, module placement, and "no Exposed in workflow code" get asserted in CI.
-- **Arrow `Either`** gives structured validation errors (`rule`, `code`, `message`) for the validation path only. Everywhere else, plain exceptions and Temporal retries stay the model.
+**kotlinx.serialization** is the candidate: it generates codecs for the sealed hierarchies at compile time, so there is no reflection, native-image works, and the sealed-subtype registry comes from the compiler instead of annotations. It is **not adopted**, and it sits alongside the other tools [under evaluation](./index.md#under-evaluation).
 
-Until any of that lands, Jackson is the contract. If you are adding a type that crosses a boundary, follow the `@JsonTypeInfo` pattern above.
+Until it lands, Jackson is the contract. If you are adding a type that crosses a boundary, follow the `@JsonTypeInfo` pattern above.

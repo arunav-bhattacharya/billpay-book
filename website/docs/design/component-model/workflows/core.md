@@ -10,7 +10,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 <Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle. The row under each heading shows the Temporal worker it runs on and the dimensions that select its stage and activity-group implementations.</Lead>
 
-The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, and the [state diagrams](../../diagrams/state-diagram.md) show the transitions.
+The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, the [state model](../../payment-state-model.md) covers the states themselves, and the [sequence diagrams](../../sequence-diagrams.md) trace the same flows across the participants.
 
 ## Create Immediate Payment
 
@@ -86,6 +86,28 @@ Changes a scheduled payment. Rather than editing it in place, Billpay cancels th
 4. Invoke Create Schedule Payment for the replacement, which validates it and then runs **PendingToScheduledStage** (→ `SCHEDULED`) if valid, or **PendingToDeclinedStage** (→ `DECLINED`) if not.
 5. Map the new payment to the original in the database for audit (`MapNewPaymentIdToPreviousIdActivity`).
 
+Two payments are in play at once, which is easier to see drawn:
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: idempotency
+  state "Original payment" as Orig {
+    SCHEDULED --> CANCELLED: CancelPaymentWF
+  }
+  state "Replacement payment" as New {
+    PENDING_new: PENDING
+    PENDING_new --> SCHEDULED_new: CreateSchedulePaymentWF
+    PENDING_new --> DECLINED_new: CreateSchedulePaymentWF
+    SCHEDULED_new: SCHEDULED
+    DECLINED_new: DECLINED
+  }
+  PENDING --> Orig
+  PENDING --> New
+  Orig --> Mapping: map old to new
+  New --> Mapping
+  Mapping --> [*]
+```
+
 ## Process Returned Payment
 
 <WorkflowMeta worker="Offline" dimensions={['accountType']} />
@@ -116,8 +138,10 @@ Re-attempts a returned payment on its representment date.
 Fetches how a corporate payment splits across the accounts it covers, then kicks off the per-allocation execution. It waits on a signal, because the breakdown comes back asynchronously from the allocation-processing system.
 
 1. **ToAllocatingStage** asks the appropriate allocations manager for the breakdown and moves the payment to `ALLOCATING`.
-2. Wait for the *AllocationsReady* signal.
+2. Wait for the *AllocationsReady* signal, which the allocations manager sends once the breakdown exists.
 3. **AllocatingToAllocatedStage** moves the parent payment to `ALLOCATED`, creates the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), and runs Execute Split Payment for each.
+
+There are two signals here, and they are not the same one. *AllocationsReady* comes into this workflow from the allocations manager. *AllocationsReceived* goes out to the parent workflow that started it, which is what Create Immediate Payment and Execute Scheduled Payment wait on.
 
 ## Process Inbound Payment
 
@@ -140,4 +164,6 @@ Registers that a customer means to pay. It becomes a real payment only once the 
 
 ## Create Balance Refund
 
-Sends money back to the customer from a credit balance on the card, following the validate → process → fulfill path. Its detailed logic and dimensions are still being defined in the spec; it runs on the Online or Offline worker depending on where it is invoked.
+<WorkflowMeta worker="Online / Offline" dimensions={['TBD']} />
+
+Sends money back to the customer from a credit balance on the card, following the same validate, process and fulfil path as a payment. Its detailed step logic is still being defined in the spec. Which worker runs it depends on where in the journey it is invoked.

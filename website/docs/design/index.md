@@ -20,6 +20,11 @@ import Highlights from '@site/src/components/Highlights';
       desc: `The five layered components, what each one is responsible for, and the call, naming, and composition rules that keep business decisions apart from transport.`,
     },
     {
+      term: 'Routing',
+      to: '/docs/design/routing',
+      desc: `What the Billpay Router reads off a request, and which workflow each trigger and condition starts.`,
+    },
+    {
       term: 'Payment State Model',
       to: '/docs/design/payment-state-model',
       desc: `The canonical lifecycle states a payment moves through, what each one means, and which states a consumer or corporate payment can reach.`,
@@ -35,14 +40,9 @@ import Highlights from '@site/src/components/Highlights';
       desc: `What exists at each layer: every workflow, the stages those workflows sequence, and the activity groups the stages call.`,
     },
     {
-      term: 'Database',
-      to: '/docs/design/database',
-      desc: `The tables that hold payment state and its audit trail, and which of them each part of the lifecycle writes to.`,
-    },
-    {
-      term: 'Diagrams',
-      to: '/docs/design/diagrams',
-      desc: `The state diagrams per workflow and the sequence diagrams for the end-to-end flows, drawn from the spec.`,
+      term: 'Sequence Diagrams',
+      to: '/docs/design/sequence-diagrams',
+      desc: `Twelve end-to-end flows traced from the caller through the router and the workflows to the activities that do the work.`,
     },
   ]}
 />

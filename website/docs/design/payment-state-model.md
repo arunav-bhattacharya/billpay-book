@@ -88,6 +88,8 @@ After `ALLOCATED`, an immediate corporate payment continues straight to `PROCESS
 </TabItem>
 </Tabs>
 
+A split payment fans out at `ACCEPTED`. Each leg is created as its own `ACCEPTED` record and runs the same `PROCESSING` and `PROCESSED` path through Execute Split Payment, so the states above describe a leg as accurately as they describe a whole payment.
+
 ## The states
 
 | State | Meaning | Terminal? |
@@ -112,4 +114,4 @@ Corporate payments add two states while their allocation breakdown is fetched:
 | `ALLOCATING` | Allocations requested from the allocation-processing system, and awaited. | No |
 | `ALLOCATED` | All allocations for the payment received. | No |
 
-The [state and sequence diagrams](./diagrams/state-diagram.md) take this apart one workflow at a time.
+For how a single workflow drives these states, see [Core Workflows](./component-model/workflows/core.md), which lists each workflow's steps and the transition each step makes. The [sequence diagrams](./sequence-diagrams.md) trace the same flows across the participants that do the work.

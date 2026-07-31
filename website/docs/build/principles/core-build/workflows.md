@@ -18,8 +18,8 @@ You do not have to police this alone. The [module layout](./code-layout.md) keep
 ## Rules for workflow code
 
 - **One workflow per journey.** Create Immediate Payment, Execute Scheduled Payment, Process Returned Payment: one each, ever. There are no per-market workflow implementations.
-- **Never `abstract`.** Variation comes from composition: the same workflow is handed different stage and activity-group implementations, selected by the market's dimensions. If you are adding a per-market `if` to workflow code, you are in the wrong layer. The branch belongs in a stage.
-- **Dimensions come first.** All four dimensions (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) must be present in the payment context *before* the workflow starts, because they are what select the implementations. A combination the market never onboarded has no implementations, and the request is rejected before any workflow begins.
+- **Never `abstract`.** Variation comes from composition, per the [composition rules](../../../design/principles.md#composition-not-inheritance). If you are adding a per-market `if` to workflow code, you are in the wrong layer. The branch belongs in a stage.
+- **Dimensions come first.** A workflow's dimensions must be in the payment context *before* it starts, because they are what select the implementations. Most workflows use the four standard ones (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`); Create Payment Intent takes `instrumentType` instead of the clearing and posting pair. Each workflow's set is listed in [Design → Core Workflows](../../../design/component-model/workflows/core.md). A combination the market never onboarded has no implementations, and the request is rejected before any workflow begins.
 - **Composite workflows call child workflows.** They never inline another workflow's body.
 - **Treat a running workflow's shape as a contract.** In-flight executions replay against the code that exists when they resume. Renaming or restructuring a workflow with live executions is a breaking change. Use Temporal's workflow-versioning facilities to branch behaviour, and remove the old path only when the last old execution has drained.
 
@@ -97,6 +97,8 @@ This is the spec's own sketch of the workflow. It is worth reading line by line,
 ```
 
 Read it once through. The idempotency check happens before anything else. Every state move is a **stage**, validation is an **activity group**, and the caller is answered at `ACCEPTED` via early return. The corporate branch runs processing and the allocations child workflow *in parallel*, then waits on the signal before fanning out the splits. Nothing in the method touches a database, a clock, or a wire. The stages and activities behind it do.
+
+The sketch is reproduced as the spec writes it, so two of its type names differ from the catalogue: `CorporatePaymentAllocationsWorkflow` is `GetCorporatePaymentAllocationsWF`, and `CreatePaymentSplitsActivity` is `PaymentSplitsCreationActivity`. Follow the catalogue names when you write the real thing.
 
 ## Which worker runs it
 

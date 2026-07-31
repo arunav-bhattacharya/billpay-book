@@ -48,8 +48,10 @@ Each entry on the two sub-pages has:
 
 ## The two surfaces
 
-- [One-Data Functions](./one-data-functions.md) carries the SLA, SLI, and SLO for the 7 versioned, contract-level functions (`CreatePayment.v3`, `UpdatePayment.v1`, and the rest). The SLAs are tighter because these are the visible surface.
-- [Billpay Core APIs](./billpay-apis.md) carries the same for the 9 REST endpoints (`POST /payments`, `PUT /payments/{payment-id}`, and the rest). Latency targets are slightly tighter, because there is no function-edge overhead.
+- [One-Data Functions](./one-data-functions.md) carries the SLA, SLI, and SLO for the versioned, contract-level functions. The SLAs are tighter because these are the visible surface.
+- [Billpay Core APIs](./billpay-apis.md) carries the same for the REST endpoints behind them. Latency targets are slightly tighter, because there is no function-edge overhead.
+
+Both pages cover the surfaces that carry targets today, which is not every contract Billpay exposes. The full set is in [Build → API Spec](../../../build/api-spec/index.md).
 
 ## Error budget at a glance
 

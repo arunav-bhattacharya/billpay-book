@@ -9,19 +9,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>The periodic workflows do not run on cron jobs bolted to a host. They run on <strong>Temporal Schedules</strong>, registered with the cluster and durable like everything else. If the worker fleet restarts, the schedules carry on.</Lead>
 
-## Schedule → workflow
-
-All of these fire on the **Offline worker**, because nothing here has a user waiting.
-
-| Schedule | Triggers | What it drives |
-| --- | --- | --- |
-| Schedule Payment Executor | `ExecuteScheduledPaymentWF` | Scheduled payments whose run date has arrived. |
-| Corporate Allocations Processor | `ExecuteSplitPaymentWF` | Corporate allocation legs ready to process. |
-| Paid Events Processor | `PaidEventsProcessingWF` | Closes payments to `PAID` once **both** the settlement and AR-posted events are in the tracker. |
-| Missing Paid Events Processor | `MissingPaidEventsProcessingWF` | Payments still missing a settlement or AR-posted event after 48 hours. It recovers the event from the owning system, or raises an alert. |
-| Data Purge | `DataPurgingWF` | Retires old rows from the transactional tables by dropping date partitions, per the [database conventions](./data-model/database.md). |
-
-The spec also describes a **Scheduled Representments Executor**, which batches returned payments due for re-presentment the same way. It has not been added to the spec's schedule table yet. Treat it as the sixth member of this set.
+Every schedule fires on the **Offline worker**, because nothing here has a user waiting. Which schedule starts which workflow, and what each one does, is in [Design → Periodic Workflows](../design/component-model/workflows/periodic.md).
 
 ## How batching works
 
@@ -29,4 +17,4 @@ Executors work in waves rather than draining everything at once. They pick up **
 
 ## Build-time wiring
 
-Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys. That makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. What each periodic workflow actually does, step by step, is in [Design → Periodic Workflows](../design/component-model/workflows/periodic.md). Where each schedule fires in the life of a payment is in [Design → System Initiated Journeys](../design/journeys/system-initiated.md).
+Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys. That makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. Where each schedule fires in the life of a payment is in [Design → System Initiated Journeys](../design/journeys/system-initiated.md).

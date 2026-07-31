@@ -25,7 +25,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 ## Core
 
-- billpay-core is the REST APIs, the [Billpay Router](./components.md), and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools. An instance runs in each site.
+- billpay-core is the REST APIs, the [Billpay Router](../design/routing.md), and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools. An instance runs in each site.
 - Both instances read from the Oracle in their own site, which keeps read latency close to the caller.
 - Writes only land in IPC2, because that's where the Oracle primary lives.
 - Both instances talk to the same Temporal cluster in us-east-1.

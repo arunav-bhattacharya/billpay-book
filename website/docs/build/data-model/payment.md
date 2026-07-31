@@ -168,6 +168,4 @@ The pending to accepted edge takes the verified pieces as arguments, so validati
 
 A [stage](../principles/core-build/stages.md) is one of these functions plus the persistence and event publication around it, which is why stage signatures stay short.
 
-:::note[Still to be modelled]
-There are no types yet for `DISALLOWED`, `ALLOCATING`, or `ALLOCATED`, and no first-class Allocation entity, since splits plus `SplitSlice` carry that today. The processing dimensions ride in the routing context, not on these types. The [spec's state model](../../design/payment-state-model.md) remains the target picture.
-:::
+The eleven status types above are fewer than the [spec's state model](../../design/payment-state-model.md) defines. What is missing, and why, is listed on the [Data Model](./index.md) page.

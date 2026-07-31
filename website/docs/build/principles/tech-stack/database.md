@@ -16,8 +16,8 @@ import Lead from '@site/src/components/Lead';
 | **Strong ACID guarantees** | Money movement cannot tolerate phantom reads, lost writes, or partial commits. Serialisable isolation and well-understood locking behaviour are the table stakes everything else builds on. |
 | **Operations we don't have to build** | A dedicated Amex DBO team covers HA, backup, restore, patching, and capacity. Picking a datastore nobody else at Amex runs would mean carrying that whole layer ourselves. |
 | **Fits our load shape** | Billpay is mixed OLTP: short, hot transactions on `trans_dtl` and `idempotency_checker` next to append-heavy logs (`trans_lfcyc_event`, the notification tracker). Oracle handles that shape predictably with the right indexes and partitioning. |
-| **Partitioning is how we purge** | The event logs grow without bound. Range-partitioning on event date lets `DataPurgingWF` drop whole partitions instead of deleting row by row. |
-| **Idempotency at the constraint level** | The `idempotency_checker` first-write-wins contract is a unique constraint. A duplicate request fails its insert (`ORA-00001`) and we return the original outcome, with no application-level race to reason about. |
+| **Partitioning is how we purge** | The event logs grow without bound, and dropping a date partition retires a month of them instantly. |
+| **Idempotency at the constraint level** | First-write-wins is a unique constraint rather than application code, so there is no race to reason about. |
 | **Replicas and DR are solved** | Read replicas take the reporting load and Data Guard covers disaster recovery. Both are run by the DBO team, not by us. |
 | **JSON where relational is overkill** | Complex payloads such as allocation breakdowns and notification bodies can sit in JSON-typed columns instead of exploding into side tables. |
 
@@ -31,6 +31,4 @@ import Lead from '@site/src/components/Lead';
 
 One logical schema for billpay-core, with separate read-write and read-only users. Connection pooling is [Agroal](./datasource.md). Schema migrations are version-controlled and run through the standard Amex DB pipeline, never by hand and never by the ORM. Application code reaches Oracle exclusively through [Exposed](./orm.md), and there is no raw JDBC in stages, activities, or anywhere else.
 
-:::tip
-Reporting and analytics belong on a read replica or a downstream warehouse. If a dashboard query is hitting the primary, that is a bug. File it.
-:::
+The tables themselves, and the three Oracle habits that follow from the reasons above, are in [Data Model → Database](../../data-model/database.md).

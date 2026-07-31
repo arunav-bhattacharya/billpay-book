@@ -22,7 +22,7 @@ import Highlights from '@site/src/components/Highlights';
     {
       term: 'API Spec',
       to: '/docs/build/api-spec',
-      desc: `The contracts: the One-Data Functions at the edge, and the core REST APIs behind them, with the router branching and the idempotency rules at the boundary.`,
+      desc: `The contracts: the One-Data Functions at the edge, the core REST APIs behind them, and the idempotency rules at the boundary.`,
     },
     {
       term: 'Data Model',

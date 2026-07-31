@@ -36,11 +36,12 @@ class PendingToAcceptedStage(
 
 ## Rules for stages
 
-- **A stage calls activity groups and activities. Nothing else.** Not workflows, not other stages, not clients. If a stage wants another transition to happen, that is the workflow's decision to make.
-- **Every transition persists and publishes.** Updating the transaction detail row, appending to the lifecycle-event log, and publishing the event to Lumi via RTF is what `PaymentStateTransitionActivity` (or its split-level twin) is for, and every stage ends with it. A state change that is not recorded cannot be traced afterwards.
-- **Never `abstract`.** Stages vary by composition, same as workflows.
-- **One default implementation per dimension combination.** Every stage has a default for a given set of dimensions. Where a combination makes no sense, say a corporate account with no AR posting, there is no implementation at all, and no workflow can start with it. At runtime the market's profile picks which implementation the workflow composes. See the [additional rules](../../../design/principles.md) in Design.
-- **Name for behaviour, not market.** If the UK and Singapore share a non-realtime clearing rule, they share one stage implementation with a behavioural name. A market name in a class name usually means the rule was written in the wrong place.
+Design sets the [rules a stage obeys](../../../design/principles.md). What they mean when you are writing one:
+
+- The constructor takes activity groups and activities, and nothing else. There is no workflow, stage, or client to inject, so the call rule holds by construction.
+- End every `execute` with `PaymentStateTransitionActivity`, or its split-level twin for a leg. That single call does the detail-row update, the lifecycle-event append, and the publish to Lumi via RTF. A transition that skips it is a state change nobody can trace.
+- Write a concrete class per dimension combination rather than an `abstract` base with overrides. A combination that makes no sense, say a corporate account with no AR posting, simply has no class, which is what stops a workflow starting with it.
+- Put the behaviour in the class name. If the UK and Singapore share a non-realtime clearing rule, they share one file. A market name in a class name usually means the rule was written in the wrong place.
 
 ## Where they live
 

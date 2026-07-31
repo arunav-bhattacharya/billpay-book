@@ -22,7 +22,7 @@ import Highlights from '@site/src/components/Highlights';
     {
       term: 'Stages',
       to: '/docs/design/component-model/stages',
-      desc: `The state-transition steps a workflow composes, grouped by the workflow that runs them and listed in the order each workflow calls them.`,
+      desc: `The sixteen state-transition steps workflows compose, what each one does, and which workflows run it.`,
     },
     {
       term: 'ActivityGroups & Activities',

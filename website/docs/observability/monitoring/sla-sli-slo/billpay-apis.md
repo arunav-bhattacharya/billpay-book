@@ -100,4 +100,4 @@ For definitions of SLA / SLI / SLO and how to read each entry, see the
 | --- | --- | --- | --- | --- |
 | 220 ms | 450 ms | 900 ms | 1.6 s | 2.4 s |
 
-**SLI:** end-to-end latency for the composite, covering the child `CreateImmediatePaymentWF`, the installment plan, and optional autopay. **Error budget:** 0.1% / 30-day window.
+**SLI:** end-to-end latency measured at the core API, covering the child `CreateImmediatePaymentWF`, the installment plan, and optional autopay. **Error budget:** 0.1% / 30-day window.

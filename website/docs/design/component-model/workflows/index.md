@@ -4,17 +4,58 @@ title: Workflows
 
 import Lead from '@site/src/components/Lead';
 import Highlights from '@site/src/components/Highlights';
+import WorkerSplit from '@site/src/components/WorkerSplit';
+
+export const WORKERS = [
+  {
+    name: 'Online worker',
+    tone: 'online',
+    waiting: 'someone is waiting',
+    desc: 'Request-path workflows, where an end user is waiting for the answer.',
+    items: [
+      'Create Immediate Payment',
+      'Update Payment',
+      'Cancel Payment',
+      'Create Payment Intent',
+    ],
+  },
+  {
+    name: 'Offline worker',
+    tone: 'offline',
+    waiting: 'nobody is blocked',
+    desc: 'Everything triggered asynchronously, by events, by async systems such as RTF, or by a scheduler.',
+    items: [
+      'Execute Scheduled Payment',
+      'Process Inbound Payment',
+      'Process Returned Payment',
+      'Process Representment',
+      'Get Corporate Payment Allocations',
+      'Periodic sweeps',
+    ],
+  },
+];
+
+export const STRIPS = [
+  {
+    label: 'Either worker',
+    text: 'A few workflows run on both, depending on where in the journey they are invoked.',
+    items: ['Create Schedule Payment', 'Execute Split Payment', 'Create Balance Refund'],
+  },
+];
 
 # Workflows
 
 <Lead>A workflow orchestrates one payment journey end to end. Every workflow runs on Temporal, falls into one of three kinds, and executes on the Online or Offline worker depending on whether an end user is waiting for it.</Lead>
 
-## The two workers
+## Where workflows run
 
-- The **Online worker** runs workflows an end user is waiting on: an immediate payment, an update, a cancellation, a payment intent.
-- The **Offline worker** runs everything triggered asynchronously: scheduled execution, inbound payments, returns, and the periodic sweeps.
+Workflows run on two Temporal worker pools, divided by whether someone is waiting for the answer.
 
-Three workflows run on either worker, depending on where in the journey they are called: Create Schedule Payment, Execute Split Payment, and Create Balance Refund.
+<WorkerSplit workers={WORKERS} strips={STRIPS} />
+
+Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../../../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level.
+
+Each workflow on the pages below carries the worker it runs on, alongside the dimensions that select its implementations.
 
 ## Pages in this section
 

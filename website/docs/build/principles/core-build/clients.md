@@ -33,8 +33,5 @@ class ClearingClient(
 
 - **One client per system.** Clearing, Accounts Receivable, Authorizations, the allocations manager, and Raven each get their own `{System}Client`. When a downstream changes its contract, the blast radius is one file.
 - **Clients may call other clients and external systems, and nothing above them.** A client never touches a workflow, stage, activity group, or activity. It is the bottom of the chain on purpose.
-- **Use the shared OkHttp client for your category.** The [HTTP client](../tech-stack/http-client.md) page explains the categories: clearing, posting, validation, notification. Take the shared instance in your constructor. Never build a client per call, or you throw away the connection pool.
-- **Respect the activity's deadline.** Per-call timeouts sit at about half the Temporal activity timeout above you, so a hung downstream surfaces as a clean, retryable failure instead of a timed-out activity.
+- **Take the shared OkHttp client for your category in the constructor.** Which categories exist, how their timeouts are set, and what the interceptors already give you are all on the [HTTP client](../tech-stack/http-client.md) page. Never build a client per call.
 - **Translate at the boundary.** External enums, codes, and field names stop at the client. If a clearing status code leaks into a stage, the client did not finish its job.
-
-Auth, tracing headers, and correlation IDs arrive via the shared client's interceptors. You get them for free, so do not re-implement them per system.

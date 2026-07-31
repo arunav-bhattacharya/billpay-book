@@ -17,17 +17,12 @@ import Highlights from '@site/src/components/Highlights';
     {
       term: 'Overview',
       to: '/docs/architecture/overview',
-      desc: `The system mapped from One-Data Functions through the workflows to the downstream systems, and why the platform is built on Temporal.`,
-    },
-    {
-      term: 'Components in Detail',
-      to: '/docs/architecture/components',
-      desc: `Each block taken in turn: the router, the Online and Offline workers, the component model, the event handlers, and the schedules.`,
+      desc: `The system mapped from One-Data Functions through the workflows to the downstream systems, where the two worker pools run, and why the platform is built on Temporal.`,
     },
     {
       term: 'High Availability',
       to: '/docs/architecture/high-availability',
-      desc: `Where everything physically runs, across two on-prem sites and two AWS regions, and what fails over to what.`,
+      desc: `Where everything physically runs, across the on-prem sites and AWS, and what fails over to what.`,
     },
   ]}
 />

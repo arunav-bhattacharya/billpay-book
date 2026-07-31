@@ -278,3 +278,84 @@ landing page. Paths are now `design/component-model/workflows/{index,core,compos
 unchanged apart from relative links. `design/principles` stays where it is and keeps the
 call, naming and composition rules: Principles is the *rules*, Component Model is the
 *catalogue* of what exists at each layer.
+
+## De-duplication pass (2026-07-30)
+
+A full read of all 91 pages found the same facts documented in up to seven places, with the
+copies already drifted apart. Three causes: Design documented each of ~12 flows five times
+over, reference tables had no owner (the One-Data list existed in five places with five
+memberships), and Vision carried zero outbound links, so every page re-explained the model
+from scratch rather than deferring to it.
+
+**The rule now in force.** Vision and Architecture may restate a concept in a sentence or
+two for their audience. **No table, diagram, or enumerated list appears twice anywhere.**
+Design and Build never restate each other, they link. Mapping tables (what triggers what)
+live in Design; contract tables (function, endpoint, type, schema) live in Build.
+
+### Ownership map, authoritative
+
+| Subject | Single home |
+|---|---|
+| Component model, call rules, naming | `design/principles.md` |
+| Payment lifecycle states | `design/payment-state-model.md` |
+| Router: trigger to workflow | `design/routing.md` |
+| Schedule to workflow | `design/component-model/workflows/periodic.md` |
+| Online / Offline worker split | `design/component-model/workflows/index.md` |
+| Per-workflow behaviour | `design/component-model/workflows/*.md` |
+| Per-stage behaviour | `design/component-model/stages.md` |
+| Activities and ActivityGroups | `design/component-model/activities.md` |
+| Flow diagrams | `design/sequence-diagrams.md` |
+| One-Data functions, core endpoints | `build/api-spec/one-data.md`, `billpay-core.md` |
+| Tables and schema | `build/data-model/database.md` |
+| Tech choices | `build/principles/tech-stack/*.md` |
+| Code rules and enforcement | `build/principles/core-build/*.md` |
+| Why Temporal, durable execution | `architecture/overview.md#why-temporal` |
+| Physical topology, failover | `architecture/high-availability.md` |
+
+### Page changes
+
+- **New:** `design/routing.md` (the router table, moved out of Architecture and out of the
+  orphaned `design/journeys/api.md`, which nothing linked to).
+- **Moved:** `design/diagrams/sequence-diagram.md` → `design/sequence-diagrams.md`.
+- **Deleted:** `design/journeys/api.md`, `design/diagrams/state-diagram.md` (9 of its 12
+  diagrams were strict subsets of `payment-state-model`; the Update Payment one was salvaged
+  into `workflows/core.md`), `design/diagrams/index.md`, `design/database.md` (superseded by
+  `build/data-model/database.md`), `architecture/components.md` (merged into `overview.md`).
+- **Rewritten:** `design/component-model/stages.md`, from 10 workflow sections with 30
+  repeating stage headings to 16 stage sections plus one workflow-to-stage-sequence table.
+  Four verbatim triplications gone.
+- Architecture is now two pages: Overview and High Availability.
+
+91 pages → 87, and 3,913 words out (37,625 → 33,712), with no facts lost.
+`@docusaurus/plugin-client-redirects` added, with a redirect for every removed path, so old
+links keep working.
+
+### Spec questions settled while doing this
+
+- Schedule names normalised to the spec's periodic-workflow list: **Scheduled Payments
+  Executor**, **Corporate Allocations Processor**, **Scheduled Representments Executor**,
+  **Paid Events Processor**, **Missing Paid Events Processor**, **Data Purger**. The wiki
+  previously carried three spellings.
+- *AllocationsReady* and *AllocationsReceived* are **two different signals**, not drift. The
+  first comes into Get Corporate Payment Allocations from the allocations manager, the
+  second goes out to the parent workflow. `workflows/core.md` now says so.
+- `ProcessInboundPaymentWF` runs on the **Offline** worker (spec §Core Workflows). The old
+  routing table left it untagged.
+- `instrumentType` **is** a real dimension (spec line 550, Create Payment Intent). Build's
+  "all four dimensions" claim was the thing that was wrong, not the Design page.
+- The installments composite has **no `WF` identifier in the spec**. `CreatePaymentAndPlanWF`
+  and `CreatePaymentInstallmentWF` were both invented; the wiki now uses the spec's prose
+  name, Create Payment & Installments.
+- Sequence diagram 7's `Invalid Notify` participant was invented. The spec defines no
+  notification on an invalid return, and the diagram now says so.
+
+### Open, needs a human answer
+
+`architecture/high-availability.md` says the Temporal cluster is **a single cluster in
+us-east-1**, and its failure row reads "no workflow can start or advance while the cluster is
+down". `deployment/temporal-server.md` says **us-east-1 active with a us-west-1 passive
+standby** and manual promotion, and points at the HA page for "the full regional picture",
+which that page does not draw. Neither `docs/Wiki_Spec.md` nor `reference/` mentions any AWS
+region, so both came from outside the source hierarchy and cannot be reconciled from any
+document in the repo. `architecture/index.md` no longer asserts a region count. **Someone who
+knows the deployment needs to say which page is right.**

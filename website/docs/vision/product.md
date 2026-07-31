@@ -81,7 +81,7 @@ The team captures a market as one or more **profiles**: specific combinations of
 
 Dimensions change how a payment is handled. They never change how it is *described*. Whatever the market, account type, or clearing rule, every payment moves through the **same set of lifecycle states**. That shared vocabulary is what lets operations, reporting, and downstream systems treat a corporate payment in one market and a consumer payment in another as the same kind of thing.
 
-The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED`, and `DISALLOWED` as the other outcomes. Corporate payments add two states while their allocations are worked out, `ALLOCATING` and `ALLOCATED`, but the rest of the journey is identical. The full state model lives in the Design section.
+The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED`, and `DISALLOWED` as the other outcomes. Corporate payments add two states while their allocations are worked out, `ALLOCATING` and `ALLOCATED`, but the rest of the journey is identical. What each state means, and every transition between them, is in the [Payment State Model](../design/payment-state-model.md).
 
 ## What processing a payment involves
 
@@ -94,3 +94,5 @@ Handling a payment is a sequence of steps. Validation comes first; the downstrea
 - **Fulfillment** tells the systems that need to know once the payment is processed: accounting, balance and control (audit), risk, and customer communications.
 
 A payment only reaches the final `PAID` state once Billpay has seen **both** confirmations come back: that the bank settled the funds, and that AR posted the payment. Until both arrive it is not called paid, so "paid" always means genuinely settled and booked.
+
+Which of these steps run in parallel, and in what order, is on the [Architecture Overview](../architecture/overview.md).

@@ -110,7 +110,7 @@ This is where every payment on the [customer journeys](./customer-initiated.md) 
       text: 'If a confirmation never turns up, the payment would sit here forever. After 48 hours the Missing Paid Events Processor, a separate schedule, asks the system that owes the event. It either records the answer so the next run can finish the payment, or raises an alert for someone to look at.',
     },
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#10-paid-events-reconciliation', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#10-paid-events-reconciliation', label: 'Sequence diagram'}}
 />
 
 Nothing here is a single request. The two confirmations land whenever the owning system produces them, the event handlers write each one into the tracker, and this workflow only acts once both are there.
@@ -180,7 +180,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
     {step: 4, text: 'A retry is a new presentment against the same payment, sitting at REPRESENTING until its date comes round.'},
     {step: 5, text: 'The Scheduled Representments Executor picks it up, revalidates, and sends it for clearing again. It either settles, or it is declined and the payment stops there.'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#7-return-processing--representment-eligibility-check', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#7-return-processing--representment-eligibility-check', label: 'Sequence diagram'}}
 />
 
 ## A Third-party pushes a Payment
@@ -238,7 +238,7 @@ Someone other than the cardmember pushes money at the account. A bank, a partner
     {step: 2, text: 'A payment Amex will not take ends at DISALLOWED. That state exists only on this journey, and it says something different from DECLINED: the payment was not rejected on its merits, it was not accepted in the first place.'},
     {text: 'Past that point the journey matches an ordinary payment. The money is applied, everyone downstream is told, and it closes once both confirmations arrive.'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#9-inbound-payment', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#9-inbound-payment', label: 'Sequence diagram'}}
 />
 
 ## Accounts Receivable initiates a payment

@@ -1,6 +1,6 @@
 ---
 title: Sequence Diagrams
-sidebar_label: Sequence Diagram
+sidebar_label: Sequence Diagrams
 ---
 
 # Sequence Diagrams
@@ -14,7 +14,7 @@ End-to-end traces from a caller's perspective. Each one follows a single Billpay
 - Amex-blue blocks are a workflow on an **online** worker, in the request path with the caller waiting. Electric-blue blocks are a workflow on an **offline** worker: schedules, event handlers, and anything drained in batches.
 - Pale-blue blocks are a sub-workflow invoked from inside another.
 - Dashed gold marks async work that runs after the caller has been answered.
-- Chips such as `state → ACCEPTED` mark a lifecycle transition. They are one colour throughout, because the chip already names the state. The [state diagram](./state-diagram.md) is where outcomes are colour-coded.
+- Chips such as `state → ACCEPTED` mark a lifecycle transition. They are one colour throughout, because the chip already names the state. The [payment state model](./payment-state-model.md) is where outcomes are colour-coded.
 - Each ActivityGroup or Activity is its own participant, labelled short: `Execution` for `PaymentExecutionActivityGroup`, `Capture` for `IdempotencyCheckActivity`, `Validation` for `PaymentValidationActivityGroup`.
 - External systems are left out (clearing, Accounts Receivable, Open-To-Buy, accounting, the database, the event bus). Each is internal to the group that owns it.
 - Diagrams fit their column. The wider ones carry an expand control in the top right, which opens a full-window view at window width or actual size. Escape closes it.
@@ -25,9 +25,6 @@ End-to-end traces from a caller's perspective. Each one follows a single Billpay
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -108,9 +105,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -206,9 +200,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -311,9 +302,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -438,9 +426,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -511,9 +496,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -568,9 +550,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -584,7 +563,6 @@ sequenceDiagram
     participant PR as Returned WF
     participant IDEMP as Capture
     participant PRV as Return Val.
-    participant PIRN as Invalid Notify
     participant PRX as Return Exec.
     participant PRE as Repr. Elig.
     participant PRC as Repr. Create
@@ -615,8 +593,7 @@ sequenceDiagram
         Note over PR: payment stays in RETURNED, representment workflow not invoked
       end
     else invalid return
-      PR->>PIRN: notify invalid return
-      Note over PR,PIRN: no state transition, payment stays in its current state
+      Note over PR,PRV: no state transition, payment stays in its current state
     end
   end
 ```
@@ -629,7 +606,7 @@ sequenceDiagram
 - It checks representment eligibility (`PaymentRepresentmentEligibilityActivityGroup`).
 - If representable, it creates the representment, moves to `REPRESENTING` (`PaymentRepresentmentCreationActivityGroup`), and hands off to `ProcessRepresentmentWF` in [diagram #8](#8-representment-workflow).
 - If not representable, the payment stays `RETURNED` and the representment workflow is never invoked.
-- An invalid return is notified and the payment keeps whatever state it had.
+- An invalid return changes nothing. The payment keeps whatever state it had. What the workflow does next is not yet defined in the spec.
 
 </details>
 
@@ -637,9 +614,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -686,9 +660,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -754,9 +725,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -804,9 +772,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -858,9 +823,6 @@ sequenceDiagram
 
 ```mermaid
 ---
-# Sans, not the site's mono: it reads better at this size and lays out about
-# 20% narrower. It has to be declared per diagram because Mermaid's global
-# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
 config:
   fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
   fontSize: 15
@@ -874,13 +836,13 @@ sequenceDiagram
   end
 
   box rgba(1,111,208,0.06) Billpay Platform
-    participant API as POST /paymentInstallments
+    participant API as POST /payment-installments
     participant CWF as Installment WF
     participant CIP as Immediate WF
   end
 
   C->>ODF: CreatePaymentInstallment.v1
-  ODF->>API: POST /paymentInstallments
+  ODF->>API: POST /payment-installments
   API->>CWF: invoke composite
 
   rect rgba(1,91,179,0.10)
@@ -909,7 +871,7 @@ sequenceDiagram
 <details>
 <summary>What happens</summary>
 
-- `CreatePaymentInstallmentWF` is a composite. It runs `CreateImmediatePaymentWF` first.
+- Create Payment & Installments is a composite workflow. It runs `CreateImmediatePaymentWF` first.
 - On `ACCEPTED` it creates the installment plan through the Installments API, and updates autopay if the flag is set.
 - On `DECLINED` it short-circuits. No installment plan is created and autopay is left alone.
 

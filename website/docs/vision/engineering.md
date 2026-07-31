@@ -70,6 +70,8 @@ Requests come in through the APIs. Workflows carry each payment from received to
   ]}
 />
 
+The gateway contracts are listed in [Build → API Spec](../build/api-spec/one-data.md), and what the router does with each request is in [Design → Routing](../design/routing.md).
+
 A workflow is assembled from four kinds of part:
 
 - A **stage** carries out one state transition, pending to accepted for instance, and does the validation, persistence, and event publication for that single move.
@@ -77,7 +79,7 @@ A workflow is assembled from four kinds of part:
 - An **activity** is a single retryable action, like writing a database row or calling one downstream system.
 - A **client** is the adapter that talks to the external system.
 
-The Design section covers the model in full.
+[Design → Principles](../design/principles.md) covers the model in full, including the rule about what each layer may call.
 
 ## Core principles
 
@@ -121,17 +123,10 @@ The Design section covers the model in full.
 
 Markets come onto the platform through configuration. Someone picks the One-Data APIs the market will use, then answers a few questions about how it processes payments. Those selections build a profile for that market and account type, held as one combination of dimensions.
 
-The profile is what composes the workflow. When a request arrives, Billpay reads the dimensions on it, resolves them to the implementations onboarded for that combination, and starts the workflow with those parts already in place. All of that happens before the run begins, so the workflow itself carries no market logic. It runs the same sequence of business steps everywhere.
+The profile is what composes the workflow. When a request arrives, Billpay reads the dimensions on it, resolves them to the implementations onboarded for that combination, and starts the workflow with those parts already in place. All of that happens before the run begins, so the workflow itself carries no market logic. It runs the same sequence of business steps everywhere. What each dimension means is on the [Product Vision](./product.md).
 
 <CompositionMap
-  apis={[
-    'CreatePayment.v3',
-    'UpdatePayment.v1',
-    'DeletePayment.v1',
-    'CreateInboundPayment.v1',
-    'CreatePaymentIntent.v1',
-    'CreateCreditBalanceRefund.v1',
-  ]}
+  apis={['CreatePayment.v3', 'UpdatePayment.v1', 'DeletePayment.v1', 'and the rest']}
   dims={DIMENSIONS}
   run={RUN}
   footnote={

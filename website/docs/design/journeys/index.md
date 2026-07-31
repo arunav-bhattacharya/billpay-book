@@ -25,10 +25,7 @@ import Highlights from '@site/src/components/Highlights';
       to: '/docs/design/journeys/system-initiated',
       desc: `A bank sends money back, a third party pushes a payment in, a timer fires to close out settlement. Nobody is waiting, so this runs in the background on its own schedule.`,
     },
-    {
-      term: 'APIs to Workflows',
-      to: '/docs/design/journeys/api',
-      desc: `Which API call starts which workflow, so you can trace any request from the endpoint it arrives on to the orchestration that runs it.`,
-    },
   ]}
 />
+
+To trace a request from the trigger it arrives on to the workflow that runs it, see [Routing](../routing.md).

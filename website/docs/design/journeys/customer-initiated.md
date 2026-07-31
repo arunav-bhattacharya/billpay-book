@@ -155,7 +155,7 @@ A customer picks an amount and a way to pay it, and wants it to count today. Bil
       text: 'The payment holds at PROCESSED until the bank confirms it settled and Accounts Receivable confirms it posted. If either is still missing after 48 hours, Billpay asks the system that owes it, or raises an alert.',
     },
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#1-immediate-payment-single-instruction', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#1-immediate-payment-single-instruction', label: 'Sequence diagram'}}
 />
 
 ## Pay on a future date
@@ -240,7 +240,7 @@ The customer picks a date. Billpay checks the payment now so they hear straight 
     {step: 4, text: 'The Scheduled Payments Executor picks up due payments in waves, roughly 2,500 a minute, and checks them again. A payment valid last week can fail today, so this second check is not a formality.'},
     {text: 'From here the journey is identical to [Pay my bill today](#pay-my-bill-today): the money moves, everyone downstream is told, and the payment closes once the bank and Accounts Receivable both confirm it.'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#2-scheduled-payment-created-today-and-executed-later', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#2-scheduled-payment-created-today-and-executed-later', label: 'Sequence diagram'}}
 />
 
 ## Pay with Points & Money
@@ -326,7 +326,7 @@ The customer pays something now and spreads the rest. One workflow drives both h
   entry={[{kind: 'function', label: 'CreatePaymentInstallment.v1', logo: 'oneData'}]}
   core={[{kind: 'api', label: 'POST /payment-installments'}]}
   workflow={[
-    {label: 'CreatePaymentAndPlanWF'},
+    {label: 'Create Payment & Installments'},
     {label: 'CreateImmediatePaymentWF', via: 'calls', child: true},
   ]}
   persist={false}
@@ -361,12 +361,12 @@ The customer pays something now and spreads the rest. One workflow drives both h
     },
   ]}
   detail={[
-    {text: 'CreatePaymentAndPlanWF orchestrates both halves. It calls CreateImmediatePaymentWF for the payment and, in parallel, sends an API request to Globestar to set up the plan. Neither waits on the other.'},
+    {text: 'Create Payment & Installments orchestrates both halves. It calls CreateImmediatePaymentWF for the payment and, in parallel, sends an API request to Globestar to set up the plan. Neither waits on the other. The spec names this composite in prose only, so unlike the core workflows it has no WF identifier yet.'},
     {step: 2, text: 'The payment itself is [Pay my bill today](#pay-my-bill-today), unchanged. Nothing about the plan alters how the money moves, or how it settles.'},
     {step: 3, text: 'Globestar holds the plan for the balance the customer chose to spread. Billpay does not own instalments, it only asks for them.'},
     {text: 'Running the two together is what makes this a composite journey. The customer asked for one thing, so they should not wait for a payment to finish before a plan exists.'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#12-create-payment--installments-composite', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#12-create-payment--installments-composite', label: 'Sequence diagram'}}
 />
 
 ## Update a payment
@@ -425,7 +425,7 @@ Nothing is edited in place. Billpay cancels the original and re-initiates it wit
     {step: 3, text: 'A new payment is raised from the updated details. It gets a new payment id but keeps the same confirmation number, so the customer sees one continuous payment rather than two.'},
     {step: 4, text: 'The new payment id is mapped to the old one, so an auditor can follow the chain later.'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#5-update-a-scheduled-payment', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#5-update-a-scheduled-payment', label: 'Sequence diagram'}}
 />
 
 ## Cancel a payment
@@ -469,7 +469,7 @@ A payment can be pulled back while it is still waiting or accepted. Once the mon
     {step: 3, text: 'The payment moves to CANCELLED and stays there. It is a terminal state, so nothing picks it up later.'},
     {text: 'A payment already sent for clearing cannot be cancelled. Getting that money back means a return, which is on [System Initiated](./system-initiated.md).'},
   ]}
-  reference={{to: '/docs/design/diagrams/sequence-diagram#6-cancel-a-payment', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#6-cancel-a-payment', label: 'Sequence diagram'}}
 />
 
 ## Intent to pay
@@ -566,5 +566,5 @@ One payment, and every state it moved through on the way. This is what a servici
 - [Payment state model](../payment-state-model.md), what each state means and which ones are final
 - [Workflows](../component-model/workflows/core.md), the step-by-step logic behind each journey
 - [Stages](../component-model/stages.md), the state-transition units the workflows compose
-- [Sequence diagrams](../diagrams/sequence-diagram.md), the same journeys at engineering resolution
-- [Architecture › Components in Detail](../../architecture/components.md), the full router table with every trigger and child workflow
+- [Sequence diagrams](../sequence-diagrams.md), the same journeys at engineering resolution
+- [Routing](../routing.md), the full router table with every trigger and child workflow

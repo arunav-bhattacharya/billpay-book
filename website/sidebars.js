@@ -27,7 +27,6 @@ const sidebars = {
       link: {type: 'doc', id: 'architecture/index'},
       items: [
         'architecture/overview',
-        'architecture/components',
         'architecture/high-availability',
       ],
     },
@@ -39,6 +38,7 @@ const sidebars = {
       link: {type: 'doc', id: 'design/index'},
       items: [
         'design/principles',
+        'design/routing',
         'design/payment-state-model',
         {
           type: 'category',
@@ -48,7 +48,6 @@ const sidebars = {
           items: [
             'design/journeys/customer-initiated',
             'design/journeys/system-initiated',
-            'design/journeys/api',
           ],
         },
         {
@@ -72,17 +71,7 @@ const sidebars = {
             'design/component-model/activities',
           ],
         },
-        'design/database',
-        {
-          type: 'category',
-          label: 'Diagrams',
-          collapsed: true,
-          link: {type: 'doc', id: 'design/diagrams/index'},
-          items: [
-            'design/diagrams/state-diagram',
-            'design/diagrams/sequence-diagram',
-          ],
-        },
+        'design/sequence-diagrams',
       ],
     },
     {

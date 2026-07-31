@@ -25,10 +25,7 @@ export const GROUPS = [
           'CreatePayment.v3',
           'UpdatePayment.v1',
           'DeletePayment.v1',
-          'ReadPayments.v1',
-          'ReadPaymentEventsById.v1',
-          'CreateCreditBalanceRefund.v1',
-          'CreateInboundPayment.v1',
+          'and the rest',
         ],
       },
     ],
@@ -94,26 +91,14 @@ export const ASIDE = {
 
 - Requests start at the customer and servicing channels, the Accounts Receivable platform, and third parties pushing money in. Async systems such as RTF trigger work here too.
 - One-Data Functions are the contracts upstream integrates with. They are versioned, so `CreatePayment.v3` keeps working while what sits behind it changes.
-- The functions do none of the work themselves. Each one delegates to a Billpay core API.
+- The functions do none of the work themselves. Each one delegates to a Billpay core API. Every function and the endpoint it delegates to is listed in [Build → API Spec](../build/api-spec/one-data.md).
 
 ### Billpay Core layer
 
 - The core REST APIs shape the request. Duplicates are caught on the way in against an idempotency record, so a retried call cannot pay twice.
-- The router picks the workflow. It reads the payment date (today runs now, a future date gets scheduled), whether the request carries one instruction or several, and the request type: create, update, cancel, return, inbound, or intent.
-- It also fetches the stages that match the market's dimensions and passes them into the workflow it starts.
-- Workflows are the durable part. Each one runs on one of two Temporal workers:
-
-  <div className="workerTable">
-
-  | Worker | Trigger | Examples |
-  | --- | --- | --- |
-  | Online | An end user is awaiting a response | `CreateImmediatePaymentWF`, `UpdatePaymentWF`, `CancelPaymentWF`, `CreatePaymentIntentWF` |
-  | Offline | Async: events, async systems (RTF), or a scheduler | `ExecuteScheduledPaymentWF`, `ProcessInboundPaymentWF`, `ProcessReturnedPaymentWF`, the periodic workflows |
-
-  </div>
-
-- A workflow never calls an external system itself. It composes components instead: Stages take the payment from one state to the next, ActivityGroups hold a set of related business actions, Activities are single retryable actions, and Clients adapt to one external system each.
-- Which implementations a workflow gets comes from the market's dimensions. The call rules are covered in the Design section.
+- The router picks the workflow. It reads the payment date (today runs now, a future date gets scheduled), whether the request carries one instruction or several, and the request type: create, update, cancel, return, inbound, or intent. It then fetches the stages that match the market's dimensions and passes them into the workflow it starts. [Design → Routing](../design/routing.md) has the full map of trigger to workflow.
+- Workflows are the durable part. Each runs on one of two Temporal worker pools, split by whether an end user is waiting for the answer. [Design → Workflows](../design/component-model/workflows/index.md) shows the two pools and what runs on each.
+- A workflow never calls an external system itself. It composes components instead, in a strict order: **Workflow → Stage → ActivityGroup → Activity → Client → external system**. What each layer is responsible for, and the rules on what it may call, are in [Design → Principles](../design/principles.md).
 
 ### External systems
 
@@ -124,8 +109,8 @@ export const ASIDE = {
 
 ### Event handlers and schedules
 
-- Event handlers take async outcomes back in: money movement for returns and settlement, Accounts Receivable posting, and open-to-buy updates. Each writes to the external-events tracker, which is what lets a payment close out to `PAID`.
-- Temporal Schedules drive the periodic Offline workflows in waves: the scheduled-payment executor, the corporate-allocations processor, the paid and missing-paid event processors, and the data purger.
+- Event handlers take async outcomes back in: money movement for returns and settlement, Accounts Receivable posting, and open-to-buy updates. Each writes to the external-events tracker, which is what lets a payment close out to `PAID`. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
+- Temporal Schedules drive the periodic Offline workflows in waves. Which schedule fires which workflow is in [Design → Periodic Workflows](../design/component-model/workflows/periodic.md).
 
 ## Why Temporal
 
@@ -135,5 +120,3 @@ We looked at several durable execution engines and picked Temporal as the best f
 - A payment scheduled months out is a workflow waiting on a timer. There is no cron plus poll glue around it.
 - Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues. Retries, timers, signals, and queries are all Temporal primitives, so none of that is ours to build.
 - Temporal requires deterministic workflow code. That constraint is why the work is factored the way it is: workflows orchestrate, activities do the I/O.
-
-Continue to [Components in Detail](./components.md) for each block in turn.

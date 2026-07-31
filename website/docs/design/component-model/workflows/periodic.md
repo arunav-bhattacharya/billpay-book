@@ -5,6 +5,7 @@ sidebar_label: Periodic
 
 import Lead from '@site/src/components/Lead';
 import WorkflowMeta from '@site/src/components/WorkflowMeta';
+import ScheduleTable from '@site/src/components/ScheduleTable';
 
 # Periodic Workflows
 
@@ -12,13 +13,26 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 For where these fire in the life of a payment, see [System Initiated Journeys](../../journeys/system-initiated.md).
 
-## Scheduler-driven executors
+## Schedule to workflow
 
-These are Temporal Schedules rather than workflows of their own. Each fires on a timer and hands work to a core workflow in batches, picking up 2,500 payments a minute, then the next 2,500 a minute later.
+A Temporal Schedule is a timer the cluster owns, not a workflow of its own. Each one fires on its cadence and starts the workflow below.
 
-- The **Scheduled Payments Executor** finds payments whose run date has arrived (still `SCHEDULED`) and triggers Execute Scheduled Payment for each.
-- The **Corporate Allocations Processor** drains the corporate allocations that are ready and triggers Execute Split Payment for each.
-- The **Scheduled Representment Executor** finds returned payments due to be re-attempted and triggers their representment execution.
+<ScheduleTable
+  rows={[
+    {schedule: 'Scheduled Payments Executor', workflow: 'ExecuteScheduledPaymentWF'},
+    {schedule: 'Corporate Allocations Processor', workflow: 'ExecuteSplitPaymentWF'},
+    {schedule: 'Paid Events Processor', workflow: 'PaidEventsProcessingWF'},
+    {schedule: 'Missing Paid Events Processor', workflow: 'MissingPaidEventsProcessingWF'},
+    {schedule: 'Data Purge', workflow: 'DataPurgingWF'},
+  ]}
+/>
+
+A sixth schedule, the **Scheduled Representments Executor**, finds returned payments due to be re-attempted and triggers their representment execution. The spec lists it among the periodic workflows but has not added it to the schedule table, so the workflow it starts is not yet named.
+
+The first three executors work in batches rather than starting everything at once. How that batching is configured is on [Build → Schedules](../../../build/schedules.md).
+
+- The **Scheduled Payments Executor** finds payments whose run date has arrived and are still `SCHEDULED`.
+- The **Corporate Allocations Processor** drains the corporate allocations that are ready.
 
 ## Paid Events Processing
 
