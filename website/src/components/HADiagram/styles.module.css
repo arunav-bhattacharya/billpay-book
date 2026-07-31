@@ -83,26 +83,17 @@
   stroke: color-mix(in srgb, var(--ha-aws) 55%, transparent);
 }
 
-.groupTemporal {
-  fill: color-mix(in srgb, var(--ha-temporal) 13%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-temporal) 58%, transparent);
-  stroke-width: 1.6;
-}
-:global([data-theme='dark']) .groupTemporal {
-  fill: color-mix(in srgb, var(--ha-temporal) 20%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-temporal) 52%, transparent);
-}
-
-/* The cluster inside the Temporal group, in Kubernetes blue. */
+/* The cluster is where everything Temporal lives, so it carries the violet
+   and the Temporal mark. The Kubernetes heptagon inside keeps its own blue. */
 .groupEks {
-  fill: color-mix(in srgb, var(--ha-k8s) 12%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-k8s) 60%, transparent);
-  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--ha-temporal) 13%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-temporal) 60%, transparent);
+  stroke-width: 1.6;
   stroke-dasharray: 7 4;
 }
 :global([data-theme='dark']) .groupEks {
-  fill: color-mix(in srgb, var(--ha-k8s) 22%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-k8s) 58%, transparent);
+  fill: color-mix(in srgb, var(--ha-temporal) 22%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-temporal) 56%, transparent);
 }
 
 .groupLabel {
@@ -160,6 +151,11 @@
 .svcIcon {
   color: var(--svc-tint);
   stroke-width: 1.6;
+}
+/* Brand glyphs come as filled paths, not stroked outlines. */
+.iconFilled {
+  fill: currentColor;
+  stroke: none;
 }
 
 /* ------------------------------------------------------------- services */
@@ -324,13 +320,29 @@
 }
 
 /* ------------------------------------------------------- Temporal mark */
-.temporalRing {
-  fill: none;
-  stroke: var(--ha-temporal-brand);
-  stroke-width: 1.8;
+.temporalMark {
+  fill: var(--ha-temporal-brand);
 }
-:global([data-theme='dark']) .temporalRing {
-  stroke: #8f9bff;
+:global([data-theme='dark']) .temporalMark {
+  fill: #8f9bff;
+}
+
+/* The rest of the cluster's services, stated rather than drawn. */
+.moreBox {
+  fill: color-mix(in srgb, var(--amex-temporal) 8%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--amex-temporal) 45%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 6 4;
+}
+:global([data-theme='dark']) .moreBox {
+  fill: color-mix(in srgb, #a48bff 12%, var(--amex-panel));
+  stroke: color-mix(in srgb, #a48bff 45%, transparent);
+}
+.moreDots {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  fill: var(--amex-mut);
 }
 
 /* ----------------------------------------------------------- Kubernetes */
@@ -493,6 +505,31 @@
 }
 .mRep {
   fill: var(--amex-mut);
+}
+
+/* Pod-to-pod: the Temporal services calling each other inside the cluster. */
+.pod {
+  stroke: var(--amex-temporal);
+  stroke-width: 1.7;
+  fill: none;
+}
+:global([data-theme='dark']) .pod {
+  stroke: #a48bff;
+}
+.mPod {
+  fill: var(--amex-temporal);
+}
+:global([data-theme='dark']) .mPod {
+  fill: #a48bff;
+}
+.podLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  fill: var(--amex-temporal);
+}
+:global([data-theme='dark']) .podLabel {
+  fill: #a48bff;
 }
 .junction {
   fill: var(--amex-blue);

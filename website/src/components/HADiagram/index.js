@@ -58,6 +58,15 @@ const ICON = {
 
 function Icon({name, x, y, size = 22, cls}) {
   const s = size / 24;
+  /* The Temporal glyph is a filled brand path, not a stroked outline like the
+     rest, so it takes its own class and skips the ICON map. */
+  if (name === 'temporal') {
+    return (
+      <g transform={`translate(${x} ${y}) scale(${s})`} className={clsx(styles.iconFilled, cls)}>
+        <path d={TEMPORAL_PATH} />
+      </g>
+    );
+  }
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`} className={clsx(styles.icon, cls)}>
       {ICON[name]}
@@ -99,14 +108,18 @@ function AwsMark({x, y, w = 44}) {
   );
 }
 
-/* Temporal: two crossed ellipses, one tall and one wide, tracing a four-point
-   orbit. Outline only, no centre. */
+/* Temporal: the official mark, path data from Temporal's own
+   temporal-no-text.svg (24x24), vendored at static/img/temporal-logo.svg.
+   Inlined rather than <image> so it can take the brand violet in light mode
+   and a lifted violet in dark, and so the service cards can tint it. */
+const TEMPORAL_PATH =
+  'M16.206 7.794C15.64 3.546 14.204 0 12 0 9.796 0 8.361 3.546 7.794 7.794 3.546 8.36 0 9.796 0 12c0 2.204 3.546 3.639 7.794 4.206C8.36 20.453 9.796 24 12 24c2.204 0 3.639-3.546 4.206-7.794C20.454 15.64 24 14.204 24 12c0-2.204-3.547-3.64-7.794-4.206Zm-8.55 7.174c-4.069-.587-6.44-1.932-6.44-2.969 0-1.036 2.372-2.381 6.44-2.969-.09.98-.137 1.98-.137 2.97 0 .99.047 1.99.137 2.968zM12 1.215c1.036 0 2.381 2.372 2.969 6.44a32.718 32.718 0 0 0-5.938 0c.587-4.068 1.932-6.44 2.969-6.44Zm4.344 13.753c-.2.03-1.022.126-1.23.146-.02.209-.117 1.03-.145 1.23-.588 4.068-1.933 6.44-2.97 6.44-1.036 0-2.38-2.372-2.968-6.44-.03-.2-.126-1.022-.147-1.23a31.833 31.833 0 0 1 0-6.23 31.813 31.813 0 0 1 7.46.146c4.068.587 6.442 1.933 6.442 2.969-.001 1.036-2.374 2.382-6.442 2.97z';
+
 function TemporalMark({cx, cy, size = 28}) {
-  const s = size / 32;
+  const s = size / 24;
   return (
     <g transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}>
-      <ellipse cx="16" cy="16" rx="5.3" ry="14" className={styles.temporalRing} />
-      <ellipse cx="16" cy="16" rx="14" ry="5.3" className={styles.temporalRing} />
+      <path d={TEMPORAL_PATH} className={styles.temporalMark} />
     </g>
   );
 }
@@ -208,8 +221,10 @@ function Chip({x, y, label, tone = 'chipTray'}) {
   );
 }
 
-/* A service box, drawn as a small stack so "more than one instance" reads. */
-function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTone, dim}) {
+/* A service box, drawn as a small stack so "more than one instance" reads.
+   The badge rides above the box by default; `badgeAt="bottom"` drops it under
+   the box, for rows where something already sits in the space above. */
+function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTone, badgeAt = 'top', dim}) {
   return (
     <g className={clsx(styles.svc, styles[tint], dim && styles.dim)}>
       <rect x={x + 8} y={y - 8} width={w} height={h} rx={13} className={styles.svcGhost} />
@@ -225,7 +240,15 @@ function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTon
           {sub}
         </text>
       )}
-      {badge && <Pill x={x + w - 6} y={y - 12} label={badge} tone={badgeTone} anchor="end" />}
+      {badge && (
+        <Pill
+          x={x + w - 6}
+          y={badgeAt === 'bottom' ? y + h + 12 : y - 12}
+          label={badge}
+          tone={badgeTone}
+          anchor="end"
+        />
+      )}
     </g>
   );
 }
@@ -257,7 +280,7 @@ export default function HADiagram() {
         viewBox="0 0 1640 880"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem Hydra sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store under One-Data. US West IPC1 is the read site, laid out the same way but with the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. Both billpay-core instances share a gRPC bus out to the cloud. Right, in AWS orange, the AWS estate, holding a violet Temporal group: us-east-1 is the active region, with Frontend, History and Matching plus Worker services on a self-hosted EKS cluster, a PostgreSQL writer and two read replicas; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
+        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data. US West IPC1 is the read site, laid out the same way but with billpay-core on standby, the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, landing on the Temporal Frontend service. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster that runs the Temporal Frontend, History, Matching and Worker services plus others, all talking pod to pod, and persisting to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -285,6 +308,11 @@ export default function HADiagram() {
           <marker id="ha-m-rep" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" className={styles.mRep} />
           </marker>
+          {/* the pod-to-pod links run in 22-unit gaps, so they need a head
+              small enough to leave some line showing between two of them */}
+          <marker id="ha-m-pod" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="4.6" markerHeight="4.6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" className={styles.mPod} />
+          </marker>
         </defs>
 
         {/* ================= the Amex estate ================= */}
@@ -301,7 +329,6 @@ export default function HADiagram() {
           h={296}
           cls={styles.regionPrem}
           label="US EAST · IPC2"
-          note="write site"
           icon={<Icon name="rack" x={62} y={128} size={20} cls={styles.siteIcon} />}
         />
         <Region
@@ -311,7 +338,6 @@ export default function HADiagram() {
           h={296}
           cls={styles.regionPrem}
           label="US WEST · IPC1"
-          note="read site"
           icon={<Icon name="rack" x={62} y={462} size={20} cls={styles.siteIcon} />}
         />
 
@@ -346,7 +372,17 @@ export default function HADiagram() {
         <text x={92} y={650} textAnchor="middle" className={styles.userLabel}>caller</text>
         <text x={92} y={663} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
         <path d="M112,616 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service x={210} y={584} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
+        <Service
+          x={210}
+          y={584}
+          tint="tGw"
+          icon="gateway"
+          title="One-Data"
+          sub="API gateway"
+          badge="ACTIVE"
+          badgeTone="pOk"
+          badgeAt="bottom"
+        />
 
         <path d="M300,580 V550" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
         <text x={314} y={556} className={styles.bufLabel}>park + replay</text>
@@ -359,7 +395,19 @@ export default function HADiagram() {
         <Chip x={300} y={441} label="CRDB · active-active" tone="chipBuf" />
 
         <path d="M390,616 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service x={474} y={584} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
+        <Service
+          x={474}
+          y={584}
+          w={200}
+          tint="tCore"
+          icon="cube"
+          title="billpay-core"
+          sub="APIs · Router · Workers"
+          badge="STANDBY"
+          badgeTone="pStandby"
+          badgeAt="bottom"
+          dim
+        />
 
         <path d="M682,606 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
         <Drum cx={752} cy={616} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
@@ -382,77 +430,76 @@ export default function HADiagram() {
         <path d="M574,584 V433" className={styles.req} />
         <circle cx={574} cy={433} r={4} className={styles.junction} />
         {/* one continuous run, hopping the Data Guard line at x=700 rather than
-            breaking for it: a gap in a request path reads as a gap in the path */}
+            breaking for it: a gap in a request path reads as a gap in the path.
+            It lands on Frontend, which is the only Temporal service a client
+            ever talks to. */}
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V316 H1118"
+          d="M574,433 H686 Q700,412 714,433 H1050 V247 H1148"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
-        <Chip x={880} y={433} label="gRPC" tone="chipReq" />
+        <Chip x={880} y={433} label="gRPC to Frontend" tone="chipReq" />
 
         {/* ================= the AWS estate ================= */}
 
         <rect x={1076} y={52} width={536} height={712} rx={22} className={styles.groupAws} />
         <AwsMark x={1096} y={66} w={56} />
 
-        <rect x={1094} y={118} width={500} height={630} rx={18} className={styles.groupTemporal} />
-        <TemporalMark cx={1128} cy={148} size={34} />
-        <text x={1152} y={153} className={styles.groupLabel}>TEMPORAL</text>
+        {/* ---- us-east-1, the active region. The ACTIVE / STANDBY pills say
+             which is which, so the regions carry no note of their own. ---- */}
+        <Region x={1110} y={118} w={468} h={434} cls={styles.regionAws} label="us-east-1" />
+        <Pill x={1524} y={144} label="ACTIVE" tone="pOk" anchor="end" />
 
-        {/* ---- us-east-1, the active region ---- */}
-        <Region
-          x={1110}
-          y={180}
-          w={468}
-          h={372}
-          cls={styles.regionAws}
-          label="us-east-1"
-          note="active cluster"
-        />
-        <Pill x={1560} y={206} label="ACTIVE" tone="pOk" anchor="end" />
+        {/* Everything Temporal is pods on one cluster, so the cluster box is
+            where the Temporal mark and the violet live. Postgres sits outside
+            it: it is a managed database, not something running on the cluster. */}
+        <rect x={1122} y={176} width={246} height={352} rx={14} className={styles.groupEks} />
+        <TemporalMark cx={1146} cy={198} size={26} />
+        <K8sMark cx={1176} cy={198} size={24} />
+        <text x={1198} y={196} className={styles.markLabel}>EKS cluster</text>
+        <text x={1198} y={211} className={styles.markSub}>self-hosted pods</text>
 
-        {/* The three services are pods on one cluster, so they get a box of
-            their own in Kubernetes blue. Postgres sits outside it: it is a
-            managed database, not something running on the cluster. */}
-        <rect x={1122} y={236} width={218} height={236} rx={14} className={styles.groupEks} />
-        <K8sMark cx={1146} cy={258} size={26} />
-        <text x={1166} y={256} className={styles.markLabel}>EKS cluster</text>
-        <text x={1166} y={270} className={styles.markSub}>self-hosted · pods</text>
+        <Service x={1160} y={228} w={176} h={38} tint="tTemporal" icon="temporal" title="Frontend" />
+        <Service x={1160} y={300} w={176} h={38} tint="tTemporal" icon="temporal" title="History" />
+        <Service x={1160} y={372} w={176} h={38} tint="tTemporal" icon="temporal" title="Matching" />
+        <Service x={1160} y={444} w={176} h={38} tint="tTemporal" icon="temporal" title="Worker" />
 
-        <Service x={1130} y={292} w={190} h={48} tint="tTemporal" icon="hub" title="Frontend" />
-        <Service x={1130} y={352} w={190} h={48} tint="tTemporal" icon="hub" title="History" />
-        <Service x={1130} y={412} w={190} h={48} tint="tTemporal" icon="hub" title="Matching + Worker" />
+        {/* and the rest of the cluster's services */}
+        <rect x={1160} y={492} width={176} height={22} rx={11} className={styles.moreBox} />
+        <text x={1248} y={510} textAnchor="middle" className={styles.moreDots}>…</text>
 
-        <path d="M1328,316 H1362" className={styles.req} />
-        <path d="M1328,376 H1362" className={styles.req} />
-        <path d="M1328,436 H1362" className={styles.req} />
-        <path d="M1362,316 V436" className={styles.req} />
-        <path d="M1362,376 H1414" className={styles.req} markerEnd="url(#ha-m-req)" />
+        {/* the services call each other inside the cluster */}
+        <path d="M1248,268 V290" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <path d="M1248,340 V362" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <path d="M1248,412 V434" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <text x={1140} y={380} textAnchor="middle" transform="rotate(-90 1140 380)" className={styles.podLabel}>
+          pod-to-pod
+        </text>
 
-        <Drum cx={1450} cy={376} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={1490} y={372} className={styles.markLabel}>Postgres</text>
-        <Pill x={1490} y={392} label="WRITER" tone="pPrimary" anchor="start" />
-        <path d="M1450,398 V446 H1416 V469" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <path d="M1450,446 H1484 V469" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={1416} cy={488} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <Drum cx={1484} cy={488} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={1450} y={530} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
+        {/* persistence: out of the cluster, into the managed Postgres */}
+        <path d="M1336,247 H1390" className={styles.req} />
+        <path d="M1336,319 H1390" className={styles.req} />
+        <path d="M1336,391 H1390" className={styles.req} />
+        <path d="M1336,463 H1390" className={styles.req} />
+        <path d="M1390,247 V463" className={styles.req} />
+        <path d="M1390,296 H1438" className={styles.req} markerEnd="url(#ha-m-req)" />
+
+        <Pill x={1470} y={226} label="WRITER" tone="pPrimary" />
+        <text x={1470} y={250} textAnchor="middle" className={styles.markLabel}>Postgres</text>
+        <Drum cx={1470} cy={296} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <path d="M1470,328 V352 H1436 V371" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <path d="M1470,352 H1504 V371" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={1436} cy={390} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <Drum cx={1504} cy={390} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <text x={1470} y={432} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
 
         {/* ---- us-west-1, the passive region ---- */}
-        <Region
-          x={1110}
-          y={580}
-          w={468}
-          h={150}
-          cls={styles.regionAws}
-          label="us-west-1"
-          note="passive standby"
-        />
-        <Pill x={1560} y={606} label="STANDBY" tone="pStandby" anchor="end" />
+        <Region x={1110} y={580} w={468} h={150} cls={styles.regionAws} label="us-west-1" />
+        <Pill x={1524} y={606} label="STANDBY" tone="pStandby" anchor="end" />
 
-        {/* down x=1380: the replicas reach 1436 on one side and the "read
-            replicas" label starts at 1400, so this is the clear lane. */}
-        <path d="M1420,376 H1380 V680 H1214" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        {/* down x=1546: the replicas reach 1524 and their label 1526, so this
+            is the clear lane between them and the region edge. */}
+        <path d="M1500,306 H1546 V680 H1214" className={styles.rep} markerEnd="url(#ha-m-rep)" />
         <Drum cx={1180} cy={680} rx={28} h={36} grad="ha-g-pg" dim glossCls={styles.drumTopDim} />
         <text x={1230} y={700} className={styles.markSub}>Replicated from the east. Promoted by hand.</text>
 
@@ -467,7 +514,7 @@ export default function HADiagram() {
           <path d="M40,846 H80" className={styles.rep} markerEnd="url(#ha-m-rep)" />
           <text x={90} y={850}>replication</text>
           <text x={260} y={850} className={styles.legendMut}>
-            dimmed drums are standbys; IPC1&apos;s Oracle and the us-west-1 Temporal cluster are both promoted by hand
+            dimmed components are standbys, promoted by hand: IPC1&apos;s billpay-core and Oracle, and the us-west-1 cluster
           </text>
         </g>
       </svg>
