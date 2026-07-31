@@ -24,7 +24,7 @@ import Lead from '@site/src/components/Lead';
 | `GET /payments/account/{account-id}` | Read the payments on an account. |
 | `GET /payments/{payment-id}` | Read one payment and its lifecycle events. |
 
-Every condition the router reads, the worker each workflow runs on, and the account-type fan-out into child workflows are in [Design → Routing](../../design/component-model/routing.md). [Payment Journeys](../../design/journeys/index.md) follows the same flows end to end.
+Every condition the router reads, the worker each workflow runs on, and the account-type fan-out into child workflows are in [Design → Routing](../../design/routing.md). [Payment Journeys](../../design/journeys/index.md) follows the same flows end to end.
 
 ## Idempotency at the boundary
 

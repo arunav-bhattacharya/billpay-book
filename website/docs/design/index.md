@@ -30,9 +30,14 @@ import Highlights from '@site/src/components/Highlights';
       desc: `Each payment followed end to end, from the channel a customer starts in, or the event that fires, to the money settling.`,
     },
     {
+      term: 'Routing',
+      to: '/docs/design/routing',
+      desc: `What the Billpay Router reads off a request, and which workflow each trigger and condition starts.`,
+    },
+    {
       term: 'Component Model',
       to: '/docs/design/component-model',
-      desc: `What exists at each layer: how a request is routed, every workflow, the stages those workflows sequence, and the activity groups the stages call.`,
+      desc: `What exists at each layer: every workflow, the stages those workflows sequence, and the activity groups the stages call.`,
     },
     {
       term: 'Sequence Diagrams',

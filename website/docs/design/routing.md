@@ -12,7 +12,7 @@ import RouteMap from '@site/src/components/RouteMap';
 
 A request travels One-Data function, core API, **Billpay Router**, workflow, then the stages, activity groups and activities the workflow sequences. The router is the only place that decides which workflow runs, so no channel or market branches that choice by hand.
 
-Each trigger below arrives through a One-Data function and a core endpoint. Those contracts are listed in [Build → API Spec](../../build/api-spec/index.md).
+Each trigger below arrives through a One-Data function and a core endpoint. Those contracts are listed in [Build → API Spec](../build/api-spec/index.md).
 
 ## Trigger to workflow
 
@@ -58,7 +58,7 @@ Each trigger below arrives through a One-Data function and a core endpoint. Thos
   ]}
 />
 
-The `Online` and `Offline` tags are the [Temporal worker](./workflows/index.md#where-workflows-run) the workflow runs on. Three workflows appear on both, because the worker depends on where in the journey they are called.
+The `Online` and `Offline` tags are the [Temporal worker](./component-model/workflows/index.md#where-workflows-run) the workflow runs on. Three workflows appear on both, because the worker depends on where in the journey they are called.
 
 ## Child workflows
 
@@ -69,4 +69,4 @@ The tagged, indented rows are the child workflows a route triggers once the paym
 
 ## What the router passes in
 
-The router does not only pick the workflow. It also looks up the stage and activity-group implementations that match the market's dimensions and passes them into the workflow it starts. That is why the same route behaves correctly in every market without a branch in the workflow code. The rules behind that composition are in [Design Principles](../principles.md).
+The router does not only pick the workflow. It also looks up the stage and activity-group implementations that match the market's dimensions and passes them into the workflow it starts. That is why the same route behaves correctly in every market without a branch in the workflow code. The rules behind that composition are in [Design Principles](./principles.md).

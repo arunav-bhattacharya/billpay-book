@@ -7,18 +7,13 @@ import Highlights from '@site/src/components/Highlights';
 
 # Component Model
 
-<Lead>The [design principles](../principles.md) set out five layered components and the rule that each may only call the layers beneath it. These pages list what actually exists: how a request reaches a workflow, then every workflow, every stage, and every activity group the platform runs.</Lead>
+<Lead>The [design principles](../principles.md) set out five layered components and the rule that each may only call the layers beneath it. These pages take three of those layers and list what actually exists: every workflow, every stage, and every activity group the platform runs.</Lead>
 
 ## Pages in this section
 
 <Highlights
   accent="var(--amex-cat-design)"
   items={[
-    {
-      term: 'Routing',
-      to: '/docs/design/component-model/routing',
-      desc: `What the Billpay Router reads off a request, and which workflow each trigger and condition starts.`,
-    },
     {
       term: 'Workflows',
       to: '/docs/design/component-model/workflows',

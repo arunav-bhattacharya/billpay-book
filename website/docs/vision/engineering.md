@@ -70,7 +70,7 @@ Requests come in through the APIs. Workflows carry each payment from received to
   ]}
 />
 
-The gateway contracts are listed in [Build → API Spec](../build/api-spec/one-data.md), and what the router does with each request is in [Design → Routing](../design/component-model/routing.md).
+The gateway contracts are listed in [Build → API Spec](../build/api-spec/one-data.md), and what the router does with each request is in [Design → Routing](../design/routing.md).
 
 A workflow is assembled from four kinds of part:
 

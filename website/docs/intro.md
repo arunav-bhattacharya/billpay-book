@@ -14,7 +14,7 @@ The site is organised around the layers a payment passes through:
 | --- | --- | --- |
 | **One-Data Functions** | The public, contract-level entry points (e.g. `CreatePayment.v3`) | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Billpay Core APIs** | The REST endpoints behind the gateway (`POST /payments`, …) | [API Spec › Billpay Core](build/api-spec/billpay-core.md) |
-| **Billpay Router** | Picks the right workflow from the request's date, instructions, and dimensions | [Design › Routing](design/component-model/routing.md) |
+| **Billpay Router** | Picks the right workflow from the request's date, instructions, and dimensions | [Design › Routing](design/routing.md) |
 | **Temporal Workflows** | Long-running, durable orchestrations on the Online and Offline workers | [Design › Workflows](design/component-model/workflows/index.md) |
 | **Stages** | One state transition each, the decision points a workflow sequences | [Design › Stages](design/component-model/stages.md) |
 | **ActivityGroups & Activities** | The reusable I/O units: clearing calls, AR posting, DB writes, notifications | [Design › ActivityGroups & Activities](design/component-model/activities.md) |

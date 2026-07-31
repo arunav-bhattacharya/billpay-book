@@ -28,4 +28,4 @@ import Highlights from '@site/src/components/Highlights';
   ]}
 />
 
-To trace a request from the trigger it arrives on to the workflow that runs it, see [Routing](../component-model/routing.md).
+To trace a request from the trigger it arrives on to the workflow that runs it, see [Routing](../routing.md).

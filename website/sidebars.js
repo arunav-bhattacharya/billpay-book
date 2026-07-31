@@ -49,13 +49,13 @@ const sidebars = {
             'design/journeys/system-initiated',
           ],
         },
+        'design/routing',
         {
           type: 'category',
           label: 'Component Model',
           collapsed: true,
           link: {type: 'doc', id: 'design/component-model/index'},
           items: [
-            'design/component-model/routing',
             {
               type: 'category',
               label: 'Workflows',
