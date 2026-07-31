@@ -1,13 +1,20 @@
 import React from 'react';
 import clsx from 'clsx';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './styles.module.css';
 
 /**
- * HADiagram: the high-availability topology in three layers: the API layer and
- * the billpay-core + Oracle layer side by side across the two on-prem regions
- * (IPC2 east, IPC1 west), then the Temporal + Postgres layer underneath.
- * Hand-authored SVG so the product marks carry their own colours; everything
- * else comes from the design tokens, so light and dark both render.
+ * HADiagram: the high-availability topology as two owned estates side by side.
+ * Left, in Amex blue, the two on-prem Hydra sites. Right, in AWS orange, the
+ * cloud, with everything Temporal inside a violet group of its own.
+ *
+ * Laid out wide rather than tall on purpose. The canvas scales to the column,
+ * so a portrait canvas renders taller than the viewport and the reader has to
+ * scroll a diagram whose whole point is to be seen at once. At roughly 16:9
+ * it lands around half the viewport height in a normal doc column.
+ *
+ * Hand-authored SVG: the product marks carry their own brand colours and
+ * everything else comes from the design tokens, so light and dark both render.
  */
 
 /* ---------------------------------------------------------------- icons -- */
@@ -60,36 +67,55 @@ function Icon({name, x, y, size = 22, cls}) {
 
 /* ---- product marks ------------------------------------------------------ */
 
-/* AWS: the wordmark sitting over its orange smile. */
-function AwsMark({x, y, w = 36}) {
-  const s = w / 36;
+/* Amex: the real logo, the one already shipping as the site favicon. */
+function AmexMark({x, y, size = 34}) {
+  const src = useBaseUrl('/img/amex-logo.png');
+  return <image href={src} x={x} y={y} width={size} height={size} className={styles.amexMark} />;
+}
+
+/* AWS: the lowercase wordmark over its orange smile-arrow. Hand-drawn to the
+   shape of the mark rather than the official asset, which is trademarked and
+   not vendored here. */
+function AwsMark({x, y, w = 44}) {
+  const s = w / 44;
   return (
-    <g transform={`translate(${x} ${y}) scale(${s})`} className={styles.awsMark}>
-      <text x="0" y="15" className={styles.awsWord}>
+    <g transform={`translate(${x} ${y}) scale(${s})`}>
+      <text x="0" y="17" className={styles.awsWord}>
         aws
       </text>
-      <path d="M0.5,21.5 C6,25.6 18.5,26.4 26,22.8" className={styles.awsSmile} />
-      <path d="M24.2,19.8 L31,21.4 L26.2,25.9 Z" className={styles.awsArrow} />
+      <path
+        d="M1,25.5 C10,32.2 27,33 38,26.4"
+        className={styles.awsSmile}
+      />
+      <path d="M34.6,22.6 L42.5,24.2 L37.2,30.2 Z" className={styles.awsArrow} />
     </g>
   );
 }
 
-/* Temporal: the brand mark, two crossed leaves tracing an orbit. */
-function TemporalMark({cx, cy, size = 26}) {
-  const s = size / 24;
+/* Temporal: the orbit motif, two rings crossing a filled core. Same caveat as
+   the AWS mark, drawn to the shape rather than vendored. */
+function TemporalMark({cx, cy, size = 28}) {
+  const s = size / 32;
   return (
-    <g
-      transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}
-      className={styles.temporalMark}
-    >
-      <path
-        d="M12,1 C18,5.6 18,18.4 12,23 C6,18.4 6,5.6 12,1 Z"
-        className={styles.temporalLeaf}
+    <g transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}>
+      <ellipse cx="16" cy="16" rx="14.5" ry="7" className={styles.temporalRing} />
+      <ellipse
+        cx="16"
+        cy="16"
+        rx="14.5"
+        ry="7"
+        className={styles.temporalRing}
+        transform="rotate(60 16 16)"
       />
-      <path
-        d="M1,12 C5.6,6 18.4,6 23,12 C18.4,18 5.6,18 1,12 Z"
-        className={styles.temporalLeaf}
+      <ellipse
+        cx="16"
+        cy="16"
+        rx="14.5"
+        ry="7"
+        className={styles.temporalRing}
+        transform="rotate(120 16 16)"
       />
+      <circle cx="16" cy="16" r="4.4" className={styles.temporalCore} />
     </g>
   );
 }
@@ -100,7 +126,7 @@ function RedisMark({cx, cy, w = 58}) {
   const ry = rx * 0.38;
   const gap = ry * 1.35;
   return (
-    <g className={styles.redisMark}>
+    <g>
       {[1, 0, -1].map((k) => (
         <g key={k}>
           <ellipse cx={cx} cy={cy + k * gap} rx={rx} ry={ry} fill="url(#ha-g-redis)" />
@@ -187,9 +213,7 @@ function Chip({x, y, label, tone = 'chipTray'}) {
   );
 }
 
-/* A service box, drawn as a small stack so "more than one instance" reads.
-   The status badge rides above the top-right corner so the title row stays
-   free for the name at full size. */
+/* A service box, drawn as a small stack so "more than one instance" reads. */
 function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTone, dim}) {
   return (
     <g className={clsx(styles.svc, styles[tint], dim && styles.dim)}>
@@ -211,17 +235,20 @@ function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTon
   );
 }
 
-function Site({x, y, w, h, label, note}) {
+/* A site or region inside one of the owner groups. */
+function Region({x, y, w, h, cls, label, note, icon}) {
   return (
     <g>
-      <rect x={x} y={y} width={w} height={h} rx={18} className={styles.regionPrem} />
-      <Icon name="rack" x={x + 18} y={y + 16} size={21} cls={styles.siteIcon} />
-      <text x={x + 47} y={y + 32} className={styles.regionLabel}>
+      <rect x={x} y={y} width={w} height={h} rx={16} className={cls} />
+      {icon}
+      <text x={x + (icon ? 40 : 20)} y={y + 26} className={styles.regionLabel}>
         {label}
       </text>
-      <text x={x + 47} y={y + 48} className={styles.regionNote}>
-        {note}
-      </text>
+      {note && (
+        <text x={x + (icon ? 40 : 20)} y={y + 43} className={styles.regionNote}>
+          {note}
+        </text>
+      )}
     </g>
   );
 }
@@ -232,10 +259,10 @@ export default function HADiagram() {
   return (
     <div className={styles.wrap}>
       <svg
-        viewBox="0 0 1120 1030"
+        viewBox="0 0 1640 880"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology in three layers, left to right. Layer one, the API layer: One-Data Functions run active in both IPC2 (US East) and IPC1 (US West), each backed by a Redis fallback store, the two replicated active-active with CRDB. Layer two, billpay-core: a core instance in each site, with the read-write Oracle primary and two read-only replicas in IPC2 and a Data Guard standby plus one read-only replica in IPC1. Layer three, on the right: Temporal frontend, history, matching and worker services on an EKS cluster in AWS us-east-1, with a PostgreSQL writer and two read replicas. Both core instances call that cluster over gRPC. Below it, a passive standby cluster in AWS us-west-1 with its PostgreSQL replicated from the east, taking no traffic until an operator promotes it."
+        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem Hydra sites: US East IPC2 is the write site, with a caller reaching One-Data, then billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store under One-Data. US West IPC1 is the read site, laid out the same way but with the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. Both billpay-core instances share a gRPC bus out to the cloud. Right, in AWS orange, the AWS estate, holding a violet Temporal group: us-east-1 is the active region, with Frontend, History and Matching plus Worker services on a self-hosted EKS cluster, a PostgreSQL writer and two read replicas; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -265,182 +292,188 @@ export default function HADiagram() {
           </marker>
         </defs>
 
-        {/* ---- layer headers + dividers ---- */}
-        <g className={styles.layerHead}>
-          <text x={230} y={32} textAnchor="middle">
-            <tspan className={styles.layerNum}>1</tspan>
-            <tspan dx="10">API</tspan>
-          </text>
-          <text x={580} y={32} textAnchor="middle">
-            <tspan className={styles.layerNum}>2</tspan>
-            <tspan dx="10">BILLPAY CORE</tspan>
-          </text>
-          <text x={952} y={32} textAnchor="middle">
-            <tspan className={styles.layerNum}>3</tspan>
-            <tspan dx="10">TEMPORAL</tspan>
-          </text>
-        </g>
-        <path d="M391,46 V782" className={styles.layerDiv} />
-        <path d="M780,46 V782" className={styles.layerDiv} />
+        {/* ================= the Amex estate ================= */}
 
-        {/* ---- the two on-prem sites ---- */}
-        <Site x={68} y={56} w={700} h={336} label="US EAST · IPC2" note="on-prem Hydra · write site" />
-        <Site x={68} y={430} w={700} h={336} label="US WEST · IPC1" note="on-prem Hydra · read site" />
+        <rect x={28} y={52} width={1012} height={712} rx={22} className={styles.groupAmex} />
+        <AmexMark x={48} y={66} size={32} />
+        <text x={92} y={82} className={styles.groupLabel}>AMERICAN EXPRESS</text>
+        <text x={92} y={99} className={styles.groupNote}>on-prem Hydra sites</text>
 
-        {/* ================= layer 1: API ================= */}
+        <Region
+          x={46}
+          y={118}
+          w={976}
+          h={296}
+          cls={styles.regionPrem}
+          label="US EAST · IPC2"
+          note="write site"
+          icon={<Icon name="rack" x={62} y={128} size={20} cls={styles.siteIcon} />}
+        />
+        <Region
+          x={46}
+          y={452}
+          w={976}
+          h={296}
+          cls={styles.regionPrem}
+          label="US WEST · IPC1"
+          note="read site"
+          icon={<Icon name="rack" x={62} y={462} size={20} cls={styles.siteIcon} />}
+        />
 
-        <Icon name="user" x={12} y={159} size={26} cls={styles.userIcon} />
-        <text x={25} y={205} textAnchor="middle" className={styles.userLabel}>caller</text>
-        <text x={25} y={218} textAnchor="middle" className={styles.userLabel}>near IPC2</text>
-        <path d="M44,172 H162" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Pill x={102} y={150} label="/CreatePayment.v3" tone="pApi" wf={6.1} />
-        <Pill x={102} y={194} label="/ReadPayments.v1" tone="pApi" wf={6.1} />
-        <Service x={168} y={140} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
+        {/* ---- east site ---- */}
+        <Icon name="user" x={58} y={236} size={26} cls={styles.userIcon} />
+        <text x={71} y={284} textAnchor="middle" className={styles.userLabel}>caller</text>
+        <text x={71} y={297} textAnchor="middle" className={styles.userLabel}>near IPC2</text>
+        <path d="M92,250 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Pill x={140} y={228} label="/CreatePayment.v3" tone="pApi" wf={6.1} />
+        <Pill x={140} y={272} label="/ReadPayments.v1" tone="pApi" wf={6.1} />
+        <Service x={210} y={218} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
-        <path d="M258,204 V272" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={272} y={242} className={styles.bufLabel}>park + replay</text>
-        <RedisMark cx={258} cy={300} w={48} />
-        <text x={290} y={296} className={styles.markLabel}>Redis</text>
-        <text x={290} y={311} className={styles.markSub}>fallback store</text>
+        <path d="M300,282 V330" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
+        <text x={314} y={310} className={styles.bufLabel}>park + replay</text>
+        <RedisMark cx={300} cy={362} w={46} />
+        <text x={334} y={358} className={styles.markLabel}>Redis</text>
+        <text x={334} y={373} className={styles.markSub}>fallback store</text>
 
-        <Icon name="user" x={12} y={637} size={26} cls={styles.userIcon} />
-        <text x={25} y={683} textAnchor="middle" className={styles.userLabel}>caller</text>
-        <text x={25} y={696} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
-        <path d="M44,650 H162" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Pill x={102} y={628} label="/CreatePayment.v3" tone="pApi" wf={6.1} />
-        <Pill x={102} y={672} label="/ReadPayments.v1" tone="pApi" wf={6.1} />
-        <Service x={168} y={618} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
+        <path d="M390,250 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Chip x={430} y={250} label="/payments" tone="chipReq" />
+        <Service x={474} y={218} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
 
-        <path d="M258,618 V550" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={272} y={588} className={styles.bufLabel}>park + replay</text>
-        <RedisMark cx={258} cy={522} w={48} />
-        <text x={290} y={518} className={styles.markLabel}>Redis</text>
-        <text x={290} y={533} className={styles.markSub}>fallback store</text>
+        <path d="M682,240 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Drum cx={752} cy={250} rx={30} h={38} grad="ha-g-oracle" />
+        <text x={752} y={296} textAnchor="middle" className={styles.markLabel}>Oracle</text>
+        <text x={752} y={312} textAnchor="middle" className={styles.markSub}>read + write</text>
+        <Pill x={752} y={332} label="PRIMARY" tone="pPrimary" />
+        <path d="M782,246 H852" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={880} cy={252} rx={20} h={26} grad="ha-g-oracle" />
+        <Drum cx={946} cy={252} rx={20} h={26} grad="ha-g-oracle" />
+        <text x={913} y={300} textAnchor="middle" className={styles.markSub}>read-only × 2</text>
 
-        <path d="M258,326 V496" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <Chip x={258} y={411} label="CRDB · active-active" tone="chipBuf" />
+        {/* ---- west site ---- */}
+        <Icon name="user" x={58} y={570} size={26} cls={styles.userIcon} />
+        <text x={71} y={618} textAnchor="middle" className={styles.userLabel}>caller</text>
+        <text x={71} y={631} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
+        <path d="M92,584 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Pill x={140} y={562} label="/CreatePayment.v3" tone="pApi" wf={6.1} />
+        <Pill x={140} y={606} label="/ReadPayments.v1" tone="pApi" wf={6.1} />
+        <Service x={210} y={552} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
-        {/* ================= layer 2: billpay-core + Oracle ================= */}
+        <path d="M300,616 V664" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
+        <text x={314} y={644} className={styles.bufLabel}>park + replay</text>
+        <RedisMark cx={300} cy={696} w={46} />
+        <text x={334} y={692} className={styles.markLabel}>Redis</text>
+        <text x={334} y={707} className={styles.markSub}>fallback store</text>
 
-        <path d="M348,172 H430" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Chip x={391} y={172} label="/payments" tone="chipReq" />
-        <Service x={434} y={140} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
+        {/* the two Redis stores are one active-active database */}
+        <path d="M300,382 V676" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
+        <Chip x={300} y={529} label="CRDB · active-active" tone="chipBuf" />
 
-        <path d="M614,158 H660" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Drum cx={696} cy={172} rx={30} h={38} grad="ha-g-oracle" />
-        <text x={696} y={218} textAnchor="middle" className={styles.markLabel}>Oracle</text>
-        <text x={696} y={234} textAnchor="middle" className={styles.markSub}>read + write</text>
-        <Pill x={696} y={252} label="PRIMARY" tone="pPrimary" />
-        <path d="M726,182 H752 V272 H672" className={styles.rep} />
-        <path d="M672,272 V285" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <path d="M720,272 V285" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={672} cy={308} rx={21} h={26} grad="ha-g-oracle" />
-        <Drum cx={720} cy={308} rx={21} h={26} grad="ha-g-oracle" />
-        <text x={696} y={352} textAnchor="middle" className={styles.markSub}>read-only × 2</text>
+        <path d="M390,584 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Chip x={430} y={584} label="/payments" tone="chipReq" />
+        <Service x={474} y={552} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
 
-        <path d="M348,650 H430" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Chip x={391} y={650} label="/payments" tone="chipReq" />
-        <Service x={434} y={618} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
+        <path d="M682,574 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Drum cx={752} cy={584} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
+        <text x={752} y={630} textAnchor="middle" className={styles.markLabel}>Oracle</text>
+        <text x={752} y={646} textAnchor="middle" className={styles.markSub}>read only</text>
+        <Pill x={752} y={666} label="STANDBY" tone="pStandby" />
+        <path d="M782,580 H852" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={880} cy={586} rx={20} h={26} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
+        <text x={880} y={634} textAnchor="middle" className={styles.markSub}>read-only</text>
 
-        <path d="M614,664 H660" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Drum cx={696} cy={650} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
-        <text x={696} y={696} textAnchor="middle" className={styles.markLabel}>Oracle</text>
-        <text x={696} y={712} textAnchor="middle" className={styles.markSub}>read only</text>
-        <Pill x={696} y={730} label="STANDBY" tone="pStandby" />
-        <path d="M726,640 H752 V516 H719" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={696} cy={516} rx={21} h={26} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
-        <text x={696} y={554} textAnchor="middle" className={styles.markSub}>read-only</text>
+        {/* Data Guard runs down the left of the Oracle column, at x=700: the
+            drums start at 722, so this is the clear lane between them and
+            billpay-core. The gRPC bus hops over it in the gap. */}
+        <path d="M722,258 H700 V576 H716" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Chip x={700} y={506} label="Data Guard" tone="chipRep" />
 
-        <path d="M666,180 H626 V642 H662" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Chip x={626} y={470} label="Data Guard" tone="chipRep" />
+        {/* ================= the gRPC bus out to the cloud ================= */}
 
-        {/* ================= layer 3: Temporal on AWS ================= */}
-
-        {/* both cores call the same cluster; the bus hops the Data Guard line */}
+        <path d="M574,282 V433" className={styles.req} />
+        <path d="M574,552 V433" className={styles.req} />
+        <circle cx={574} cy={433} r={4} className={styles.junction} />
+        {/* one continuous run, hopping the Data Guard line at x=700 rather than
+            breaking for it: a gap in a request path reads as a gap in the path */}
         <path
-          d="M520,204 V411 H612 Q626,390 640,411 H812 V258 H826"
+          d="M574,433 H686 Q700,412 714,433 H1050 V310 H1122"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
-        <path d="M520,618 V411" className={styles.req} />
-        <circle cx={520} cy={411} r={4} className={styles.junction} />
-        <Chip x={566} y={411} label="gRPC" tone="chipReq" />
+        <Chip x={880} y={433} label="gRPC" tone="chipReq" />
 
-        <rect x={792} y={56} width={320} height={710} rx={18} className={styles.regionAws} />
-        <AwsMark x={812} y={74} w={36} />
-        <text x={856} y={90} className={styles.regionLabel}>us-east-1</text>
-        <TemporalMark cx={950} cy={88} size={28} />
-        <text x={970} y={93} className={styles.regionLabel}>Temporal</text>
-        <K8sMark cx={825} cy={136} size={26} />
-        <text x={847} y={132} className={styles.regionLabel}>EKS cluster</text>
-        <text x={847} y={148} className={styles.regionNote}>self-hosted · pods</text>
+        {/* ================= the AWS estate ================= */}
 
-        <Service x={830} y={230} w={200} h={56} tint="tTemporal" icon="hub" title="Frontend" />
-        <Service x={830} y={306} w={200} h={56} tint="tTemporal" icon="hub" title="History" />
-        <Service x={830} y={382} w={200} h={56} tint="tTemporal" icon="hub" title="Matching + Worker" />
+        <rect x={1076} y={52} width={536} height={712} rx={22} className={styles.groupAws} />
+        <AwsMark x={1096} y={62} w={42} />
 
-        <path d="M1030,258 H1060 V470 H900 V486" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <path d="M1030,334 H1060" className={styles.req} />
-        <path d="M1030,410 H1060" className={styles.req} />
-        <Drum cx={900} cy={510} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={938} y={506} className={styles.markLabel}>Postgres</text>
-        <Pill x={938} y={524} label="WRITER" tone="pPrimary" anchor="start" />
+        <rect x={1094} y={118} width={500} height={630} rx={18} className={styles.groupTemporal} />
+        <TemporalMark cx={1126} cy={146} size={26} />
+        <text x={1148} y={151} className={styles.groupLabel}>TEMPORAL</text>
 
-        <path d="M900,542 V566 H858 V584" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <path d="M900,566 H942 V584" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={858} cy={612} rx={24} h={30} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <Drum cx={942} cy={612} rx={24} h={30} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={900} y={656} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
-
-        <text x={812} y={702} className={styles.markSub}>Histories, task queues and schedules live here.</text>
-        <text x={812} y={720} className={styles.markSub}>Nothing sits in worker memory.</text>
-
-        {/* ---- the passive region ----
-            us-west-1 takes no traffic, so it gets a short band rather than a
-            second full stack: the Postgres it replicates is the only thing in
-            it worth drawing. Dimmed, like IPC1's Oracle standby, because the
-            two are promoted the same way and for the same reason. */}
-        {/* Down the far right at x=1088: the "Histories…" line above reaches
-            1071, so this is the only clear lane between it and the region
-            edge. Enters the drum side-on at its centreline. */}
-        <path
-          d="M930,510 H1088 V880 H934"
-          className={styles.rep}
-          markerEnd="url(#ha-m-rep)"
+        {/* ---- us-east-1, the active region ---- */}
+        <Region
+          x={1110}
+          y={180}
+          w={468}
+          h={372}
+          cls={styles.regionAws}
+          label="us-east-1"
+          note="active cluster"
         />
+        <Pill x={1560} y={206} label="ACTIVE" tone="pOk" anchor="end" />
 
-        <rect x={792} y={790} width={320} height={150} rx={18} className={styles.regionAws} />
-        <AwsMark x={812} y={806} w={36} />
-        <text x={856} y={822} className={styles.regionLabel}>us-west-1</text>
-        <text x={856} y={838} className={styles.regionNote}>passive standby</text>
+        <K8sMark cx={1146} cy={252} size={24} />
+        <text x={1166} y={250} className={styles.markLabel}>EKS cluster</text>
+        <text x={1166} y={265} className={styles.markSub}>self-hosted · pods</text>
 
-        <Drum
-          cx={900}
-          cy={880}
-          rx={30}
-          h={40}
-          grad="ha-g-pg"
-          dim
-          glossCls={styles.drumTopDim}
+        <Service x={1130} y={286} w={190} h={48} tint="tTemporal" icon="hub" title="Frontend" />
+        <Service x={1130} y={346} w={190} h={48} tint="tTemporal" icon="hub" title="History" />
+        <Service x={1130} y={406} w={190} h={48} tint="tTemporal" icon="hub" title="Matching + Worker" />
+
+        <path d="M1328,310 H1360" className={styles.req} />
+        <path d="M1328,370 H1360" className={styles.req} />
+        <path d="M1328,430 H1360" className={styles.req} />
+        <path d="M1360,310 V430" className={styles.req} />
+        <path d="M1360,370 H1414" className={styles.req} markerEnd="url(#ha-m-req)" />
+
+        <Drum cx={1450} cy={370} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <text x={1490} y={366} className={styles.markLabel}>Postgres</text>
+        <Pill x={1490} y={386} label="WRITER" tone="pPrimary" anchor="start" />
+        <path d="M1450,392 V440 H1416 V463" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <path d="M1450,440 H1484 V463" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={1416} cy={482} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <Drum cx={1484} cy={482} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <text x={1450} y={524} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
+
+        {/* ---- us-west-1, the passive region ---- */}
+        <Region
+          x={1110}
+          y={580}
+          w={468}
+          h={150}
+          cls={styles.regionAws}
+          label="us-west-1"
+          note="passive standby"
         />
-        {/* Above the drum, not beside it: the replication arrow comes in on
-            the drum's centreline and would run straight through a pill there. */}
-        <Pill x={1000} y={832} label="STANDBY" tone="pStandby" anchor="start" />
-        <text x={812} y={926} className={styles.markSub}>
-          Replicated from the east. Promoted by hand.
-        </text>
+        <Pill x={1560} y={606} label="STANDBY" tone="pStandby" anchor="end" />
+
+        {/* down x=1380: the replicas reach 1436 on one side and the "read
+            replicas" label starts at 1400, so this is the clear lane. */}
+        <path d="M1420,370 H1380 V680 H1214" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={1180} cy={680} rx={28} h={36} grad="ha-g-pg" dim glossCls={styles.drumTopDim} />
+        <text x={1230} y={700} className={styles.markSub}>Replicated from the east. Promoted by hand.</text>
 
         {/* ---- legend ---- */}
         <g className={styles.legend}>
-          <path d="M20,976 H60" className={styles.req} markerEnd="url(#ha-m-req)" />
-          <text x={70} y={980}>request path</text>
-          <path d="M190,976 H230" className={styles.buf} markerEnd="url(#ha-m-buf)" />
-          <text x={240} y={980}>
+          <path d="M40,812 H80" className={styles.req} markerEnd="url(#ha-m-req)" />
+          <text x={90} y={816}>request path</text>
+          <path d="M210,812 H250" className={styles.buf} markerEnd="url(#ha-m-buf)" />
+          <text x={260} y={816}>
             fallback: One-Data parks the request in Redis when billpay-core can&apos;t be reached, then replays it
           </text>
-          <path d="M20,1006 H60" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-          <text x={70} y={1010}>replication</text>
-          <text x={240} y={1010} className={styles.legendMut}>
+          <path d="M40,846 H80" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+          <text x={90} y={850}>replication</text>
+          <text x={260} y={850} className={styles.legendMut}>
             dimmed drums are standbys; IPC1&apos;s Oracle and the us-west-1 Temporal cluster are both promoted by hand
           </text>
         </g>

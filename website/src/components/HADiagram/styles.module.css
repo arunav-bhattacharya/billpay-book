@@ -68,27 +68,50 @@
   font-family: var(--amex-font-sans);
 }
 
-/* ---------------------------------------------------------- layer chrome */
-.layerHead text {
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  fill: var(--amex-mut);
+/* --------------------------------------------------------------- groups */
+/* The two owned estates. Brand colour as a wash rather than a flat fill: the
+   regions and service cards sit inside these, so a saturated background would
+   take the contrast the content needs. The border carries the brand at full
+   strength, which is what makes the ownership read. */
+.groupAmex {
+  fill: color-mix(in srgb, var(--amex-blue) 11%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--amex-blue) 62%, transparent);
+  stroke-width: 2;
 }
-.layerNum {
+:global([data-theme='dark']) .groupAmex {
+  fill: color-mix(in srgb, var(--amex-blue-bright) 13%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
+}
+
+.groupAws {
+  fill: color-mix(in srgb, var(--ha-aws) 11%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-aws) 62%, transparent);
+  stroke-width: 2;
+}
+:global([data-theme='dark']) .groupAws {
+  fill: color-mix(in srgb, var(--ha-aws) 15%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-aws) 55%, transparent);
+}
+
+.groupTemporal {
+  fill: color-mix(in srgb, var(--ha-temporal) 13%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-temporal) 58%, transparent);
+  stroke-width: 1.6;
+}
+:global([data-theme='dark']) .groupTemporal {
+  fill: color-mix(in srgb, var(--ha-temporal) 20%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-temporal) 52%, transparent);
+}
+
+.groupLabel {
   font-size: 14px;
   font-weight: 800;
-  fill: var(--amex-blue);
-  letter-spacing: 0;
+  letter-spacing: 0.12em;
+  fill: var(--amex-txt-strong);
 }
-:global([data-theme='dark']) .layerNum {
-  fill: var(--amex-blue-bright);
-}
-.layerDiv {
-  stroke: var(--amex-line-strong);
-  stroke-width: 1;
-  stroke-dasharray: 2 8;
-  fill: none;
+.groupNote {
+  font-size: 12px;
+  fill: var(--amex-mut);
 }
 
 /* -------------------------------------------------------------- regions */
@@ -131,9 +154,6 @@
 }
 .siteIcon {
   color: var(--amex-platinum);
-}
-.awsIcon {
-  color: var(--ha-aws);
 }
 .svcIcon {
   color: var(--svc-tint);
@@ -274,13 +294,6 @@
   fill: var(--amex-mut);
 }
 
-/* ---------------------------------------------------------------- Redis */
-.redisMark {
-  filter: drop-shadow(0 4px 7px rgba(0, 38, 99, 0.24));
-}
-:global([data-theme='dark']) .redisMark {
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
-}
 .discEdge {
   fill: none;
   stroke: rgba(0, 0, 0, 0.24);
@@ -290,17 +303,22 @@
   fill: rgba(255, 255, 255, 0.42);
 }
 
+/* ------------------------------------------------------------ Amex mark */
+.amexMark {
+  border-radius: 6px;
+}
+
 /* ------------------------------------------------------------ AWS mark */
 .awsWord {
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   fill: var(--amex-txt-strong);
 }
 .awsSmile {
   fill: none;
   stroke: var(--ha-aws);
-  stroke-width: 2.4;
+  stroke-width: 3;
   stroke-linecap: round;
 }
 .awsArrow {
@@ -308,11 +326,19 @@
 }
 
 /* ------------------------------------------------------- Temporal mark */
-.temporalLeaf {
+.temporalRing {
   fill: none;
   stroke: var(--ha-temporal-brand);
-  stroke-width: 1.7;
-  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.temporalCore {
+  fill: var(--ha-temporal-brand);
+}
+:global([data-theme='dark']) .temporalRing {
+  stroke: #8f9bff;
+}
+:global([data-theme='dark']) .temporalCore {
+  fill: #8f9bff;
 }
 
 /* ----------------------------------------------------------- Kubernetes */
