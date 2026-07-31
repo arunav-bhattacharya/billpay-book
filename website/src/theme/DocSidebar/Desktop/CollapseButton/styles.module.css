@@ -1,12 +1,19 @@
-/* Positioning only. The button's look comes from the shared `.rail-toggle`
+/* Positioning only. The buttons' look comes from the shared `.rail-toggle`
    class in custom.css, which the expand control uses too.
 
-   The theme renders this last, so `order` lifts it above the menu and
+   The theme renders this last, so `order` lifts the cluster above the menu and
    `align-self` parks it in the top-right corner of the rail. */
 
-.collapse {
+.cluster {
   order: -1;
   align-self: flex-end;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 1rem 1rem 0.35rem;
+}
+
+.collapse {
+  flex: 0 0 auto;
 }

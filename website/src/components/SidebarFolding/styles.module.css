@@ -1,0 +1,8 @@
+/* Positioning only. The look comes from the shared `.rail-toggle` class in
+   custom.css, which the sidebar's collapse and expand controls use too. The
+   cluster in src/theme/DocSidebar/Desktop/CollapseButton places this button:
+   all it needs here is to hold its size in that row. */
+
+.foldAll {
+  flex: 0 0 auto;
+}
