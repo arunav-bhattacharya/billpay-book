@@ -5,6 +5,12 @@
 
 .wrap {
   position: relative;
+  /* A diagram is a heavier block than a paragraph, and the "What happens"
+     details that follows most of them is a bordered panel, so the two sat
+     edge to edge with no gap at all. Slightly more than the paragraph rhythm
+     (1.25rem), which is enough to read as a separate thing. The expanded
+     layer resets margin to 0, so this only ever applies inline. */
+  margin-bottom: 1.75rem;
 }
 
 /* Every control on a diagram is a square icon button of the same size, so the
