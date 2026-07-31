@@ -452,15 +452,6 @@
 .chipRep text {
   fill: var(--amex-mut);
 }
-.chipPod rect {
-  stroke: color-mix(in srgb, var(--amex-temporal) 55%, transparent);
-}
-.chipPod text {
-  fill: var(--amex-temporal);
-}
-:global([data-theme='dark']) .chipPod text {
-  fill: #a48bff;
-}
 
 /* ---------------------------------------------------------------- flows */
 .req {
@@ -534,10 +525,24 @@
 :global([data-theme='dark']) .mPod {
   fill: #a48bff;
 }
-.podDot {
+/* The bus itself, drawn as a pill so it reads as one shared medium the
+   services tap rather than as a bracket grouping them. */
+.podBus rect {
+  fill: color-mix(in srgb, var(--amex-temporal) 15%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--amex-temporal) 60%, transparent);
+  stroke-width: 1.2;
+}
+.podBus text {
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
   fill: var(--amex-temporal);
 }
-:global([data-theme='dark']) .podDot {
+:global([data-theme='dark']) .podBus rect {
+  fill: color-mix(in srgb, #a48bff 20%, var(--amex-panel));
+  stroke: color-mix(in srgb, #a48bff 55%, transparent);
+}
+:global([data-theme='dark']) .podBus text {
   fill: #a48bff;
 }
 .junction {

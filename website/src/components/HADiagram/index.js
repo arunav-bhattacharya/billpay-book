@@ -440,10 +440,11 @@ export default function HADiagram() {
         <circle cx={574} cy={433} r={4} className={styles.junction} />
         {/* one continuous run, hopping the Data Guard line at x=700 rather than
             breaking for it: a gap in a request path reads as a gap in the path.
-            It lands on Frontend, which is the only Temporal service a client
-            ever talks to. */}
+            It comes over the top of the region and drops into Frontend, the
+            only Temporal service a client ever talks to. Entering from above
+            leaves the whole left edge of the stack to the pod-to-pod bus. */}
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V237 H1164"
+          d="M574,433 H686 Q700,412 714,433 H1050 V162 H1300 V218"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
@@ -470,35 +471,38 @@ export default function HADiagram() {
         {/* Frontend sits apart from the rest: it is the only service a client
             talks to, and the gap says so. The last box stands for the cluster's
             remaining services, so it is a service like the others. */}
-        <Service x={1176} y={220} w={160} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
-        <Service x={1176} y={296} w={160} h={34} tint="tTemporal" icon="temporal" title="History" />
-        <Service x={1176} y={354} w={160} h={34} tint="tTemporal" icon="temporal" title="Matching" />
-        <Service x={1176} y={412} w={160} h={34} tint="tTemporal" icon="temporal" title="Worker" />
-        <Service x={1176} y={470} w={160} h={34} tint="tTemporal" icon="temporal" title="…" />
+        <Service x={1188} y={228} w={148} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
+        <Service x={1188} y={306} w={148} h={34} tint="tTemporal" icon="temporal" title="History" />
+        <Service x={1188} y={360} w={148} h={34} tint="tTemporal" icon="temporal" title="Matching" />
+        <Service x={1188} y={414} w={148} h={34} tint="tTemporal" icon="temporal" title="Worker" />
+        <Service x={1188} y={468} w={148} h={34} tint="tTemporal" icon="temporal" title="…" />
 
-        {/* One shared bus rather than a link per pair: every service on it can
-            call every other, Frontend included, and it stays one line. */}
-        <path
-          d="M1240,260 V270 H1140 V487 H1164"
-          className={styles.pod}
-          markerStart="url(#ha-m-pod)"
-          markerEnd="url(#ha-m-pod)"
-        />
-        <path d="M1140,313 H1164" className={styles.pod} markerEnd="url(#ha-m-pod)" />
-        <path d="M1140,371 H1164" className={styles.pod} markerEnd="url(#ha-m-pod)" />
-        <path d="M1140,429 H1164" className={styles.pod} markerEnd="url(#ha-m-pod)" />
-        {[313, 371, 429].map((cy) => (
-          <circle key={cy} cx={1140} cy={cy} r={3} className={styles.podDot} />
+        {/* One bus down the side of the stack rather than a link per pair.
+            Every service taps it, Frontend included, so any of them can call
+            any other and it stays one shape. */}
+        <g className={styles.podBus}>
+          <rect x={1130} y={228} width={24} height={272} rx={12} />
+          <text x={1142} y={364} textAnchor="middle" dominantBaseline="central" transform="rotate(-90 1142 364)">
+            pod-to-pod
+          </text>
+        </g>
+        {[245, 323, 377, 431, 485].map((cy) => (
+          <path
+            key={cy}
+            d={`M1154,${cy} H1176`}
+            className={styles.pod}
+            markerStart="url(#ha-m-pod)"
+            markerEnd="url(#ha-m-pod)"
+          />
         ))}
-        <Chip x={1200} y={270} label="pod-to-pod" tone="chipPod" />
 
         {/* persistence: out of the cluster, into the managed Postgres */}
-        <path d="M1336,237 H1390" className={styles.req} />
-        <path d="M1336,313 H1390" className={styles.req} />
-        <path d="M1336,371 H1390" className={styles.req} />
-        <path d="M1336,429 H1390" className={styles.req} />
-        <path d="M1336,487 H1390" className={styles.req} />
-        <path d="M1390,237 V487" className={styles.req} />
+        <path d="M1336,245 H1390" className={styles.req} />
+        <path d="M1336,323 H1390" className={styles.req} />
+        <path d="M1336,377 H1390" className={styles.req} />
+        <path d="M1336,431 H1390" className={styles.req} />
+        <path d="M1336,485 H1390" className={styles.req} />
+        <path d="M1390,245 V485" className={styles.req} />
         <path d="M1390,296 H1438" className={styles.req} markerEnd="url(#ha-m-req)" />
 
         <Pill x={1470} y={226} label="WRITER" tone="pPrimary" />
