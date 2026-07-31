@@ -13,7 +13,7 @@ import Lead from '@site/src/components/Lead';
 
 Four choices sit underneath everything and are not revisited per component:
 
-- **Kotlin** is the platform language, top to bottom. The domain model leans hard on sealed hierarchies and null-safety, and the [Data Model](../../data-model/index.md) pages show why.
+- **Kotlin** is the platform language, top to bottom. The domain model leans hard on sealed hierarchies and null-safety, and the [Domain Model](../../domain-model/index.md) pages show why.
 - **Quarkus (ArC/CDI)** does the dependency injection and app wiring. We use it lightly: `@ApplicationScoped` beans and constructor injection, and none of the rest of the framework.
 - **Gradle** builds everything from one multi-module monorepo. The [code layout](../core-build/code-layout.md) page shows how the modules map to the component model.
 - **Temporal** is the workflow engine. Its guarantees (durable state, replay, retries, signals, schedules) are why the [core build rules](../core-build/index.md) look the way they do.

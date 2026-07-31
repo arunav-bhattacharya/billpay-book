@@ -26,7 +26,7 @@ Column-level definitions are still settling and are deliberately not documented 
 
 ## How the code sees it
 
-Every table has one [Exposed](../principles/tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Activities open one `transaction { }` per call, which is also the [retry boundary](../principles/core-build/activities.md). Workflow code never touches any of this, because it has to [stay deterministic](../principles/core-build/workflows.md#why-workflow-code-must-be-deterministic).
+Every table has one [Exposed](./principles/tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Activities open one `transaction { }` per call, which is also the [retry boundary](./principles/core-build/activities.md). Workflow code never touches any of this, because it has to [stay deterministic](./principles/core-build/workflows.md#why-workflow-code-must-be-deterministic).
 
 ## Three Oracle habits to know
 

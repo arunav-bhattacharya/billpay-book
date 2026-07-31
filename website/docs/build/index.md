@@ -25,9 +25,14 @@ import Highlights from '@site/src/components/Highlights';
       desc: `The contracts: the One-Data Functions at the edge, the core REST APIs behind them, and the idempotency rules at the boundary.`,
     },
     {
-      term: 'Data Model',
-      to: '/docs/build/data-model',
-      desc: `The Kotlin domain model (payments, options, instruments) and the Oracle tables underneath it, including how the code maps onto them.`,
+      term: 'Domain Model',
+      to: '/docs/build/domain-model',
+      desc: `The Kotlin types behind a payment: payments, options, and instruments, built so an illegal state will not compile.`,
+    },
+    {
+      term: 'Database',
+      to: '/docs/build/database',
+      desc: `The Oracle tables under the domain model, which activity writes each one, and the three Oracle habits worth knowing.`,
     },
     {
       term: 'Schedules',

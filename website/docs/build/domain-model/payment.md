@@ -168,4 +168,4 @@ The pending to accepted edge takes the verified pieces as arguments, so validati
 
 A [stage](../principles/core-build/stages.md) is one of these functions plus the persistence and event publication around it, which is why stage signatures stay short.
 
-The eleven status types above are fewer than the [spec's state model](../../design/payment-state-model.md) defines. What is missing, and why, is listed on the [Data Model](./index.md) page.
+The eleven status types above are fewer than the [spec's state model](../../design/payment-state-model.md) defines. What is missing, and why, is listed on the [Domain Model](./index.md) page.

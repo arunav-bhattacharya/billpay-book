@@ -13,7 +13,7 @@ import Lead from '@site/src/components/Lead';
 
 Naming is mechanical: `{From}To{To}Stage`. `InitiatedToPendingStage`, `PendingToAcceptedStage`, `AcceptedToProcessingStage`. The name tells you the edge. One class, one public function, one transition.
 
-The [domain model](../../data-model/payment.md) types the transition for you. Each lifecycle state is its own Kotlin type and the edges between them are extension functions, so a stage's signature *is* its contract.
+The [domain model](../../domain-model/payment.md) types the transition for you. Each lifecycle state is its own Kotlin type and the edges between them are extension functions, so a stage's signature *is* its contract.
 
 ```kotlin
 class PendingToAcceptedStage(

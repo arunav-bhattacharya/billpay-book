@@ -31,4 +31,4 @@ import Lead from '@site/src/components/Lead';
 
 One logical schema for billpay-core, with separate read-write and read-only users. Connection pooling is [Agroal](./datasource.md). Schema migrations are version-controlled and run through the standard Amex DB pipeline, never by hand and never by the ORM. Application code reaches Oracle exclusively through [Exposed](./orm.md), and there is no raw JDBC in stages, activities, or anywhere else.
 
-The tables themselves, and the three Oracle habits that follow from the reasons above, are in [Data Model → Database](../../data-model/database.md).
+The tables themselves, and the three Oracle habits that follow from the reasons above, are in [Database](../../database.md).

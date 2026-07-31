@@ -1,11 +1,11 @@
 ---
-title: Data Model
-sidebar_label: Data Model
+title: Domain Model
+sidebar_label: Domain Model
 ---
 
 import Lead from '@site/src/components/Lead';
 
-# Data Model
+# Domain Model
 
 <Lead>The domain model lives in <code>com.aexp.billpay.core.domain.transaction</code> and is built around one idea: <strong>make illegal payment states unrepresentable.</strong> Each lifecycle state is its own Kotlin type, every type is immutable, and the only way from one state to the next is a function the compiler checks. An illegal state change is caught at compile time rather than at runtime.</Lead>
 
@@ -37,7 +37,8 @@ Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete
 - [Payment](./payment.md) covers `Transaction`, `Payment`, the eleven status types, Full and Split, timelines, and the transition functions that are the state machine.
 - [Payment Options](./payment-options.md) covers the eight option types and their Reference to Verified lifecycle.
 - [Instruments](./instruments.md) covers bank accounts, debit cards, and loyalty as funding instruments, with the international identification schemas.
-- [Database](./database.md) covers the Oracle tables underneath, and how the model maps onto them.
+
+The Oracle tables these types are persisted into, and how the code maps onto them, are on the [Database](../database.md) page.
 
 :::note[Still to be modelled]
 The code does not yet cover everything the [spec's state model](../../design/payment-state-model.md) defines. These gaps are tracked deliberately rather than papered over.

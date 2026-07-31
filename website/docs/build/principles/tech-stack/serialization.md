@@ -11,7 +11,7 @@ import Lead from '@site/src/components/Lead';
 
 ## Jackson, with type discriminators
 
-Today that job is done by **Jackson**. Every sealed hierarchy in the [domain model](../../data-model/index.md) carries the same annotation:
+Today that job is done by **Jackson**. Every sealed hierarchy in the [domain model](../../domain-model/index.md) carries the same annotation:
 
 ```kotlin
 @JsonTypeInfo(

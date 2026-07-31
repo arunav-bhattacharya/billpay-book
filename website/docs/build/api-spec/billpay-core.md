@@ -33,6 +33,6 @@ Every mutating endpoint is idempotency-guarded, and the mechanism is worth knowi
 - **Create paths** do not check and then write. The write *is* the check. `PersistPendingPaymentActivity` inserts the idempotency record, the `trans_dtl` row, and the first `trans_lfcyc_event` row together. If the insert fails on the unique index, this is a repeat request, and the caller gets the **original payment** back, not an error and not a duplicate.
 - **Mutate paths** (update, cancel, returns) run `IdempotencyCheckActivity`, which inserts only the idempotency record for that API. A duplicate insert means the request was already handled, and the previous response is returned.
 
-Both paths rest on the same [unique-index guarantee](../data-model/database.md) in Oracle.
+Both paths rest on the same [unique-index guarantee](../database.md) in Oracle.
 
 Field-level request and response schemas are defined as OpenAPI alongside the endpoint code. This page stays at the contract level on purpose.

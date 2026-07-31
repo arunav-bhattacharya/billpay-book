@@ -306,7 +306,7 @@ live in Design; contract tables (function, endpoint, type, schema) live in Build
 | Activities and ActivityGroups | `design/component-model/activities.md` |
 | Flow diagrams | `design/sequence-diagrams.md` |
 | One-Data functions, core endpoints | `build/api-spec/one-data.md`, `billpay-core.md` |
-| Tables and schema | `build/data-model/database.md` |
+| Tables and schema | `build/database.md` |
 | Tech choices | `build/principles/tech-stack/*.md` |
 | Code rules and enforcement | `build/principles/core-build/*.md` |
 | Why Temporal, durable execution | `architecture/overview.md#why-temporal` |
@@ -321,7 +321,7 @@ live in Design; contract tables (function, endpoint, type, schema) live in Build
 - **Deleted:** `design/journeys/api.md`, `design/diagrams/state-diagram.md` (9 of its 12
   diagrams were strict subsets of `payment-state-model`; the Update Payment one was salvaged
   into `workflows/core.md`), `design/diagrams/index.md`, `design/database.md` (superseded by
-  `build/data-model/database.md`), `architecture/components.md` (merged into `overview.md`).
+  `build/database.md`), `architecture/components.md` (merged into `overview.md`).
 - **Rewritten:** `design/component-model/stages.md`, from 10 workflow sections with 30
   repeating stage headings to 16 stage sections plus one workflow-to-stage-sequence table.
   Four verbatim triplications gone.
