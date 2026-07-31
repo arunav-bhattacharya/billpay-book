@@ -8,7 +8,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 # High Availability
 
-<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against a **single self-hosted Temporal cluster** in AWS us-east-1. The front half of the platform is live in both sites at once. The write side of the database is deliberately not. And when billpay-core can't be reached, One-Data parks the request in Redis rather than turning the caller away.</Lead>
+<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against a **self-hosted Temporal cluster** in AWS us-east-1. The front half of the platform is live in both sites at once. The write side of the database is deliberately not, and neither is Temporal: both have a standby that only takes over when someone promotes it. And when billpay-core can't be reached, One-Data parks the request in Redis rather than turning the caller away.</Lead>
 
 ## Topology
 
@@ -39,9 +39,10 @@ import HADiagram from '@site/src/components/HADiagram';
 
 ## Temporal
 
-- Temporal is self-hosted on an EKS cluster in AWS us-east-1. The frontend, history, matching and worker services all run as pods there.
+- Temporal is self-hosted on an EKS cluster in AWS us-east-1. The frontend, history, matching and worker services all run as pods there. This is the active cluster, and the only one taking traffic.
 - Persistence is PostgreSQL: one writer with two read replicas. This is Temporal's own database, not Billpay's Oracle.
-- Both billpay-core instances connect to that cluster over gRPC to start workflows and poll for work.
+- **us-west-1 holds a passive standby**, with its Postgres replicated from the east. It serves nothing in normal operation. Promoting it is a manual call, the same rule as the Oracle standby in IPC1: one write site at a time, no split brain.
+- Both billpay-core instances connect to the active cluster over gRPC to start workflows and poll for work.
 - Workflow state lives in that Postgres, never in worker memory. Restart the workers and in-flight payments carry on from their event histories.
 - Cluster detail is on the [Temporal Server](../deployment/temporal-server.md) page.
 
@@ -52,6 +53,6 @@ import HADiagram from '@site/src/components/HADiagram';
 | **billpay-core in one site** | One-Data on that site keeps answering callers and parks their requests in Redis, then replays them when the core is back. Nothing is dropped, it just processes late. |
 | **A whole site** | The other site keeps taking traffic on its own One-Data and core. If the lost site was IPC2, an operator promotes the Data Guard standby in IPC1 so writes have somewhere to land again. |
 | **Oracle primary** | The standby in IPC1 is promoted. Until it is, reads still work off the read-only replicas, but nothing new can be written. |
-| **Temporal in us-east-1** | No workflow can start or advance while the cluster is down. Because every history is in Postgres and not in a worker, workflows resume exactly where they stopped once it's back. This is the durability Temporal was [chosen for](./overview.md#why-temporal). |
+| **Temporal in us-east-1** | No workflow can start or advance until either the cluster returns or an operator promotes the us-west-1 standby and billpay-core reconnects to it. Either way nothing is lost: every history is in Postgres rather than in a worker, so workflows resume exactly where they stopped. This is the durability Temporal was [chosen for](./overview.md#why-temporal). |
 
 Two rules hold this together. The front door stays open on both sites, and there is only ever one place where writes land. Moving that place is a call someone makes, not something that happens by itself.

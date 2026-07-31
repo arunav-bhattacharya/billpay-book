@@ -232,10 +232,10 @@ export default function HADiagram() {
   return (
     <div className={styles.wrap}>
       <svg
-        viewBox="0 0 1120 850"
+        viewBox="0 0 1120 1030"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology in three layers, left to right. Layer one, the API layer: One-Data Functions run active in both IPC2 (US East) and IPC1 (US West), each backed by a Redis fallback store, the two replicated active-active with CRDB. Layer two, billpay-core: a core instance in each site, with the read-write Oracle primary and two read-only replicas in IPC2 and a Data Guard standby plus one read-only replica in IPC1. Layer three, on the right: Temporal frontend, history, matching and worker services on an EKS cluster in AWS us-east-1, with a PostgreSQL writer and two read replicas. Both core instances call that cluster over gRPC."
+        aria-label="High-availability topology in three layers, left to right. Layer one, the API layer: One-Data Functions run active in both IPC2 (US East) and IPC1 (US West), each backed by a Redis fallback store, the two replicated active-active with CRDB. Layer two, billpay-core: a core instance in each site, with the read-write Oracle primary and two read-only replicas in IPC2 and a Data Guard standby plus one read-only replica in IPC1. Layer three, on the right: Temporal frontend, history, matching and worker services on an EKS cluster in AWS us-east-1, with a PostgreSQL writer and two read replicas. Both core instances call that cluster over gRPC. Below it, a passive standby cluster in AWS us-west-1 with its PostgreSQL replicated from the east, taking no traffic until an operator promotes it."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -395,18 +395,53 @@ export default function HADiagram() {
         <text x={812} y={702} className={styles.markSub}>Histories, task queues and schedules live here.</text>
         <text x={812} y={720} className={styles.markSub}>Nothing sits in worker memory.</text>
 
+        {/* ---- the passive region ----
+            us-west-1 takes no traffic, so it gets a short band rather than a
+            second full stack: the Postgres it replicates is the only thing in
+            it worth drawing. Dimmed, like IPC1's Oracle standby, because the
+            two are promoted the same way and for the same reason. */}
+        {/* Down the far right at x=1088: the "Histories…" line above reaches
+            1071, so this is the only clear lane between it and the region
+            edge. Enters the drum side-on at its centreline. */}
+        <path
+          d="M930,510 H1088 V880 H934"
+          className={styles.rep}
+          markerEnd="url(#ha-m-rep)"
+        />
+
+        <rect x={792} y={790} width={320} height={150} rx={18} className={styles.regionAws} />
+        <AwsMark x={812} y={806} w={36} />
+        <text x={856} y={822} className={styles.regionLabel}>us-west-1</text>
+        <text x={856} y={838} className={styles.regionNote}>passive standby</text>
+
+        <Drum
+          cx={900}
+          cy={880}
+          rx={30}
+          h={40}
+          grad="ha-g-pg"
+          dim
+          glossCls={styles.drumTopDim}
+        />
+        {/* Above the drum, not beside it: the replication arrow comes in on
+            the drum's centreline and would run straight through a pill there. */}
+        <Pill x={1000} y={832} label="STANDBY" tone="pStandby" anchor="start" />
+        <text x={812} y={926} className={styles.markSub}>
+          Replicated from the east. Promoted by hand.
+        </text>
+
         {/* ---- legend ---- */}
         <g className={styles.legend}>
-          <path d="M20,796 H60" className={styles.req} markerEnd="url(#ha-m-req)" />
-          <text x={70} y={800}>request path</text>
-          <path d="M190,796 H230" className={styles.buf} markerEnd="url(#ha-m-buf)" />
-          <text x={240} y={800}>
+          <path d="M20,976 H60" className={styles.req} markerEnd="url(#ha-m-req)" />
+          <text x={70} y={980}>request path</text>
+          <path d="M190,976 H230" className={styles.buf} markerEnd="url(#ha-m-buf)" />
+          <text x={240} y={980}>
             fallback: One-Data parks the request in Redis when billpay-core can&apos;t be reached, then replays it
           </text>
-          <path d="M20,826 H60" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-          <text x={70} y={830}>replication</text>
-          <text x={240} y={830} className={styles.legendMut}>
-            dimmed drums are standbys; IPC1&apos;s Oracle is promoted if the east site is lost
+          <path d="M20,1006 H60" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+          <text x={70} y={1010}>replication</text>
+          <text x={240} y={1010} className={styles.legendMut}>
+            dimmed drums are standbys; IPC1&apos;s Oracle and the us-west-1 Temporal cluster are both promoted by hand
           </text>
         </g>
       </svg>

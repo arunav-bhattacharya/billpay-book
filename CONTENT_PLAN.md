@@ -350,13 +350,30 @@ links keep working.
 - Sequence diagram 7's `Invalid Notify` participant was invented. The spec defines no
   notification on an invalid return, and the diagram now says so.
 
-### Open, needs a human answer
+### The AWS region contradiction, resolved (2026-07-31)
 
-`architecture/high-availability.md` says the Temporal cluster is **a single cluster in
-us-east-1**, and its failure row reads "no workflow can start or advance while the cluster is
-down". `deployment/temporal-server.md` says **us-east-1 active with a us-west-1 passive
-standby** and manual promotion, and points at the HA page for "the full regional picture",
-which that page does not draw. Neither `docs/Wiki_Spec.md` nor `reference/` mentions any AWS
-region, so both came from outside the source hierarchy and cannot be reconciled from any
-document in the repo. `architecture/index.md` no longer asserts a region count. **Someone who
-knows the deployment needs to say which page is right.**
+`architecture/high-availability.md` used to say the Temporal cluster was **a single cluster in
+us-east-1**, with a failure row reading "no workflow can start or advance while the cluster is
+down". `deployment/temporal-server.md` said **us-east-1 active with a us-west-1 passive
+standby** and manual promotion, and pointed at the HA page for "the full regional picture",
+which that page did not draw.
+
+**Resolved on user direction in favour of two regions**, which is what `temporal-server.md`
+already described in detail. This was a judgement call by the user, not something a document
+settled: neither `docs/Wiki_Spec.md` nor `reference/` mentions any AWS region, so both accounts
+came from outside the source hierarchy. Treat the two-region topology as the authority now,
+and if that is ever wrong, the HA page and `temporal-server.md` have to move together.
+
+What changed on the HA page:
+- The lead no longer says "single cluster", and names the standby alongside Oracle's, since the
+  two are promoted the same way and for the same reason.
+- `## Temporal` gains the us-west-1 standby with its replicated Postgres and manual promotion.
+- The failure row now says an operator can promote the standby, rather than implying there is
+  nothing to fail over to.
+- `HADiagram` gains a us-west-1 band under the us-east-1 one: a dimmed Postgres drum, a
+  `STANDBY` pill, and a replication edge from the east writer. The canvas grew from 850 to 1030
+  to fit it, and the legend moved down. Verified against the live DOM as the original was: zero
+  text collisions in screen space, nothing outside the canvas, and the new edge crosses no
+  label. It routes down x=1088 because the "Histories…" line above reaches x=1071, which is the
+  only clear lane to the region edge.
+- `architecture/index.md` still does not assert a region count, which stays correct either way.
