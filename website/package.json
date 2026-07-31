@@ -30,10 +30,11 @@
     "@docusaurus/module-type-aliases": "3.10.1",
     "@docusaurus/types": "3.10.1"
   },
-  "//overrides": "Force-patch build/dev-time-only transitive deps flagged by npm audit (none ship in the static site). Avoids downgrading Docusaurus, which is already latest (3.10.1).",
+  "//overrides": "Force-patch transitive deps flagged by npm audit, without downgrading Docusaurus (already latest, 3.10.1). brace-expansion is only patched on its 5.x line, while minimatch@3 (via serve-handler, which backs `npm run serve`) asks for ^1.1.7, so the fix has to be forced across majors. Verified: build, serve, and Mermaid rendering all still work.",
   "overrides": {
     "serialize-javascript": "^7.0.7",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "brace-expansion": "^5.0.9"
   },
   "browserslist": {
     "production": [
