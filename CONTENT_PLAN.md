@@ -298,7 +298,7 @@ live in Design; contract tables (function, endpoint, type, schema) live in Build
 |---|---|
 | Component model, call rules, naming | `design/principles.md` |
 | Payment lifecycle states | `design/payment-state-model.md` |
-| Router: trigger to workflow | `design/routing.md` |
+| Router: trigger to workflow | `design/component-model/routing.md` |
 | Schedule to workflow | `design/component-model/workflows/periodic.md` |
 | Online / Offline worker split | `design/component-model/workflows/index.md` |
 | Per-workflow behaviour | `design/component-model/workflows/*.md` |
@@ -314,8 +314,9 @@ live in Design; contract tables (function, endpoint, type, schema) live in Build
 
 ### Page changes
 
-- **New:** `design/routing.md` (the router table, moved out of Architecture and out of the
-  orphaned `design/journeys/api.md`, which nothing linked to).
+- **New:** `design/component-model/routing.md` (the router table, moved out of Architecture
+  and out of the orphaned `design/journeys/api.md`, which nothing linked to). It sits first
+  under Component Model, before Workflows, because routing is what picks the workflow.
 - **Moved:** `design/diagrams/sequence-diagram.md` → `design/sequence-diagrams.md`.
 - **Deleted:** `design/journeys/api.md`, `design/diagrams/state-diagram.md` (9 of its 12
   diagrams were strict subsets of `payment-state-model`; the Update Payment one was salvaged

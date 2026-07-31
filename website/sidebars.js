@@ -38,7 +38,6 @@ const sidebars = {
       link: {type: 'doc', id: 'design/index'},
       items: [
         'design/principles',
-        'design/routing',
         'design/payment-state-model',
         {
           type: 'category',
@@ -56,6 +55,7 @@ const sidebars = {
           collapsed: true,
           link: {type: 'doc', id: 'design/component-model/index'},
           items: [
+            'design/component-model/routing',
             {
               type: 'category',
               label: 'Workflows',

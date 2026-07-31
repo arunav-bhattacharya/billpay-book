@@ -52,7 +52,8 @@ const config = {
         // the plugin adds. Redirect files are emitted by `build`, not by the
         // dev server, so test them with `npm run build && npm run serve`.
         redirects: [
-          {from: '/docs/design/journeys/api', to: '/docs/design/routing'},
+          {from: '/docs/design/journeys/api', to: '/docs/design/component-model/routing'},
+          {from: '/docs/design/routing', to: '/docs/design/component-model/routing'},
           {from: '/docs/design/diagrams', to: '/docs/design/sequence-diagrams'},
           {
             from: '/docs/design/diagrams/sequence-diagram',
