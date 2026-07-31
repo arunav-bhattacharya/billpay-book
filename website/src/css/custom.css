@@ -598,8 +598,19 @@ a {
   font-weight: 600;
 }
 
-/* Sidebar active item gets an Amex-blue left rail. */
-.menu__link--active:not(.menu__link--sublist) {
+/* Blue in the sidebar means one thing only: this is the page you are on.
+   Docusaurus also flags every ancestor of the current page as active, which
+   paints whole branches blue and drains the signal, so ancestors are pulled
+   back to the ordinary menu colour. */
+.theme-doc-sidebar-menu .menu__link--sublist.menu__link--active {
+  color: var(--ifm-menu-color);
+}
+
+/* The current page: leaf links, and section headers that are pages in their
+   own right. Both get the blue label and the Amex-blue left rail. */
+.theme-doc-sidebar-menu .menu__link--active:not(.menu__link--sublist),
+.theme-doc-sidebar-menu .menu__list-item-collapsible--active > .menu__link.menu__link--active {
+  color: var(--ifm-menu-color-active);
   box-shadow: inset 3px 0 0 var(--ifm-color-primary);
   font-weight: 600;
 }
@@ -707,20 +718,16 @@ a {
   background: var(--amex-mut);
 }
 
-/* Numbered top-level sidebar sections — mirrors the homepage card indices
+/* Numbered top-level sidebar sections, mirroring the homepage card indices
    (zero-padded). The homepage gives each card its own accent, but eight
-   accents stacked in a narrow rail read as noise, so the sidebar uses one
-   colour for every section: label and number both in brand blue. */
-.sidebar-sec {
-  --sec-color: var(--amex-blue);
-}
-
-[data-theme='dark'] .sidebar-sec {
-  --sec-color: var(--amex-blue-bright);
-}
-
+   accents stacked in a narrow rail read as noise. Section labels sit in the
+   ordinary menu colour and the index sits a shade back from it, so the rail
+   stays quiet and blue is left to mark the current page. With colour off the
+   table, size carries the hierarchy: sections run a step above their pages,
+   and the index scales with the label it sits beside. */
 .sidebar-sec > .menu__list-item-collapsible > .menu__link {
-  color: var(--sec-color, inherit);
+  color: var(--ifm-menu-color);
+  font-size: 1.1em;
 }
 
 .sidebar-sec > .menu__list-item-collapsible > .menu__link::before {
@@ -731,7 +738,12 @@ a {
   font-weight: 700;
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
-  color: var(--sec-color, var(--ifm-color-emphasis-600));
+  color: var(--ifm-color-emphasis-600);
+}
+
+/* On the section's own page the whole row goes blue, index included. */
+.sidebar-sec > .menu__list-item-collapsible--active > .menu__link.menu__link--active::before {
+  color: inherit;
 }
 
 .sidebar-sec--vision > .menu__list-item-collapsible > .menu__link::before { content: '01'; }
