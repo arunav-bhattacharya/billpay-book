@@ -103,6 +103,18 @@
   stroke: color-mix(in srgb, var(--ha-temporal) 52%, transparent);
 }
 
+/* The cluster inside the Temporal group, in Kubernetes blue. */
+.groupEks {
+  fill: color-mix(in srgb, var(--ha-k8s) 12%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-k8s) 60%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 4;
+}
+:global([data-theme='dark']) .groupEks {
+  fill: color-mix(in srgb, var(--ha-k8s) 22%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--ha-k8s) 58%, transparent);
+}
+
 .groupLabel {
   font-size: 14px;
   font-weight: 800;
@@ -318,7 +330,7 @@
 .awsSmile {
   fill: none;
   stroke: var(--ha-aws);
-  stroke-width: 3;
+  stroke-width: 3.2;
   stroke-linecap: round;
 }
 .awsArrow {
@@ -331,31 +343,34 @@
   stroke: var(--ha-temporal-brand);
   stroke-width: 1.8;
 }
-.temporalCore {
-  fill: var(--ha-temporal-brand);
-}
 :global([data-theme='dark']) .temporalRing {
   stroke: #8f9bff;
-}
-:global([data-theme='dark']) .temporalCore {
-  fill: #8f9bff;
 }
 
 /* ----------------------------------------------------------- Kubernetes */
 .k8sBody {
-  fill: color-mix(in srgb, var(--ha-k8s) 88%, #ffffff);
-  stroke: color-mix(in srgb, var(--ha-k8s) 70%, #000000);
-  stroke-width: 0.9;
+  fill: var(--ha-k8s);
+  stroke: color-mix(in srgb, var(--ha-k8s) 74%, #000000);
+  stroke-width: 0.7;
   filter: drop-shadow(0 3px 6px rgba(0, 38, 99, 0.22));
 }
-.k8sHub {
+/* The helm: ring, spokes, pegs and hub, all white on the blue. */
+.k8sRing {
   fill: none;
   stroke: #ffffff;
-  stroke-width: 1.5;
+  stroke-width: 1.15;
+}
+.k8sHub {
+  fill: #ffffff;
 }
 .k8sSpoke {
   stroke: #ffffff;
-  stroke-width: 1.4;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+.k8sPeg {
+  stroke: #ffffff;
+  stroke-width: 1.55;
   stroke-linecap: round;
 }
 

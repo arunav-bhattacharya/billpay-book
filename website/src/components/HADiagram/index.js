@@ -73,9 +73,10 @@ function AmexMark({x, y, size = 34}) {
   return <image href={src} x={x} y={y} width={size} height={size} className={styles.amexMark} />;
 }
 
-/* AWS: the lowercase wordmark over its orange smile-arrow. Hand-drawn to the
-   shape of the mark rather than the official asset, which is trademarked and
-   not vendored here. */
+/* AWS: the lowercase wordmark over the Amazon smile, the smile swinging up on
+   the right into its arrow. Drawn as a stroked arc plus a filled head rather
+   than one tapered outline: at the size this renders the taper is invisible,
+   and the arc keeps the curve even where a hand-built outline went lumpy. */
 function AwsMark({x, y, w = 44}) {
   const s = w / 44;
   return (
@@ -84,38 +85,22 @@ function AwsMark({x, y, w = 44}) {
         aws
       </text>
       <path
-        d="M1,25.5 C10,32.2 27,33 38,26.4"
+        d="M2,23 C7.5,29.6 14.4,32.8 22,32.8 C29.2,32.8 35.4,30 40,25.4"
         className={styles.awsSmile}
       />
-      <path d="M34.6,22.6 L42.5,24.2 L37.2,30.2 Z" className={styles.awsArrow} />
+      <path d="M37.9,22.6 L44,20.6 L41.6,27 Z" className={styles.awsArrow} />
     </g>
   );
 }
 
-/* Temporal: the orbit motif, two rings crossing a filled core. Same caveat as
-   the AWS mark, drawn to the shape rather than vendored. */
+/* Temporal: two crossed ellipses, one tall and one wide, tracing a four-point
+   orbit. Outline only, no centre. */
 function TemporalMark({cx, cy, size = 28}) {
   const s = size / 32;
   return (
     <g transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}>
-      <ellipse cx="16" cy="16" rx="14.5" ry="7" className={styles.temporalRing} />
-      <ellipse
-        cx="16"
-        cy="16"
-        rx="14.5"
-        ry="7"
-        className={styles.temporalRing}
-        transform="rotate(60 16 16)"
-      />
-      <ellipse
-        cx="16"
-        cy="16"
-        rx="14.5"
-        ry="7"
-        className={styles.temporalRing}
-        transform="rotate(120 16 16)"
-      />
-      <circle cx="16" cy="16" r="4.4" className={styles.temporalCore} />
+      <ellipse cx="16" cy="16" rx="5.3" ry="14" className={styles.temporalRing} />
+      <ellipse cx="16" cy="16" rx="14" ry="5.3" className={styles.temporalRing} />
     </g>
   );
 }
@@ -138,26 +123,30 @@ function RedisMark({cx, cy, w = 58}) {
   );
 }
 
-/* Kubernetes: the seven-spoke wheel. */
+/* Kubernetes: the blue heptagon with the ship's helm inside. Seven spokes off
+   a hub, a ring around them, and seven handle pegs poking out past the ring,
+   each peg lined up with a spoke. Generated round the circle rather than
+   hand-listed, so the sevenfold symmetry is exact. */
 function K8sMark({cx, cy, size = 34}) {
   const s = size / 24;
-  const pts = '12,2.8 19.19,6.27 20.97,14.05 15.99,20.29 8.01,20.29 3.03,14.05 4.81,6.27';
-  const spokes = [
-    'M12 8.6V5.4',
-    'M14.66 9.88 17.16 7.89',
-    'M15.31 12.76 18.43 13.47',
-    'M13.48 15.06 14.87 17.95',
-    'M10.52 15.06 9.13 17.95',
-    'M8.69 12.76 5.57 13.47',
-    'M9.34 9.88 6.84 7.89',
-  ];
+  const pts = '12,2.6 19.5,6.2 21.36,14.3 16.16,20.8 7.84,20.8 2.64,14.3 4.5,6.2';
+  const wheel = {x: 12, y: 12.4};
+  const arms = Array.from({length: 7}, (_, i) => {
+    const a = ((-90 + i * (360 / 7)) * Math.PI) / 180;
+    const at = (r) => `${(wheel.x + r * Math.cos(a)).toFixed(2)},${(wheel.y + r * Math.sin(a)).toFixed(2)}`;
+    return {spoke: `M${at(1.7)} L${at(5.5)}`, peg: `M${at(6.1)} L${at(7.5)}`};
+  });
   return (
     <g transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}>
       <polygon points={pts} className={styles.k8sBody} />
-      <circle cx="12" cy="12" r="2.5" className={styles.k8sHub} />
-      {spokes.map((d) => (
-        <path key={d} d={d} className={styles.k8sSpoke} />
+      <circle cx={wheel.x} cy={wheel.y} r="5.9" className={styles.k8sRing} />
+      {arms.map((a) => (
+        <path key={a.spoke} d={a.spoke} className={styles.k8sSpoke} />
       ))}
+      {arms.map((a) => (
+        <path key={a.peg} d={a.peg} className={styles.k8sPeg} />
+      ))}
+      <circle cx={wheel.x} cy={wheel.y} r="1.55" className={styles.k8sHub} />
     </g>
   );
 }
@@ -395,7 +384,7 @@ export default function HADiagram() {
         {/* one continuous run, hopping the Data Guard line at x=700 rather than
             breaking for it: a gap in a request path reads as a gap in the path */}
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V310 H1122"
+          d="M574,433 H686 Q700,412 714,433 H1050 V316 H1118"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
@@ -422,28 +411,32 @@ export default function HADiagram() {
         />
         <Pill x={1560} y={206} label="ACTIVE" tone="pOk" anchor="end" />
 
-        <K8sMark cx={1146} cy={252} size={24} />
-        <text x={1166} y={250} className={styles.markLabel}>EKS cluster</text>
-        <text x={1166} y={265} className={styles.markSub}>self-hosted · pods</text>
+        {/* The three services are pods on one cluster, so they get a box of
+            their own in Kubernetes blue. Postgres sits outside it: it is a
+            managed database, not something running on the cluster. */}
+        <rect x={1122} y={236} width={218} height={236} rx={14} className={styles.groupEks} />
+        <K8sMark cx={1146} cy={258} size={26} />
+        <text x={1166} y={256} className={styles.markLabel}>EKS cluster</text>
+        <text x={1166} y={270} className={styles.markSub}>self-hosted · pods</text>
 
-        <Service x={1130} y={286} w={190} h={48} tint="tTemporal" icon="hub" title="Frontend" />
-        <Service x={1130} y={346} w={190} h={48} tint="tTemporal" icon="hub" title="History" />
-        <Service x={1130} y={406} w={190} h={48} tint="tTemporal" icon="hub" title="Matching + Worker" />
+        <Service x={1130} y={292} w={190} h={48} tint="tTemporal" icon="hub" title="Frontend" />
+        <Service x={1130} y={352} w={190} h={48} tint="tTemporal" icon="hub" title="History" />
+        <Service x={1130} y={412} w={190} h={48} tint="tTemporal" icon="hub" title="Matching + Worker" />
 
-        <path d="M1328,310 H1360" className={styles.req} />
-        <path d="M1328,370 H1360" className={styles.req} />
-        <path d="M1328,430 H1360" className={styles.req} />
-        <path d="M1360,310 V430" className={styles.req} />
-        <path d="M1360,370 H1414" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <path d="M1328,316 H1362" className={styles.req} />
+        <path d="M1328,376 H1362" className={styles.req} />
+        <path d="M1328,436 H1362" className={styles.req} />
+        <path d="M1362,316 V436" className={styles.req} />
+        <path d="M1362,376 H1414" className={styles.req} markerEnd="url(#ha-m-req)" />
 
-        <Drum cx={1450} cy={370} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={1490} y={366} className={styles.markLabel}>Postgres</text>
-        <Pill x={1490} y={386} label="WRITER" tone="pPrimary" anchor="start" />
-        <path d="M1450,392 V440 H1416 V463" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <path d="M1450,440 H1484 V463" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={1416} cy={482} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <Drum cx={1484} cy={482} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={1450} y={524} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
+        <Drum cx={1450} cy={376} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <text x={1490} y={372} className={styles.markLabel}>Postgres</text>
+        <Pill x={1490} y={392} label="WRITER" tone="pPrimary" anchor="start" />
+        <path d="M1450,398 V446 H1416 V469" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <path d="M1450,446 H1484 V469" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={1416} cy={488} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <Drum cx={1484} cy={488} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
+        <text x={1450} y={530} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
 
         {/* ---- us-west-1, the passive region ---- */}
         <Region
@@ -459,7 +452,7 @@ export default function HADiagram() {
 
         {/* down x=1380: the replicas reach 1436 on one side and the "read
             replicas" label starts at 1400, so this is the clear lane. */}
-        <path d="M1420,370 H1380 V680 H1214" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <path d="M1420,376 H1380 V680 H1214" className={styles.rep} markerEnd="url(#ha-m-rep)" />
         <Drum cx={1180} cy={680} rx={28} h={36} grad="ha-g-pg" dim glossCls={styles.drumTopDim} />
         <text x={1230} y={700} className={styles.markSub}>Replicated from the east. Promoted by hand.</text>
 
