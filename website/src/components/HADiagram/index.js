@@ -73,23 +73,29 @@ function AmexMark({x, y, size = 34}) {
   return <image href={src} x={x} y={y} width={size} height={size} className={styles.amexMark} />;
 }
 
-/* AWS: the lowercase wordmark over the Amazon smile, the smile swinging up on
-   the right into its arrow. Drawn as a stroked arc plus a filled head rather
-   than one tapered outline: at the size this renders the taper is invisible,
-   and the arc keeps the curve even where a hand-built outline went lumpy. */
+/* AWS: the official mark, path data from the Amazon Web Services logo
+   (Wikimedia Commons, viewBox 304x182), vendored at static/img/aws-logo.svg.
+   Inlined rather than <image> so the wordmark can take a light fill in dark
+   mode: the shipped artwork is navy, which disappears on a dark panel. */
+const AWS_PATHS = [
+  {kind: 'word', d: 'M86.4,66.4c0,3.7,0.4,6.7,1.1,8.9c0.8,2.2,1.8,4.6,3.2,7.2c0.5,0.8,0.7,1.6,0.7,2.3c0,1-0.6,2-1.9,3l-6.3,4.2 c-0.9,0.6-1.8,0.9-2.6,0.9c-1,0-2-0.5-3-1.4C76.2,90,75,88.4,74,86.8c-1-1.7-2-3.6-3.1-5.9c-7.8,9.2-17.6,13.8-29.4,13.8 c-8.4,0-15.1-2.4-20-7.2c-4.9-4.8-7.4-11.2-7.4-19.2c0-8.5,3-15.4,9.1-20.6c6.1-5.2,14.2-7.8,24.5-7.8c3.4,0,6.9,0.3,10.6,0.8 c3.7,0.5,7.5,1.3,11.5,2.2v-7.3c0-7.6-1.6-12.9-4.7-16c-3.2-3.1-8.6-4.6-16.3-4.6c-3.5,0-7.1,0.4-10.8,1.3c-3.7,0.9-7.3,2-10.8,3.4 c-1.6,0.7-2.8,1.1-3.5,1.3c-0.7,0.2-1.2,0.3-1.6,0.3c-1.4,0-2.1-1-2.1-3.1v-4.9c0-1.6,0.2-2.8,0.7-3.5c0.5-0.7,1.4-1.4,2.8-2.1 c3.5-1.8,7.7-3.3,12.6-4.5c4.9-1.3,10.1-1.9,15.6-1.9c11.9,0,20.6,2.7,26.2,8.1c5.5,5.4,8.3,13.6,8.3,24.6V66.4z M45.8,81.6 c3.3,0,6.7-0.6,10.3-1.8c3.6-1.2,6.8-3.4,9.5-6.4c1.6-1.9,2.8-4,3.4-6.4c0.6-2.4,1-5.3,1-8.7v-4.2c-2.9-0.7-6-1.3-9.2-1.7 c-3.2-0.4-6.3-0.6-9.4-0.6c-6.7,0-11.6,1.3-14.9,4c-3.3,2.7-4.9,6.5-4.9,11.5c0,4.7,1.2,8.2,3.7,10.6 C37.7,80.4,41.2,81.6,45.8,81.6z M126.1,92.4c-1.8,0-3-0.3-3.8-1c-0.8-0.6-1.5-2-2.1-3.9L96.7,10.2c-0.6-2-0.9-3.3-0.9-4 c0-1.6,0.8-2.5,2.4-2.5h9.8c1.9,0,3.2,0.3,3.9,1c0.8,0.6,1.4,2,2,3.9l16.8,66.2l15.6-66.2c0.5-2,1.1-3.3,1.9-3.9c0.8-0.6,2.2-1,4-1 h8c1.9,0,3.2,0.3,4,1c0.8,0.6,1.5,2,1.9,3.9l15.8,67l17.3-67c0.6-2,1.3-3.3,2-3.9c0.8-0.6,2.1-1,3.9-1h9.3c1.6,0,2.5,0.8,2.5,2.5 c0,0.5-0.1,1-0.2,1.6c-0.1,0.6-0.3,1.4-0.7,2.5l-24.1,77.3c-0.6,2-1.3,3.3-2.1,3.9c-0.8,0.6-2.1,1-3.8,1h-8.6c-1.9,0-3.2-0.3-4-1 c-0.8-0.7-1.5-2-1.9-4L156,23l-15.4,64.4c-0.5,2-1.1,3.3-1.9,4c-0.8,0.7-2.2,1-4,1H126.1z M254.6,95.1c-5.2,0-10.4-0.6-15.4-1.8 c-5-1.2-8.9-2.5-11.5-4c-1.6-0.9-2.7-1.9-3.1-2.8c-0.4-0.9-0.6-1.9-0.6-2.8v-5.1c0-2.1,0.8-3.1,2.3-3.1c0.6,0,1.2,0.1,1.8,0.3 c0.6,0.2,1.5,0.6,2.5,1c3.4,1.5,7.1,2.7,11,3.5c4,0.8,7.9,1.2,11.9,1.2c6.3,0,11.2-1.1,14.6-3.3c3.4-2.2,5.2-5.4,5.2-9.5 c0-2.8-0.9-5.1-2.7-7c-1.8-1.9-5.2-3.6-10.1-5.2L246,52c-7.3-2.3-12.7-5.7-16-10.2c-3.3-4.4-5-9.3-5-14.5c0-4.2,0.9-7.9,2.7-11.1 c1.8-3.2,4.2-6,7.2-8.2c3-2.3,6.4-4,10.4-5.2c4-1.2,8.2-1.7,12.6-1.7c2.2,0,4.5,0.1,6.7,0.4c2.3,0.3,4.4,0.7,6.5,1.1 c2,0.5,3.9,1,5.7,1.6c1.8,0.6,3.2,1.2,4.2,1.8c1.4,0.8,2.4,1.6,3,2.5c0.6,0.8,0.9,1.9,0.9,3.3v4.7c0,2.1-0.8,3.2-2.3,3.2 c-0.8,0-2.1-0.4-3.8-1.2c-5.7-2.6-12.1-3.9-19.2-3.9c-5.7,0-10.2,0.9-13.3,2.8c-3.1,1.9-4.7,4.8-4.7,8.9c0,2.8,1,5.2,3,7.1 c2,1.9,5.7,3.8,11,5.5l14.2,4.5c7.2,2.3,12.4,5.5,15.5,9.6c3.1,4.1,4.6,8.8,4.6,14c0,4.3-0.9,8.2-2.6,11.6 c-1.8,3.4-4.2,6.4-7.3,8.8c-3.1,2.5-6.8,4.3-11.1,5.6C264.4,94.4,259.7,95.1,254.6,95.1z'},
+  {kind: 'smile', d: 'M273.5,143.7c-32.9,24.3-80.7,37.2-121.8,37.2c-57.6,0-109.5-21.3-148.7-56.7c-3.1-2.8-0.3-6.6,3.4-4.4 c42.4,24.6,94.7,39.5,148.8,39.5c36.5,0,76.6-7.6,113.5-23.2C274.2,133.6,278.9,139.7,273.5,143.7z'},
+  {kind: 'smile', d: 'M287.2,128.1c-4.2-5.4-27.8-2.6-38.5-1.3c-3.2,0.4-3.7-2.4-0.8-4.5c18.8-13.2,49.7-9.4,53.3-5 c3.6,4.5-1,35.4-18.6,50.2c-2.7,2.3-5.3,1.1-4.1-1.9C282.5,155.7,291.4,133.4,287.2,128.1z'},
+];
+
 function AwsMark({x, y, w = 44}) {
-  const s = w / 44;
+  const h = (w * 182) / 304;
   return (
-    <g transform={`translate(${x} ${y}) scale(${s})`}>
-      <text x="0" y="17" className={styles.awsWord}>
-        aws
-      </text>
-      <path
-        d="M2,23 C7.5,29.6 14.4,32.8 22,32.8 C29.2,32.8 35.4,30 40,25.4"
-        className={styles.awsSmile}
-      />
-      <path d="M37.9,22.6 L44,20.6 L41.6,27 Z" className={styles.awsArrow} />
-    </g>
+    <svg x={x} y={y} width={w} height={h} viewBox="0 0 304 182" overflow="visible">
+      {AWS_PATHS.map((p) => (
+        <path
+          key={p.d.slice(0, 24)}
+          d={p.d}
+          className={p.kind === 'word' ? styles.awsWord : styles.awsSmile}
+          fillRule={p.kind === 'smile' ? 'evenodd' : undefined}
+        />
+      ))}
+    </svg>
   );
 }
 
@@ -251,7 +257,7 @@ export default function HADiagram() {
         viewBox="0 0 1640 880"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem Hydra sites: US East IPC2 is the write site, with a caller reaching One-Data, then billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store under One-Data. US West IPC1 is the read site, laid out the same way but with the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. Both billpay-core instances share a gRPC bus out to the cloud. Right, in AWS orange, the AWS estate, holding a violet Temporal group: us-east-1 is the active region, with Frontend, History and Matching plus Worker services on a self-hosted EKS cluster, a PostgreSQL writer and two read replicas; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
+        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem Hydra sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store under One-Data. US West IPC1 is the read site, laid out the same way but with the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. Both billpay-core instances share a gRPC bus out to the cloud. Right, in AWS orange, the AWS estate, holding a violet Temporal group: us-east-1 is the active region, with Frontend, History and Matching plus Worker services on a self-hosted EKS cluster, a PostgreSQL writer and two read replicas; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -314,8 +320,6 @@ export default function HADiagram() {
         <text x={71} y={284} textAnchor="middle" className={styles.userLabel}>caller</text>
         <text x={71} y={297} textAnchor="middle" className={styles.userLabel}>near IPC2</text>
         <path d="M92,250 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Pill x={140} y={228} label="/CreatePayment.v3" tone="pApi" wf={6.1} />
-        <Pill x={140} y={272} label="/ReadPayments.v1" tone="pApi" wf={6.1} />
         <Service x={210} y={218} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
         <path d="M300,282 V330" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
@@ -325,7 +329,6 @@ export default function HADiagram() {
         <text x={334} y={373} className={styles.markSub}>fallback store</text>
 
         <path d="M390,250 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Chip x={430} y={250} label="/payments" tone="chipReq" />
         <Service x={474} y={218} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
 
         <path d="M682,240 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
@@ -343,8 +346,6 @@ export default function HADiagram() {
         <text x={71} y={618} textAnchor="middle" className={styles.userLabel}>caller</text>
         <text x={71} y={631} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
         <path d="M92,584 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Pill x={140} y={562} label="/CreatePayment.v3" tone="pApi" wf={6.1} />
-        <Pill x={140} y={606} label="/ReadPayments.v1" tone="pApi" wf={6.1} />
         <Service x={210} y={552} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
         <path d="M300,616 V664" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
@@ -358,7 +359,6 @@ export default function HADiagram() {
         <Chip x={300} y={529} label="CRDB · active-active" tone="chipBuf" />
 
         <path d="M390,584 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Chip x={430} y={584} label="/payments" tone="chipReq" />
         <Service x={474} y={552} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
 
         <path d="M682,574 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
@@ -393,7 +393,7 @@ export default function HADiagram() {
         {/* ================= the AWS estate ================= */}
 
         <rect x={1076} y={52} width={536} height={712} rx={22} className={styles.groupAws} />
-        <AwsMark x={1096} y={62} w={42} />
+        <AwsMark x={1096} y={64} w={64} />
 
         <rect x={1094} y={118} width={500} height={630} rx={18} className={styles.groupTemporal} />
         <TemporalMark cx={1126} cy={146} size={26} />
