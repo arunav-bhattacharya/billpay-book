@@ -1,0 +1,235 @@
+/* ActivityTable — the activity catalogue with a dimension filter above it.
+   Same panel treatment as the other tables on the site: rounded surface,
+   Amex-blue header, alternating rows. */
+
+.root {
+  margin: 1.2rem 0 2rem;
+}
+
+/* ---- filter bar ---- */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.barLabel {
+  margin-right: 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--amex-mut);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--amex-txt);
+  background: var(--amex-panel);
+  border: 1px solid var(--amex-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: color-mix(in srgb, var(--amex-blue) 45%, transparent);
+  color: var(--amex-txt-strong);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--amex-blue);
+  outline-offset: 2px;
+}
+
+.chipOn {
+  color: #ffffff;
+  background: var(--amex-blue);
+  border-color: var(--amex-blue);
+}
+
+:global([data-theme='dark']) .chipOn {
+  color: #001327;
+  background: var(--amex-blue-bright);
+  border-color: var(--amex-blue-bright);
+}
+
+/* The count rides inside the chip, dimmed, so the chip reads as a label first
+   and a tally second. */
+.count {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--amex-mut);
+}
+
+.chipOn .count {
+  color: inherit;
+  opacity: 0.72;
+}
+
+/* ---- table ---- */
+
+.wrap {
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  display: table;
+  font-size: 0.9rem;
+}
+
+.table thead tr {
+  background: var(--amex-blue);
+  border: none;
+}
+
+.table thead th {
+  padding: 0.72rem 1rem;
+  text-align: left;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #ffffff;
+  border: none;
+}
+
+.thName {
+  width: 20%;
+}
+.thDims {
+  width: 17%;
+}
+.thState {
+  width: 17%;
+}
+
+.table tbody tr {
+  background: none;
+  transition: background-color 0.15s ease;
+}
+
+.table tbody tr:nth-child(2n) {
+  background: var(--amex-row-alt);
+}
+
+.table tbody tr:hover {
+  background: var(--amex-row-hover);
+}
+
+.table tbody th,
+.table tbody td {
+  padding: 0.7rem 1rem;
+  border: none;
+  border-top: 1px solid var(--amex-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table tbody tr:first-child th,
+.table tbody tr:first-child td {
+  border-top: none;
+}
+
+.nameCell {
+  font-weight: 550;
+  color: var(--amex-txt-strong);
+}
+
+/* ---- dimension cell ---- */
+
+.dimsCell {
+  display: table-cell;
+}
+
+.dim,
+.generic {
+  display: inline-block;
+  margin: 0 0.25rem 0.25rem 0;
+  padding: 1px 7px;
+  font-size: 0.76rem;
+  border-radius: 6px;
+  color: var(--amex-mut);
+  background: color-mix(in srgb, var(--amex-mut) 8%, transparent);
+  border: 1px solid var(--amex-line);
+}
+
+/* The dimension being filtered on is lit up, so a filtered row shows at a
+   glance which of its dimensions matched. */
+.dimOn {
+  color: var(--amex-blue);
+  background: color-mix(in srgb, var(--amex-blue) 12%, transparent);
+  border-color: color-mix(in srgb, var(--amex-blue) 34%, transparent);
+}
+
+:global([data-theme='dark']) .dimOn {
+  color: var(--amex-blue-bright);
+  background: color-mix(in srgb, var(--amex-blue-bright) 15%, transparent);
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 36%, transparent);
+}
+
+.stateCell code {
+  white-space: nowrap;
+}
+
+/* ---- what it does ---- */
+
+.does {
+  margin: 0;
+  padding-left: 1.05rem;
+}
+
+.does li {
+  margin: 0 0 0.3rem;
+  line-height: 1.55;
+}
+
+.does li:last-child {
+  margin-bottom: 0;
+}
+
+.foot {
+  margin: 0.7rem 0 0;
+  font-size: 0.84rem;
+  color: var(--amex-mut);
+}
+
+@media (max-width: 900px) {
+  .table {
+    font-size: 0.85rem;
+  }
+  .table thead th,
+  .table tbody th,
+  .table tbody td {
+    padding: 0.6rem 0.7rem;
+  }
+  .thName,
+  .thDims,
+  .thState {
+    width: auto;
+  }
+}
