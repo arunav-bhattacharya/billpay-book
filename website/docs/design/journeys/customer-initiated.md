@@ -4,6 +4,7 @@ sidebar_label: Customer initiated
 ---
 
 import Lead from '@site/src/components/Lead';
+import Highlights from '@site/src/components/Highlights';
 import JourneyMap from '@site/src/components/JourneyMap';
 
 # Customer Initiated Journeys
@@ -12,34 +13,51 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 ## Journeys at a glance
 
-### Make a payment
-
-- [Pay my bill today](#pay-my-bill-today), the immediate payment everything else varies from
-- [Pay on a future date](#pay-on-a-future-date), validated now and executed on the day by the Scheduled Payments Executor
-- [Pay with Points & Money](#pay-with-points--money), one request carrying more than one payment instruction
-- [Pay & Plan](#pay--plan), an immediate payment that also opens an instalment plan
-
-### Change a payment
-
-- [Update a scheduled payment](#update-a-scheduled-payment), cancelled and rebuilt, keeping the customer's confirmation number
-- [Cancel a payment](#cancel-a-payment), while it is still `SCHEDULED` or `ACCEPTED`
-
-### Read payments
-
-- [Read payments by card account](#read-payments-by-card-account), every payment on an account
-- [Read details of a payment](#read-details-of-a-payment), one payment and the states it moved through
-
-### Refund a balance
-
-- [Initiate a credit balance refund](#initiate-a-credit-balance-refund), sending a credit balance back to the customer
-
-### Create an intent to pay
-
-- [Intent to pay](#intent-to-pay), where the customer's own bank confirms the payment before Billpay processes it
+<Highlights
+  accent="var(--amex-cat-design)"
+  items={[
+    {
+      term: 'Make a payment',
+      links: [
+        {to: '#pay-my-bill-today', label: 'Pay my bill today'},
+        {to: '#pay-on-a-future-date', label: 'Pay on a future date'},
+        {to: '#pay-with-points--money', label: 'Pay with Points & Money'},
+        {to: '#pay--plan', label: 'Pay & Plan'},
+      ],
+    },
+    {
+      term: 'Change a payment',
+      links: [
+        {to: '#update-a-scheduled-payment', label: 'Update a scheduled payment'},
+        {to: '#cancel-a-payment', label: 'Cancel a payment'},
+      ],
+    },
+    {
+      term: 'Read payments',
+      links: [
+        {to: '#read-payments-by-card-account', label: 'Read payments by card account'},
+        {to: '#read-details-of-a-payment', label: 'Read details of a payment'},
+      ],
+    },
+    {
+      term: 'Refund a balance',
+      links: [
+        {to: '#initiate-a-credit-balance-refund', label: 'Initiate a credit balance refund'},
+      ],
+    },
+    {
+      term: 'Create an intent to pay',
+      links: [
+        {to: '#intent-to-pay', label: 'Intent to pay'},
+      ],
+    },
+  ]}
+/>
 
 Journeys nobody starts by hand, such as returns, third-party pushes and the settlement that closes every payment out, are on [System Initiated](./system-initiated.md).
 
-## How to read the diagrams
+<details>
+<summary>How to read the diagrams</summary>
 
 Every journey below uses the same diagram, so a step means the same thing throughout: what happens, which systems it calls, and the state the payment holds when it is done.
 
@@ -48,6 +66,8 @@ Every journey below uses the same diagram, so a step means the same thing throug
 - The shaded region shows where the caller already has its answer and the rest runs unwatched.
 
 The [system initiated](./system-initiated.md) journeys use the same diagram without those three marks, because nothing on that page is a request.
+
+</details>
 
 ## Pay my bill today
 
@@ -110,7 +130,6 @@ A customer picks an amount and a way to pay it, and wants it to count today. Bil
       exit: {state: 'RETURNED'},
     },
   ]}
-  detailOpen
   detail={[
     {
       step: 1,

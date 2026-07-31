@@ -68,6 +68,34 @@
   margin-bottom: 0.45rem;
 }
 
+/* A card that carries several destinations rather than one. Nothing but the
+   links, so they set the card's height and the accent carries them. Height
+   follows the list rather than the tallest card in the row, since a group of
+   two links padded out to match a group of four just reads as a gap. */
+.itemLinks {
+  align-self: start;
+}
+
+.links {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.97rem;
+  line-height: 1.4;
+}
+
+.links a {
+  color: var(--hl-accent);
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.links a:hover {
+  text-decoration: underline;
+}
+
 /* The supporting detail — deliberately quieter. */
 .desc {
   font-size: 0.92rem;

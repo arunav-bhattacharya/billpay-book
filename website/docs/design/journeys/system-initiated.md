@@ -4,6 +4,7 @@ sidebar_label: System initiated
 ---
 
 import Lead from '@site/src/components/Lead';
+import Highlights from '@site/src/components/Highlights';
 import JourneyMap from '@site/src/components/JourneyMap';
 
 # System Initiated Journeys
@@ -12,17 +13,35 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 ## Journeys at a glance
 
-- [A payment is Posted](#a-payment-is-posted), the tail every payment ends in
-- [A payment is Returned](#a-payment-is-returned), where the bank sends the money back and Billpay decides whether to try again
-- [A Third Party pushes a Payment](#a-third-party-pushes-a-payment), where someone other than the cardmember pays the bill
-- [Accounts Receivable initiates a payment](#accounts-receivable-initiates-a-payment), raised inside Amex rather than by a customer
+<Highlights
+  accent="var(--amex-cat-design)"
+  items={[
+    {
+      term: 'After a payment is executed',
+      links: [
+        {to: '#a-payment-is-posted', label: 'A payment is Posted'},
+        {to: '#a-payment-is-returned', label: 'A payment is Returned'},
+      ],
+    },
+    {
+      term: 'Payments raised elsewhere',
+      links: [
+        {to: '#a-third-party-pushes-a-payment', label: 'A Third-party pushes a Payment'},
+        {to: '#accounts-receivable-initiates-a-payment', label: 'Accounts Receivable initiates a payment'},
+      ],
+    },
+  ]}
+/>
 
-## How to read the diagrams
+<details>
+<summary>How to read the diagrams</summary>
 
 These use the same diagram as the [customer initiated](./customer-initiated.md) journeys, so a step means the same thing on either page: what happens, which systems it calls, and the state the payment holds when it is done.
 
 - Each one opens with the event or the schedule that sets it off, rather than a person and a channel.
 - No step is marked as a customer waiting, and there is no shaded region, because none of this is a request.
+
+</details>
 
 ## A payment is Posted
 
@@ -68,7 +87,6 @@ This is where every payment on the [customer journeys](./customer-initiated.md) 
       systems: ['Lumi'],
     },
   ]}
-  detailOpen
   detail={[
     {
       text: 'A payment reaches this point already processed. The money has gone to the bank and the balances are updated, but nobody has confirmed it landed yet.',
