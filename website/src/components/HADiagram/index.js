@@ -399,9 +399,14 @@ export default function HADiagram() {
 
         {/* IPC1's core is a standby, so IPC1's One-Data crosses to IPC2's.
             The riser sits at x=440: clear of One-Data's shadow at 398, clear
-            of the "fallback store" caption above, clear of the core at 474. */}
-        <path d="M390,616 H440 V310 H520 V294" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Chip x={440} y={330} label="cross-site" tone="chipReq" />
+            of both "fallback store" captions at 419, clear of the core at 474.
+            It turns at y=330 rather than 310 so the run east does not sit on
+            the same line as the "park + replay" caption, then rises into the
+            core's underside at 520. The head stops at 287, five short of the
+            box at 282, which is the gap every other request arrow leaves. */}
+        <path d="M390,616 H440 V330 H520 V287" className={styles.req} markerEnd="url(#ha-m-req)" />
+        {/* on the long straight stretch of the riser, not over a corner */}
+        <Chip x={440} y={490} label="cross-site" tone="chipReq" />
 
         <Service
           x={474}
@@ -479,17 +484,19 @@ export default function HADiagram() {
 
         {/* One bus down the side of the stack rather than a link per pair.
             Every service taps it, Frontend included, so any of them can call
-            any other and it stays one shape. */}
+            any other and it stays one shape. It is inset 16 from the cluster's
+            left edge, near enough the 18 it leaves at the bottom, so it does
+            not read as pinned to the border. */}
         <g className={styles.podBus}>
-          <rect x={1128} y={220} width={28} height={294} rx={14} />
-          <text x={1142} y={367} textAnchor="middle" dominantBaseline="central" transform="rotate(-90 1142 367)">
+          <rect x={1138} y={220} width={28} height={294} rx={14} />
+          <text x={1152} y={367} textAnchor="middle" dominantBaseline="central" transform="rotate(-90 1152 367)">
             pod-to-pod
           </text>
         </g>
         {[245, 308, 371, 434, 497].map((cy) => (
           <path
             key={cy}
-            d={`M1157,${cy} H1187`}
+            d={`M1167,${cy} H1187`}
             className={styles.pod}
             markerStart="url(#ha-m-pod)"
             markerEnd="url(#ha-m-pod)"
