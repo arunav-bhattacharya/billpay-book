@@ -28,14 +28,14 @@ import JourneyMap from '@site/src/components/JourneyMap';
     {
       term: 'Change a payment',
       links: [
-        {to: '#update-a-scheduled-payment', label: 'Update a scheduled payment'},
+        {to: '#update-a-payment', label: 'Update a payment'},
         {to: '#cancel-a-payment', label: 'Cancel a payment'},
       ],
     },
     {
       term: 'Read payments',
       links: [
-        {to: '#read-payments-by-card-account', label: 'Read payments by card account'},
+        {to: '#read-payments-by-card-account', label: 'Read payments by account'},
         {to: '#read-details-of-a-payment', label: 'Read details of a payment'},
       ],
     },
@@ -369,12 +369,12 @@ The customer pays something now and spreads the rest. One workflow drives both h
   reference={{to: '/docs/design/diagrams/sequence-diagram#12-create-payment--installments-composite', label: 'Sequence diagram'}}
 />
 
-## Update a scheduled payment
+## Update a payment
 
 Nothing is edited in place. Billpay cancels the original and re-initiates it with the new details, then ties the two together so the history reads straight. The customer keeps their confirmation number throughout.
 
 <JourneyMap
-  title="Update a scheduled payment"
+  title="Update a payment"
   origin={{
     actor: 'Cardmember',
     icon: 'user',
