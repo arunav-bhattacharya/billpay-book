@@ -106,13 +106,13 @@
 }
 
 .groupLabel {
-  font-size: 14px;
+  font-size: 16.0px;
   font-weight: 800;
   letter-spacing: 0.12em;
   fill: var(--amex-txt-strong);
 }
 .groupNote {
-  font-size: 12px;
+  font-size: 13.7px;
   fill: var(--amex-mut);
 }
 
@@ -129,13 +129,13 @@
   stroke-dasharray: 8 5;
 }
 .regionLabel {
-  font-size: 13.5px;
+  font-size: 15.4px;
   font-weight: 750;
   letter-spacing: 0.1em;
   fill: var(--amex-txt-strong);
 }
 .regionNote {
-  font-size: 12px;
+  font-size: 13.7px;
   fill: var(--amex-mut);
 }
 
@@ -151,7 +151,7 @@
   color: var(--amex-mut);
 }
 .userLabel {
-  font-size: 11px;
+  font-size: 12.5px;
   fill: var(--amex-mut);
 }
 .siteIcon {
@@ -213,12 +213,12 @@
   fill: rgba(255, 255, 255, 0.05);
 }
 .svcTitle {
-  font-size: 15px;
+  font-size: 17.1px;
   font-weight: 650;
   fill: var(--amex-txt-strong);
 }
 .svcSub {
-  font-size: 11px;
+  font-size: 12.5px;
   fill: var(--amex-mut);
 }
 .dim {
@@ -281,16 +281,16 @@
 }
 
 .markLabel {
-  font-size: 14px;
+  font-size: 16.0px;
   font-weight: 650;
   fill: var(--amex-txt-strong);
 }
 .markSub {
-  font-size: 12px;
+  font-size: 13.7px;
   fill: var(--amex-mut);
 }
 .groupLabel {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 750;
   letter-spacing: 0.12em;
   fill: var(--amex-mut);
@@ -365,7 +365,7 @@
   stroke-width: 1;
 }
 .pill text {
-  font-size: 10px;
+  font-size: 11.4px;
   font-weight: 750;
   letter-spacing: 0.04em;
 }
@@ -412,7 +412,7 @@
 }
 .pApi text {
   font-family: var(--amex-font-mono);
-  font-size: 9.6px;
+  font-size: 10.9px;
   font-weight: 600;
   letter-spacing: 0;
   fill: var(--amex-blue);
@@ -427,7 +427,7 @@
   stroke-width: 1;
 }
 .chip text {
-  font-size: 12px;
+  font-size: 13.7px;
   font-weight: 600;
 }
 .chipTray rect {
@@ -501,14 +501,14 @@
   fill: var(--amex-blue-bright);
 }
 .bufLabel {
-  font-size: 11.5px;
+  font-size: 13.1px;
   font-weight: 600;
   fill: var(--amex-state-choice);
 }
 
 /* --------------------------------------------------------------- legend */
 .legend text {
-  font-size: 13px;
+  font-size: 14.8px;
   fill: var(--amex-txt);
 }
 .legendMut {

@@ -182,12 +182,12 @@ function Drum({cx, cy, rx = 34, h = 44, grad, dim, glossCls}) {
 
 /* ---------------------------------------------------------------- parts -- */
 
-function Pill({x, y, label, tone, anchor = 'middle', wf = 6.6}) {
-  const w = label.length * wf + 16;
+function Pill({x, y, label, tone, anchor = 'middle', wf = 7.5}) {
+  const w = label.length * wf + 18;
   const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
   return (
     <g className={clsx(styles.pill, styles[tone])}>
-      <rect x={left} y={y - 10} width={w} height={20} rx={10} />
+      <rect x={left} y={y - 11} width={w} height={22} rx={11} />
       <text x={left + w / 2} y={y + 4} textAnchor="middle">
         {label}
       </text>
@@ -197,10 +197,10 @@ function Pill({x, y, label, tone, anchor = 'middle', wf = 6.6}) {
 
 /* An opaque chip that sits on top of a connector so the label never collides. */
 function Chip({x, y, label, tone = 'chipTray'}) {
-  const w = label.length * 6.8 + 22;
+  const w = label.length * 7.8 + 24;
   return (
     <g className={clsx(styles.chip, styles[tone])}>
-      <rect x={x - w / 2} y={y - 11} width={w} height={22} rx={11} />
+      <rect x={x - w / 2} y={y - 12} width={w} height={24} rx={12} />
       <text x={x} y={y + 4} textAnchor="middle">
         {label}
       </text>
@@ -292,7 +292,7 @@ export default function HADiagram() {
         <rect x={28} y={52} width={1012} height={712} rx={22} className={styles.groupAmex} />
         <AmexMark x={48} y={66} size={32} />
         <text x={92} y={82} className={styles.groupLabel}>AMERICAN EXPRESS</text>
-        <text x={92} y={99} className={styles.groupNote}>on-prem Hydra sites</text>
+        <text x={92} y={99} className={styles.groupNote}>on-prem</text>
 
         <Region
           x={46}
@@ -393,11 +393,11 @@ export default function HADiagram() {
         {/* ================= the AWS estate ================= */}
 
         <rect x={1076} y={52} width={536} height={712} rx={22} className={styles.groupAws} />
-        <AwsMark x={1096} y={64} w={64} />
+        <AwsMark x={1096} y={66} w={56} />
 
         <rect x={1094} y={118} width={500} height={630} rx={18} className={styles.groupTemporal} />
-        <TemporalMark cx={1126} cy={146} size={26} />
-        <text x={1148} y={151} className={styles.groupLabel}>TEMPORAL</text>
+        <TemporalMark cx={1128} cy={148} size={34} />
+        <text x={1152} y={153} className={styles.groupLabel}>TEMPORAL</text>
 
         {/* ---- us-east-1, the active region ---- */}
         <Region
