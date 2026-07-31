@@ -25,7 +25,7 @@ export const GROUPS = [
           'CreatePayment.v3',
           'UpdatePayment.v1',
           'DeletePayment.v1',
-          'and the rest',
+          '...',
         ],
       },
     ],
