@@ -528,9 +528,9 @@
 /* The bus itself, drawn as a pill so it reads as one shared medium the
    services tap rather than as a bracket grouping them. */
 .podBus rect {
-  fill: color-mix(in srgb, var(--amex-temporal) 15%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-temporal) 60%, transparent);
-  stroke-width: 1.2;
+  fill: color-mix(in srgb, var(--amex-temporal) 22%, var(--amex-panel));
+  stroke: color-mix(in srgb, var(--amex-temporal) 70%, transparent);
+  stroke-width: 1.4;
 }
 .podBus text {
   font-size: 12.5px;

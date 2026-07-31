@@ -468,28 +468,28 @@ export default function HADiagram() {
         <K8sMark cx={1176} cy={196} size={24} />
         <text x={1198} y={201} className={styles.markLabel}>EKS cluster</text>
 
-        {/* Frontend sits apart from the rest: it is the only service a client
-            talks to, and the gap says so. The last box stands for the cluster's
-            remaining services, so it is a service like the others. */}
+        {/* Even pitch: nothing about one service makes it deserve more room
+            than the next. The last box stands for the cluster's remaining
+            services, so it is a service like the others. */}
         <Service x={1188} y={228} w={148} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
-        <Service x={1188} y={306} w={148} h={34} tint="tTemporal" icon="temporal" title="History" />
-        <Service x={1188} y={360} w={148} h={34} tint="tTemporal" icon="temporal" title="Matching" />
-        <Service x={1188} y={414} w={148} h={34} tint="tTemporal" icon="temporal" title="Worker" />
-        <Service x={1188} y={468} w={148} h={34} tint="tTemporal" icon="temporal" title="…" />
+        <Service x={1188} y={291} w={148} h={34} tint="tTemporal" icon="temporal" title="History" />
+        <Service x={1188} y={354} w={148} h={34} tint="tTemporal" icon="temporal" title="Matching" />
+        <Service x={1188} y={417} w={148} h={34} tint="tTemporal" icon="temporal" title="Worker" />
+        <Service x={1188} y={480} w={148} h={34} tint="tTemporal" icon="temporal" title="…" />
 
         {/* One bus down the side of the stack rather than a link per pair.
             Every service taps it, Frontend included, so any of them can call
             any other and it stays one shape. */}
         <g className={styles.podBus}>
-          <rect x={1130} y={228} width={24} height={272} rx={12} />
-          <text x={1142} y={364} textAnchor="middle" dominantBaseline="central" transform="rotate(-90 1142 364)">
+          <rect x={1128} y={220} width={28} height={294} rx={14} />
+          <text x={1142} y={367} textAnchor="middle" dominantBaseline="central" transform="rotate(-90 1142 367)">
             pod-to-pod
           </text>
         </g>
-        {[245, 323, 377, 431, 485].map((cy) => (
+        {[245, 308, 371, 434, 497].map((cy) => (
           <path
             key={cy}
-            d={`M1154,${cy} H1176`}
+            d={`M1157,${cy} H1187`}
             className={styles.pod}
             markerStart="url(#ha-m-pod)"
             markerEnd="url(#ha-m-pod)"
@@ -498,11 +498,11 @@ export default function HADiagram() {
 
         {/* persistence: out of the cluster, into the managed Postgres */}
         <path d="M1336,245 H1390" className={styles.req} />
-        <path d="M1336,323 H1390" className={styles.req} />
-        <path d="M1336,377 H1390" className={styles.req} />
-        <path d="M1336,431 H1390" className={styles.req} />
-        <path d="M1336,485 H1390" className={styles.req} />
-        <path d="M1390,245 V485" className={styles.req} />
+        <path d="M1336,308 H1390" className={styles.req} />
+        <path d="M1336,371 H1390" className={styles.req} />
+        <path d="M1336,434 H1390" className={styles.req} />
+        <path d="M1336,497 H1390" className={styles.req} />
+        <path d="M1390,245 V497" className={styles.req} />
         <path d="M1390,296 H1438" className={styles.req} markerEnd="url(#ha-m-req)" />
 
         <Pill x={1470} y={226} label="WRITER" tone="pPrimary" />
