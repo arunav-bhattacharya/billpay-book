@@ -8,7 +8,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 # High Availability
 
-<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against a **self-hosted Temporal cluster** in AWS us-east-1. The front half of the platform is live in both sites at once. The write side of the database is deliberately not, and neither is Temporal: both have a standby that only takes over when someone promotes it. And when billpay-core can't be reached, One-Data parks the request in Redis rather than turning the caller away.</Lead>
+<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against a **self-hosted Temporal cluster** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: billpay-core, the write side of the database and Temporal each have a standby that does nothing until someone promotes it. And when billpay-core can't be reached, One-Data parks the request in Redis rather than turning the caller away.</Lead>
 
 ## Topology
 
@@ -17,7 +17,7 @@ import HADiagram from '@site/src/components/HADiagram';
 ## Front door
 
 - One-Data Functions run active in both sites, so losing a site doesn't close the front door.
-- Each site's One-Data calls the billpay-core in the same site. Traffic stays local.
+- Both of them call the same billpay-core, the one in IPC2. IPC1's One-Data routes across.
 - Each site also has a Redis store that sits empty most of the time. It's there for one case: billpay-core is unreachable.
 - When that happens, One-Data writes the request into Redis instead of failing the caller, then replays it into billpay-core once the core is healthy again.
 - The two Redis instances are one active-active database (Redis calls this a CRDB), so a request parked on one site is visible from the other.
@@ -25,10 +25,10 @@ import HADiagram from '@site/src/components/HADiagram';
 
 ## Core
 
-- billpay-core is the REST APIs, the [Billpay Router](../design/routing.md), and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools. An instance runs in each site.
-- Both instances read from the Oracle in their own site, which keeps read latency close to the caller.
-- Writes only land in IPC2, because that's where the Oracle primary lives.
-- Both instances talk to the same Temporal cluster in us-east-1.
+- billpay-core is the REST APIs, the [Billpay Router](../design/routing.md), and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools. An instance is deployed in each site, but only IPC2's takes traffic.
+- It reads and writes the Oracle primary next to it in IPC2, and it is the only thing connected to the Temporal cluster in us-east-1.
+- The IPC1 instance is a standby. It stays deployed and ready, and an operator promotes it if IPC2 goes.
+- So there is one write path and one worker pool, which is also one place to look when a payment is stuck.
 
 ## Oracle
 
@@ -50,9 +50,9 @@ import HADiagram from '@site/src/components/HADiagram';
 
 | What fails | What happens |
 | --- | --- |
-| **billpay-core in one site** | One-Data on that site keeps answering callers and parks their requests in Redis, then replays them when the core is back. Nothing is dropped, it just processes late. |
-| **A whole site** | The other site keeps taking traffic on its own One-Data and core. If the lost site was IPC2, an operator promotes the Data Guard standby in IPC1 so writes have somewhere to land again. |
+| **billpay-core in IPC2** | Both One-Data instances keep answering callers and park their requests in Redis, then replay them when the core is back. Nothing is dropped, it just processes late. |
+| **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and parking in Redis until an operator promotes the billpay-core and the Data Guard standby there. |
 | **Oracle primary** | The standby in IPC1 is promoted. Until it is, reads still work off the read-only replicas, but nothing new can be written. |
 | **Temporal in us-east-1** | No workflow can start or advance until either the cluster returns or an operator promotes the us-west-1 standby and billpay-core reconnects to it. Either way nothing is lost: every history is in Postgres rather than in a worker, so workflows resume exactly where they stopped. This is the durability Temporal was [chosen for](./overview.md#why-temporal). |
 
-Two rules hold this together. The front door stays open on both sites, and there is only ever one place where writes land. Moving that place is a call someone makes, not something that happens by itself.
+Two rules hold this together. The front door stays open on both sites, and everything behind it runs in one place at a time. Moving that place is a call someone makes, not something that happens by itself.

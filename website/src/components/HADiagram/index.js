@@ -280,7 +280,7 @@ export default function HADiagram() {
         viewBox="0 0 1640 880"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data. US West IPC1 is the read site, laid out the same way but with billpay-core on standby, the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, landing on the Temporal Frontend service. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster that runs the Temporal Frontend, History, Matching and Worker services plus others, all talking pod to pod, and persisting to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
+        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data. US West IPC1 is laid out the same way, but its billpay-core is a standby, so its One-Data routes across to the IPC2 core instead; it also holds the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, landing on the Temporal Frontend service. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster that runs the Temporal Frontend, History, Matching and Worker services plus others, all talking pod to pod, and persisting to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -312,6 +312,9 @@ export default function HADiagram() {
               small enough to leave some line showing between two of them */}
           <marker id="ha-m-pod" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="4.6" markerHeight="4.6" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" className={styles.mPod} />
+          </marker>
+          <marker id="ha-m-idle" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.6" markerHeight="6.6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" className={styles.mIdle} />
           </marker>
         </defs>
 
@@ -394,7 +397,12 @@ export default function HADiagram() {
         <path d="M300,382 V500" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
         <Chip x={300} y={441} label="CRDB · active-active" tone="chipBuf" />
 
-        <path d="M390,616 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
+        {/* IPC1's core is a standby, so IPC1's One-Data crosses to IPC2's.
+            The riser sits at x=440: clear of One-Data's shadow at 398, clear
+            of the "fallback store" caption above, clear of the core at 474. */}
+        <path d="M390,616 H440 V310 H520 V294" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Chip x={440} y={330} label="cross-site" tone="chipReq" />
+
         <Service
           x={474}
           y={584}
@@ -409,7 +417,8 @@ export default function HADiagram() {
           dim
         />
 
-        <path d="M682,606 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
+        {/* wired, but carrying nothing until the standby is promoted */}
+        <path d="M682,606 H716" className={styles.reqIdle} markerEnd="url(#ha-m-idle)" />
         <Drum cx={752} cy={616} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
         <text x={752} y={662} textAnchor="middle" className={styles.markLabel}>Oracle</text>
         <text x={752} y={678} textAnchor="middle" className={styles.markSub}>read only</text>
@@ -427,7 +436,7 @@ export default function HADiagram() {
         {/* ================= the gRPC bus out to the cloud ================= */}
 
         <path d="M574,282 V433" className={styles.req} />
-        <path d="M574,584 V433" className={styles.req} />
+        <path d="M574,584 V433" className={styles.reqIdle} />
         <circle cx={574} cy={433} r={4} className={styles.junction} />
         {/* one continuous run, hopping the Data Guard line at x=700 rather than
             breaking for it: a gap in a request path reads as a gap in the path.
@@ -514,7 +523,7 @@ export default function HADiagram() {
           <path d="M40,846 H80" className={styles.rep} markerEnd="url(#ha-m-rep)" />
           <text x={90} y={850}>replication</text>
           <text x={260} y={850} className={styles.legendMut}>
-            dimmed components are standbys, promoted by hand: IPC1&apos;s billpay-core and Oracle, and the us-west-1 cluster
+            dimmed components and faded links are standbys, idle until promoted: IPC1&apos;s billpay-core and Oracle, and the us-west-1 cluster
           </text>
         </g>
       </svg>

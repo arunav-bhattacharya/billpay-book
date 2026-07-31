@@ -480,6 +480,26 @@
 :global([data-theme='dark']) .req {
   stroke: var(--amex-blue-bright);
 }
+/* Wired, but carrying nothing until someone promotes the standby behind it. */
+.reqIdle {
+  stroke: var(--amex-blue);
+  stroke-width: 1.8;
+  stroke-dasharray: 5 5;
+  opacity: 0.42;
+  fill: none;
+  stroke-linejoin: round;
+}
+:global([data-theme='dark']) .reqIdle {
+  stroke: var(--amex-blue-bright);
+}
+.mIdle {
+  fill: var(--amex-blue);
+  opacity: 0.42;
+}
+:global([data-theme='dark']) .mIdle {
+  fill: var(--amex-blue-bright);
+}
+
 .buf {
   stroke: var(--amex-state-choice);
   stroke-width: 2;
