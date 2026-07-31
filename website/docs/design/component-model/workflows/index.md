@@ -35,14 +35,6 @@ export const WORKERS = [
   },
 ];
 
-export const STRIPS = [
-  {
-    label: 'Either worker',
-    text: 'A few workflows run on both, depending on where in the journey they are invoked.',
-    items: ['Create Schedule Payment', 'Execute Split Payment', 'Create Balance Refund'],
-  },
-];
-
 # Workflows
 
 <Lead>A workflow orchestrates one payment journey end to end. Every workflow runs on Temporal, falls into one of three kinds, and executes on the Online or Offline worker depending on whether an end user is waiting for it.</Lead>
@@ -51,7 +43,11 @@ export const STRIPS = [
 
 Workflows run on two Temporal worker pools, divided by whether someone is waiting for the answer.
 
-<WorkerSplit workers={WORKERS} strips={STRIPS} />
+<WorkerSplit workers={WORKERS} />
+
+:::info[Either worker]
+Three workflows run on both, depending on where in the journey they are invoked: **Create Schedule Payment**, **Execute Split Payment**, and **Create Balance Refund**.
+:::
 
 Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../../../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level.
 

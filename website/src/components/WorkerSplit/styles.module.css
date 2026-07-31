@@ -3,7 +3,10 @@
    with the shared cases on quieter strips underneath. */
 
 .wrap {
-  margin: 1.4rem 0 2.2rem;
+  /* The cards throw a 22px/42px drop shadow, so it reaches about 43px below
+     them. The bottom margin has to clear that, or whatever follows on the page
+     sits inside the shadow. */
+  margin: 1.4rem 0 3rem;
 }
 
 .pair {
@@ -93,56 +96,8 @@
   border: 1px solid color-mix(in srgb, var(--wk, var(--amex-blue)) 26%, var(--amex-line));
 }
 
-.itemQuiet {
-  color: var(--amex-mut);
-  background: color-mix(in srgb, var(--amex-mut) 7%, transparent);
-  border-color: var(--amex-line);
-}
-
-/* ---- strips ---- */
-.strip {
-  display: flex;
-  align-items: baseline;
-  gap: 0.9rem;
-  margin-top: 0.7rem;
-  padding: 0.75rem 1rem 0.8rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 12px;
-  background: var(--amex-panel);
-}
-
-.stripLabel {
-  flex: none;
-  width: 128px;
-  font-size: 0.64rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--amex-mut);
-}
-
-.stripBody {
-  flex: 1;
-  min-width: 0;
-}
-
-.stripText {
-  margin: 0 0 0.4rem;
-  font-size: 0.86rem;
-  line-height: 1.55;
-  color: var(--amex-txt);
-}
-
-.stripBody .items:only-child {
-  margin-top: 0;
-}
-
 @media (max-width: 560px) {
-  .strip {
-    flex-direction: column;
-    gap: 0.45rem;
-  }
-  .stripLabel {
-    width: auto;
+  .pair {
+    gap: 0.7rem;
   }
 }

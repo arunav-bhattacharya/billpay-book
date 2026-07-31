@@ -6,13 +6,13 @@ import styles from './styles.module.css';
  * WorkerSplit: the two Temporal workers side by side, split by whether anyone
  * is waiting for the answer, with the workflows each one carries.
  *
- * The strips below hold what does not belong to one side: workflows that run on
- * either worker, and the periodic work driven by Temporal Schedules.
+ * Anything that belongs to neither side, such as the workflows that run on
+ * either worker, goes in an admonition after the component rather than in here.
+ * A third band inside the card grid read as a third worker.
  *
  * workers: [{name, tone: 'online' | 'offline', waiting, desc, items: string[]}]
- * strips:  [{label, text, items?: string[]}]
  */
-export default function WorkerSplit({workers = [], strips = []}) {
+export default function WorkerSplit({workers = []}) {
   return (
     <div className={styles.wrap}>
       <div className={styles.pair}>
@@ -35,24 +35,6 @@ export default function WorkerSplit({workers = [], strips = []}) {
           </section>
         ))}
       </div>
-
-      {strips.map((s) => (
-        <div key={s.label} className={styles.strip}>
-          <span className={styles.stripLabel}>{s.label}</span>
-          <div className={styles.stripBody}>
-            {s.text && <p className={styles.stripText}>{s.text}</p>}
-            {s.items && (
-              <div className={styles.items}>
-                {s.items.map((it) => (
-                  <span key={it} className={clsx(styles.item, styles.itemQuiet)}>
-                    {it}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
