@@ -8,11 +8,13 @@ import styles from './styles.module.css';
  * systems. The supporting domains the estate leans on but does not own sit in
  * their own panel beneath the payments domain.
  *
- * Colour follows the deck's four families (payments domain, supporting domain,
- * supporting tech platform, external), with Bill Pay Core lifted out of the
- * blue family into the signature gradient. The Type-A pill marks every domain
- * that exposes one; who calls which is prose, not geometry. Only the payments
- * domain is numbered, Bill Pay Core first.
+ * Colour follows the deck's families (Billpay domain, shared payments domain,
+ * supporting domain, external), with Bill Pay Core lifted out of the blue
+ * family into the signature gradient. Every domain behind the wall exposes a
+ * Type-A API, so that fact is carried once by the rail down the left edge
+ * rather than repeated on every box. Only the payments domain is numbered,
+ * Bill Pay Core first. Control Tower runs the full width underneath, because it
+ * cuts across all of them rather than sitting in the line.
  *
  * CSS Grid rather than SVG: every box plus its capabilities in a fixed viewBox
  * would force horizontal scroll everywhere but a wide desktop. Sizing is driven
@@ -76,7 +78,6 @@ const CHANNELS = [
 const CORE = {
   n: 1,
   title: 'Bill Pay Core',
-  typeA: true,
   tier: 'domain',
   hero: true,
   caps: [
@@ -100,7 +101,6 @@ const PLATFORM = [
   {
     n: 2,
     title: 'Plans',
-    typeA: true,
     tier: 'domain',
     caps: ['Recurring/Autopay'],
     store: 'Plan Data',
@@ -108,14 +108,12 @@ const PLATFORM = [
   {
     n: 3,
     title: 'Bill Pay Inbound Processor',
-    typeA: true,
     tier: 'domain',
     caps: ['Validation', 'STP / Non-STP Decisioning', 'Enrichment', 'AML/Sanctions'],
   },
   {
     n: 4,
     title: 'Allocation Manager',
-    typeA: true,
     tier: 'domain',
     caps: ['Validation', 'Lifecycle'],
     store: 'Allocation Data',
@@ -127,8 +125,7 @@ const SHARED = [
   {
     n: 5,
     title: 'Payment Instruments',
-    typeA: true,
-    tier: 'domain',
+    tier: 'shared',
     caps: [
       'Instrument Management',
       'Tokenization',
@@ -143,32 +140,24 @@ const SHARED = [
   {
     n: 6,
     title: 'Mandates',
-    typeA: true,
-    tier: 'domain',
+    tier: 'shared',
     caps: ['Authorization', 'Mandate Management', 'Mandate Lifecycle'],
     store: 'Mandate Data',
   },
 ];
 
-/* the desk that researches and repairs a payment that went wrong */
-const CONTROL_TOWER = [
-  {n: 7, title: 'Control Tower', tier: 'domain', caps: ['Research', 'Repair/Replay']},
-];
-
-/* the rails a payment leaves on, the switch above the clearing it feeds */
+/* the rails a payment leaves on, the switch above the money movement it feeds */
 const RAILS = [
   {
-    n: 8,
+    n: 7,
     title: 'Multirail Gateway',
-    typeA: true,
-    tier: 'tech',
+    tier: 'shared',
     caps: ['Core Switch', 'Web Proxy', 'Accounting', 'Routing'],
   },
   {
-    n: 9,
-    title: 'Payments Clearing',
-    typeA: true,
-    tier: 'domain',
+    n: 8,
+    title: 'Money Movement (M3)',
+    tier: 'shared',
     caps: [
       'Payment Routes',
       'Scheme Adapters',
@@ -182,6 +171,15 @@ const RAILS = [
     ],
   },
 ];
+
+/* the desk that researches and repairs a payment that went wrong: it works on
+   any of the domains rather than sitting among them, so it runs the full width
+   outside the payments domain box. No channel calls it, so it carries neither a
+   number nor a place behind the Type-A rail. */
+const CONTROL_TOWER = {
+  title: 'Control Tower',
+  caps: ['Research', 'Repair/Replay'],
+};
 
 /* Numbering is reserved for the payments domain, so the supporting estate
    carries none. */
@@ -222,7 +220,7 @@ function Store({label}) {
   );
 }
 
-function Card({n, title, caps, store, typeA, tier = 'domain', hero, compact}) {
+function Card({n, title, caps, store, tier = 'domain', hero, compact}) {
   return (
     <article
       className={clsx(
@@ -230,14 +228,10 @@ function Card({n, title, caps, store, typeA, tier = 'domain', hero, compact}) {
         styles[tier],
         hero && styles.hero,
         compact && styles.compact,
-        typeA && styles.hasApi,
       )}>
       <header className={styles.head}>
         {n && <span className={styles.num}>{n}</span>}
         <div className={styles.headText}>
-          {/* floated, so it holds the top right corner and the title wraps
-              under it instead of being squeezed into a narrow column */}
-          {typeA && <span className={styles.api}>Type-A</span>}
           <h4 className={styles.title}>{title}</h4>
         </div>
       </header>
@@ -259,12 +253,28 @@ function Card({n, title, caps, store, typeA, tier = 'domain', hero, compact}) {
   );
 }
 
+/** Control Tower: the same card, turned on its side to run under the row. */
+function CrossCard({title, caps}) {
+  return (
+    <article className={clsx(styles.card, styles.domain, styles.cross)}>
+      <h4 className={styles.title}>{title}</h4>
+      <div className={styles.crossCaps}>
+        {caps.map((c) => (
+          <span key={c} className={styles.cap}>
+            {c}
+          </span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 const LEGEND = [
   {cls: 'heroSwatch', label: 'Bill Pay Core'},
-  {cls: 'domain', label: 'Payments domain'},
+  {cls: 'domain', label: 'Billpay domain'},
+  {cls: 'shared', label: 'Shared payments domain'},
   {cls: 'channels', label: 'Channel'},
   {cls: 'support', label: 'Supporting domain'},
-  {cls: 'tech', label: 'Supporting tech platform'},
   {cls: 'external', label: 'External'},
 ];
 
@@ -273,7 +283,7 @@ export default function LandscapeMap() {
     <div
       className={styles.wrap}
       role="img"
-      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then Control Tower, then the Multirail Gateway above Payments Clearing. Every one of those exposes a Type-A API except Control Tower. Payments Clearing is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
+      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. They reach the payments domain through the Type-A APIs, a rail down its left edge. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway above Money Movement (M3). Control Tower runs the full width underneath, outside the payments domain box and outside the Type-A rail, because it works on all of those domains rather than sitting among them. Money Movement is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
       <div className={styles.board}>
         <div className={styles.flowScroll}>
           <div className={styles.main}>
@@ -290,35 +300,42 @@ export default function LandscapeMap() {
               </div>
             </section>
 
-            {/* ---- group 2: the payments domain, at the centre ---- */}
-            <section className={clsx(styles.group, styles.groupDomain)}>
-              <h4 className={styles.groupTitle}>Payments domain</h4>
-              <div className={styles.domainGrid}>
-                <div className={clsx(styles.col, styles.colCore)}>
-                  <Card {...CORE} />
-                </div>
-                <div className={styles.col}>
-                  {PLATFORM.map((d) => (
-                    <Card key={d.n} {...d} />
-                  ))}
-                </div>
-                <div className={styles.col}>
-                  {SHARED.map((d) => (
-                    <Card key={d.n} {...d} />
-                  ))}
-                </div>
-                <div className={styles.col}>
-                  {CONTROL_TOWER.map((d) => (
-                    <Card key={d.n} {...d} />
-                  ))}
-                </div>
-                <div className={styles.col}>
-                  {RAILS.map((d) => (
-                    <Card key={d.n} {...d} />
-                  ))}
-                </div>
+            {/* ---- group 2: the payments domain, at the centre, with the one
+                 door into it fixed to its left edge ---- */}
+            <div className={styles.domainZone}>
+              <div className={styles.domainRow}>
+                <aside className={styles.apiRail} aria-hidden="true">
+                  <span className={styles.apiRailText}>Type-A APIs</span>
+                </aside>
+
+                <section className={clsx(styles.group, styles.groupDomain)}>
+                  <h4 className={styles.groupTitle}>Payments domain</h4>
+                  <div className={styles.domainGrid}>
+                    <div className={clsx(styles.col, styles.colCore)}>
+                      <Card {...CORE} />
+                    </div>
+                    <div className={styles.col}>
+                      {PLATFORM.map((d) => (
+                        <Card key={d.n} {...d} />
+                      ))}
+                    </div>
+                    <div className={styles.col}>
+                      {SHARED.map((d) => (
+                        <Card key={d.n} {...d} />
+                      ))}
+                    </div>
+                    <div className={styles.col}>
+                      {RAILS.map((d) => (
+                        <Card key={d.n} {...d} />
+                      ))}
+                    </div>
+                  </div>
+                </section>
               </div>
-            </section>
+
+              {/* outside the box on purpose: nothing reaches it through Type-A */}
+              <CrossCard {...CONTROL_TOWER} />
+            </div>
 
             {/* ---- group 3: outside Amex, on the right ---- */}
             <section className={clsx(styles.group, styles.groupExternal)}>
@@ -357,10 +374,6 @@ export default function LandscapeMap() {
             {l.label}
           </span>
         ))}
-        <span className={styles.legendItem}>
-          <i className={clsx(styles.api, styles.legendApi)}>Type-A</i>
-          exposes a Type-A API
-        </span>
       </div>
     </div>
   );

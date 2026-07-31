@@ -19,8 +19,10 @@ import CompareTable from '@site/src/components/CompareTable';
 ### How the pieces connect
 
 - Channels reach **four domains and no others**: Bill Pay Core, Plans, Payment Instruments and Mandates. Each exposes a **Type-A API**, the house standard for what a domain's interface looks like.
-- **Multirail Gateway** and **Payments Clearing** expose Type-A APIs as well, but their only caller is **Bill Pay Core**. No channel touches them.
-- Everything outside Amex is reached through **Payments Clearing**: partner banks, TPSPs, P2P networks and the payment networks.
+- **Multirail Gateway** and **Money Movement (M3)** expose Type-A APIs as well, but their only caller is **Bill Pay Core**. No channel touches them.
+- That is what the rail down the left edge stands for. Type-A is how a caller gets in, so it is drawn once on the edge instead of repeated on every box.
+- Everything outside Amex is reached through **Money Movement (M3)**: partner banks, TPSPs, P2P networks and the payment networks.
+- **Control Tower** sits outside the box, underneath all of it, because it works on all of it rather than taking calls of its own. It is where a payment gets researched, and repaired or replayed when something has gone wrong.
 
 ## The legacy estate
 
@@ -52,47 +54,47 @@ There was no payments domain to call. There was Arrangement Manager, and behind 
   rows={[
     {
       what: 'Channel contract',
-      legacy: '**Multiple customer journey interfaces are exposed from a single app**',
-      modern: '**One set of Type-A APIs per domain**',
+      legacy: 'One app carried the interfaces for every journey, so **each channel connected its own way**',
+      modern: '**One set of Type-A APIs**, the same for every channel',
     },
     {
       what: 'Ownership',
-      legacy: 'AM starts it, GPP clears it, FTN files it, the mainframe bills it. **Ownership is shared across systems, and nobody owns tracing a payment end to end**',
-      modern: '**Bill Pay Core owns the payment** end to end',
+      legacy: 'Starting a payment, clearing it and billing it sat in different places, so **each system held a part of it**',
+      modern: '**One domain owns the payment orchestration** from start to finish',
     },
     {
       what: 'History',
-      legacy: '**Merged** from an AM feed and an FTN batch',
-      modern: '**One owner, one source**',
+      legacy: '**Assembled from different sources**',
+      modern: '**Payment history sits in one place**',
     },
     {
-      what: 'Deployables',
-      legacy: 'One app, one schema, **one release train**',
-      modern: '**Three domains, three release trains**',
+      what: 'Deployments',
+      legacy: 'One app, so **changes went out together**',
+      modern: '**Each domain releases on its own**',
     },
     {
-      what: 'Blast radius',
-      legacy: 'Shared schema, so **a defect crosses domains**',
-      modern: '**Own store per domain**, contract is the only coupling',
+      what: 'Database',
+      legacy: '**Shared mainframe database**, so changes and outages impact the entire ecosystem',
+      modern: '**Each domain keeps its own data.** The API is the only link between them',
     },
     {
       what: 'Scaling',
-      legacy: '**Everything scales together**',
-      modern: '**Each domain to its own load shape**',
+      legacy: '**Everything grew together**, whether it needed to or not',
+      modern: '**Each domain scales to its own traffic**',
     },
     {
       what: 'Third-party payments',
-      legacy: 'Arrive as **files**, on their own path',
-      modern: '**Same lifecycle**, validated on the way in',
+      legacy: 'Arrived as files, **processed as batches in files**',
+      modern: '**Converted and processed in events**',
     },
     {
-      what: 'Latency',
-      legacy: 'FINCAP to TRIUMPH to CRS to Global Billing: **a full batch cycle**',
-      modern: '**Events**, not a nightly chain',
+      what: 'Downstream integrations',
+      legacy: 'Passed on step by step, so **a change waited for the next batch run**',
+      modern: '**Sent as events**, picked up as they happen',
     },
     {
       what: 'Traceability',
-      legacy: '**Breaks** at AM, GPP, GPHDB, IL and the DataPower and APIGEE hops',
+      legacy: 'The trail was **split across systems**, so following one payment meant several lookups',
       modern: '**One lifecycle, one set of states**',
     },
   ]}

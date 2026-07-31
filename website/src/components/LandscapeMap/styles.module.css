@@ -24,14 +24,6 @@
   box-shadow: var(--card-sh);
 }
 
-/* Claim back the article's side padding. The map needs every pixel of the
-   column it is given, and the page container still supplies the outer margin. */
-@media (min-width: 997px) {
-  .wrap {
-    margin-inline: calc(-1 * clamp(1rem, 3vw, 2.5rem));
-  }
-}
-
 /* ---- the four families ---- */
 .domain {
   --tier: var(--amex-blue);
@@ -41,7 +33,8 @@
   --tier: var(--amex-cat-build);
   --fill: 17%;
 }
-.tech {
+/* the domains every payment product draws on, not Billpay's own */
+.shared {
   --tier: var(--amex-cat-observability);
   --fill: 17%;
 }
@@ -84,9 +77,22 @@
   grid-column: 1;
   grid-row: 1;
 }
-.groupDomain {
+/* The payments domain and the one domain that works on it from outside, stacked
+   so Control Tower lines up with the whole thing rather than sitting in it. */
+.domainZone {
   grid-column: 2;
   grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+/* the Type-A rail and the box it belongs to, side by side */
+.domainRow {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
 }
 .groupExternal {
   grid-column: 3;
@@ -109,15 +115,17 @@
   background: color-mix(in srgb, var(--tier) 7%, var(--amex-panel));
 }
 
-.groupTitle {
+/* Compounded on purpose: the group titles are h4s, and the global
+   `.markdown h4` rule outranks a bare class, which would drop them to Regular. */
+.group .groupTitle {
   margin: 0 0 0.1rem;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.2rem 0.45rem;
   padding-inline: 0.15rem;
-  font-size: 0.66rem;
-  font-weight: 800;
+  font-size: 0.76rem;
+  font-weight: 550;
   letter-spacing: 0.06em;
   line-height: 1.35;
   text-transform: uppercase;
@@ -135,11 +143,15 @@
 }
 
 /* The centre of the diagram, so it carries a heavier rule and a deeper field
-   than the three groups around it. */
+   than the three groups around it. Its left corners are squared off because the
+   Type-A rail is fixed to that edge. */
 .groupDomain {
   --tier: var(--amex-blue);
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0.8rem 0.8rem 0.85rem;
   border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
+  border-radius: 0 16px 16px 0;
   background: color-mix(in srgb, var(--amex-blue) 9%, var(--amex-panel));
   box-shadow: 0 6px 22px color-mix(in srgb, var(--amex-blue) 14%, transparent);
 }
@@ -154,14 +166,48 @@
   color: var(--amex-blue-bright);
 }
 
+/* ---- the Type-A rail ----
+   Every domain behind it exposes the same house-standard interface, so the fact
+   is stated once on the wall the channels come through rather than repeated on
+   each box. Fixed to the panel's left edge, sharing its border. */
+.apiRail {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  padding: 0.5rem 0;
+  border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  background: color-mix(in srgb, var(--amex-blue) 16%, var(--amex-panel));
+}
+
+.apiRailText {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 0.76rem;
+  font-weight: 550;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amex-blue);
+}
+
+:global([data-theme='dark']) .apiRail {
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
+  background: color-mix(in srgb, var(--amex-blue-bright) 17%, var(--amex-panel));
+}
+:global([data-theme='dark']) .apiRailText {
+  color: var(--amex-blue-bright);
+}
+
 .domainGrid {
   display: grid;
   grid-template-columns:
     minmax(176px, 1.44fr) /* Bill Pay Core */
     minmax(150px, 1.14fr) /* Plans, Inbound Processor, Allocation Manager */
     minmax(154px, 1.18fr) /* Payment Instruments, Mandates */
-    minmax(128px, 0.82fr) /* Control Tower */
-    minmax(158px, 1.3fr); /* Multirail Gateway, Payments Clearing */
+    minmax(158px, 1.3fr); /* Multirail Gateway, Money Movement */
   gap: 0.5rem;
   align-items: start;
 }
@@ -247,26 +293,46 @@
   box-shadow: var(--amex-sh-sm);
 }
 
-/* a domain that exposes a Type-A API gets a solid top edge to go with the pill */
-.hasApi {
-  border-top-width: 3px;
-  border-top-color: color-mix(in srgb, var(--tier) 85%, var(--amex-panel));
+/* Control Tower — it works on all of the domains rather than sitting among
+   them, so it runs the full width underneath and outside the payments domain
+   box, with its name and capabilities on one line. Nothing reaches it through
+   the Type-A rail, which is why it is not behind it. */
+.cross {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-style: dashed;
+  border-width: 1.5px;
+}
+.card.cross .title {
+  font-size: 0.82rem;
+}
+
+.crossCaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.crossCaps .cap {
+  padding-inline: 0.6rem;
 }
 
 /* Bill Pay Core — the one box the page is about. Signature gradient, white
-   type, its own glow. Nothing else on the map is treated this way. */
+   type, a light lift. Nothing else on the map is treated this way. */
 .hero {
   border: none;
   border-top: 3px solid rgba(255, 255, 255, 0.8);
   border-radius: 14px;
   padding: 0.72rem 0.7rem 0.75rem;
   background: var(--amex-grad-btn);
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--amex-blue-bright) 45%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--amex-blue-bright) 22%, transparent);
 }
-.hero .title {
+.card.hero .title {
   color: #fff;
   font-size: 1.02rem;
-  font-weight: 700;
+  font-weight: 550;
 }
 .hero .num {
   color: var(--amex-blue-deep);
@@ -287,19 +353,13 @@
 .hero .storeGlyph ellipse {
   fill: rgba(255, 255, 255, 0.2);
 }
-.hero .api {
-  color: var(--amex-blue-deep);
-  background: #fff;
-  border-color: #fff;
-  box-shadow: 0 3px 12px rgba(2, 20, 48, 0.32), inset 0 -1px 0 rgba(2, 20, 48, 0.12);
-}
 
 /* the supporting estate is context, so its cards run a size down */
 .compact {
   padding: 0.52rem 0.55rem 0.55rem;
   gap: 0.3rem;
 }
-.compact .title {
+.card.compact .title {
   font-size: 0.78rem;
 }
 .compact .num {
@@ -350,50 +410,20 @@
   );
 }
 
-/* never split a domain name mid-word: it drops to the next line instead, which
-   below the floated pill is the full width of the card */
-.title {
+/* never split a domain name mid-word: it drops to the next line instead.
+   Compounded for the same reason as .groupTitle: `.markdown h4` outranks a
+   bare class and would drop the weight to Regular. */
+.card .title {
   margin: 0;
   min-width: 0;
   overflow-wrap: normal;
   word-break: normal;
   hyphens: none;
   font-size: 0.87rem;
-  font-weight: 650;
+  font-weight: 550;
   line-height: 1.3;
   letter-spacing: -0.004em;
   color: var(--amex-txt-strong);
-}
-
-/* ---- the Type-A pill ----
-   The one thing on the map a reader is meant to spot from across the room, so
-   it is a filled pill with its own lift rather than a tinted outline. */
-.api {
-  float: right;
-  margin-left: 0.4rem;
-  padding: 0.17rem 0.42rem;
-  border-radius: 999px;
-  font-size: 0.58rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: #fff;
-  background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-bright) 100%);
-  border: 1px solid color-mix(in srgb, var(--amex-blue-bright) 62%, #ffffff);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--amex-blue-bright) 52%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38);
-}
-:global([data-theme='dark']) .api {
-  color: #04122a;
-  background: linear-gradient(
-    135deg,
-    var(--amex-blue-bright) 0%,
-    color-mix(in srgb, var(--amex-blue-bright) 65%, #ffffff) 100%
-  );
-  border-color: color-mix(in srgb, var(--amex-blue-bright) 75%, #ffffff);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--amex-blue-bright) 55%, transparent);
 }
 
 /* Capabilities sit two-up the way the deck draws them, and fall to one column
@@ -512,14 +542,8 @@
   background: var(--amex-grad-btn);
 }
 
-.legendApi {
-  float: none;
-  margin-left: 0;
-  font-style: normal;
-}
-
 /* just under the row's own minimum, so the hint appears only once it is cut off */
-@container (max-width: 1170px) {
+@container (max-width: 1090px) {
   .hint {
     display: block;
   }
@@ -540,11 +564,33 @@
     gap: 0.85rem;
   }
   .groupChannels,
-  .groupDomain,
+  .domainZone,
   .groupExternal,
   .groupSupport {
     grid-column: 1;
     grid-row: auto;
+  }
+  /* no room for a rail beside the panel, so it lies flat on top of it */
+  .domainRow {
+    flex-direction: column;
+  }
+  .apiRail {
+    width: auto;
+    padding: 0.3rem 0;
+    border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+  }
+  :global([data-theme='dark']) .apiRail {
+    border-color: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
+    border-bottom: none;
+  }
+  .apiRailText {
+    writing-mode: horizontal-tb;
+    transform: none;
+  }
+  .groupDomain {
+    border-radius: 0 0 16px 16px;
   }
   .domainGrid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
