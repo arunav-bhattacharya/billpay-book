@@ -327,23 +327,6 @@
   fill: #8f9bff;
 }
 
-/* The rest of the cluster's services, stated rather than drawn. */
-.moreBox {
-  fill: color-mix(in srgb, var(--amex-temporal) 8%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-temporal) 45%, transparent);
-  stroke-width: 1.2;
-  stroke-dasharray: 6 4;
-}
-:global([data-theme='dark']) .moreBox {
-  fill: color-mix(in srgb, #a48bff 12%, var(--amex-panel));
-  stroke: color-mix(in srgb, #a48bff 45%, transparent);
-}
-.moreDots {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  fill: var(--amex-mut);
-}
 
 /* ----------------------------------------------------------- Kubernetes */
 .k8sBody {

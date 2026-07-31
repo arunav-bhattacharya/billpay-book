@@ -310,7 +310,7 @@ export default function HADiagram() {
           </marker>
           {/* the pod-to-pod links run in 22-unit gaps, so they need a head
               small enough to leave some line showing between two of them */}
-          <marker id="ha-m-pod" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="4.6" markerHeight="4.6" orient="auto-start-reverse">
+          <marker id="ha-m-pod" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" className={styles.mPod} />
           </marker>
           <marker id="ha-m-idle" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.6" markerHeight="6.6" orient="auto-start-reverse">
@@ -443,7 +443,7 @@ export default function HADiagram() {
             It lands on Frontend, which is the only Temporal service a client
             ever talks to. */}
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V247 H1148"
+          d="M574,433 H686 Q700,412 714,433 H1050 V237 H1148"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
@@ -462,35 +462,35 @@ export default function HADiagram() {
         {/* Everything Temporal is pods on one cluster, so the cluster box is
             where the Temporal mark and the violet live. Postgres sits outside
             it: it is a managed database, not something running on the cluster. */}
-        <rect x={1122} y={176} width={246} height={352} rx={14} className={styles.groupEks} />
-        <TemporalMark cx={1146} cy={198} size={26} />
-        <K8sMark cx={1176} cy={198} size={24} />
-        <text x={1198} y={196} className={styles.markLabel}>EKS cluster</text>
-        <text x={1198} y={211} className={styles.markSub}>self-hosted pods</text>
+        <rect x={1122} y={176} width={246} height={356} rx={14} className={styles.groupEks} />
+        <TemporalMark cx={1146} cy={196} size={26} />
+        <K8sMark cx={1176} cy={196} size={24} />
+        <text x={1198} y={201} className={styles.markLabel}>EKS cluster</text>
 
-        <Service x={1160} y={228} w={176} h={38} tint="tTemporal" icon="temporal" title="Frontend" />
-        <Service x={1160} y={300} w={176} h={38} tint="tTemporal" icon="temporal" title="History" />
-        <Service x={1160} y={372} w={176} h={38} tint="tTemporal" icon="temporal" title="Matching" />
-        <Service x={1160} y={444} w={176} h={38} tint="tTemporal" icon="temporal" title="Worker" />
-
-        {/* and the rest of the cluster's services */}
-        <rect x={1160} y={492} width={176} height={22} rx={11} className={styles.moreBox} />
-        <text x={1248} y={510} textAnchor="middle" className={styles.moreDots}>…</text>
+        {/* The last box stands for the rest of the cluster's services, so it is
+            a service like the others: same size, same mark, same wiring. */}
+        <Service x={1160} y={220} w={176} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
+        <Service x={1160} y={286} w={176} h={34} tint="tTemporal" icon="temporal" title="History" />
+        <Service x={1160} y={352} w={176} h={34} tint="tTemporal" icon="temporal" title="Matching" />
+        <Service x={1160} y={418} w={176} h={34} tint="tTemporal" icon="temporal" title="Worker" />
+        <Service x={1160} y={484} w={176} h={34} tint="tTemporal" icon="temporal" title="…" />
 
         {/* the services call each other inside the cluster */}
-        <path d="M1248,268 V290" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <path d="M1248,340 V362" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <path d="M1248,412 V434" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <text x={1140} y={380} textAnchor="middle" transform="rotate(-90 1140 380)" className={styles.podLabel}>
+        <path d="M1248,256 V276" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <path d="M1248,322 V342" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <path d="M1248,388 V408" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <path d="M1248,454 V474" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
+        <text x={1140} y={369} textAnchor="middle" transform="rotate(-90 1140 369)" className={styles.podLabel}>
           pod-to-pod
         </text>
 
         {/* persistence: out of the cluster, into the managed Postgres */}
-        <path d="M1336,247 H1390" className={styles.req} />
-        <path d="M1336,319 H1390" className={styles.req} />
-        <path d="M1336,391 H1390" className={styles.req} />
-        <path d="M1336,463 H1390" className={styles.req} />
-        <path d="M1390,247 V463" className={styles.req} />
+        <path d="M1336,237 H1390" className={styles.req} />
+        <path d="M1336,303 H1390" className={styles.req} />
+        <path d="M1336,369 H1390" className={styles.req} />
+        <path d="M1336,435 H1390" className={styles.req} />
+        <path d="M1336,501 H1390" className={styles.req} />
+        <path d="M1390,237 V501" className={styles.req} />
         <path d="M1390,296 H1438" className={styles.req} markerEnd="url(#ha-m-req)" />
 
         <Pill x={1470} y={226} label="WRITER" tone="pPrimary" />
