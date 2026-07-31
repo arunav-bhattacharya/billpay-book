@@ -316,10 +316,10 @@ export default function HADiagram() {
         />
 
         {/* ---- east site ---- */}
-        <Icon name="user" x={58} y={236} size={26} cls={styles.userIcon} />
-        <text x={71} y={284} textAnchor="middle" className={styles.userLabel}>caller</text>
-        <text x={71} y={297} textAnchor="middle" className={styles.userLabel}>near IPC2</text>
-        <path d="M92,250 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Icon name="user" x={79} y={236} size={26} cls={styles.userIcon} />
+        <text x={92} y={284} textAnchor="middle" className={styles.userLabel}>caller</text>
+        <text x={92} y={297} textAnchor="middle" className={styles.userLabel}>near IPC2</text>
+        <path d="M112,250 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
         <Service x={210} y={218} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
         <path d="M300,282 V330" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
@@ -342,44 +342,44 @@ export default function HADiagram() {
         <text x={913} y={300} textAnchor="middle" className={styles.markSub}>read-only × 2</text>
 
         {/* ---- west site ---- */}
-        <Icon name="user" x={58} y={570} size={26} cls={styles.userIcon} />
-        <text x={71} y={618} textAnchor="middle" className={styles.userLabel}>caller</text>
-        <text x={71} y={631} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
-        <path d="M92,584 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service x={210} y={552} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
+        <Icon name="user" x={79} y={602} size={26} cls={styles.userIcon} />
+        <text x={92} y={650} textAnchor="middle" className={styles.userLabel}>caller</text>
+        <text x={92} y={663} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
+        <path d="M112,616 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Service x={210} y={584} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
-        <path d="M300,616 V664" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={314} y={644} className={styles.bufLabel}>park + replay</text>
-        <RedisMark cx={300} cy={696} w={46} />
-        <text x={334} y={692} className={styles.markLabel}>Redis</text>
-        <text x={334} y={707} className={styles.markSub}>fallback store</text>
+        <path d="M300,580 V550" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
+        <text x={314} y={556} className={styles.bufLabel}>park + replay</text>
+        <RedisMark cx={300} cy={526} w={46} />
+        <text x={334} y={522} className={styles.markLabel}>Redis</text>
+        <text x={334} y={537} className={styles.markSub}>fallback store</text>
 
         {/* the two Redis stores are one active-active database */}
-        <path d="M300,382 V676" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <Chip x={300} y={529} label="CRDB · active-active" tone="chipBuf" />
+        <path d="M300,382 V500" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
+        <Chip x={300} y={441} label="CRDB · active-active" tone="chipBuf" />
 
-        <path d="M390,584 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service x={474} y={552} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
+        <path d="M390,616 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Service x={474} y={584} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
 
-        <path d="M682,574 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Drum cx={752} cy={584} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
-        <text x={752} y={630} textAnchor="middle" className={styles.markLabel}>Oracle</text>
-        <text x={752} y={646} textAnchor="middle" className={styles.markSub}>read only</text>
-        <Pill x={752} y={666} label="STANDBY" tone="pStandby" />
-        <path d="M782,580 H852" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={880} cy={586} rx={20} h={26} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
-        <text x={880} y={634} textAnchor="middle" className={styles.markSub}>read-only</text>
+        <path d="M682,606 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Drum cx={752} cy={616} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
+        <text x={752} y={662} textAnchor="middle" className={styles.markLabel}>Oracle</text>
+        <text x={752} y={678} textAnchor="middle" className={styles.markSub}>read only</text>
+        <Pill x={752} y={698} label="STANDBY" tone="pStandby" />
+        <path d="M782,612 H852" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <Drum cx={880} cy={618} rx={20} h={26} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
+        <text x={880} y={666} textAnchor="middle" className={styles.markSub}>read-only</text>
 
         {/* Data Guard runs down the left of the Oracle column, at x=700: the
             drums start at 722, so this is the clear lane between them and
             billpay-core. The gRPC bus hops over it in the gap. */}
-        <path d="M722,258 H700 V576 H716" className={styles.rep} markerEnd="url(#ha-m-rep)" />
+        <path d="M722,258 H700 V608 H716" className={styles.rep} markerEnd="url(#ha-m-rep)" />
         <Chip x={700} y={506} label="Data Guard" tone="chipRep" />
 
         {/* ================= the gRPC bus out to the cloud ================= */}
 
         <path d="M574,282 V433" className={styles.req} />
-        <path d="M574,552 V433" className={styles.req} />
+        <path d="M574,584 V433" className={styles.req} />
         <circle cx={574} cy={433} r={4} className={styles.junction} />
         {/* one continuous run, hopping the Data Guard line at x=700 rather than
             breaking for it: a gap in a request path reads as a gap in the path */}
