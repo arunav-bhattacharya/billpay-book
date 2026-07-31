@@ -280,7 +280,7 @@ export default function HADiagram() {
         viewBox="0 0 1640 880"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data. US West IPC1 is laid out the same way, but its billpay-core is a standby, so its One-Data routes across to the IPC2 core instead; it also holds the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, landing on the Temporal Frontend service. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster that runs the Temporal Frontend, History, Matching and Worker services plus others, all talking pod to pod, and persisting to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
+        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data. US West IPC1 is laid out the same way, but its billpay-core is a standby, so its One-Data routes across to the IPC2 core instead; it also holds the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, landing on the Temporal Frontend service. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster. Frontend sits at the top of that cluster as the only service a client talks to, and it shares one pod-to-pod bus with History, Matching, Worker and the cluster's remaining services, so any of them can call any other. All of them persist to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -443,7 +443,7 @@ export default function HADiagram() {
             It lands on Frontend, which is the only Temporal service a client
             ever talks to. */}
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V237 H1148"
+          d="M574,433 H686 Q700,412 714,433 H1050 V237 H1164"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
@@ -467,30 +467,38 @@ export default function HADiagram() {
         <K8sMark cx={1176} cy={196} size={24} />
         <text x={1198} y={201} className={styles.markLabel}>EKS cluster</text>
 
-        {/* The last box stands for the rest of the cluster's services, so it is
-            a service like the others: same size, same mark, same wiring. */}
-        <Service x={1160} y={220} w={176} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
-        <Service x={1160} y={286} w={176} h={34} tint="tTemporal" icon="temporal" title="History" />
-        <Service x={1160} y={352} w={176} h={34} tint="tTemporal" icon="temporal" title="Matching" />
-        <Service x={1160} y={418} w={176} h={34} tint="tTemporal" icon="temporal" title="Worker" />
-        <Service x={1160} y={484} w={176} h={34} tint="tTemporal" icon="temporal" title="…" />
+        {/* Frontend sits apart from the rest: it is the only service a client
+            talks to, and the gap says so. The last box stands for the cluster's
+            remaining services, so it is a service like the others. */}
+        <Service x={1176} y={220} w={160} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
+        <Service x={1176} y={296} w={160} h={34} tint="tTemporal" icon="temporal" title="History" />
+        <Service x={1176} y={354} w={160} h={34} tint="tTemporal" icon="temporal" title="Matching" />
+        <Service x={1176} y={412} w={160} h={34} tint="tTemporal" icon="temporal" title="Worker" />
+        <Service x={1176} y={470} w={160} h={34} tint="tTemporal" icon="temporal" title="…" />
 
-        {/* the services call each other inside the cluster */}
-        <path d="M1248,256 V276" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <path d="M1248,322 V342" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <path d="M1248,388 V408" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <path d="M1248,454 V474" className={styles.pod} markerStart="url(#ha-m-pod)" markerEnd="url(#ha-m-pod)" />
-        <text x={1140} y={369} textAnchor="middle" transform="rotate(-90 1140 369)" className={styles.podLabel}>
-          pod-to-pod
-        </text>
+        {/* One shared bus rather than a link per pair: every service on it can
+            call every other, Frontend included, and it stays one line. */}
+        <path
+          d="M1240,260 V270 H1140 V487 H1164"
+          className={styles.pod}
+          markerStart="url(#ha-m-pod)"
+          markerEnd="url(#ha-m-pod)"
+        />
+        <path d="M1140,313 H1164" className={styles.pod} markerEnd="url(#ha-m-pod)" />
+        <path d="M1140,371 H1164" className={styles.pod} markerEnd="url(#ha-m-pod)" />
+        <path d="M1140,429 H1164" className={styles.pod} markerEnd="url(#ha-m-pod)" />
+        {[313, 371, 429].map((cy) => (
+          <circle key={cy} cx={1140} cy={cy} r={3} className={styles.podDot} />
+        ))}
+        <Chip x={1200} y={270} label="pod-to-pod" tone="chipPod" />
 
         {/* persistence: out of the cluster, into the managed Postgres */}
         <path d="M1336,237 H1390" className={styles.req} />
-        <path d="M1336,303 H1390" className={styles.req} />
-        <path d="M1336,369 H1390" className={styles.req} />
-        <path d="M1336,435 H1390" className={styles.req} />
-        <path d="M1336,501 H1390" className={styles.req} />
-        <path d="M1390,237 V501" className={styles.req} />
+        <path d="M1336,313 H1390" className={styles.req} />
+        <path d="M1336,371 H1390" className={styles.req} />
+        <path d="M1336,429 H1390" className={styles.req} />
+        <path d="M1336,487 H1390" className={styles.req} />
+        <path d="M1390,237 V487" className={styles.req} />
         <path d="M1390,296 H1438" className={styles.req} markerEnd="url(#ha-m-req)" />
 
         <Pill x={1470} y={226} label="WRITER" tone="pPrimary" />
