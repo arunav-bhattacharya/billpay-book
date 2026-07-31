@@ -1,6 +1,7 @@
 /* RouteMap — the Billpay Router as a grouped, scannable table.
 
-   Set in the body sans throughout, at one size: --rm-fs. The trigger,
+   Set in the body sans throughout, at one size in the body: --rm-fs, with the
+   header band a step above it at --rm-th-fs. The trigger,
    condition, workflow name, sequence arrow and the two pill labels each used
    to carry their own font-size, spanning 0.56rem to 0.95rem, and the
    workflow name was monospaced. Emphasis comes from weight, colour and the
@@ -21,6 +22,7 @@
   box-shadow: var(--card-sh);
 
   --rm-fs: 0.88rem;
+  --rm-th-fs: 0.94rem;
   /* Chips (the Online/Offline worker pill, the account tag) sit a step below
      the text. They are uppercase and tracked, so matching --rm-fs made them
      read larger than the prose beside them rather than equal to it. */
@@ -44,7 +46,7 @@
 
 .table thead th {
   text-align: left;
-  font-size: var(--rm-fs);
+  font-size: var(--rm-th-fs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -221,5 +223,6 @@
      row stays one size. */
   .wrap {
     --rm-fs: 0.82rem;
+    --rm-th-fs: 0.88rem;
   }
 }

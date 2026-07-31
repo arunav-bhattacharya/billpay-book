@@ -412,6 +412,19 @@ strong {
   font-weight: 600;
 }
 
+/* Only the page title carries Medium. Every heading below it drops to Regular,
+   the same cut as body copy, so a long page reads as one voice instead of a
+   ladder of bold bars. The hierarchy is still there — it comes from size, the
+   gradient rule under h2, and the space above each heading, which is enough
+   once the weight stops shouting. */
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-weight: 400;
+}
+
 /* Gradient-underline accent for section headings on content pages. */
 .markdown > h2 {
   padding-bottom: 0.3em;
@@ -1224,8 +1237,10 @@ a {
    15. Markdown tables — every pipe table in the docs, in the treatment the
    table components on Components in Detail carry: a rounded panel, a solid
    Amex-blue header band, rows alternating between the panel and one step off
-   it, and one type size throughout (headers included) so a row reads as one
-   tier rather than three. Resize the whole table from --md-table-fs.
+   it, and one type size through the body so a row reads as one tier rather
+   than three. The header band sits one step above that, from
+   --md-table-th-fs, which is enough to name the columns without reopening the
+   three-tier row. Resize the body from --md-table-fs.
 
    A table cannot clip its own corners or scroll sideways, and markdown gives
    no place to hang a wrapper, so src/theme/MDXComponents.js wraps each one in
@@ -1247,6 +1262,7 @@ a {
   overflow-x: auto;
 
   --md-table-fs: 0.88rem;
+  --md-table-th-fs: 0.94rem;
 }
 
 .mdTable table {
@@ -1272,7 +1288,7 @@ a {
 
 .mdTable table thead th {
   padding: 0.72rem 1rem;
-  font-size: var(--md-table-fs);
+  font-size: var(--md-table-th-fs);
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1302,6 +1318,7 @@ a {
 @media (max-width: 700px) {
   .mdTable {
     --md-table-fs: 0.82rem;
+    --md-table-th-fs: 0.88rem;
   }
   .mdTable table thead th,
   .mdTable table tbody th,

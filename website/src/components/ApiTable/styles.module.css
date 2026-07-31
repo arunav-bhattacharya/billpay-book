@@ -8,11 +8,12 @@
    monospaced, but nothing here needs column alignment, and mono at these
    sizes read smaller and greyer than the prose around it.
 
-   Every cell, header included, is one size: --api-fs. The column headers,
-   function name, verb badge, path and description each used to carry their
-   own font-size, spanning 0.66rem to 0.92rem, which made a single row read
-   as four different tiers. Emphasis comes from weight, colour and the badge
-   instead. Change the token below to resize the whole table. */
+   Every body cell is one size: --api-fs. The column headers, function name,
+   verb badge, path and description each used to carry their own font-size,
+   spanning 0.66rem to 0.92rem, which made a single row read as four different
+   tiers. Emphasis comes from weight, colour and the badge instead. The header
+   band is the one exception, a step up at --api-th-fs. Change the tokens below
+   to resize the table. */
 
 /* The house card, per the recipe in custom.css section 9a. */
 .wrap {
@@ -28,6 +29,7 @@
   overflow-x: auto;
 
   --api-fs: 0.88rem;
+  --api-th-fs: 0.94rem;
   /* Chips (the verb badge, the tag) sit a step below the text. They are
      uppercase and tracked, so matching --api-fs made them read larger than
      the prose beside them rather than equal to it. */
@@ -58,7 +60,7 @@
 
 .table thead th {
   padding: 0.72rem 1rem;
-  font-size: var(--api-fs);
+  font-size: var(--api-th-fs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -227,6 +229,7 @@
      row stays one size. */
   .wrap {
     --api-fs: 0.82rem;
+    --api-th-fs: 0.88rem;
   }
   .table thead th,
   .table tbody th,
