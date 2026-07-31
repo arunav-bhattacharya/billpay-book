@@ -538,4 +538,4 @@ One payment, and every state it moved through on the way. This is what a servici
 - [Workflows](../workflows/core.md), the step-by-step logic behind each journey
 - [Stages](../stages.md), the state-transition units the workflows compose
 - [Sequence diagrams](../diagrams/sequence-diagram.md), the same journeys at engineering resolution
-- [Architecture › A Closer Look](../../architecture/components.md), the full router table with every trigger and child workflow
+- [Architecture › Components in Detail](../../architecture/components.md), the full router table with every trigger and child workflow

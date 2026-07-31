@@ -5,37 +5,37 @@ sidebar_label: Sequence Diagram
 
 # Sequence Diagrams
 
-End-to-end traces from a caller's perspective. Each diagram follows one complete Billpay flow: **caller → Core API → Billpay Router → Workflows → the ActivityGroups and Activities that do the work**.
+End-to-end traces from a caller's perspective. Each one follows a single Billpay flow from the caller through the Core API and the Router to the Workflows, and on to the ActivityGroups and Activities that do the work.
 
-Most diagrams show two groups at the top:
+<details>
+<summary>How to read these diagrams</summary>
 
-- **Caller**, in soft slate, is the client and the request contract it calls, such as `CreatePayment.v3`.
-- **Billpay Platform**, in light blue, is everything past the contract: the Core API endpoint, the Billpay Router, the Workflows, and the ActivityGroups and Activities they invoke.
+- The navy group at the top is the caller: the client and the contract it calls, such as `CreatePayment.v3`. The light-blue group is the Billpay Platform, everything past that contract. Reconciliation flows show only the platform group.
+- Amex-blue blocks are a workflow on an **online** worker, in the request path with the caller waiting. Electric-blue blocks are a workflow on an **offline** worker: schedules, event handlers, and anything drained in batches.
+- Pale-blue blocks are a sub-workflow invoked from inside another.
+- Dashed gold marks async work that runs after the caller has been answered.
+- Chips such as `state → ACCEPTED` mark a lifecycle transition. They are one colour throughout, because the chip already names the state. The [state diagram](./state-diagram.md) is where outcomes are colour-coded.
+- Each ActivityGroup or Activity is its own participant, labelled short: `Execution` for `PaymentExecutionActivityGroup`, `Capture` for `IdempotencyCheckActivity`, `Validation` for `PaymentValidationActivityGroup`.
+- External systems are left out (clearing, Accounts Receivable, Open-To-Buy, accounting, the database, the event bus). Each is internal to the group that owns it.
+- Diagrams fit their column. The wider ones carry an expand control in the top right, which opens a full-window view at window width or actual size. Escape closes it.
 
-Internal reconciliation flows (event handlers + schedules) show only the Billpay Platform group.
-
-Inside the body:
-
-- **Deep-blue rectangles** wrap the messages that belong to a single workflow, with the workflow name at the top of the block. A sub-workflow invoked from inside another shows as a lighter **cyan** rectangle.
-- **Gold-tinted rectangles** mark async work that happens *after* the caller has been responded to.
-- **State-transition chips** pop out the moments where the payment moves from one lifecycle state to another, colour-coded by outcome to match the [state diagram](./state-diagram.md). Green means the payment advances or completes (`→ ACCEPTED`, `→ PROCESSED`, `→ PAID`), red is a terminal failure (`→ DECLINED`, `→ CANCELLED`, `→ DISALLOWED`), and indigo means the payment is still in flight or the outcome is not settled yet (`→ PENDING`, `→ PROCESSING`).
-
-Each ActivityGroup or Activity appears as its **own participant**. To keep the diagrams readable the participant labels are short: `Execution` stands for `PaymentExecutionActivityGroup`, `Idempotency` for `IdempotencyCheckActivity`, `Validation` for `PaymentValidationActivityGroup`. Each diagram's intro names the full classes it uses. External systems and infrastructure (clearing, Accounts Receivable, Open-To-Buy, accounting, the database, the event bus) are left off on purpose, because they are internal details of the groups that own them.
+</details>
 
 ## 1. Immediate payment, single instruction
 
-`CreatePayment.v3` → `POST /payments` (today, single instruction) →
-`CreateImmediatePaymentWF`. The workflow checks idempotency
-(`IdempotencyCheckActivity`) and validates (`PaymentValidationActivityGroup`),
-then on `ACCEPTED` runs execution (`PaymentExecutionActivityGroup`) and
-fulfillment (`PaymentFulfillmentActivityGroup`) in the background; a failed
-validation declines and notifies (`PaymentDeclinedNotificationActivityGroup`).
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
     participant ODF as CreatePayment.v3
   end
@@ -44,9 +44,8 @@ sequenceDiagram
     participant API as POST /payments
     participant R as Billpay Router
     participant WF as Immediate WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PVAL as Validation
-    participant PDN as Decline
     participant PEX as Execution
     participant PFL as Fulfillment
   end
@@ -57,57 +56,69 @@ sequenceDiagram
   R->>WF: invoke(workflow-key)
 
   rect rgba(1,91,179,0.10)
-    Note over WF,PDN: Online · Immediate WF validates inline, then accepts or declines
-    WF->>IDEMP: check idempotency
-    rect rgba(52,81,158,0.15)
+    Note over WF,PVAL: Online Worker
+    WF->>IDEMP: Capture and check idempotency
+    rect rgba(0,98,182,0.20)
       IDEMP-->>WF: state → PENDING
     end
     WF->>PVAL: validate
     alt validation passes
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PVAL-->>WF: state → ACCEPTED
       end
     else validation fails
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PVAL-->>WF: state → DECLINED
       end
-      WF->>PDN: notify decline
+      WF->>PFL: notify decline
     end
   end
 
-  Note over C,WF: 201 · ACCEPTED or DECLINED. Only ACCEPTED proceeds to background fulfillment
+  Note over C,WF: 201 · ACCEPTED or DECLINED
   WF-->>API: success (payment-id, ACCEPTED or DECLINED)
   API-->>ODF: 201 Created
   ODF-->>C: payment-id, status
 
-  rect rgba(198,146,20,0.12)
-    Note over WF,PFL: Online · Immediate WF runs async execution and fulfillment only on ACCEPTED
-    WF->>PEX: execute
-    rect rgba(52,81,158,0.15)
-      PEX-->>WF: state → PROCESSING
-    end
-    WF->>PFL: fulfill
-    rect rgba(47,125,84,0.16)
-      PFL-->>WF: state → PROCESSED
+  rect rgba(198,146,20,0.20)
+    Note over WF,PFL: Online Worker
+    opt only in ACCEPTED state
+      WF->>PEX: execute
+      rect rgba(0,98,182,0.20)
+        PEX-->>WF: state → PROCESSING
+      end
+      WF->>PFL: fulfill
+      rect rgba(0,98,182,0.20)
+        PFL-->>WF: state → PROCESSED
+      end
     end
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `CreatePayment.v3` calls `POST /payments` with today's date and a single instruction, and the Router picks `CreateImmediatePaymentWF`.
+- The workflow captures the payment and checks idempotency (`IdempotencyCheckActivity`), then validates (`PaymentValidationActivityGroup`).
+- On `ACCEPTED` the caller gets its 201 straight away, and execution (`PaymentExecutionActivityGroup`) and fulfillment (`PaymentFulfillmentActivityGroup`) run in the background.
+- A failed validation declines instead, and fulfillment sends the decline notification.
+
+</details>
+
 ## 2. Scheduled payment, created today and executed later
 
-`CreatePayment.v3` → `POST /payments` (future date) →
-`CreateSchedulePaymentWF`, which validates the schedule
-(`PaymentValidationActivityGroup`) and notifies on success
-(`PaymentScheduledNotificationActivityGroup`). On the payment date the
-Scheduled Payment Executor drains `SCHEDULED` payments into
-`ExecuteScheduledPaymentWF`, which re-validates on execution
-(`PaymentValidationOnExecutionActivityGroup`) before executing and fulfilling.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
   end
 
@@ -115,14 +126,12 @@ sequenceDiagram
     participant API as POST /payments
     participant R as Billpay Router
     participant CSP as Schedule WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PVS as Validation
     participant PSN as Scheduled
-    participant PDN as Decline
     participant SCH as Sched. Executor
     participant ESP as Exec Scheduled WF
     participant PVX as Validate (exec)
-    participant PDNE as Decline
     participant PEX as Execution
     participant PFL as Fulfillment
   end
@@ -132,22 +141,22 @@ sequenceDiagram
   R->>CSP: invoke(workflow-key)
 
   rect rgba(1,91,179,0.10)
-    Note over CSP,PDN: Online · Schedule WF validates the schedule, then schedules or declines
-    CSP->>IDEMP: check idempotency
-    rect rgba(52,81,158,0.15)
+    Note over CSP,PVS: Online Worker
+    CSP->>IDEMP: Capture and check idempotency
+    rect rgba(0,98,182,0.20)
       IDEMP-->>CSP: state → PENDING
     end
     CSP->>PVS: validate schedule
     alt validation passes
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PVS-->>CSP: state → SCHEDULED
       end
       CSP->>PSN: notify scheduled
     else validation fails
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PVS-->>CSP: state → DECLINED
       end
-      CSP->>PDN: notify decline
+      CSP->>PFL: notify decline
     end
   end
 
@@ -156,49 +165,58 @@ sequenceDiagram
 
   Note over SCH,ESP: On payment date · Sched. Executor fires (2,500/min), only SCHEDULED
 
-  rect rgba(198,146,20,0.12)
-    Note over SCH,PFL: Offline · Exec Scheduled WF re-validates, then executes and fulfills or declines
+  rect rgba(198,146,20,0.20)
+    Note over SCH,PFL: Offline Worker
     SCH->>ESP: pick up SCHEDULED payments (batches of 2,500/min)
     ESP->>PVX: validate
     alt validation passes
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PVX-->>ESP: state → ACCEPTED
       end
       ESP->>PEX: execute
-      rect rgba(52,81,158,0.15)
+      rect rgba(0,98,182,0.20)
         PEX-->>ESP: state → PROCESSING
       end
       ESP->>PFL: fulfill
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PFL-->>ESP: state → PROCESSED
       end
     else validation fails
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PVX-->>ESP: state → DECLINED
       end
-      ESP->>PDNE: notify decline on execution
+      ESP->>PFL: notify decline on execution
     end
   end
 ```
 
-:::note[After PROCESSED]
-`PAID` is reached separately by the **Paid Events Processor reconciliation**. See [diagram #10](#10-paid-events-reconciliation).
-:::
+<details>
+<summary>What happens</summary>
+
+- `CreatePayment.v3` calls `POST /payments` with a future date, and the Router picks `CreateSchedulePaymentWF`.
+- That workflow validates the schedule (`PaymentValidationActivityGroup`) and notifies on success (`PaymentScheduledNotificationActivityGroup`).
+- On the payment date the Scheduled Payment Executor drains `SCHEDULED` payments into `ExecuteScheduledPaymentWF`, 2,500 a minute.
+- `ExecuteScheduledPaymentWF` re-validates (`PaymentValidationOnExecutionActivityGroup`) before executing and fulfilling.
+- Either validation can decline, and fulfillment (`PaymentFulfillmentActivityGroup`) sends the notification both times.
+- `PROCESSED` is not the end of it. `PAID` is reached separately by the Paid Events Processor reconciliation, in [diagram #10](#10-paid-events-reconciliation).
+
+</details>
 
 ## 3. Immediate Corporate Payment
 
-`POST /payments` with `payment-date = today` and a corporate marker →
-`CreateImmediatePaymentWF`. On `ACCEPTED`, the parent fans out to
-`GetCorporatePaymentAllocationsWF`, which requests allocations
-(`PaymentAllocatingActivityGroup`), receives them
-(`PaymentAllocatedActivityGroup`), and creates the split legs
-(`PaymentSplitsCreationActivity`); then `ExecuteSplitPaymentWF` runs per split.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
   end
 
@@ -206,9 +224,8 @@ sequenceDiagram
     participant API as POST /payments
     participant R as Billpay Router
     participant CIP as Immediate WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PVAL as Validation
-    participant PDN as Decline
     participant GPA as Allocations WF
     participant ARQ as Allocating
     participant ARC as Allocated
@@ -223,73 +240,88 @@ sequenceDiagram
   R->>CIP: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over CIP,PDN: Online · Immediate WF validates inline, then accepts or declines
-    CIP->>IDEMP: check idempotency
-    rect rgba(52,81,158,0.15)
+    Note over CIP,PVAL: Online Worker
+    CIP->>IDEMP: Capture and check idempotency
+    rect rgba(0,98,182,0.20)
       IDEMP-->>CIP: state → PENDING
     end
     CIP->>PVAL: validate
     alt validation passes
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PVAL-->>CIP: state → ACCEPTED
       end
     else validation fails
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PVAL-->>CIP: state → DECLINED
       end
-      CIP->>PDN: notify decline
+      CIP->>PFL: notify decline
     end
   end
 
-  Note over C,CIP: 201 · ACCEPTED or DECLINED. Only ACCEPTED proceeds to allocations and splits
+  Note over C,CIP: 201 · ACCEPTED or DECLINED
   CIP-->>API: success (payment-id, ACCEPTED or DECLINED)
   API-->>C: 201 Created
 
-  rect rgba(198,146,20,0.12)
-    Note over CIP,PFL: Async. Corporate allocations fetched, then per-split execution runs in waves
+  rect rgba(198,146,20,0.20)
+    Note over CIP,PFL: Async
+    opt only in ACCEPTED state
 
-    rect rgba(1,91,179,0.10)
-      Note over GPA,PSC: Offline · Allocations WF fetches the split breakdown
-      CIP->>GPA: trigger allocations workflow
-      GPA->>ARQ: request allocations
-      rect rgba(52,81,158,0.15)
-        ARQ-->>GPA: state → ALLOCATING
+      rect rgba(0,163,224,0.13)
+        Note over GPA,PSC: Offline Worker
+        CIP->>GPA: trigger allocations workflow
+        GPA->>ARQ: request allocations
+        rect rgba(0,98,182,0.20)
+          ARQ-->>GPA: state → ALLOCATING
+        end
+        GPA->>ARC: process allocations payload
+        rect rgba(0,98,182,0.20)
+          ARC-->>GPA: state → ALLOCATED
+        end
+        GPA->>PSC: create payment splits
       end
-      GPA->>ARC: process allocations payload
-      rect rgba(52,81,158,0.15)
-        ARC-->>GPA: state → ALLOCATED
-      end
-      GPA->>PSC: create payment splits
-    end
 
-    rect rgba(1,91,179,0.10)
-      Note over ESP,PFL: Offline · Split WF, drained by Allocations Sched.
-      GPA->>ESP: trigger split execution
-      ESP->>PEX: execute split
-      rect rgba(52,81,158,0.15)
-        PEX-->>ESP: state → PROCESSING
-      end
-      ESP->>PFL: fulfill split
-      rect rgba(47,125,84,0.16)
-        PFL-->>ESP: state → PROCESSED
+      rect rgba(0,163,224,0.13)
+        Note over ESP,PFL: Offline Worker
+        GPA->>ESP: trigger split execution
+        ESP->>PEX: execute split
+        rect rgba(0,98,182,0.20)
+          PEX-->>ESP: state → PROCESSING
+        end
+        ESP->>PFL: fulfill split
+        rect rgba(0,98,182,0.20)
+          PFL-->>ESP: state → PROCESSED
+        end
       end
     end
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `POST /payments` with `payment-date = today` and a corporate marker runs `CreateImmediatePaymentWF`.
+- On `ACCEPTED` the parent fans out to `GetCorporatePaymentAllocationsWF`.
+- That workflow requests allocations (`PaymentAllocatingActivityGroup`), receives them (`PaymentAllocatedActivityGroup`), and creates the split legs (`PaymentSplitsCreationActivity`).
+- `ExecuteSplitPaymentWF` then runs once per split.
+- A failed validation declines before any of that, and fulfillment (`PaymentFulfillmentActivityGroup`) sends the notification.
+
+</details>
+
 ## 4. Scheduled Corporate Payment
 
-`POST /payments` with `payment-date = future` and a corporate marker →
-`CreateSchedulePaymentWF`. On `SCHEDULED`, allocations are fetched **up front**
-(`GetCorporatePaymentAllocationsWF`) so they're ready on the payment date. When
-the date arrives, `ExecuteScheduledPaymentWF` re-validates
-(`ALLOCATED → ACCEPTED`) and `ExecuteSplitPaymentWF` runs per split.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
   end
 
@@ -297,9 +329,8 @@ sequenceDiagram
     participant API as POST /payments
     participant R as Billpay Router
     participant CSP as Schedule WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PVS as Validation
-    participant PDN as Decline
     participant GPA as Allocations WF
     participant ARQ as Allocating
     participant ARC as Allocated
@@ -307,7 +338,6 @@ sequenceDiagram
     participant SCH as Sched. Executor
     participant ESPS as Exec Scheduled WF
     participant PVX as Validate (exec)
-    participant PDNE as Decline
     participant ESP as Split WF
     participant PEX as Execution
     participant PFL as Fulfillment
@@ -318,39 +348,39 @@ sequenceDiagram
   R->>CSP: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over CSP,PDN: Online · Schedule WF validates the schedule, then schedules or declines
-    CSP->>IDEMP: check idempotency
-    rect rgba(52,81,158,0.15)
+    Note over CSP,PVS: Online Worker
+    CSP->>IDEMP: Capture and check idempotency
+    rect rgba(0,98,182,0.20)
       IDEMP-->>CSP: state → PENDING
     end
     CSP->>PVS: validate schedule
     alt validation passes
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PVS-->>CSP: state → SCHEDULED
       end
     else validation fails
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PVS-->>CSP: state → DECLINED
       end
-      CSP->>PDN: notify decline
+      CSP->>PFL: notify decline
     end
   end
 
   CSP-->>API: SCHEDULED or DECLINED
   API-->>C: 201 Created (status)
 
-  rect rgba(198,146,20,0.12)
+  rect rgba(198,146,20,0.20)
     Note over CSP,PSC: Async (today). Allocations fetched up front, ready on payment date
 
-    rect rgba(1,91,179,0.10)
-      Note over GPA,PSC: Offline · Allocations WF fetches the split breakdown
+    rect rgba(0,163,224,0.13)
+      Note over GPA,PSC: Offline Worker
       CSP->>GPA: trigger allocations workflow
       GPA->>ARQ: request allocations
-      rect rgba(52,81,158,0.15)
+      rect rgba(0,98,182,0.20)
         ARQ-->>GPA: state → ALLOCATING
       end
       GPA->>ARC: process allocations payload
-      rect rgba(52,81,158,0.15)
+      rect rgba(0,98,182,0.20)
         ARC-->>GPA: state → ALLOCATED
       end
       GPA->>PSC: create payment splits
@@ -359,61 +389,73 @@ sequenceDiagram
 
   Note over SCH,ESPS: On payment date · Sched. Executor fires (2,500/min)
 
-  rect rgba(198,146,20,0.12)
-    Note over SCH,PFL: Offline chain. Re-validate, then execute and fulfill each split
+  rect rgba(198,146,20,0.20)
+    Note over SCH,PFL: Async
 
-    rect rgba(1,91,179,0.10)
-      Note over SCH,PDNE: Offline · Exec Scheduled WF re-validates, then accepts or declines
+    rect rgba(0,163,224,0.13)
+      Note over SCH,PVX: Offline Worker
       SCH->>ESPS: pick up ALLOCATED payments
       ESPS->>PVX: validate
       alt validation passes
-        rect rgba(47,125,84,0.16)
+        rect rgba(0,98,182,0.20)
           PVX-->>ESPS: state → ACCEPTED
         end
       else validation fails
-        rect rgba(192,57,43,0.14)
+        rect rgba(0,98,182,0.20)
           PVX-->>ESPS: state → DECLINED
         end
-        ESPS->>PDNE: notify decline on execution
+        ESPS->>PFL: notify decline on execution
       end
     end
 
-    rect rgba(1,91,179,0.10)
-      Note over ESP,PFL: Offline · Split WF, only on ACCEPTED, drained by Allocations Sched.
+    rect rgba(0,163,224,0.13)
+      Note over ESP,PFL: Offline Worker
       ESPS->>ESP: trigger split execution
       ESP->>PEX: execute split
-      rect rgba(52,81,158,0.15)
+      rect rgba(0,98,182,0.20)
         PEX-->>ESP: state → PROCESSING
       end
       ESP->>PFL: fulfill split
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PFL-->>ESP: state → PROCESSED
       end
     end
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `POST /payments` with `payment-date = future` and a corporate marker runs `CreateSchedulePaymentWF`.
+- On `SCHEDULED`, allocations are fetched up front (`GetCorporatePaymentAllocationsWF`) so they are ready on the payment date.
+- When the date arrives, `ExecuteScheduledPaymentWF` re-validates, taking the payment from `ALLOCATED` to `ACCEPTED`.
+- `ExecuteSplitPaymentWF` then runs once per split.
+- As with the non-corporate schedule, either validation can decline, and fulfillment (`PaymentFulfillmentActivityGroup`) sends the notification.
+
+</details>
+
 ## 5. Update a scheduled payment
 
-`PUT /payments/:id` → `UpdatePaymentWF`. It cancels the original through
-`CancelPaymentWF`, which runs the cancel-eligibility check
-(`PaymentCancelValidationActivityGroup`) then the cancellation
-(`PaymentCancellationActivityGroup`). It then creates a replacement via
-`CreateSchedulePaymentWF`, and maps the new payment id back to the original for
-the audit trail (`MapNewPaymentIdToPreviousIdActivity`).
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
   end
 
   box rgba(1,111,208,0.06) Billpay Platform
     participant API as PUT /payments/:id
     participant U as Update WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant CAN as Cancel WF
     participant PCV as Cancel Val.
     participant PCN as Cancellation
@@ -425,25 +467,25 @@ sequenceDiagram
   API->>U: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over U,MAP: Online · Update WF cancels the original, creates the replacement, maps old → new
-    U->>IDEMP: check idempotency
-    rect rgba(52,81,158,0.15)
+    Note over U,MAP: Online Worker
+    U->>IDEMP: Capture and check idempotency
+    rect rgba(0,98,182,0.20)
       IDEMP-->>U: state → PENDING
     end
 
-    rect rgba(0,163,224,0.10)
+    rect rgba(96,165,224,0.13)
       U->>CAN: cancel original
       CAN->>PCV: validate cancel
       CAN->>PCN: cancel
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PCN-->>CAN: state → CANCELLED
       end
       CAN-->>U: cancelled
     end
 
-    rect rgba(0,163,224,0.10)
+    rect rgba(96,165,224,0.13)
       U->>CSP: create replacement
-      rect rgba(52,81,158,0.15)
+      rect rgba(0,98,182,0.20)
         CSP-->>U: new payment-id (state → SCHEDULED or DECLINED)
       end
     end
@@ -455,25 +497,38 @@ sequenceDiagram
   API-->>C: 200 OK
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `PUT /payments/:id` runs `UpdatePaymentWF`.
+- It cancels the original through `CancelPaymentWF`, which runs the eligibility check (`PaymentCancelValidationActivityGroup`) then the cancellation (`PaymentCancellationActivityGroup`).
+- It creates the replacement through `CreateSchedulePaymentWF`.
+- It maps the new payment id back to the original, so the audit trail survives the swap (`MapNewPaymentIdToPreviousIdActivity`).
+
+</details>
+
 ## 6. Cancel a payment
 
-`DELETE /payments/:id` → `CancelPaymentWF`. It checks cancel eligibility
-(`PaymentCancelValidationActivityGroup`) and, if eligible, transitions a
-`SCHEDULED` or `ACCEPTED` payment to `CANCELLED`
-(`PaymentCancellationActivityGroup`).
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
   end
 
   box rgba(1,111,208,0.06) Billpay Platform
     participant API as DELETE /payments/:id
     participant CWF as Cancel WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PCV as Cancel Val.
     participant PCN as Cancellation
   end
@@ -482,12 +537,12 @@ sequenceDiagram
   API->>CWF: invoke
 
   rect rgba(1,91,179,0.10)
-    Note over CWF,PCN: Online · Cancel WF checks eligibility, then transitions to CANCELLED
-    CWF->>IDEMP: check idempotency
+    Note over CWF,PCN: Online Worker
+    CWF->>IDEMP: Capture and check idempotency
     CWF->>PCV: validate cancel
     alt eligible
       CWF->>PCN: cancel
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PCN-->>CWF: state → CANCELLED
       end
       CWF-->>API: CANCELLED
@@ -499,18 +554,27 @@ sequenceDiagram
   API-->>C: response
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `DELETE /payments/:id` runs `CancelPaymentWF`.
+- It checks cancel eligibility (`PaymentCancelValidationActivityGroup`).
+- If eligible, a `SCHEDULED` or `ACCEPTED` payment moves to `CANCELLED` (`PaymentCancellationActivityGroup`).
+- If not, the caller gets an error and the payment keeps its state.
+
+</details>
+
 ## 7. Return Processing + Representment Eligibility Check
 
-`ProcessReturnedPaymentWF` is triggered by Money Movement return events. It
-validates the return (`PaymentReturnValidationActivity`), transitions the
-payment to `RETURNED` (`PaymentReturnExecutionActivityGroup`), then checks
-representment eligibility (`PaymentRepresentmentEligibilityActivityGroup`). If
-representable, it creates the representment and moves to `REPRESENTING`
-(`PaymentRepresentmentCreationActivityGroup`), handing off to
-`ProcessRepresentmentWF` (see [diagram #8](#8-representment-workflow)); an
-invalid return is notified and the payment keeps its state.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
@@ -518,7 +582,7 @@ sequenceDiagram
     participant MMH as MM Handler
     participant API as POST /payments/returns
     participant PR as Returned WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PRV as Return Val.
     participant PIRN as Invalid Notify
     participant PRX as Return Exec.
@@ -531,19 +595,19 @@ sequenceDiagram
   MMH->>API: POST /payments/returns
   API->>PR: invoke
 
-  rect rgba(1,91,179,0.10)
-    Note over PR,PRC: Offline · Returned WF handles the return, then checks representment eligibility
-    PR->>IDEMP: check idempotency
+  rect rgba(0,163,224,0.13)
+    Note over PR,PRC: Offline Worker
+    PR->>IDEMP: Capture and check idempotency
     PR->>PRV: validate return
     alt valid return
       PR->>PRX: execute return
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PRX-->>PR: state → RETURNED
       end
       PR->>PRE: check representment eligibility
       alt representable
         PR->>PRC: create representment
-        rect rgba(52,81,158,0.15)
+        rect rgba(0,98,182,0.20)
           PRC-->>PR: state → REPRESENTING
         end
         PR->>PRP: hand off to ProcessRepresentmentWF
@@ -557,16 +621,29 @@ sequenceDiagram
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- Money Movement return events (MR/M3) trigger `ProcessReturnedPaymentWF`.
+- It validates the return (`PaymentReturnValidationActivity`), then moves the payment to `RETURNED` (`PaymentReturnExecutionActivityGroup`).
+- It checks representment eligibility (`PaymentRepresentmentEligibilityActivityGroup`).
+- If representable, it creates the representment, moves to `REPRESENTING` (`PaymentRepresentmentCreationActivityGroup`), and hands off to `ProcessRepresentmentWF` in [diagram #8](#8-representment-workflow).
+- If not representable, the payment stays `RETURNED` and the representment workflow is never invoked.
+- An invalid return is notified and the payment keeps whatever state it had.
+
+</details>
+
 ## 8. Representment Workflow
 
-`ProcessRepresentmentWF` is picked up from the `REPRESENTING` state set by
-[diagram #7](#7-return-processing--representment-eligibility-check). It
-re-checks eligibility on the representment day
-(`PaymentRepresentmentValidationActivityGroup`) and, if valid, re-clears the
-transaction to `REPRESENTED` (`PaymentRepresentmentExecutionActivityGroup`);
-otherwise it falls to `DECLINED`.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
@@ -579,33 +656,43 @@ sequenceDiagram
 
   PR->>PRP: hand off (state = REPRESENTING)
 
-  rect rgba(1,91,179,0.10)
-    Note over PRP,PRRX: Offline · Representment WF re-clears a returned transaction on the representment day
+  rect rgba(0,163,224,0.13)
+    Note over PRP,PRRX: Offline Worker
     PRP->>PRRV: validate representment
     alt valid representment
       PRP->>PRRX: execute representment
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PRRX-->>PRP: state → REPRESENTED
       end
     else invalid representment
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         Note over PRP: state → DECLINED
       end
     end
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `ProcessRepresentmentWF` picks up from the `REPRESENTING` state set in [diagram #7](#7-return-processing--representment-eligibility-check).
+- It re-checks eligibility on the representment day (`PaymentRepresentmentValidationActivityGroup`).
+- If valid, it re-clears the transaction to `REPRESENTED` (`PaymentRepresentmentExecutionActivityGroup`).
+- If not, the payment falls to `DECLINED`.
+
+</details>
+
 ## 9. Inbound payment
 
-`ProcessInboundPaymentWF` handles an upstream (third-party) payment entering through
-the Unstructured Payment Handler and `POST /payments/inbound`. It checks
-idempotency, validates the posting (`PaymentValidationActivityGroup`), then
-posts and fulfils (`PaymentExecutionActivityGroup`,
-`PaymentFulfillmentActivityGroup`), fans out consumer splits
-(`PaymentSplitsCreationActivity`). If Amex does not accept it, the payment
-moves to `DISALLOWED` (`PendingToDisallowedStage`) instead.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
@@ -613,7 +700,7 @@ sequenceDiagram
     participant UPH as Inbound Handler
     participant API as POST /payments/inbound
     participant IB as Inbound WF
-    participant IDEMP as Idempotency
+    participant IDEMP as Capture
     participant PVP as Validation
     participant PPS as Execution
     participant PFL as Fulfillment
@@ -625,41 +712,55 @@ sequenceDiagram
   UPH->>API: POST /payments/inbound
   API->>IB: invoke
 
-  rect rgba(1,91,179,0.10)
-    Note over IB,PRJ: Offline · Inbound WF posts an upstream-originated payment into Billpay
-    IB->>IDEMP: check idempotency
-    rect rgba(52,81,158,0.15)
+  rect rgba(0,163,224,0.13)
+    Note over IB,PRJ: Offline Worker
+    IB->>IDEMP: Capture and check idempotency
+    rect rgba(0,98,182,0.20)
       IDEMP-->>IB: state → PENDING
     end
     IB->>PVP: validate posting
     alt accepted (Full)
       IB->>PPS: post
-      rect rgba(52,81,158,0.15)
+      rect rgba(0,98,182,0.20)
         PPS-->>IB: state → PROCESSING
       end
       IB->>PFL: fulfill
-      rect rgba(47,125,84,0.16)
+      rect rgba(0,98,182,0.20)
         PFL-->>IB: state → PROCESSED
       end
     else accepted (Split, Consumer)
       IB->>PSC: create splits, trigger ExecuteSplitPaymentWF
     else not accepted
       IB->>PRJ: disallow
-      rect rgba(192,57,43,0.14)
+      rect rgba(0,98,182,0.20)
         PRJ-->>IB: state → DISALLOWED
       end
     end
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- An upstream third-party payment arrives through the Unstructured Payment Handler and `POST /payments/inbound`, running `ProcessInboundPaymentWF`.
+- It captures the payment and checks idempotency (`IdempotencyCheckActivity`), then validates the posting (`PaymentValidationActivityGroup`).
+- A full payment posts and fulfils (`PaymentExecutionActivityGroup`, then `PaymentFulfillmentActivityGroup`).
+- A consumer split fans out instead, through `PaymentSplitsCreationActivity` into `ExecuteSplitPaymentWF`.
+- If Amex does not accept it, the payment moves to `DISALLOWED` (`PendingToDisallowedStage`).
+
+</details>
+
 ## 10. Paid Events reconciliation
 
-`PaidEventsProcessingWF` is the continuous sweep that closes a payment out.
-AR-Posted and Settled events arrive independently and are tracked in the
-External Transaction Events Tracker; once both are present for a payment it
-moves to `PAID`.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
@@ -671,7 +772,7 @@ sequenceDiagram
     participant PEP as Paid Events WF
   end
 
-  rect rgba(148,163,184,0.10)
+  rect rgba(90,112,145,0.10)
     Note over PPH,TRK: Async event ingestion. AR-Posted and Settled events arrive independently
     Note over PPH: receives AR Posted event
     PPH->>TRK: insert AR-Posted row
@@ -679,25 +780,37 @@ sequenceDiagram
     MMH->>TRK: insert Settled row
   end
 
-  rect rgba(1,91,179,0.10)
-    Note over SCH,PEP: Offline · Paid Events WF closes the payment to PAID once both events arrive
+  rect rgba(0,163,224,0.13)
+    Note over SCH,PEP: Offline Worker
     SCH->>PEP: tick (continuous batch)
     PEP->>TRK: find pairs (AR-Posted + Settled)
     PEP->>TRK: mark Picked-up-for-processing
-    rect rgba(47,125,84,0.16)
+    rect rgba(0,98,182,0.20)
       Note over PEP: state → PAID (insert lifecycle event, update status, publish PAID lifecycle event)
     end
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `PaidEventsProcessingWF` is the continuous sweep that closes a payment out.
+- AR-Posted and Settled events arrive independently and are recorded in the External Transaction Events Tracker.
+- The workflow finds pairs, marks them picked up for processing, and once both are present the payment moves to `PAID`.
+
+</details>
+
 ## 11. Missing Paid Events reconciliation
 
-`MissingPaidEventsProcessingWF` is an hourly probe. For payments still missing
-an AR-Posted or Settled event after 48 hours, it queries Accounts Receivable or
-Clearing directly; if the event is found it is recorded, otherwise it raises an
-alert.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
@@ -707,8 +820,8 @@ sequenceDiagram
     participant TRK as Events Tracker
   end
 
-  rect rgba(1,91,179,0.10)
-    Note over SCH,TRK: Offline · Missing Paid WF, hourly probe for AR-Posted or Settled missing over 48h
+  rect rgba(0,163,224,0.13)
+    Note over SCH,TRK: Offline Worker
     SCH->>MPE: tick (hourly / configurable)
     MPE->>TRK: find payments missing AR-Posted or Settled > 48h
   end
@@ -731,18 +844,31 @@ sequenceDiagram
   end
 ```
 
+<details>
+<summary>What happens</summary>
+
+- `MissingPaidEventsProcessingWF` is an hourly probe, and the interval is configurable.
+- It looks for payments still missing an AR-Posted or Settled event after 48 hours.
+- It queries Accounts Receivable or Clearing directly for whichever event is missing.
+- If the event is found it is recorded. If it is still missing, the probe raises an alert.
+
+</details>
+
 ## 12. Create Payment + Installments (composite)
 
-`CreatePaymentInstallmentWF` is a composite. It runs `CreateImmediatePaymentWF`,
-on `ACCEPTED` it creates the installment plan and, if the autopay flag is set,
-updates autopay. On `DECLINED` it short-circuits, so no installment plan is
-created and autopay is left alone.
-
 ```mermaid
+---
+# Sans, not the site's mono: it reads better at this size and lays out about
+# 20% narrower. It has to be declared per diagram because Mermaid's global
+# fontFamily is mono for the state diagrams and overrides sequence.*FontFamily.
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
 sequenceDiagram
   autonumber
 
-  box rgba(111,124,143,0.12) Caller
+  box rgba(0,23,90,0.07) Caller
     participant C as Client
     participant ODF as CreatePaymentInstallment.v1
   end
@@ -758,12 +884,12 @@ sequenceDiagram
   API->>CWF: invoke composite
 
   rect rgba(1,91,179,0.10)
-    Note over CWF,CIP: Online · Installment WF composite: payment + installment plan + optional autopay
+    Note over CWF,CIP: Online Worker
 
-    rect rgba(0,163,224,0.10)
+    rect rgba(96,165,224,0.13)
       CWF->>CIP: invoke CreateImmediatePaymentWF
       alt inner payment ACCEPTED
-        rect rgba(47,125,84,0.16)
+        rect rgba(0,98,182,0.20)
           CIP-->>CWF: payment-id (state → ACCEPTED)
         end
         Note over CWF: call Installments API to create installment plan, receive installment-id
@@ -771,7 +897,7 @@ sequenceDiagram
           Note over CWF: call Autopay API to update autopay
         end
       else inner payment DECLINED
-        rect rgba(192,57,43,0.14)
+        rect rgba(0,98,182,0.20)
           CIP-->>CWF: payment-id (state → DECLINED)
         end
         Note over CWF: composite short-circuits, no installment plan created, no autopay
@@ -779,3 +905,12 @@ sequenceDiagram
     end
   end
 ```
+
+<details>
+<summary>What happens</summary>
+
+- `CreatePaymentInstallmentWF` is a composite. It runs `CreateImmediatePaymentWF` first.
+- On `ACCEPTED` it creates the installment plan through the Installments API, and updates autopay if the flag is set.
+- On `DECLINED` it short-circuits. No installment plan is created and autopay is left alone.
+
+</details>

@@ -19,7 +19,7 @@ import JourneyMap from '@site/src/components/JourneyMap';
 
 ## A payment is Posted
 
-This is where every payment on the [customer journeys](./customer-initiated.md) ends. Billpay does not mark a payment paid just because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted. Two confirmations, arriving at their own pace, matched by a timer.
+This is where every payment on the [customer journeys](./customer-initiated.md) ends. Billpay does not mark a payment paid just because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted. The two confirmations arrive at their own pace, and a timer matches them up.
 
 <JourneyMap
   title="A payment is Posted"
@@ -209,7 +209,7 @@ Someone other than the cardmember pushes money at the account. A bank, a partner
     },
   ]}
   detail={[
-    {step: 1, text: 'Recorded once, the same as any payment. Third parties retry, so the idempotency check earns its keep here.'},
+    {step: 1, text: 'Recorded once, the same as any payment. Third parties retry, so the idempotency check matters here.'},
     {step: 2, text: 'A payment Amex will not take ends at DISALLOWED. That state exists only on this journey, and it says something different from DECLINED: the payment was not rejected on its merits, it was not accepted in the first place.'},
     {text: 'Past that point the journey matches an ordinary payment. The money is applied, everyone downstream is told, and it closes once both confirmations arrive.'},
   ]}
@@ -293,7 +293,3 @@ Some payments start inside Amex. Accounts Receivable raises one on the customer'
     {text: 'Accounts Receivable also raises refunds through the same function. The spec covers only the payment side, so that is all this diagram claims.'},
   ]}
 />
-
-## What runs on a timer
-
-Every step above is a Temporal Schedule firing rather than a person acting. The same goes for the scheduled-payment and representment journeys. For the full set of schedules and the batching rhythm they work in, see [Build › Schedules](../../build/schedules.md). For what each periodic workflow does, see [Periodic Workflows](../workflows/periodic.md).

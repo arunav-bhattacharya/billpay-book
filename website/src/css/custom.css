@@ -7,8 +7,22 @@
  *   - Typeface: Benton Sans (the Amex corporate face) for text, falling back
  *     to SF Pro Rounded / the system stack. SF Mono for code.
  *
- * Design language: deep-navy → electric-blue → cyan multi-tone gradients,
- * premium metallic (gold / platinum) secondary accents, subtle layered depth.
+ * Colour strategy. Blue is the brand, but a page made entirely of blue reads
+ * as a screensaver rather than a document, and light mode is where that shows
+ * first. So blue is rationed by role:
+ *
+ *   Surface   exactly one full-strength blue block per page (the homepage
+ *             hero), plus the footer that closes it. Everything between them
+ *             is paper in light and near-black in dark.
+ *   Ink       headings and body sit in deep navy rather than grey, so the
+ *             brand still runs through the text.
+ *   Accent    Blue Box blue on rails, indices, links, table headers and
+ *             arrows, against a neutral surface.
+ *
+ * Gold is the secondary, used sparingly and warm: shimmer rules, the hero
+ * eyebrow, the footer stripe, a whisper in the page wash. It is what keeps
+ * the neutrals from turning cold and blue-grey.
+ *
  * Both light and dark modes are first-class. All values are CSS custom
  * properties — components never hardcode color.
  */
@@ -37,8 +51,12 @@
  * 2. Signature gradients (shared; tuned per-theme where noted)
  * ==================================================================== */
 :root {
-  /* The hero / brand gradient: midnight → blue → cyan. */
-  --amex-grad-brand: linear-gradient(125deg, #002663 0%, #015bb3 46%, #00a3e0 100%);
+  /* The hero / brand gradient. It stops at the Blue Box rather than running on
+     to cyan: the old version spent its last third in pale sky blue, which is
+     what made the light homepage look washed out. Every stop here is a colour
+     white type clears comfortably, so the field stays deep from corner to
+     corner and the cyan appears only as a small corner light in .heroGlow. */
+  --amex-grad-brand: linear-gradient(118deg, #00133d 0%, #002663 32%, #01488f 68%, #0166c2 100%);
   /* Button gradient. */
   --amex-grad-btn: linear-gradient(135deg, #0164c4 0%, #018ad6 55%, #00a3e0 100%);
   --amex-grad-btn-hover: linear-gradient(135deg, #01579f 0%, #0176bd 55%, #0d94cf 100%);
@@ -180,12 +198,15 @@ h3 {
   --ifm-color-primary-lighter: #2f89da;
   --ifm-color-primary-lightest: #57a0e2;
 
-  /* Surfaces — near-white with the faintest cream warmth, never flat white. */
-  --amex-bg: #faf9f7;
+  /* Surfaces — near-white with the faintest cream warmth, never flat white.
+     The wash is warm only. An earlier version carried a blue radial in the top
+     left, which tinted the whole canvas and left light mode with nowhere that
+     wasn't blue. Warmth here is what makes the blue accents read as accents. */
+  --amex-bg: #faf9f6;
   --amex-bg-grad:
-    radial-gradient(115% 95% at 88% 100%, rgba(206, 192, 150, 0.04), transparent 60%),
-    radial-gradient(105% 95% at 8% 0%, rgba(1, 111, 208, 0.045), transparent 55%),
-    linear-gradient(158deg, #fcfcfa 0%, #f8f8f5 50%, #fbfbf7 100%);
+    radial-gradient(118% 92% at 90% 100%, rgba(198, 146, 20, 0.05), transparent 62%),
+    radial-gradient(100% 80% at 6% 0%, rgba(198, 146, 20, 0.028), transparent 58%),
+    linear-gradient(158deg, #fdfcfa 0%, #f8f7f2 52%, #fbfaf5 100%);
   --amex-card: linear-gradient(160deg, #ffffff 0%, #fbfbf8 52%, #f8f7f2 100%);
   --amex-card-hover: linear-gradient(160deg, #ffffff 0%, #fafaf6 48%, #f6f5f0 100%);
   --amex-panel: #fdfdfb;
@@ -196,11 +217,72 @@ h3 {
   --amex-line: #e8e6df;
   --amex-line-strong: #d9d5cd;
 
+  /* Table rows. Every table on the site alternates between the panel it sits
+     on and one step off it, and lifts to the hover tint under the cursor.
+     Shared here so a markdown table and a component table stripe alike. */
+  --amex-row-alt: color-mix(in srgb, var(--amex-line) 40%, transparent);
+  --amex-row-hover: color-mix(in srgb, var(--amex-blue) 7%, transparent);
+
   /* Navy-tinted layered shadow (subtle depth, not flat). */
   --amex-sh-sm: 0 2px 6px rgba(0, 38, 99, 0.07);
   --amex-sh: 0 10px 28px rgba(0, 38, 99, 0.1), 0 2px 6px rgba(0, 38, 99, 0.06);
   --amex-sh-lg: 0 22px 48px rgba(0, 38, 99, 0.16), 0 4px 12px rgba(0, 38, 99, 0.08);
   --amex-glow: 0 8px 26px rgba(1, 111, 208, 0.28);
+
+  /* ---- Card system ----
+     Every card on the site is one thing: a paper face, no outline, an uplifted
+     navy shadow, and an accent that is solid at the bottom-right corner and
+     gone a third of the way round. Section 9a has the recipe and how to apply
+     it.
+
+     The homepage cards arrived here first. They used to be eight solid blue
+     faces, which put a second blue slab under the hero and a third above the
+     footer. A blue tinted face was tried and reverted (a wash across eight
+     cards puts the colour back where it was doing the damage), and so was a
+     full gradient border, which drew a hard outline around every card. The
+     corner is what survived, and it now runs everywhere.
+
+     Every stop mixes off --card-accent, so a component that owns a hue sets
+     that one property and the corner follows. The fade ends on 2% of the
+     accent rather than on `transparent`, because `transparent` is transparent
+     black and interpolating toward it puts a grey haze mid-ramp.
+
+     The shadow is navy rather than neutral grey, which is what keeps it in the
+     palette rather than reading as a generic drop shadow. */
+  --card-accent: var(--amex-blue);
+  --card-face: linear-gradient(160deg, #ffffff 0%, #fdfcfa 55%, #faf9f4 100%);
+  --card-face-hover: linear-gradient(160deg, #ffffff 0%, #ffffff 55%, #fdfcf8 100%);
+  --card-radius: 16px;
+  /* 315deg points the gradient line at the top-left corner, which puts the 0%
+     stop, and so the solid end of the accent, at the bottom right. */
+  --card-border: linear-gradient(
+    315deg,
+    color-mix(in srgb, var(--card-accent) 58%, #ffffff) 0%,
+    var(--card-accent) 10%,
+    color-mix(in srgb, var(--card-accent) 34%, transparent) 20%,
+    color-mix(in srgb, var(--card-accent) 2%, transparent) 32%
+  );
+  --card-border-hover: linear-gradient(
+    315deg,
+    color-mix(in srgb, var(--card-accent) 42%, #ffffff) 0%,
+    var(--card-accent) 14%,
+    color-mix(in srgb, var(--card-accent) 46%, transparent) 28%,
+    color-mix(in srgb, var(--card-accent) 2%, transparent) 44%
+  );
+  --card-sh:
+    0 22px 42px rgba(0, 38, 99, 0.14),
+    0 9px 18px rgba(0, 38, 99, 0.09),
+    0 2px 4px rgba(0, 38, 99, 0.06);
+  --card-sh-hover:
+    0 36px 66px rgba(0, 38, 99, 0.24),
+    0 15px 28px rgba(0, 38, 99, 0.15),
+    0 3px 7px rgba(1, 111, 208, 0.12);
+  /* Corner lighting for cards that want it, banked on the same corner as the
+     accent so hover lights the card from where the brand already touches it.
+     Gold answers from the opposite corner. */
+  --card-glow:
+    radial-gradient(112% 82% at 100% 100%, rgba(1, 111, 208, 0.1), transparent 62%),
+    radial-gradient(78% 68% at 0% 0%, rgba(198, 146, 20, 0.06), transparent 60%);
 
   /* Per-section accent coding (Amex-family hues). */
   --amex-cat-vision: #016fd0;
@@ -258,10 +340,35 @@ h3 {
   --amex-line: #1c355f;
   --amex-line-strong: #274372;
 
+  --amex-row-alt: color-mix(in srgb, var(--amex-line) 50%, transparent);
+  --amex-row-hover: color-mix(in srgb, var(--amex-blue-bright) 10%, transparent);
+
   --amex-sh-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
   --amex-sh: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(90, 160, 230, 0.07);
   --amex-sh-lg: 0 26px 60px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(90, 160, 230, 0.09);
   --amex-glow: 0 10px 34px rgba(0, 130, 224, 0.4);
+
+  /* Same card, dark skin. The face is the navy panel rather than paper, so it
+     reads as lit against the near-black canvas, and the accent steps up to the
+     brighter blue to stay legible on it. The ramp geometry is shared with
+     light: only the colours and the shadows change. */
+  --card-accent: var(--amex-blue-bright);
+  --card-face: linear-gradient(158deg, #123061 0%, #0c1f42 55%, #0a1730 100%);
+  --card-face-hover: linear-gradient(158deg, #17386a 0%, #102649 55%, #0d1c37 100%);
+  /* On the near-black canvas a cast shadow has almost nothing to fall on, so
+     the inset top highlight is what gives the panel its edge. */
+  --card-sh:
+    0 16px 34px rgba(0, 0, 0, 0.6),
+    0 5px 12px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(140, 195, 245, 0.12);
+  --card-sh-hover:
+    0 30px 60px rgba(0, 0, 0, 0.7),
+    0 10px 24px rgba(0, 0, 0, 0.5),
+    0 3px 12px rgba(0, 130, 224, 0.24),
+    inset 0 1px 0 rgba(140, 195, 245, 0.2);
+  --card-glow:
+    radial-gradient(112% 84% at 100% 100%, rgba(0, 163, 224, 0.2), transparent 64%),
+    radial-gradient(78% 68% at 0% 0%, rgba(230, 191, 90, 0.07), transparent 62%);
 
   --amex-cat-vision: #4da3e6;
   --amex-cat-architecture: #6f9fdc;
@@ -327,11 +434,35 @@ hr {
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--amex-line);
+  /* Infima's 0.75rem put the seven section links about 25px apart, which read
+     as one run of words rather than seven destinations. This opens each gap to
+     roughly 32px. */
+  --ifm-navbar-item-padding-horizontal: 0.95rem;
 }
+
+/* One size for the whole bar, a step above body copy. The wordmark and the
+   links move together so the wordmark never ends up smaller than the links
+   beside it. */
+.navbar__title,
+.navbar__link {
+  font-size: 1.06rem;
+}
+
 .navbar__title {
   font-weight: 600;
   letter-spacing: 0.005em;
 }
+
+/* Everything else in the bar sits at Regular. Infima ships every navbar item at
+   semibold, which makes seven section links compete with the wordmark and read
+   as headings rather than as navigation. The wordmark is the only thing up here
+   that carries weight; the current section is marked by colour and the
+   underline below, not by stepping back up. */
+.navbar__link,
+.navbar__item {
+  font-weight: 400;
+}
+
 .navbar__link--active {
   color: var(--ifm-color-primary);
 }
@@ -381,13 +512,46 @@ hr {
 }
 
 /* ==================================================================== *
- * 9. Cards & surfaces — gradient fill, layered depth, hairline
+ * 9. Cards & surfaces
  * ==================================================================== */
+
+/* ---- 9a. The card recipe ----------------------------------------------
+   Every panel on the site wears this: docs components, tables, the homepage
+   grid. Apply it with the .amexCard class below, or, inside a CSS module where
+   the class name is local, by copying the four properties.
+
+   The accent is a border, and a border cannot take a gradient, so it is
+   painted as three background layers instead:
+
+     face   padding-box   the card's own surface, on top
+     ramp   border-box    shows only in the border ring
+     face   border-box    fills the rest of the ring, under the ramp
+
+   Without that third layer the ring would be transparent everywhere the ramp
+   has faded out, and the page would show through as a hairline gap. It is what
+   lets a table with a solid header band sit inside this without a seam.
+
+   Components that own a hue set --card-accent and nothing else. Ones that want
+   more or less of the corner set --card-radius or override --card-border.
+--------------------------------------------------------------------------- */
+.amexCard,
 .card {
-  background: var(--amex-card);
-  border: 1px solid var(--amex-line);
-  border-radius: 14px;
-  box-shadow: var(--amex-sh);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
+}
+
+.amexCard--hover:hover,
+a.card:hover {
+  background:
+    var(--card-face-hover) padding-box,
+    var(--card-border-hover) border-box,
+    var(--card-face-hover) border-box;
+  box-shadow: var(--card-sh-hover);
 }
 
 /* ==================================================================== *
@@ -414,12 +578,7 @@ a {
   font-weight: 600;
 }
 
-table thead tr {
-  background: rgba(1, 111, 208, 0.06);
-}
-[data-theme='dark'] table thead tr {
-  background: rgba(77, 163, 230, 0.1);
-}
+/* Markdown tables are in section 16. */
 
 .theme-admonition {
   border-radius: 12px;
@@ -549,8 +708,17 @@ table thead tr {
 }
 
 /* Numbered top-level sidebar sections — mirrors the homepage card indices
-   (zero-padded, in each section's accent colour). The section label text
-   picks up the same accent as its number. */
+   (zero-padded). The homepage gives each card its own accent, but eight
+   accents stacked in a narrow rail read as noise, so the sidebar uses one
+   colour for every section: label and number both in brand blue. */
+.sidebar-sec {
+  --sec-color: var(--amex-blue);
+}
+
+[data-theme='dark'] .sidebar-sec {
+  --sec-color: var(--amex-blue-bright);
+}
+
 .sidebar-sec > .menu__list-item-collapsible > .menu__link {
   color: var(--sec-color, inherit);
 }
@@ -565,15 +733,6 @@ table thead tr {
   font-variant-numeric: tabular-nums;
   color: var(--sec-color, var(--ifm-color-emphasis-600));
 }
-
-.sidebar-sec--vision { --sec-color: var(--amex-cat-vision); }
-.sidebar-sec--architecture { --sec-color: var(--amex-cat-architecture); }
-.sidebar-sec--design { --sec-color: var(--amex-cat-design); }
-.sidebar-sec--build { --sec-color: var(--amex-cat-build); }
-.sidebar-sec--testing { --sec-color: var(--amex-cat-testing); }
-.sidebar-sec--deployment { --sec-color: var(--amex-cat-deployment); }
-.sidebar-sec--observability { --sec-color: var(--amex-cat-observability); }
-.sidebar-sec--operations { --sec-color: var(--amex-cat-operations); }
 
 .sidebar-sec--vision > .menu__list-item-collapsible > .menu__link::before { content: '01'; }
 .sidebar-sec--architecture > .menu__list-item-collapsible > .menu__link::before { content: '02'; }
@@ -650,13 +809,16 @@ table thead tr {
   padding: 10px 0 2px;
 }
 
-/* Diagram text uses the monospace stack, forced over Mermaid's inline font. */
-.docusaurus-mermaid-container svg text,
-.docusaurus-mermaid-container svg .nodeLabel,
-.docusaurus-mermaid-container svg .nodeLabel p,
-.docusaurus-mermaid-container svg .edgeLabel,
-.docusaurus-mermaid-container svg .edgeLabel p,
-.docusaurus-mermaid-container svg .cluster .nodeLabel {
+/* State-diagram text uses the monospace stack, forced over Mermaid's inline
+   font. Sequence diagrams are excluded on purpose: they set their own face in
+   per-diagram front matter so Mermaid measures and draws in the same font, and
+   overriding it here would push their labels out of the boxes Mermaid sized. */
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) text,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .nodeLabel,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .nodeLabel p,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .edgeLabel,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .edgeLabel p,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .cluster .nodeLabel {
   font-family: var(--amex-font-mono) !important;
 }
 
@@ -768,6 +930,35 @@ table thead tr {
   --seq-ink: #a6c6ec;
 }
 
+/* --- Size and frame ------------------------------------------------------
+ * Mermaid emits these at natural size (sequence.useMaxWidth: false in
+ * docusaurus.config.js), which gives the SVG real width and height
+ * attributes. Sizing is then left entirely to CSS: fitted to the column
+ * here, and re-sized by src/theme/Mermaid when a diagram is expanded.
+ *
+ * A diagram wide enough to be shrunk by this rule grows an Expand button.
+ * See the note at the top of src/theme/Mermaid/index.js for why fitting is
+ * still the default when it costs this much legibility.
+ *
+ * Nothing here sets font-size or font-family on a sequence diagram. Mermaid
+ * sized every box around the text it measured at layout time; restyling the
+ * text now would push it out of those boxes. Per-diagram front matter is the
+ * one place sequence type is set.
+ * ------------------------------------------------------------------------ */
+.docusaurus-mermaid-container:has(svg[aria-roledescription='sequence']) {
+  display: block;
+  padding: 14px 12px 10px;
+  border: 1px solid var(--amex-line);
+  border-radius: var(--card-radius);
+  background: var(--amex-panel);
+}
+.docusaurus-mermaid-container > svg[aria-roledescription='sequence'] {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
 /* Participant (actor) boxes — solid Amex Blue Box, white labels. */
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.actor {
   fill: #016fd0 !important;
@@ -793,23 +984,26 @@ table thead tr {
   stroke: color-mix(in srgb, #4da3e6 40%, transparent) !important;
 }
 
-/* Notes — gold callouts, re-inked per theme (no more glare in dark). */
+/* Notes — pale blue caption panels. They carry the running commentary, so
+   they sit in the blue family and leave gold free to mean something. */
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
-  fill: #f7e3ab !important;
-  stroke: #c69214 !important;
+  fill: #e3f0fc !important;
+  stroke: #7fb4e4 !important;
   stroke-width: 1px !important;
+  rx: 6px !important;
+  ry: 6px !important;
 }
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText,
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText > tspan {
-  fill: #3a2c08 !important;
+  fill: #0b2748 !important;
 }
 [data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
-  fill: #33290f !important;
-  stroke: #9c7a24 !important;
+  fill: #10294c !important;
+  stroke: #34689f !important;
 }
 [data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText,
 [data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText > tspan {
-  fill: #f0deac !important;
+  fill: #d6e7fa !important;
 }
 
 /* alt / opt / loop frames — blue label pentagon, dashed hairline frame. */
@@ -834,8 +1028,21 @@ table thead tr {
   stroke: color-mix(in srgb, #4da3e6 45%, transparent) !important;
 }
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText,
-.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText > tspan {
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText > tspan,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .sectionTitle,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .sectionTitle > tspan {
   fill: var(--amex-mut) !important;
+}
+
+/* Titles of the participant groups (`box Caller`, `box Billpay Platform`).
+   Mermaid draws them in its default grey. The group fills come from the
+   sentinels further down. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.text {
+  fill: #01488f !important;
+  letter-spacing: 0.05em !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.text {
+  fill: #7fb4e4 !important;
 }
 
 /* Messages — theme ink for lines, arrowheads, and labels. */
@@ -859,138 +1066,260 @@ table thead tr {
   fill: #ffffff !important;
 }
 
-/* --- Region-rect sentinel re-tints (dark) + chip chrome (both themes) ---
- * Sentinel key (unique RGB triples, source values tuned for light):
- *   111,124,143 caller box      | 1,111,208  platform box
- *   1,91,179    workflow span   | 0,163,224  nested sub-workflow span
- *   198,146,20  async span      | 148,163,184 event-ingestion strip
- *   47,125,84   chip: success   | 192,57,43  chip: failure
- *   52,81,158   chip: in-flight
+/* --- Region-rect fills + chip chrome ------------------------------------
+ * The palette is Amex blue throughout, with one gold.
+ *
+ * Two distinctions do the work. Which worker ran the block: Amex blue for
+ * online, electric blue for offline. And whether the caller has already been
+ * answered: gold, dashed, for the async span. Everything else is a tint of
+ * the same blue and carries only nesting.
+ *
+ * State-transition chips are deliberately all one colour. Colour-coding them
+ * by outcome competed with the worker distinction for the reader's attention,
+ * and the chip already spells the state out (`state → DECLINED`).
+ *
+ * Every fill here is OPAQUE, and the source rgba() values in the markdown are
+ * only sentinels for these selectors to match on. Translucent fills looked
+ * fine in isolation and wrong in combination: Mermaid paints these regions
+ * back to front, so an offline block nested inside the gold async span
+ * composited cyan over gold and came out green. Opaque fills mean a block is
+ * the same colour wherever it is nested. Safe to do, because Mermaid draws
+ * every region before the lifelines, actor boxes, arrows and labels, so
+ * nothing readable sits underneath one.
+ *
+ * Sentinel key (unique RGB triples, matched on prefix):
+ *   0,23,90     caller box       | 1,111,208  platform box
+ *   1,91,179    online worker    | 0,163,224  offline worker
+ *   96,165,224  nested sub-workflow
+ *   198,146,20  async span       | 90,112,145 event-ingestion strip
+ *   0,98,182    state chip, every transition
  */
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(111,124,143'] {
-  fill: rgba(147, 163, 187, 0.14) !important;
+.docusaurus-mermaid-container rect[fill^='rgba(0,23,90'] {
+  fill: #eff2f7 !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  fill: #f2f6fc !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  fill: #bfd6f5 !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  fill: #d3f0fa !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(96,165,224'] {
+  fill: #e4edfb !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  fill: #f8e6bd !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
+  fill: #edeff4 !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  fill: #8fb8e8 !important;
+}
+
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,23,90'] {
+  fill: #16294a !important;
 }
 [data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
-  fill: rgba(77, 163, 230, 0.08) !important;
+  fill: #102546 !important;
 }
 [data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
-  fill: rgba(1, 111, 208, 0.17) !important;
+  fill: #123f7d !important;
 }
 [data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
-  fill: rgba(0, 163, 224, 0.13) !important;
+  fill: #0b5f7d !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(96,165,224'] {
+  fill: #1d4372 !important;
 }
 [data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
-  fill: rgba(224, 179, 78, 0.13) !important;
+  fill: #4a3f22 !important;
 }
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(148,163,184'] {
-  fill: rgba(148, 163, 184, 0.07) !important;
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
+  fill: #16253d !important;
 }
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(47,125,84'] {
-  fill: rgba(87, 180, 131, 0.2) !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(192,57,43'] {
-  fill: rgba(226, 104, 92, 0.17) !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
-  fill: rgba(123, 147, 222, 0.18) !important;
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  fill: #2f6fb8 !important;
 }
 
 /* State-transition chips read as rounded, hairline-stroked pills. */
-.docusaurus-mermaid-container rect[fill^='rgba(47,125,84'],
-.docusaurus-mermaid-container rect[fill^='rgba(192,57,43'],
-.docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
+.docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
   rx: 6px !important;
   ry: 6px !important;
+  stroke: rgba(0, 98, 182, 0.55) !important;
   stroke-width: 1px !important;
 }
-.docusaurus-mermaid-container rect[fill^='rgba(47,125,84'] {
-  stroke: rgba(47, 125, 84, 0.5) !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(192,57,43'] {
-  stroke: rgba(192, 57, 43, 0.45) !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
-  stroke: rgba(52, 81, 158, 0.45) !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(47,125,84'] {
-  stroke: rgba(87, 180, 131, 0.55) !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(192,57,43'] {
-  stroke: rgba(226, 104, 92, 0.5) !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(52,81,158'] {
-  stroke: rgba(123, 147, 222, 0.5) !important;
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  stroke: rgba(120, 180, 240, 0.55) !important;
 }
 
-/* Workflow / async / group regions get soft rounded corners. */
+/* Worker regions. Each takes a hairline in its own hue, so the two read apart
+   at a glance rather than only once you reach the note at the top. */
 .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'],
 .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'],
-.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'],
-.docusaurus-mermaid-container rect[fill^='rgba(148,163,184'] {
+.docusaurus-mermaid-container rect[fill^='rgba(96,165,224'],
+.docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
   rx: 8px !important;
   ry: 8px !important;
 }
+/* Online worker: Amex Blue Box. */
+.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  stroke: #015bb3 !important;
+  stroke-width: 1.6px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  stroke: #4d94dd !important;
+}
+/* Offline worker: electric blue. */
+.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  stroke: #0090c6 !important;
+  stroke-width: 1.6px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  stroke: #26b6e8 !important;
+}
+
+/* The two participant-group frames. Mermaid outlines them in its default
+   grey, which is the last non-Amex colour in the diagram. */
+.docusaurus-mermaid-container rect[fill^='rgba(0,23,90'],
+.docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  rx: 10px !important;
+  ry: 10px !important;
+  stroke: color-mix(in srgb, #016fd0 28%, transparent) !important;
+  stroke-width: 1px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,23,90'],
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  stroke: color-mix(in srgb, #4da3e6 26%, transparent) !important;
+}
+
+/* The async span. It is the one thing in a diagram that is not simply the next
+   step, so it gets the only gold and the only dashed frame. */
+.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  rx: 8px !important;
+  ry: 8px !important;
+  stroke: #c69214 !important;
+  stroke-width: 1.6px !important;
+  stroke-dasharray: 7 4 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  stroke: rgba(235, 197, 100, 0.85) !important;
+}
 
 /* ---------------------------------------------------------------------------
-   15. Worker table — the Online/Offline split under Architecture ▸ Overview.
-   Two rows, and the row's colour carries the meaning: Online takes the Billpay
-   Core violet from the system map, Offline the architecture accent it shares
-   with the async band that feeds it. The rows are addressed by position
-   because the table is a fixed pair, not a list that grows.
+   15. Markdown tables — every pipe table in the docs, in the treatment the
+   table components on Components in Detail carry: a rounded panel, a solid
+   Amex-blue header band, rows alternating between the panel and one step off
+   it, and one type size throughout (headers included) so a row reads as one
+   tier rather than three. Resize the whole table from --md-table-fs.
+
+   A table cannot clip its own corners or scroll sideways, and markdown gives
+   no place to hang a wrapper, so src/theme/MDXComponents.js wraps each one in
+   .mdTable on the way through.
+
+   Emphasis is left to the content. Where a table wants its first column to
+   read as a row header, the markdown bolds it.
 --------------------------------------------------------------------------- */
-.workerTable {
-  margin: 0.85rem 0 1.15rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 15px;
+.mdTable {
+  margin: 1.4rem 0 2rem;
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
   overflow: hidden;
   overflow-x: auto;
-  box-shadow: var(--amex-sh-sm);
-  background: var(--amex-panel);
+
+  --md-table-fs: 0.88rem;
 }
-.workerTable table {
+
+.mdTable table {
   width: 100%;
   display: table;
   margin: 0;
   border: 0;
+  border-collapse: collapse;
   box-shadow: none;
+  font-size: var(--md-table-fs);
 }
-.workerTable table th,
-.workerTable table td {
+
+.mdTable table th,
+.mdTable table td {
   border: 0;
-  border-bottom: 1px solid var(--amex-line);
-  background: transparent;
+  text-align: left;
   vertical-align: top;
 }
-/* Header band: the Amex-blue treatment the tables on A Closer Look carry. */
-.workerTable table thead tr {
+
+.mdTable table thead tr {
   background: var(--amex-blue);
 }
-.workerTable table tbody tr:nth-child(2n) {
-  background: transparent;
-}
-.workerTable table tbody tr:last-child td {
-  border-bottom: 0;
-}
-.workerTable table th {
-  padding: 0.72rem 0.95rem;
-  font-size: 0.76rem;
+
+.mdTable table thead th {
+  padding: 0.72rem 1rem;
+  font-size: var(--md-table-fs);
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #ffffff;
-  border-bottom: 0;
-}
-.workerTable table td {
-  padding: 0.9rem 0.95rem;
-  font-size: 0.92rem;
-  line-height: 1.5;
+  white-space: nowrap;
 }
 
-.workerTable table tbody tr:nth-child(1) { --wk-row: var(--amex-temporal); }
-.workerTable table tbody tr:nth-child(2) { --wk-row: var(--amex-cat-architecture); }
+.mdTable table tbody tr {
+  background: none;
+  transition: background-color 0.15s ease;
+}
+.mdTable table tbody tr:nth-child(2n) {
+  background: var(--amex-row-alt);
+}
+.mdTable table tbody tr:hover {
+  background: var(--amex-row-hover);
+}
+
+.mdTable table tbody th,
+.mdTable table tbody td {
+  padding: 0.7rem 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--amex-txt);
+}
+
+@media (max-width: 700px) {
+  .mdTable {
+    --md-table-fs: 0.82rem;
+  }
+  .mdTable table thead th,
+  .mdTable table tbody th,
+  .mdTable table tbody td {
+    padding: 0.6rem 0.7rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   16. Worker table — the Online/Offline split under Architecture ▸ Overview.
+   The panel comes from .mdTable above; this adds the one thing that table
+   does differently, which is that the row's colour carries the meaning:
+   Online takes the Billpay Core violet from the system map, Offline the
+   architecture accent it shares with the async band that feeds it. The rows
+   are addressed by position because the table is a fixed pair, not a list
+   that grows.
+--------------------------------------------------------------------------- */
+.workerTable .mdTable {
+  margin: 0.85rem 0 1.15rem;
+}
+
+.workerTable .mdTable table tbody tr:nth-child(1) { --wk-row: var(--amex-temporal); }
+.workerTable .mdTable table tbody tr:nth-child(2) { --wk-row: var(--amex-cat-architecture); }
+
+.workerTable .mdTable table tbody td {
+  padding: 0.9rem 0.95rem;
+}
 
 /* the name column reads as a row header, on its own rail */
-.workerTable table td:first-child {
+.workerTable .mdTable table tbody td:first-child {
   position: relative;
   width: 8rem;
   padding-left: 1.2rem;
@@ -999,11 +1328,11 @@ table thead tr {
   color: color-mix(in srgb, var(--wk-row) 62%, var(--amex-txt-strong));
   background: color-mix(in srgb, var(--wk-row) 8%, transparent);
 }
-[data-theme='dark'] .workerTable table td:first-child {
+[data-theme='dark'] .workerTable .mdTable table tbody td:first-child {
   color: color-mix(in srgb, var(--wk-row) 55%, #ffffff);
   background: color-mix(in srgb, var(--wk-row) 14%, transparent);
 }
-.workerTable table td:first-child::before {
+.workerTable .mdTable table tbody td:first-child::before {
   content: '';
   position: absolute;
   left: 0;
@@ -1018,23 +1347,23 @@ table thead tr {
 }
 
 /* workflow names pick up their row's colour instead of the global code blue */
-.workerTable table td:last-child code {
+.workerTable .mdTable table tbody td:last-child code {
   background: color-mix(in srgb, var(--wk-row) 10%, transparent);
   border-color: color-mix(in srgb, var(--wk-row) 30%, var(--amex-line));
   color: var(--amex-txt-strong);
   white-space: nowrap;
 }
-[data-theme='dark'] .workerTable table td:last-child code {
+[data-theme='dark'] .workerTable .mdTable table tbody td:last-child code {
   background: color-mix(in srgb, var(--wk-row) 22%, transparent);
   color: #e8f0fb;
 }
 
 @media (max-width: 620px) {
-  .workerTable table td:first-child {
+  .workerTable .mdTable table tbody td:first-child {
     width: auto;
   }
-  .workerTable table td,
-  .workerTable table th {
+  .workerTable .mdTable table tbody td,
+  .workerTable .mdTable table thead th {
     padding: 0.7rem;
   }
 }

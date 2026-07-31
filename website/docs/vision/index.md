@@ -9,7 +9,7 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>American Express's platform for credit card **bill payments and refunds**. One core processes every payment the same way in every market, and absorbs the differences between markets, account types, and processing rules.</Lead>
 
-## The Big Picture
+## What Billpay does
 
 <Highlights
   items={[
@@ -18,7 +18,7 @@ import Highlights from '@site/src/components/Highlights';
       desc: `Billpay runs the full life of a credit card bill payment, and its reversal as a refund, from the moment it is initiated to the moment it settles, in every market Amex operates in.`,
     },
     {
-      term: 'The core idea',
+      term: 'One core, every market',
       desc: `The lifecycle of a payment is the same everywhere. What changes between markets (account type, clearing, posting rules) is configuration on a shared core, not a new codebase per market.`,
     },
     {
@@ -30,7 +30,7 @@ import Highlights from '@site/src/components/Highlights';
       ),
     },
     {
-      term: 'Durable by design',
+      term: 'Durable processing',
       desc: `Each payment runs as a durable, resumable process. It survives failures and long waits, retries safely, and never loses its place. Correctness comes before speed.`,
     },
     {

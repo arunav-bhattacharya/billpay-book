@@ -10,22 +10,32 @@
   gap: 0.85rem;
 }
 
+/* The house card, per the recipe in custom.css section 9a. The section hue
+   drives the corner, so the rule keeps the colour coding it always had: it
+   used to be a left rail, and it is the top-right corner now. */
 .card {
+  --card-accent: var(--pr-accent);
+
   position: relative;
   overflow: hidden;
   padding: 1.25rem 1.35rem 1.35rem;
-  border: 1px solid var(--amex-line);
-  border-left: 3px solid color-mix(in srgb, var(--pr-accent) 55%, transparent);
-  border-radius: 14px;
-  background: var(--amex-card);
-  box-shadow: var(--amex-sh-sm);
-  transition: transform 0.17s ease, box-shadow 0.17s ease, border-color 0.17s ease;
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
+  transition: transform 0.17s ease, box-shadow 0.17s ease, background 0.17s ease;
 }
 
 .card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--amex-sh);
-  border-left-color: var(--pr-accent);
+  transform: translateY(-4px);
+  background:
+    var(--card-face-hover) padding-box,
+    var(--card-border-hover) border-box,
+    var(--card-face-hover) border-box;
+  box-shadow: var(--card-sh-hover);
 }
 
 /* The numeral sits in the flow at the top left, well clear of the corner, and

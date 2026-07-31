@@ -40,22 +40,22 @@ export const RUN = {
 
 <Lead highlight>Billpay runs each payment as a **durable, resumable workflow on Temporal**, and keeps the parts that differ by market or account type in small, swappable components rather than in the workflow itself. One workflow describes the journey. The market's configuration decides how each step behaves.</Lead>
 
-## The main parts
+## The three main parts
 
-Three things make up the platform: the APIs that take requests in, the workflows that carry each payment from received to settled, and the event handlers that bring asynchronous outcomes back.
+Requests come in through the APIs. Workflows carry each payment from received to settled. Event handlers bring the asynchronous outcomes back.
 
 <Highlights
   items={[
     {
-      term: 'The way in',
+      term: 'How requests get in',
       desc: `Amex's channels never call Billpay directly. They call One-Data Functions, the versioned gateway contracts, one per operation: create a payment, update or cancel one, register a payment intent. Each function delegates to Billpay's core REST APIs. A Billpay Router then reads the request, its instructions, its date, and the market's dimensions, and decides which workflow to run.`,
     },
     {
-      term: 'The orchestration',
+      term: 'How a payment runs',
       desc: `Each payment runs as a workflow: an ordered set of steps that takes it from received to settled. The workflow sequences the business steps and nothing else. Which implementation of each step runs is settled from the market's dimensions before the workflow starts.`,
     },
     {
-      term: 'The way back',
+      term: 'How outcomes come back',
       desc: (
         <>
           Much of a payment's life happens after the caller already has an answer. The bank settles
@@ -70,7 +70,14 @@ Three things make up the platform: the APIs that take requests in, the workflows
   ]}
 />
 
-A workflow is assembled from four kinds of part. A **stage** carries out one state transition, pending to accepted for instance, and does the validation, persistence, and event publication for that single move. An **activity group** gathers the actions behind one concern, such as everything involved in executing a payment. An **activity** is a single retryable action, like writing a database row or calling one downstream system. A **client** is the adapter that talks to the external system. The Design section covers the model in full.
+A workflow is assembled from four kinds of part:
+
+- A **stage** carries out one state transition, pending to accepted for instance, and does the validation, persistence, and event publication for that single move.
+- An **activity group** gathers the actions behind one concern, such as everything involved in executing a payment.
+- An **activity** is a single retryable action, like writing a database row or calling one downstream system.
+- A **client** is the adapter that talks to the external system.
+
+The Design section covers the model in full.
 
 ## Core principles
 
@@ -110,7 +117,7 @@ A workflow is assembled from four kinds of part. A **stage** carries out one sta
   ]}
 />
 
-## Composable Workflows
+## How a workflow is composed
 
 Markets come onto the platform through configuration. Someone picks the One-Data APIs the market will use, then answers a few questions about how it processes payments. Those selections build a profile for that market and account type, held as one combination of dimensions.
 
@@ -138,7 +145,7 @@ The profile is what composes the workflow. When a request arrives, Billpay reads
 
 A new variant is a new implementation behind one combination. The workflow keeps its shape, and no market ends up as a branch inside it.
 
-## Optimize for
+## What we optimise for
 
 <Highlights
   items={[

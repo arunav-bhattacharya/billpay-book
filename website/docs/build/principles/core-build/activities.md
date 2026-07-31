@@ -33,7 +33,7 @@ class PaymentStateTransitionActivityImpl(
 
 *(Shape, simplified.)* Three rules make activities safe:
 
-- **Assume Temporal will retry you.** It will. An activity that writes half its state and throws gets called again with the same input, so it must not double-write. Idempotent writes are the habit: keyed inserts, and absolute updates like `status = ACCEPTED` rather than increments.
+- **Assume Temporal will retry the activity.** An activity that writes half its state and throws gets called again with the same input, so it must not double-write. Idempotent writes are the habit: keyed inserts, and absolute updates like `status = ACCEPTED` rather than increments.
 - **Take only the fields you need.** Activities are shared across every market, and their inputs are recorded in workflow history. Pass the payment id and the two fields you use, not the whole `Payment` object.
 - **One `transaction { }` per activity.** The activity is the transaction boundary *and* the retry boundary. If it throws, the transaction rolls back and Temporal's retry policy decides what happens next. One clean unit, with no partial commits to reason about.
 

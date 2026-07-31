@@ -16,10 +16,10 @@ import Lead from '@site/src/components/Lead';
 
 ## Failover
 
-Failover to us-west-1 is a **manual promotion**. During a us-east-1 outage an operator promotes the standby, and billpay-core reconnects to the west cluster. Every workflow's state is in the replicated persistence layer rather than in worker memory, so in-flight payments resume from their event histories once workers reconnect. That durability is the property the whole platform [leans on](../architecture/overview.md).
+Failover to us-west-1 is a **manual promotion**. During a us-east-1 outage an operator promotes the standby, and billpay-core reconnects to the west cluster. Every workflow's state is in the replicated persistence layer rather than in worker memory, so in-flight payments resume from their event histories once workers reconnect. That durability is [why the platform runs on Temporal](../architecture/overview.md#why-temporal).
 
 The full regional picture, showing how Temporal's two regions line up with the on-prem Hydra sites, Oracle's Data Guard pair, and the Redis buffer, is on the [High Availability](../architecture/high-availability.md) page.
 
-## Day-2 operations
+## Running the cluster day to day
 
 Operational familiarity with the cluster lives under Operations: [Temporal Server on AWS](../operations/familiarity/temporal-server-aws.md) (namespaces, task queues, scaling), [Temporal DB on AWS](../operations/familiarity/temporal-db-aws.md) (the persistence layer), and the [Temporal Web UI](../operations/familiarity/temporal-web-ui.md). Note that workflow payloads in the Web UI are decrypted via the [Codec Server](./deployables/codec-server-app.md).

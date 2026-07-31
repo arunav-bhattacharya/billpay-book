@@ -7,23 +7,23 @@ import Lead from '@site/src/components/Lead';
 
 # Payment Journeys
 
-<Lead accent="var(--amex-cat-design)">Every journey through Billpay begins one of two ways. Either somebody asks for it, or something happens.</Lead>
+<Lead accent="var(--amex-cat-design)">Every journey through Billpay begins one of two ways. Either a customer asks for it, or an event somewhere else sets it off.</Lead>
 
-## Somebody asks for it
+## Customer initiated journeys
 
 A cardmember pays a bill from the web, from the app, or by calling a servicing representative. There is a person on the other end waiting to hear back, so Billpay answers the moment it accepts the payment and finishes the work afterwards.
 
 These are the [customer initiated](./customer-initiated.md) journeys: paying, scheduling, changing, cancelling, and looking a payment up.
 
-## Something happens
+## System initiated journeys
 
 A bank sends money back. A third party pushes a payment in. A timer fires to close out settlement. Nobody is waiting on any of this, so it runs in the background, on its own schedule.
 
 These are the [system initiated](./system-initiated.md) journeys.
 
-## Telling them apart on a diagram
+## How to read the diagrams
 
-The two kinds read differently, and you can see it without reading a word:
+The two kinds look different on the page before you read a word:
 
 - A customer journey opens with a person and the Amex channels they came in through. Its early steps are marked as the customer waiting.
 - A system journey opens with an event or a schedule instead, and no step is marked that way.

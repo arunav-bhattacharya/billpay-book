@@ -7,7 +7,7 @@ import Lead from '@site/src/components/Lead';
 
 # Database
 
-<Lead>One row in <code>trans_dtl</code> is the truth about a payment's current state. Everything else in the schema is either an append-only log of how it got there, a guard against processing it twice, or a tracker for the events and notifications still owed. Learn those four roles and the schema stops needing a diagram.</Lead>
+<Lead>One row in <code>trans_dtl</code> is the truth about a payment's current state. Everything else in the schema is either an append-only log of how it got there, a guard against processing it twice, or a tracker for the events and notifications still owed. Those four roles cover the whole schema.</Lead>
 
 ## The tables
 
@@ -26,9 +26,9 @@ Column-level definitions are still settling and are deliberately not documented 
 
 ## How the code sees it
 
-Each table has exactly one [Exposed](../principles/tech-stack/orm.md) `Table` object: `TransDtl`, `TransLfcycEvent`, `IdempotencyChecker`, and so on. Those objects are the only place column names appear in Kotlin. Activities open one `transaction { }` per call. Workflow code never touches any of this, because determinism demands it, and the [rule](../principles/core-build/workflows.md) is absolute.
+Each table has exactly one [Exposed](../principles/tech-stack/orm.md) `Table` object: `TransDtl`, `TransLfcycEvent`, `IdempotencyChecker`, and so on. Those objects are the only place column names appear in Kotlin. Activities open one `transaction { }` per call. Workflow code never touches any of this, because it has to stay deterministic, and the [rule](../principles/core-build/workflows.md) is absolute.
 
-## Three Oracle habits to internalise
+## Three Oracle habits to know
 
 - **The unique index is the idempotency check.** Nobody SELECTs to see if a request was seen before. We insert, and `ORA-00001` on the duplicate *is* the answer. First write wins with no race window, and the losing request reads back the original outcome.
 - **Partitions are how the logs stay finite.** The lifecycle-event and notification logs only grow, so they are range-partitioned by event date and `DataPurgingWF` retires whole partitions. Dropping a partition is instant. Deleting a billion rows is not.

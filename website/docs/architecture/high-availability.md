@@ -52,6 +52,6 @@ import HADiagram from '@site/src/components/HADiagram';
 | **billpay-core in one site** | One-Data on that site keeps answering callers and parks their requests in Redis, then replays them when the core is back. Nothing is dropped, it just processes late. |
 | **A whole site** | The other site keeps taking traffic on its own One-Data and core. If the lost site was IPC2, an operator promotes the Data Guard standby in IPC1 so writes have somewhere to land again. |
 | **Oracle primary** | The standby in IPC1 is promoted. Until it is, reads still work off the read-only replicas, but nothing new can be written. |
-| **Temporal in us-east-1** | No workflow can start or advance while the cluster is down. Because every history is in Postgres and not in a worker, workflows resume exactly where they stopped once it's back. Durability is the platform's [founding bet](./overview.md). |
+| **Temporal in us-east-1** | No workflow can start or advance while the cluster is down. Because every history is in Postgres and not in a worker, workflows resume exactly where they stopped once it's back. This is the durability Temporal was [chosen for](./overview.md#why-temporal). |
 
-Two ideas hold this together. The front door stays open on both sites, and there is only ever one place where writes land. Moving that place is a call someone makes, not something that happens by itself.
+Two rules hold this together. The front door stays open on both sites, and there is only ever one place where writes land. Moving that place is a call someone makes, not something that happens by itself.

@@ -9,7 +9,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>An instrument is <em>where the money comes from</em>: a bank account, a debit card, or a loyalty balance. Like payment options, instruments follow a resolve-then-trust pattern. Inputs arrive as references or provided details, and only a <strong>verified</strong> instrument can fund a payment.</Lead>
 
-## The hierarchy
+## The instrument hierarchy
 
 ```kotlin
 sealed interface Instrument                                  // the umbrella
@@ -37,9 +37,9 @@ The `RegulatedInstrument` split matters for compliance. Anything that touches re
 
 ## The three verified instruments
 
-**`FinancialInstitutionInstrument`** is a bank account. It carries the institution code, redacted and optionally encrypted account numbers, and two enums that make it work internationally.
+**`FinancialInstitutionInstrument`** is a bank account. It carries the institution code, redacted and optionally encrypted account numbers, and two enums that make it work internationally: `FIAccountType` and `IdentificationSchema`.
 
-| `FIAccountType` | `IdentificationSchema` (how the account is identified) |
+| Account type | How the account is identified |
 | --- | --- |
 | `SAVINGS` | `SORT_CODE_AND_BANK_ACCOUNT_NUMBER` (UK) |
 | `CHECKING` | `ROUTING_NUMBER_AND_BANK_ACCOUNT_NUMBER` (US) |
@@ -50,7 +50,7 @@ The `RegulatedInstrument` split matters for compliance. Anything that touches re
 | `BUSINESS_CHECKING` | `BANK_IDENTIFIER_CODE_AND_INTERNATIONAL_BANK_ACCOUNT_NUMBER` (SEPA, BIC plus IBAN) |
 | | `CLABE` (Mexico) |
 
-*(These are two independent enums. The columns are not paired.)* One new market usually means one new `IdentificationSchema` value rather than a new instrument type, and that is the point of the design.
+*(These are two independent enums. The columns are not paired.)* A new market usually adds one `IdentificationSchema` value rather than a new instrument type.
 
 **`DebitCardInstrument`** is a debit card. It holds a redacted card number for display, optionally an encrypted card number, and an expiry serialized as `MM/yyyy` (`@field:JsonFormat(shape = STRING, pattern = "MM/yyyy") val expiryDate: YearMonth?`).
 

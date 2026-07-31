@@ -7,9 +7,9 @@ import Highlights from '@site/src/components/Highlights';
 
 # Design
 
-<Lead>Design turns the platform's shape into a **precise model**: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.</Lead>
+<Lead>Design sets out the **precise model** behind the platform: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.</Lead>
 
-## What Design covers
+## What this section covers
 
 <Highlights
   accent="var(--amex-cat-design)"
@@ -37,7 +37,7 @@ import Highlights from '@site/src/components/Highlights';
   ]}
 />
 
-## Explore
+## Pages in this section
 
 - [Principles](./principles.md) sets out the component model and its call, naming, and composition rules.
 - [Payment state model](./payment-state-model.md) lists the canonical lifecycle states and what each one means.

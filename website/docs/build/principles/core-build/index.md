@@ -7,7 +7,7 @@ import Lead from '@site/src/components/Lead';
 
 # Core Build
 
-<Lead>Tool Selection covers what we buy. This covers what we write: how the component model from Design becomes code, one layer at a time, and the rules that keep each layer doing only its own job.</Lead>
+<Lead>[Tech Stack](../tech-stack/index.md) covers what we buy. This covers what we write: how the component model from Design becomes code, one layer at a time, and the rules that keep each layer doing only its own job.</Lead>
 
 The call chain is strict, **Workflow → Stage → ActivityGroup → Activity → Client → external system**, exactly as the [component model](../../../design/principles.md) defines it. Each page below is a how-to for one link in it.
 
@@ -17,4 +17,4 @@ The call chain is strict, **Workflow → Stage → ActivityGroup → Activity �
 - [Activities & ActivityGroups](./activities.md) covers the I/O units and the groups that compose them.
 - [Clients](./clients.md) covers the adapters that actually talk to external systems.
 
-If you are new, read them once in that order, top of the chain to the bottom. The rest of the section will then read like detail instead of doctrine.
+If you are new, read them once in that order, top of the chain to the bottom.

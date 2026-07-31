@@ -7,10 +7,14 @@
      collapsing the page TOC widens it without the viewport changing at all. */
   container-type: inline-size;
   margin: 1.5rem 0 2.6rem;
-  border: 1px solid var(--amex-line-strong);
-  border-radius: 16px;
-  background: var(--ifm-background-color);
-  box-shadow: var(--amex-sh-sm);
+  /* The house card, per the recipe in custom.css section 9a. */
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
 
   /* The signature Blue Box blue, not the cyan-leaning section accent. */
   --jm-accent: var(--amex-blue);

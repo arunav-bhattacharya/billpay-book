@@ -24,31 +24,28 @@ billpay-book/
 
 ## Running it locally
 
-You need Node 20 or newer. The repo pins a version in `website/.nvmrc`, so `nvm use` picks up the right one. On Apple Silicon, use the arm64 Node from nvm rather than an x64 build under `/usr/local`, or the native build bindings fail.
-
-Everything below runs from `website/`:
+From the repo root:
 
 ```bash
-cd website
+./start.sh
 ```
 
-Install:
+That is the whole thing. The site comes up at <http://localhost:3100/billpay-book/> with hot reload, and `Ctrl-C` stops it.
 
-```bash
-nvm use && npm ci
-```
+`start.sh` handles the four things that otherwise go wrong:
 
-`npm ci` reproduces the lockfile exactly, which is what CI does. Use `npm install` only when you are deliberately changing dependencies.
+- Selects the Node version pinned in `website/.nvmrc`, sourcing nvm itself so it works in a non-interactive shell.
+- Refuses to run under an x64 Node on an Apple Silicon Mac. The build pulls native bindings for whichever architecture installed them, so a mismatch fails later with a confusing missing-module error.
+- Stops a dev server this repo left on port 3100. If something else holds the port it says so and stops, rather than killing a process it does not own.
+- Runs `npm ci` when `node_modules/.bin/docusaurus` is missing. A dependency tree can hold every package and still be missing its `.bin` symlinks, and the failure then reads only as `sh: docusaurus: command not found`.
 
-Start the dev server:
+If you would rather drive it by hand, the equivalent is `cd website && nvm use && npm ci && npm start`. Use `npm ci` rather than `npm install` unless you are deliberately changing dependencies: it reproduces the lockfile exactly, which is what CI does.
 
-```bash
-npm start
-```
-
-The port is pinned to 3100, so the site comes up at <http://localhost:3100/billpay-book/> with hot reload.
+Restart the server after editing `website/docusaurus.config.js` or anything under `website/src/theme/`. Hot reload does not cover either.
 
 ## Building
+
+These run from `website/`:
 
 ```bash
 npm run build

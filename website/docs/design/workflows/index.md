@@ -15,7 +15,7 @@ import Lead from '@site/src/components/Lead';
 
 Three workflows run on either worker, depending on where in the journey they are called: Create Schedule Payment, Execute Split Payment, and Create Balance Refund.
 
-## Three kinds
+## The three kinds of workflow
 
 - [Core](./core.md) workflows are triggered per request: create, update, cancel, execute, return, represent, allocate.
 - [Composite](./composite.md) workflows wrap one or more core workflows and add logic that spans domains, such as installments or multi-instruction payments.

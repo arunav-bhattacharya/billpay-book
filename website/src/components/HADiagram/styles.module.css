@@ -22,13 +22,19 @@
 
   margin: 1.5rem 0 2rem;
   overflow-x: auto;
-  border: 1px solid var(--amex-line);
-  border-radius: 16px;
-  background: var(--ha-tray);
+  /* The house card, per the recipe in custom.css section 9a, but keeping the
+     tray: the diagram sits in a recessed surface, so the inset shadows stay and
+     the face is --ha-tray rather than the paper the other cards use. */
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--ha-tray) padding-box,
+    var(--card-border) border-box,
+    var(--ha-tray) border-box;
   box-shadow:
     inset 0 2px 8px rgba(0, 38, 99, 0.09),
     inset 0 -1px 0 rgba(255, 255, 255, 0.7),
-    var(--amex-sh-sm);
+    var(--card-sh);
   padding: 10px 6px 4px;
 }
 

@@ -6,7 +6,7 @@ import Lead from '@site/src/components/Lead';
 
 # Deployables
 
-<Lead>Every artifact the platform **ships to production**: five deployables in all, from the API gateway functions to the worker app that runs the workflows.</Lead>
+<Lead>Every artifact the platform **ships to production**. There are five, and the worker app that runs the workflows is the one most changes touch.</Lead>
 
 - [**One-Data Functions** (API Gateway)](./one-data-functions.md)
 - [**Worker App** (Online + Offline Temporal Workers, one JVM)](./worker-app.md)

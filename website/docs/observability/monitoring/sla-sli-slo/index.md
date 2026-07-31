@@ -46,7 +46,7 @@ Each entry on the two sub-pages has:
 3. A **five-cell latency row** carrying the SLO targets at P50, P90, P99, P99.9, and P99.99.
 4. The **SLI**, the metric, plus the error budget.
 
-## Pick a surface
+## The two surfaces
 
 - [One-Data Functions](./one-data-functions.md) carries the SLA, SLI, and SLO for the 7 versioned, contract-level functions (`CreatePayment.v3`, `UpdatePayment.v1`, and the rest). The SLAs are tighter because these are the visible surface.
 - [Billpay Core APIs](./billpay-apis.md) carries the same for the 9 REST endpoints (`POST /payments`, `PUT /payments/{payment-id}`, and the rest). Latency targets are slightly tighter, because there is no function-edge overhead.
@@ -59,6 +59,6 @@ Each entry on the two sub-pages has:
 | **99.95%** | ~21.6 minutes | ~4.4 hours |
 | **99.9%**  | ~43.2 minutes | ~8.8 hours |
 
-:::tip[Operationally]
+:::tip[In practice]
 The **SLO** is what engineering steers to. The **SLA** is what the platform commits to externally. We deliberately leave headroom, so an SLO breach with the SLA still intact is the cue to fix things **before** customers notice.
 :::

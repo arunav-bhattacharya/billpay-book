@@ -20,10 +20,14 @@
   --lem-new: #6d4aca;    /* added on top: violet, used nowhere else */
   margin: 1.5rem 0 2.4rem;
   padding: 0.9rem 0.9rem 1.1rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 16px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
+  /* The house card, per the recipe in custom.css section 9a. */
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
 }
 :global([data-theme='dark']) .wrap {
   --lem-iface: #22d3ee;

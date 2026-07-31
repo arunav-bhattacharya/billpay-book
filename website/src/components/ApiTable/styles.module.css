@@ -1,7 +1,8 @@
 /* ApiTable — gateway function on the left, the core API it delegates to in the
    middle, what it is for on the right. Follows the RouteMap table treatment:
-   a rounded panel, tracked small-caps headers, no zebra striping, and colour
-   used only where it carries meaning (the HTTP verb).
+   a rounded panel, tracked small-caps headers, rows alternating on the shared
+   --amex-row-alt, and colour used only where it carries meaning (the HTTP
+   verb).
 
    All three columns set in the body sans. The function name and path were
    monospaced, but nothing here needs column alignment, and mono at these
@@ -13,12 +14,16 @@
    as four different tiers. Emphasis comes from weight, colour and the badge
    instead. Change the token below to resize the whole table. */
 
+/* The house card, per the recipe in custom.css section 9a. */
 .wrap {
   margin: 1.4rem 0 2rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 15px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
   overflow: hidden;
   overflow-x: auto;
 
@@ -63,17 +68,16 @@
 }
 
 .table tbody tr {
-  border-top: 1px solid var(--amex-line);
   background: none;
   transition: background-color 0.15s ease;
 }
 
-.table tbody tr:first-child {
-  border-top: none;
+.table tbody tr:nth-child(2n) {
+  background: var(--amex-row-alt);
 }
 
 .table tbody tr:hover {
-  background: color-mix(in srgb, var(--amex-blue) 4%, transparent);
+  background: var(--amex-row-hover);
 }
 
 .table tbody th,
@@ -218,10 +222,6 @@
   background: color-mix(in srgb, #57b483 15%, transparent);
   border-color: color-mix(in srgb, #57b483 32%, transparent);
 }
-:global([data-theme='dark']) .table tbody tr:hover {
-  background: color-mix(in srgb, var(--amex-blue-bright) 7%, transparent);
-}
-
 @media (max-width: 700px) {
   /* Retune the token, not .table, so every cell shrinks together and the
      row stays one size. */

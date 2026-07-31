@@ -7,7 +7,7 @@ import Lead from '@site/src/components/Lead';
 
 # API Spec
 
-<Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data Functions</strong> are the versioned public contracts the rest of Amex integrates with; each delegates to a <strong>Billpay core REST API</strong>, where the router decides which workflow runs. Keep the layers straight and every integration question has an obvious home.</Lead>
+<Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data Functions</strong> are the versioned public contracts the rest of Amex integrates with; each delegates to a <strong>Billpay core REST API</strong>, where the router decides which workflow runs. Most integration questions come down to knowing which of the two layers you are in.</Lead>
 
 - [One-Data Functions](./one-data.md) is the gateway. Every function, what it is for, and which core API it delegates to, including the event-handler functions that bring asynchronous outcomes back in.
 - [Billpay Core APIs](./billpay-core.md) is the REST surface. Each endpoint, how the router branches it to a workflow, and how idempotency is enforced at the boundary.

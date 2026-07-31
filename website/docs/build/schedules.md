@@ -23,7 +23,7 @@ All of these fire on the **Offline worker**, because nothing here has a user wai
 
 The spec also describes a **Scheduled Representments Executor**, which batches returned payments due for re-presentment the same way. It has not been added to the spec's schedule table yet. Treat it as the sixth member of this set.
 
-## The batching rhythm
+## How batching works
 
 Executors work in waves rather than draining everything at once. They pick up **2,500 items, spread over the next minute, then the next 2,500 a minute later**. The cadence is deliberate. It turns a morning spike of due payments into a flat, predictable load on the Offline worker and every downstream system behind it, and it means a stuck batch delays the next wave rather than swallowing the whole backlog.
 

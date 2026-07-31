@@ -1,0 +1,123 @@
+/**
+ * Chrome for the expandable diagram figure. The diagram's own colours live in
+ * section 14 of src/css/custom.css; everything here is the frame around it.
+ */
+
+.wrap {
+  position: relative;
+}
+
+/* Every control on a diagram is a square icon button of the same size, so the
+   inline expand and the two in the expanded layer read as one set. */
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* px, not rem: the base font size is 17px, so a rem-sized control comes out
+     noticeably chunkier than the icon inside it wants to be. */
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 22%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--amex-panel) 90%, transparent);
+  color: color-mix(in srgb, var(--amex-blue) 75%, transparent);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.iconButton:hover {
+  background: var(--amex-blue);
+  border-color: var(--amex-blue);
+  color: #ffffff;
+}
+[data-theme='dark'] .iconButton {
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 28%, transparent);
+  color: color-mix(in srgb, var(--amex-blue-bright) 78%, transparent);
+}
+[data-theme='dark'] .iconButton:hover {
+  background: var(--amex-blue-bright);
+  border-color: var(--amex-blue-bright);
+  color: #001327;
+}
+
+.icon {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* Sits over the top-right corner of the figure. It stays visible rather than
+   waiting for a hover: it is the only way to read the busier diagrams, and an
+   affordance nobody finds is not an affordance. At icon size it can be. */
+.expandButton {
+  composes: iconButton;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+.wrap:hover .expandButton {
+  border-color: color-mix(in srgb, var(--amex-blue) 45%, transparent);
+  color: var(--amex-blue);
+}
+[data-theme='dark'] .wrap:hover .expandButton {
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 50%, transparent);
+  color: var(--amex-blue-bright);
+}
+
+[data-theme='dark'] .expandButton {
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 40%, transparent);
+  color: var(--amex-blue-bright);
+}
+[data-theme='dark'] .expandButton:hover {
+  background: var(--amex-blue-bright);
+  color: #001327;
+}
+
+/* --- Expanded layer ---------------------------------------------------- */
+
+.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 500; /* over the navbar, which Infima puts at 200 */
+  margin: 0;
+  padding: 3.4rem 1rem 1.5rem;
+  background: var(--amex-bg);
+  overflow: auto;
+}
+
+/* Fitted to the window: the diagram takes the full width it can get, roughly
+   twice the column, and the layer scrolls down through it. */
+.expanded :global(.docusaurus-mermaid-container) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+.expanded :global(.docusaurus-mermaid-container) > svg {
+  max-width: 100% !important;
+  width: auto;
+  height: auto;
+}
+
+/* Actual size: the diagram draws at 1:1 and the layer scrolls both ways. On
+   the busiest diagrams this is the only size the labels are readable at. */
+.actualSize :global(.docusaurus-mermaid-container) > svg {
+  max-width: none !important;
+  width: auto;
+  height: auto;
+}
+
+.toolbar {
+  position: fixed;
+  top: 0.85rem;
+  right: 1.1rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.toolButton {
+  composes: iconButton;
+  background: var(--amex-panel);
+}

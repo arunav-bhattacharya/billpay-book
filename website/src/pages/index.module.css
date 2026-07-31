@@ -1,43 +1,45 @@
-/* ---- Hero: full-bleed Amex brand gradient ---- */
+/* ---- Hero: the one full-strength blue block on the page ----
+   Everything below it is paper in light and near-black in dark, so this is
+   where the brand gets to run at full volume. It is a little shorter than it
+   was, enough that the first row of cards is in the fold and the eye sees the
+   page is not blue all the way down. */
 .hero {
   position: relative;
   overflow: hidden;
   background: var(--amex-grad-brand);
   color: #fff;
-  padding: 5.5rem 1rem 5rem;
+  padding: 4.75rem 1rem 4.25rem;
   text-align: center;
   isolation: isolate;
 }
 
-/* Soft radial highlight + faint "Blue Box" motif for depth. */
+/* Corner lighting, at low volume. Cyan is a light in the top right rather
+   than a third of the gradient, and gold answers it from the bottom left. */
 .heroGlow {
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(44% 58% at 90% 94%, rgba(230, 191, 90, 0.16), transparent 66%),
-    radial-gradient(66% 96% at 78% 2%, rgba(0, 163, 224, 0.28), transparent 68%),
-    radial-gradient(56% 86% at 8% 100%, rgba(0, 38, 99, 0.5), transparent 66%);
+    radial-gradient(38% 48% at 92% 8%, rgba(0, 163, 224, 0.3), transparent 68%),
+    radial-gradient(40% 52% at 6% 96%, rgba(230, 191, 90, 0.12), transparent 66%),
+    radial-gradient(70% 90% at 34% 108%, rgba(0, 12, 40, 0.42), transparent 64%);
+}
+
+/* Shimmer rule along the bottom edge, the same one that opens the footer, so
+   the hero closes on a line rather than a hard change of colour. */
+.hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--amex-grad-rule);
 }
 
 .heroInner {
   max-width: 820px;
   margin: 0 auto;
-}
-
-.eyebrow {
-  display: inline-block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #e9dfc9;
-  padding: 0.4rem 0.9rem;
-  border: 1px solid rgba(230, 191, 90, 0.32);
-  border-radius: 999px;
-  background: rgba(230, 191, 90, 0.08);
-  backdrop-filter: blur(6px);
-  margin-bottom: 1.4rem;
 }
 
 .heroTitle {
@@ -92,6 +94,17 @@
   margin: 0 0 0.4rem;
   color: var(--amex-txt-strong);
 }
+/* Same shimmer rule the content pages hang under every h2, so the homepage
+   and the docs read as one place. */
+.sectionHeadTitle::after {
+  content: '';
+  display: block;
+  width: 76px;
+  height: 3px;
+  margin: 0.75rem auto 0;
+  border-radius: 3px;
+  background: var(--amex-grad-rule);
+}
 .sectionHeadSub {
   color: var(--amex-mut);
   margin: 0;
@@ -104,50 +117,85 @@
   padding: 0 0 5rem;
 }
 
-/* ---- Section card: per-section accent via --cat ---- */
+/* ---- Section card ----
+   The house card, straight off the recipe in custom.css section 9a: paper face,
+   no outline, uplifted navy shadow, and the accent solid at the bottom-right
+   corner and gone a third of the way round. That is the corner the arrow lives
+   in, so hover lights the accent and the arrow together. The grid reads as
+   eight of one thing rather than eight solid blue fills under a blue hero. */
 .card {
   position: relative;
-  display: block;
-  padding: 1.5rem 1.5rem 1.6rem;
-  border-radius: 16px;
-  background: var(--amex-card);
-  border: 1px solid var(--amex-line);
-  box-shadow: var(--amex-sh);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  padding-bottom: 2.1rem;
+  border-radius: var(--card-radius);
+  border: 2.5px solid transparent;
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
   text-decoration: none;
-  color: inherit;
-  overflow: hidden;
-  transition: transform 0.17s ease, box-shadow 0.17s ease, border-color 0.17s ease;
+  color: var(--amex-txt-strong);
+  isolation: isolate;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
-/* Gradient top accent bar tinted to the section color. */
-.card::before {
+
+/* The hero's corner lighting at card scale, held back until hover so the grid
+   at rest is quiet. */
+.card::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--cat), transparent 92%);
-  opacity: 0.9;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--card-glow);
+  opacity: 0;
+  transition: opacity 0.22s ease;
 }
+
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--amex-sh-lg);
-  border-color: color-mix(in srgb, var(--cat) 55%, var(--amex-line));
+  transform: translateY(-5px);
+  background:
+    var(--card-face-hover) padding-box,
+    var(--card-border-hover) border-box,
+    var(--card-face-hover) border-box;
+  box-shadow: var(--card-sh-hover);
   text-decoration: none;
-  color: inherit;
+  color: var(--amex-txt-strong);
+}
+.card:hover::after {
+  opacity: 1;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--card-accent);
+  outline-offset: 3px;
+}
+
+/* Number and title share a line, the way the sidebar sets them. */
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
 }
 
 .cardIndex {
-  display: block;
-  font-size: 0.82rem;
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  color: var(--cat);
-  margin-bottom: 0.5rem;
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  font-variant-numeric: tabular-nums;
+  color: var(--card-accent);
 }
 
 .cardTitle {
-  margin: 0 0 0.4rem;
+  margin: 0;
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.004em;
@@ -161,19 +209,35 @@
   color: var(--amex-mut);
 }
 
+/* Lives in the card's bottom padding rather than in the flow, so it costs
+   no text width and nothing shifts when it appears on hover. */
 .cardArrow {
   position: absolute;
-  right: 1.3rem;
-  bottom: 1.2rem;
-  font-size: 1.1rem;
-  color: var(--cat);
+  right: 1.35rem;
+  bottom: 0.95rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--card-accent);
   opacity: 0;
   transform: translateX(-6px);
-  transition: opacity 0.17s ease, transform 0.17s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .card:hover .cardArrow {
   opacity: 1;
   transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card::after,
+  .cardArrow,
+  .heroGhost {
+    transition: none;
+  }
+  .card:hover,
+  .heroGhost:hover {
+    transform: none;
+  }
 }
 
 @media (max-width: 500px) {

@@ -95,6 +95,45 @@ const config = {
             nodeSpacing: 70,
             rankSpacing: 80,
           },
+          // useMaxWidth: false makes Mermaid emit real width and height
+          // attributes on the SVG rather than a max-width sized to the
+          // column. Sizing then belongs entirely to CSS, which is what lets
+          // the same rendered diagram fit the column inline and open at
+          // window width or actual size when expanded. See section 14 of
+          // custom.css and src/theme/Mermaid.
+          //
+          // Font size and family are deliberately absent here. Mermaid
+          // resolves every *FontSize / *FontFamily from the global fontSize
+          // and themeVariables.fontFamily, which are set to mono for the
+          // state diagrams, so setting them per element in this block does
+          // nothing. Each sequence diagram therefore declares its own face in
+          // front matter (`config.fontFamily` / `config.fontSize` above the
+          // `sequenceDiagram` line). Sans is both easier to read at this size
+          // and about 20% narrower than mono, which is worth a lot on a
+          // diagram that already runs past the column.
+          //
+          // Nothing in CSS may restate those fonts. Mermaid measures each
+          // label, then draws its box around the measurement; restyling the
+          // text afterwards would push it back out of the box.
+          sequence: {
+            useMaxWidth: false,
+            diagramMarginX: 16,
+            diagramMarginY: 14,
+            actorMargin: 44,
+            width: 170,
+            height: 52,
+            boxMargin: 14,
+            boxTextMargin: 6,
+            noteMargin: 12,
+            messageMargin: 46,
+            mirrorActors: true,
+            actorFontWeight: 600,
+            // Long message and note labels wrap instead of stretching the gap
+            // between two participants. Takes roughly a fifth off the width of
+            // the busier diagrams for a few extra pixels of height.
+            wrap: true,
+            wrapPadding: 10,
+          },
           themeVariables: {
             fontFamily:
               "'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",

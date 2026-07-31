@@ -7,9 +7,9 @@ import Lead from '@site/src/components/Lead';
 
 # Data Model
 
-<Lead>The domain model lives in <code>com.aexp.billpay.core.domain.transaction</code> and is built around one idea: <strong>make illegal payment states unrepresentable.</strong> Each lifecycle state is its own Kotlin type, every type is immutable, and the only way from one state to the next is a function the compiler checks. Most of the bugs a payments system dreads simply do not compile here.</Lead>
+<Lead>The domain model lives in <code>com.aexp.billpay.core.domain.transaction</code> and is built around one idea: <strong>make illegal payment states unrepresentable.</strong> Each lifecycle state is its own Kotlin type, every type is immutable, and the only way from one state to the next is a function the compiler checks. An illegal state change is caught at compile time rather than at runtime.</Lead>
 
-## The shape of the model
+## The type hierarchy
 
 ```mermaid
 flowchart TD
@@ -24,15 +24,15 @@ flowchart TD
   TL --> P
 ```
 
-Three patterns repeat everywhere, and once you see them the whole model reads itself:
+Three patterns repeat throughout the model:
 
-- **Status by shape.** A payment's lifecycle state (its status type) and its shape (`FullPayment` or `SplitPayment`) are two independent axes, and the concrete classes are their cross-product. `AcceptedSplitPayment` is exactly what its name says.
-- **The Verified narrowing.** In-flight states, `SCHEDULED` through `REPRESENTED`, are required by their own types to carry a non-null amount, a `VerifiedPaymentOption`, and a `VerifiedInstrument`. `PENDING`, `CANCELLED`, and `DECLINED` may hold unverified data. Validation is not a boolean here. It is a type change.
-- **Reference to Verified, twice.** Payment options and instruments both arrive as unverified references and are resolved into verified values by the system of record. The same two-phase pattern runs on both directive families.
+- Status and shape are two independent axes. A payment's lifecycle state (its status type) and its shape (`FullPayment` or `SplitPayment`) combine into the concrete classes, so `AcceptedSplitPayment` is exactly what its name says.
+- The in-flight states, `SCHEDULED` through `REPRESENTED`, are required by their own types to carry a non-null amount, a `VerifiedPaymentOption`, and a `VerifiedInstrument`. `PENDING`, `CANCELLED`, and `DECLINED` may hold unverified data. Validation here is a change of type, not a boolean flag.
+- Payment options and instruments both arrive as unverified references and are resolved into verified values by the system of record. The same two-phase pattern runs on both directive families.
 
 Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary. See [Serialization](../principles/tech-stack/serialization.md).
 
-## The pages
+## Pages in this section
 
 - [Payment](./payment.md) covers `Transaction`, `Payment`, the eleven status types, Full and Split, timelines, and the transition functions that are the state machine.
 - [Payment Options](./payment-options.md) covers the eight option types and their Reference to Verified lifecycle.

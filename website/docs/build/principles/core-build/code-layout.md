@@ -33,6 +33,6 @@ This is not tidiness. Temporal replays workflow code from its event history to r
 - A market doing something different changes only that market's `market/{m}/stages/` or `market/{m}/activityGroups/`. The workflow, activities, and clients stay as they are.
 - A new downstream system means a new `{System}Client` in `core/lib/clients/`, plus the activity that calls it.
 
-Name implementations for the **behaviour**, not the market. A stage that skips realtime clearing is `NonRealtimeClearingExecutionStage`-shaped, not `GermanyExecutionStage`, so the next market with the same rule reuses it instead of copying it.
+Name implementations for the **behaviour**, not the market. A stage that skips realtime clearing is called something like `NonRealtimeClearingExecutionStage`, not `GermanyExecutionStage`, so the next market with the same rule reuses it instead of copying it.
 
 The deployables this monorepo produces are covered under [Deployment](../../../deployment/deployables/index.md): the worker app (one JVM hosting both the Online and Offline workers), the codec server, the UI, and the mocks.

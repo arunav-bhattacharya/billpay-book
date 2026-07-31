@@ -1,13 +1,17 @@
 /* CompositionMap — onboarding, profile, composed workflow. One accent for the
    whole map, quiet surfaces, and monospace kept for literals only. */
 
+/* The house card, per the recipe in custom.css section 9a. */
 .wrap {
   margin: 1.8rem 0 2.4rem;
   padding: 1.4rem 1.35rem 1.25rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 18px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
 }
 
 .band,

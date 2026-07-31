@@ -23,7 +23,7 @@ import Lead from '@site/src/components/Lead';
 
 ## What we turned down
 
-- **PostgreSQL** is equally capable on paper. There is no shared operational baseline at Amex for our scale tier, though, so we would carry the ops cost alone. The engine is not the decision. The ecosystem is.
+- **PostgreSQL** is equally capable on paper. There is no shared operational baseline at Amex for our scale tier, though, so we would carry the ops cost alone. The engine was never the deciding factor. The operational support around it was.
 - **NoSQL (DynamoDB, MongoDB)** does not fit, because payments are relentlessly relational: a parent payment, its splits, their lifecycle events, an original-to-replacement mapping. Joins and multi-table transactional guarantees are precisely what document stores make awkward.
 - **An event store with Kafka as the source of truth** does not work either. A payment's *current* state must be readable in O(1), not rebuilt from a stream. Teams that go this way end up bolting on a derived relational store anyway, and we would rather have the relational store be the truth.
 

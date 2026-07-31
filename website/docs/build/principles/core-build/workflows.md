@@ -7,15 +7,15 @@ import Lead from '@site/src/components/Lead';
 
 # Building Workflows
 
-<Lead>A workflow is the durable spine of one payment journey. It sequences stages, fans out child workflows, and waits on signals. It does nothing else. If you remember one thing from this page, it is that workflow code orchestrates and never does the work.</Lead>
+<Lead>A workflow is the durable spine of one payment journey. It sequences stages, fans out child workflows, and waits on signals. It does nothing else. Workflow code orchestrates; it never does the work itself.</Lead>
 
-## Determinism is the contract
+## Why workflow code must be deterministic
 
 Temporal recovers a workflow after any failure by **replaying** its code against the event history it already recorded. That only works if the code takes the same path every time. So inside a workflow: no direct I/O, no wall clocks, no random numbers, no reaching for the database. Anything non-deterministic happens inside an [activity](./activities.md), whose *result* is recorded and replayed.
 
-You do not have to police this alone. The [module layout](./code-layout.md) keeps activity implementations and clients out of the workflow's compile-time reach. The discipline still matters when you are tempted to compute a date inline. Do not. Ask an activity.
+You do not have to police this alone. The [module layout](./code-layout.md) keeps activity implementations and clients out of the workflow's compile-time reach. The discipline still matters, though. If you are tempted to compute a date inline, call an activity instead.
 
-## The rules
+## Rules for workflow code
 
 - **One workflow per journey.** Create Immediate Payment, Execute Scheduled Payment, Process Returned Payment: one each, ever. There are no per-market workflow implementations.
 - **Never `abstract`.** Variation comes from composition: the same workflow is handed different stage and activity-group implementations, selected by the market's dimensions. If you are adding a per-market `if` to workflow code, you are in the wrong layer. The branch belongs in a stage.
@@ -23,7 +23,7 @@ You do not have to police this alone. The [module layout](./code-layout.md) keep
 - **Composite workflows call child workflows.** They never inline another workflow's body.
 - **Treat a running workflow's shape as a contract.** In-flight executions replay against the code that exists when they resume. Renaming or restructuring a workflow with live executions is a breaking change. Use Temporal's workflow-versioning facilities to branch behaviour, and remove the old path only when the last old execution has drained.
 
-## The Temporal toolkit we actually use
+## The Temporal features we use
 
 - **Child workflows** come from `newChildWorkflowStub<T>()`. Create Immediate Payment fans out to Get Corporate Payment Allocations, then one Execute Split Payment per allocation.
 - **Signals** replace polling. A corporate payment waits on *AllocationsReceived*, and Get Corporate Payment Allocations waits on *AllocationsReady*.
@@ -31,9 +31,9 @@ You do not have to police this alone. The [module layout](./code-layout.md) keep
 - **Async fan-out** uses `asyncFunction { }` and `asyncProcedure { }`, which return promises. `Promise.allOf(...)` joins them.
 - **Early return** answers the caller once a payment is `ACCEPTED`, and the workflow keeps processing in the background.
 
-## The worked example
+## A worked example: Create Immediate Payment
 
-This is the spec's own sketch of Create Immediate Payment. It is worth reading line by line, because every rule above is visible in it.
+This is the spec's own sketch of the workflow. It is worth reading line by line, because every rule above is visible in it.
 
 ```kotlin
     // Check if the incoming payment is idempotent
@@ -96,7 +96,7 @@ This is the spec's own sketch of Create Immediate Payment. It is worth reading l
     }
 ```
 
-Walk it once. The idempotency check happens before anything else. Every state move is a **stage**, validation is an **activity group**, and the caller is answered at `ACCEPTED` via early return. The corporate branch runs processing and the allocations child workflow *in parallel*, then waits on the signal before fanning out the splits. Nothing in the method touches a database, a clock, or a wire. The stages and activities behind it do.
+Read it once through. The idempotency check happens before anything else. Every state move is a **stage**, validation is an **activity group**, and the caller is answered at `ACCEPTED` via early return. The corporate branch runs processing and the allocations child workflow *in parallel*, then waits on the signal before fanning out the splits. Nothing in the method touches a database, a clock, or a wire. The stages and activities behind it do.
 
 ## Which worker runs it
 

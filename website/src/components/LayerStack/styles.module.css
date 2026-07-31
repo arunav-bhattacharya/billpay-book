@@ -133,7 +133,10 @@
     var(--ly-accent) calc((var(--ly-lo) + var(--ly-d, 0) * (var(--ly-hi) - var(--ly-lo))) * 1%),
     var(--ly-surface)
   );
-  box-shadow: var(--amex-sh-sm);
+  /* The house card shadow. The block keeps its tinted fill and accent rail,
+     because those are what code it to a tier, but it sits off the page the
+     same way every other card on the site does. */
+  box-shadow: var(--card-sh);
   overflow: hidden;
 }
 

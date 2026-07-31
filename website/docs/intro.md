@@ -6,15 +6,15 @@ import Lead from '@site/src/components/Lead';
 
 # Welcome to the Billpay Wiki
 
-<Lead>Billpay is **American Express's enterprise platform for executing and orchestrating customer bill payments**, mostly credit card payments. It runs the whole lifecycle: initiation, validation, money movement, posting, settlement, and the financial updates that follow. Payment state stays synchronized and visible across every enterprise domain that needs it.</Lead>
+<Lead>Billpay is **American Express's enterprise platform for executing and orchestrating customer bill payments**, mostly credit card payments. It runs the whole lifecycle: initiation, validation, money movement, posting, settlement, and the financial updates that follow. Every enterprise domain that needs a payment's state can see the same version of it.</Lead>
 
-The site is organized around the layers a payment passes through:
+The site is organised around the layers a payment passes through:
 
 | Layer | What it is | Where to read |
 | --- | --- | --- |
 | **One-Data Functions** | The public, contract-level entry points (e.g. `CreatePayment.v3`) | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Billpay Core APIs** | The REST endpoints behind the gateway (`POST /payments`, …) | [API Spec › Billpay Core](build/api-spec/billpay-core.md) |
-| **Billpay Router** | Picks the right workflow from the request's date, instructions, and dimensions | [Architecture › A Closer Look](architecture/components.md) |
+| **Billpay Router** | Picks the right workflow from the request's date, instructions, and dimensions | [Architecture › Components in Detail](architecture/components.md) |
 | **Temporal Workflows** | Long-running, durable orchestrations on the Online and Offline workers | [Design › Workflows](design/workflows/index.md) |
 | **Stages** | One state transition each, the decision points a workflow sequences | [Design › Stages](design/stages.md) |
 | **ActivityGroups & Activities** | The reusable I/O units: clearing calls, AR posting, DB writes, notifications | [Design › ActivityGroups & Activities](design/activities.md) |

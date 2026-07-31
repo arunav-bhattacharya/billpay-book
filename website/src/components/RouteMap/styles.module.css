@@ -7,14 +7,18 @@
    pill fills instead. Matches the ApiTable token above it on the page.
    Change the token to resize the whole table. */
 
+/* The house card, per the recipe in custom.css section 9a. */
 .wrap {
   margin: 1.4rem 0 2rem;
   overflow: hidden;
   overflow-x: auto;
-  border: 1px solid var(--amex-line);
-  border-radius: 15px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
 
   --rm-fs: 0.88rem;
   /* Chips (the Online/Offline worker pill, the account tag) sit a step below
@@ -28,7 +32,9 @@
   min-width: 660px;
   border-collapse: collapse;
   font-size: var(--rm-fs);
-  background: var(--amex-panel);
+  /* Transparent, so the card's own face shows through rather than a flat panel
+     colour sitting on top of it. */
+  background: transparent;
 }
 
 /* ---- header: the Amex-blue band the page's other tables carry ---- */

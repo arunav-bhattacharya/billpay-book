@@ -12,7 +12,7 @@ import CompareTable from '@site/src/components/CompareTable';
 
 <Lead highlight>Billpay sits at the centre of the modern payments platform. Channels come to it, and it runs a payment to completion by calling the domains around it, some inside the payments estate and some outside Amex altogether.</Lead>
 
-## Payments Landscape
+## The payments landscape today
 
 <LandscapeMap />
 
@@ -22,7 +22,7 @@ import CompareTable from '@site/src/components/CompareTable';
 - **Multirail Gateway** and **Payments Clearing** expose Type-A APIs as well, but their only caller is **Bill Pay Core**. No channel touches them.
 - Everything outside Amex is reached through **Payments Clearing**: partner banks, TPSPs, P2P networks and the payment networks.
 
-## Legacy Payments Landscape
+## The legacy estate
 
 <LegacyEstateMap />
 

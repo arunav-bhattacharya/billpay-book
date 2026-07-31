@@ -1,12 +1,16 @@
 /* ScheduleTable — the periodic work, in the same panel treatment as the other
-   tables on the page: rounded surface, Amex-blue header, no zebra striping. */
+   tables on the page: rounded surface, Amex-blue header, alternating rows. */
 
+/* The house card, per the recipe in custom.css section 9a. */
 .wrap {
   margin: 1.2rem 0 2rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 15px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
   overflow: hidden;
   overflow-x: auto;
 }
@@ -41,17 +45,16 @@
 }
 
 .table tbody tr {
-  border-top: 1px solid var(--amex-line);
   background: none;
   transition: background-color 0.15s ease;
 }
 
-.table tbody tr:first-child {
-  border-top: none;
+.table tbody tr:nth-child(2n) {
+  background: var(--amex-row-alt);
 }
 
 .table tbody tr:hover {
-  background: color-mix(in srgb, var(--amex-blue) 4%, transparent);
+  background: var(--amex-row-hover);
 }
 
 .table tbody th,
@@ -86,10 +89,6 @@
   color: #e0b34e;
   background: color-mix(in srgb, #e0b34e 14%, transparent);
   border-color: color-mix(in srgb, #e0b34e 32%, transparent);
-}
-
-:global([data-theme='dark']) .table tbody tr:hover {
-  background: color-mix(in srgb, var(--amex-blue-bright) 7%, transparent);
 }
 
 @media (max-width: 640px) {

@@ -9,7 +9,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>A client is the adapter to exactly one external system: <code>&#123;System&#125;Client</code>, in <code>core/lib/clients/</code>. It owns that system's protocol, contract, and quirks, and translates between Billpay's payment language and whatever the other side speaks. Everything above a client stays protocol-free.</Lead>
 
-## The job
+## What a client does
 
 When an activity needs clearing, it calls `ClearingClient.clear(…)` with domain-shaped arguments and gets a domain-shaped answer. The client is where that becomes an HTTP call: the URL, the headers, the request body the clearing system expects, the mapping of its status codes back into something the activity can act on.
 

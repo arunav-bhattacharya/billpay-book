@@ -7,7 +7,7 @@ import Highlights from '@site/src/components/Highlights';
 
 # Build
 
-<Lead>[Design](../design/index.md) describes what the platform does: the lifecycle, the workflows, the component model. This section is how we actually build it. The stack we bet on and why, how the code is organised, and how you write each kind of component. Read it as a guide from the people who set the conventions, not as reference trivia.</Lead>
+<Lead>[Design](../design/index.md) describes what the platform does: the lifecycle, the workflows, the component model. This section is how we build it. It covers the stack we chose and why, how the code is organised, and how to write each kind of component.</Lead>
 
 ## The stack at a glance
 

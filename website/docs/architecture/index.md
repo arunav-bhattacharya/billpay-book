@@ -9,7 +9,7 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>Billpay is **layered so each tier has one responsibility**. A request travels from the API gateway at the top down to the systems that move the money, and async outcomes loop back in through event handlers.</Lead>
 
-## The Big Picture
+## How the system fits together
 
 <Highlights
   accent="var(--amex-cat-architecture)"
@@ -42,5 +42,5 @@ import Highlights from '@site/src/components/Highlights';
 />
 
 - [Overview](./overview.md) maps the system from One-Data Functions through the workflows to the downstream systems, and says why the platform is built on Temporal.
-- [A Closer Look](./components.md) takes each block in turn: the router, the Online and Offline workers, the component model, event handlers, and schedules.
+- [Components in Detail](./components.md) takes each block in turn: the router, the Online and Offline workers, the component model, event handlers, and schedules.
 - [High Availability](./high-availability.md) covers where everything physically runs, across two on-prem sites and two AWS regions, and what fails over to what.

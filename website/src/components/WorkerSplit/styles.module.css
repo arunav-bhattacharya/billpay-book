@@ -12,25 +12,21 @@
   gap: 0.9rem;
 }
 
+/* The house card, per the recipe in custom.css section 9a. The worker's hue
+   drives the corner, which is where the hairline along the top used to be. */
 .card {
+  --card-accent: var(--wk);
+
   position: relative;
   overflow: hidden;
   padding: 1.1rem 1.2rem 1.15rem;
-  border: 1px solid color-mix(in srgb, var(--wk) 30%, var(--amex-line));
-  border-radius: 15px;
-  background: var(--amex-card);
-  box-shadow: var(--amex-sh-sm);
-}
-
-/* a hairline of the worker's colour along the top */
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--wk), transparent 92%);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
 }
 
 .online {

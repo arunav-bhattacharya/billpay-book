@@ -7,9 +7,9 @@ import Lead from '@site/src/components/Lead';
 
 # Payment
 
-<Lead>One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions. This page walks the hierarchy top down. Read it once against the sources under `docs/domainModel`, and the naming does the rest.</Lead>
+<Lead>One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions. This page walks the hierarchy top down. Read it once against the sources under `docs/domainModel` and the naming will carry you from there.</Lead>
 
-## The roots
+## The root types
 
 `Transaction` is the platform root, meaning anything that moves value. `Payment` is its only family so far.
 
@@ -43,7 +43,7 @@ Amounts are `javax.money.MonetaryAmount` throughout. `confirmationCode` is the c
 
 ## The Verified narrowing
 
-A file-private interface does the model's sharpest work:
+A file-private interface carries the constraint:
 
 ```kotlin
 private interface VerifiedPayment {
@@ -59,7 +59,7 @@ Every in-flight status type mixes it in, and the entry and terminal-failure type
 
 Each status is a `sealed class` that pins `status` to one constant:
 
-| Status type | `status` | Verified? | Notes |
+| Status type | Status constant | Verified? | Notes |
 | --- | --- | --- | --- |
 | `PendingPayment` | `PENDING` | No | May carry a null amount and unverified directives. |
 | `ScheduledPayment` | `SCHEDULED` | ✓ | |
@@ -109,9 +109,9 @@ data class SplitSlice(
 )
 ```
 
-A leg's identity is derived, not invented: `paymentId = "${parent.paymentId}_$sequenceNumber"`, with `originalPaymentId` pointing back at the parent.
+A leg's identity comes from its parent: `paymentId = "${parent.paymentId}_$sequenceNumber"`, with `originalPaymentId` pointing back at the parent.
 
-## One guarded doorway
+## The guard on PendingFullPayment
 
 `PendingFullPayment`, the type every API-created payment starts as, checks its own consistency at construction.
 
@@ -142,7 +142,7 @@ Dates and times live in their own small hierarchy rather than as loose fields.
 | `ImmediateTimeline` | `frequency` fixed to `ONCE` | pay-today payments |
 | `ScheduledTimeline` | `scheduleDate` | future-dated payments (`SCHEDULED` requires it) |
 
-Same trick as the Verified narrowing. A payment cannot reach an executable state without a timeline that knows its clearing date and cancel cutoff, because the types will not line up otherwise.
+This mirrors the Verified narrowing. A payment cannot reach an executable state without a timeline that knows its clearing date and cancel cutoff, because the types will not line up otherwise.
 
 ## Transitions: the state machine as functions
 
@@ -164,9 +164,9 @@ There is no `setStatus`. Each legal edge is a top-level extension function that 
 | `ProcessedSplitPayment` | `toPaidSplitPayment()` · `toReturnedSplitPayment()` |
 | `PaidSplitPayment` / `ReturnedSplitPayment` / `RepresentingSplitPayment` / `RepresentedSplitPayment` | mirror the Full edges at the split level |
 
-Notice that the pending to accepted edge *demands* the verified pieces as arguments. Validation's outputs are the transition's inputs. Note `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)` too. That is the corporate fan-out edge, where an already-processing parent spawns `ACCEPTED` split legs once its allocations arrive.
+The pending to accepted edge takes the verified pieces as arguments, so validation's outputs are the transition's inputs. `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)` is the corporate fan-out edge, where an already-processing parent spawns `ACCEPTED` split legs once its allocations arrive.
 
-A [stage](../principles/core-build/stages.md) is essentially one of these functions plus the persistence and event publication around it, which is why stage signatures are so clean.
+A [stage](../principles/core-build/stages.md) is one of these functions plus the persistence and event publication around it, which is why stage signatures stay short.
 
 :::note[Still to be modelled]
 There are no types yet for `DISALLOWED`, `ALLOCATING`, or `ALLOCATED`, and no first-class Allocation entity, since splits plus `SplitSlice` carry that today. The processing dimensions ride in the routing context, not on these types. The [spec's state model](../../design/payment-state-model.md) remains the target picture.

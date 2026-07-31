@@ -1,14 +1,19 @@
 /* CompareTable — the dimension on the left, the legacy estate in the middle,
    the modern platform on the right. Follows the ApiTable treatment: a rounded
-   panel, a solid blue header band with tracked small-caps, no zebra striping,
-   and colour used only where it carries meaning (which side a phrase is on). */
+   panel, a solid blue header band with tracked small-caps, rows alternating on
+   the shared --amex-row-alt, and colour used only where it carries meaning
+   (which side a phrase is on). */
 
+/* The house card, per the recipe in custom.css section 9a. */
 .wrap {
   margin: 1.4rem 0 2rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 15px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
+  border: 2.5px solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
   overflow: hidden;
   overflow-x: auto;
 }
@@ -45,17 +50,16 @@
 }
 
 .table tbody tr {
-  border-top: 1px solid var(--amex-line);
   background: none;
   transition: background-color 0.15s ease;
 }
 
-.table tbody tr:first-child {
-  border-top: none;
+.table tbody tr:nth-child(2n) {
+  background: var(--amex-row-alt);
 }
 
 .table tbody tr:hover {
-  background: color-mix(in srgb, var(--amex-blue) 4%, transparent);
+  background: var(--amex-row-hover);
 }
 
 .table tbody th,
@@ -114,9 +118,6 @@
 }
 :global([data-theme='dark']) .hiModern {
   color: var(--amex-blue-bright);
-}
-:global([data-theme='dark']) .table tbody tr:hover {
-  background: color-mix(in srgb, var(--amex-blue-bright) 7%, transparent);
 }
 
 @media (max-width: 700px) {

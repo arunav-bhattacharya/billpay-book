@@ -1,6 +1,6 @@
 ---
-title: A Closer Look
-sidebar_label: A Closer Look
+title: Components in Detail
+sidebar_label: Components in Detail
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -113,9 +113,9 @@ export const SCHEDULES = [
   {schedule: 'Data Purge', workflow: 'DataPurgingWF'},
 ];
 
-# A Closer Look
+# Components in Detail
 
-<Lead>The blocks the [overview](./overview.md) introduced, one at a time: the gateway and the core APIs, the router, the two worker pools, the building blocks inside a workflow, and the async edges.</Lead>
+<Lead>The blocks the [overview](./overview.md) introduced, one at a time: the gateway and the core APIs, the router, the two worker pools, the parts inside a workflow, and the event handlers and schedules around it.</Lead>
 
 ## How a request gets in
 
@@ -123,7 +123,7 @@ Upstream channels never call Billpay directly. They call **One-Data Functions**,
 
 <ApiTable rows={FUNCTIONS} />
 
-Event-driven functions such as `MoneyMovementEventHandler` bring async outcomes back in. Those are covered under [Async edges](#async-edges).
+Event-driven functions such as `MoneyMovementEventHandler` bring async outcomes back in. Those are covered under [Event handlers and schedules](#event-handlers-and-schedules).
 
 ## Billpay Router
 
@@ -179,11 +179,11 @@ Workflows run on two Temporal worker pools, divided by whether someone is waitin
 
 <WorkerSplit workers={WORKERS} strips={STRIPS} />
 
-Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level. The periodic work the Offline worker carries is fired by Temporal Schedules, listed under [Async edges](#async-edges).
+Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level. The periodic work the Offline worker carries is fired by Temporal Schedules, listed under [Event handlers and schedules](#event-handlers-and-schedules).
 
-## Building Blocks
+## Inside a workflow
 
-Inside a workflow, work is layered so each concern lives in exactly one place, and a workflow never calls an external system directly.
+Work is layered so each concern lives in exactly one place, and a workflow never calls an external system directly.
 
 <Highlights
   accent="var(--amex-cat-architecture)"
@@ -218,7 +218,7 @@ Inside a workflow, work is layered so each concern lives in exactly one place, a
 
 The call direction is strict: **Workflow → Stage → ActivityGroup → Activity → Client → external system**. It is **composition, not inheritance**, so there is one workflow per journey, and market or account-type variation comes from swapping stage and activity-group implementations. The full call rules, code locations, and naming conventions live in the Design section.
 
-## Async edges
+## Event handlers and schedules
 
 **Event handlers** are the event-driven One-Data functions that take async outcomes in: money movement for returns and settlement, Accounts-Receivable posting, and Open-To-Buy updates. Each one is recorded in the external-events tracker, so a workflow can advance or a payment can close out to `PAID`.
 

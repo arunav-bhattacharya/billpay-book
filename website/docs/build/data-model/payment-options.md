@@ -7,9 +7,9 @@ import Lead from '@site/src/components/Lead';
 
 # Payment Options
 
-<Lead>A payment option is <em>what the customer chose to pay</em>: the minimum due, the full statement balance, an amount they typed in. The type system tracks one fact about it, and it is the one that matters. Has the system of record confirmed it yet?</Lead>
+<Lead>A payment option is <em>what the customer chose to pay</em>: the minimum due, the full statement balance, an amount they typed in. The type system tracks one fact about it, which is whether the system of record has confirmed it yet.</Lead>
 
-## Two phases, one hierarchy
+## From reference to verified
 
 Every option starts as a **reference**. The customer named an option, but nothing is confirmed. Validation then resolves it into a **verified** option, with an id and amount the system of record stands behind.
 
@@ -32,7 +32,7 @@ The nullability *is* the state. A `PaymentOptionReference` may hold nothing but 
 
 ## The eight option types
 
-| `OptionType` | Meaning |
+| Option type | Meaning |
 | --- | --- |
 | `MINIMUM_DUE` | The minimum payment the account requires. |
 | `OUTSTANDING_BALANCE` | Everything currently owed on the account. |
@@ -61,11 +61,11 @@ data class VerifiedMinimumDuePaymentOption(
 ) : MinimumDuePaymentOption(), VerifiedPaymentOption
 ```
 
-## The one asymmetry worth remembering
+## The two options that need an amount up front
 
-Six of the eight references take an optional `value`, because the amount is the *system's* to compute. What is the minimum due? Billpay looks it up. Two require the value at construction.
+Six of the eight references take an optional `value`, because the amount is the *system's* to compute: Billpay looks up the minimum due itself. Two require the value at construction.
 
 - `OtherAmountPaymentOptionReference(value: MonetaryAmount)`
 - `InitialPaymentAmountPaymentOptionReference(value: MonetaryAmount)`
 
-Those are the user-specified amounts. There is nothing to look up, so a reference without a value would be meaningless. This is also exactly the rule `PendingFullPayment` enforces in its [init guard](./payment.md#one-guarded-doorway): amount present for user-specified options, amount absent for computed ones.
+Those are the user-specified amounts. There is nothing to look up, so a reference without a value would be meaningless. This is the same rule `PendingFullPayment` enforces in its [init guard](./payment.md#the-guard-on-pendingfullpayment): amount present for user-specified options, amount absent for computed ones.
