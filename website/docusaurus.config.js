@@ -12,7 +12,8 @@ const REPO_NAME = 'billpay-book';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Billpay Wiki',
-  tagline: "American Express's platform for processing credit-card bill payments and refunds",
+  tagline:
+    "Architecture, lifecycle, design, engineering standards, and operating guidance for American Express's Billpay platform",
   favicon: 'img/amex-logo.png',
 
   future: {
