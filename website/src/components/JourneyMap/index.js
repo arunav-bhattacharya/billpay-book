@@ -83,8 +83,8 @@ const STATUS_KIND = {
    uses, repeated here so a reader who scrolled straight to a diagram still
    knows which kind they are looking at. */
 const JOURNEY_KIND = {
-  customer: 'Customer-started',
-  system: 'System-started',
+  customer: 'Customer initiated',
+  system: 'System initiated',
 };
 
 const MODE_NOTE = {

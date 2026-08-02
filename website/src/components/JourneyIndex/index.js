@@ -18,8 +18,8 @@ import styles from './styles.module.css';
  */
 
 export const KINDS = {
-  customer: {label: 'Customer-started', gloss: 'someone is waiting'},
-  system: {label: 'System-started', gloss: 'nobody is waiting'},
+  customer: {label: 'Customer initiated', gloss: 'someone is waiting'},
+  system: {label: 'System initiated', gloss: 'nobody is waiting'},
 };
 
 function Dot({kind}) {

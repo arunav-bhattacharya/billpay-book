@@ -11,7 +11,7 @@ import ScheduleTable from '@site/src/components/ScheduleTable';
 
 <Lead>Two kinds of thing run on a timer here: **schedules** that re-trigger core workflows in waves, and a few **standalone workflows** that reconcile settlement and tidy up. All of it runs on the Offline worker, with no end user waiting.</Lead>
 
-For where these fire in the life of a payment, see the system-started journeys on [Journeys](../../journeys/index.md).
+For where these fire in the life of a payment, see the system initiated journeys on [Journeys](../../journeys/index.md).
 
 ## Schedule to workflow
 

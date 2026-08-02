@@ -90,8 +90,12 @@
  * Legend
  * ==================================================================== */
 
+/* Sits under the right-hand edge of the grid, out of the way of the cards it
+   explains. A reader who already knows the two markers never has to step over
+   it on the way down the page. */
 .legend {
   display: flex;
+  justify-content: flex-end;
   gap: 1.2rem;
   flex-wrap: wrap;
   margin: 1rem 0 0;

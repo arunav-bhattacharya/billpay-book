@@ -25,6 +25,23 @@ export const GROUPS = [
     ],
   },
   {
+    label: 'Refund a balance',
+    journeys: [
+      {label: 'Initiate a credit balance refund', to: '#initiate-a-credit-balance-refund', kind: 'customer'},
+    ],
+  },
+  {
+    label: 'Initiate payment intent',
+    journeys: [{label: 'Intent to pay', to: '#intent-to-pay', kind: 'customer'}],
+  },
+  {
+    label: 'Read payments',
+    journeys: [
+      {label: 'Read payments by account', to: '#read-payments-by-card-account', kind: 'customer'},
+      {label: 'Read details of a payment', to: '#read-details-of-a-payment', kind: 'customer'},
+    ],
+  },
+  {
     label: 'Corporate payments',
     journeys: [
       {label: 'Pay a corporate bill today', to: '#pay-a-corporate-bill-today', kind: 'customer'},
@@ -47,23 +64,6 @@ export const GROUPS = [
       {label: 'Accounts Receivable initiates a payment', to: '#accounts-receivable-initiates-a-payment', kind: 'system'},
     ],
   },
-  {
-    label: 'Refund a balance',
-    journeys: [
-      {label: 'Initiate a credit balance refund', to: '#initiate-a-credit-balance-refund', kind: 'customer'},
-    ],
-  },
-  {
-    label: 'Initiate payment intent',
-    journeys: [{label: 'Intent to pay', to: '#intent-to-pay', kind: 'customer'}],
-  },
-  {
-    label: 'Read payments',
-    journeys: [
-      {label: 'Read payments by account', to: '#read-payments-by-card-account', kind: 'customer'},
-      {label: 'Read details of a payment', to: '#read-details-of-a-payment', kind: 'customer'},
-    ],
-  },
 ];
 
 # Payment Journeys
@@ -77,8 +77,8 @@ export const GROUPS = [
 
 Every journey below uses the same diagram, so a step means the same thing throughout: what happens, which systems it calls, and the state the payment holds when it is done.
 
-- A customer-started journey opens with the person and the Amex channels they came in through. Its early steps are marked as the customer waiting, and the shaded region shows where the caller already has its answer and the rest runs unwatched.
-- A system-started journey opens with the event, the file or the schedule that set it off. Nothing is marked as waiting and there is no shaded region, because none of it is a request.
+- A customer initiated journey opens with the person and the Amex channels they came in through. Its early steps are marked as the customer waiting, and the shaded region shows where the caller already has its answer and the rest runs unwatched.
+- A system initiated journey opens with the event, the file or the schedule that set it off. Nothing is marked as waiting and there is no shaded region, because none of it is a request.
 
 </details>
 
@@ -495,6 +495,107 @@ A payment can be pulled back while it is still waiting or accepted. Once the mon
     {text: 'A payment already sent for clearing cannot be cancelled. Getting that money back means [a return](#a-payment-is-returned).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#6-cancel-a-payment', label: 'Sequence diagram'}}
+/>
+
+## Refund a balance
+
+### Initiate a credit balance refund
+
+When an account carries a credit balance, the money goes back to the customer.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Credit balance refund"
+  title="Initiate a credit balance refund"
+  origin={{
+    actor: 'Cardmember',
+    icon: 'user',
+    channels: [{icon: 'headset', label: 'Servicing rep'}],
+  }}
+  entry={[{kind: 'function', label: 'CreateCreditBalanceRefund.v1', logo: 'oneData'}]}
+  core={[{kind: 'api', label: 'POST /refunds'}]}
+  workflow={{label: 'CreateBalanceRefundWF'}}
+  status={{
+    kind: 'unmapped',
+    note: 'The function, the endpoint and the workflow all exist in the spec, but it never says which routes to which, and never describes the steps. The chain above is what the naming implies, not a documented route.',
+  }}
+/>
+
+## Initiate payment intent
+
+### Intent to pay
+
+Some payments are not Amex's to accept. The customer signals an intent, and it is only processed once their bank confirms it.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Payment intent"
+  title="Intent to pay"
+  origin={{
+    actor: 'Cardmember',
+    icon: 'user',
+    channels: [
+      {icon: 'monitor', label: 'Web'},
+      {icon: 'phone', label: 'Mobile app'},
+    ],
+  }}
+  entry={[{kind: 'function', label: 'CreatePaymentIntent.v1', logo: 'oneData'}]}
+  core={[{kind: 'api', label: 'POST /payments/intent'}]}
+  workflow={{label: 'CreatePaymentIntentWF'}}
+  status={{
+    kind: 'tbd',
+    note: 'The route to the workflow is settled. The workflow logic itself is marked TBD in the spec, so there is no journey to draw yet.',
+  }}
+/>
+
+## Read payments
+
+Reading touches none of the machinery above: no router decision, no workflow, no state change.
+
+### Read payments by card account
+
+Everything a customer has paid on one card. This is the payment history screen behind the web and mobile apps.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Reads"
+  title="Read payments by card account"
+  origin={{
+    actor: 'Cardmember or servicing rep',
+    icon: 'user',
+    channels: [
+      {icon: 'monitor', label: 'Web'},
+      {icon: 'phone', label: 'Mobile app'},
+      {icon: 'headset', label: 'Servicing rep'},
+    ],
+  }}
+  entry={[{kind: 'function', label: 'ReadPayments.v1', logo: 'oneData'}]}
+  core={[{kind: 'api', label: 'GET /payments/account/{account-id}'}]}
+  status={{
+    kind: 'read-only',
+    note: 'Lists every payment on the account. The endpoint pairing is inferred from the naming, because reads do not appear in the router table.',
+  }}
+/>
+
+### Read details of a payment
+
+One payment, and every state it moved through on the way. This is what a servicing rep opens when a customer asks what happened to a particular payment.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Reads"
+  title="Read details of a payment"
+  origin={{
+    actor: 'Cardmember',
+    icon: 'user',
+    channels: [{icon: 'headset', label: 'Servicing rep'}],
+  }}
+  entry={[{kind: 'function', label: 'ReadPaymentEventsById.v1', logo: 'oneData'}]}
+  core={[{kind: 'api', label: 'GET /payments/{payment-id}'}]}
+  status={{
+    kind: 'read-only',
+    note: 'Returns the lifecycle history of a single payment, which is the audit trail written at every state change on the diagrams above. Like the account read, the endpoint pairing is inferred rather than stated.',
+  }}
 />
 
 ## Corporate payments
@@ -1080,107 +1181,6 @@ Some payments start inside Amex. Accounts Receivable raises one on the customer'
     {step: 4, text: 'The Scheduled Payments Executor wakes it on the due date and checks it again before any money moves.'},
     {text: 'Accounts Receivable also raises refunds through the same function. The spec covers only the payment side, so that is all this diagram claims.'},
   ]}
-/>
-
-## Refund a balance
-
-### Initiate a credit balance refund
-
-When an account carries a credit balance, the money goes back to the customer.
-
-<JourneyMap
-  kind="customer"
-  eyebrow="Credit balance refund"
-  title="Initiate a credit balance refund"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [{icon: 'headset', label: 'Servicing rep'}],
-  }}
-  entry={[{kind: 'function', label: 'CreateCreditBalanceRefund.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /refunds'}]}
-  workflow={{label: 'CreateBalanceRefundWF'}}
-  status={{
-    kind: 'unmapped',
-    note: 'The function, the endpoint and the workflow all exist in the spec, but it never says which routes to which, and never describes the steps. The chain above is what the naming implies, not a documented route.',
-  }}
-/>
-
-## Initiate payment intent
-
-### Intent to pay
-
-Some payments are not Amex's to accept. The customer signals an intent, and it is only processed once their bank confirms it.
-
-<JourneyMap
-  kind="customer"
-  eyebrow="Payment intent"
-  title="Intent to pay"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'CreatePaymentIntent.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments/intent'}]}
-  workflow={{label: 'CreatePaymentIntentWF'}}
-  status={{
-    kind: 'tbd',
-    note: 'The route to the workflow is settled. The workflow logic itself is marked TBD in the spec, so there is no journey to draw yet.',
-  }}
-/>
-
-## Read payments
-
-Reading touches none of the machinery above: no router decision, no workflow, no state change.
-
-### Read payments by card account
-
-Everything a customer has paid on one card. This is the payment history screen behind the web and mobile apps.
-
-<JourneyMap
-  kind="customer"
-  eyebrow="Reads"
-  title="Read payments by card account"
-  origin={{
-    actor: 'Cardmember or servicing rep',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'ReadPayments.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'GET /payments/account/{account-id}'}]}
-  status={{
-    kind: 'read-only',
-    note: 'Lists every payment on the account. The endpoint pairing is inferred from the naming, because reads do not appear in the router table.',
-  }}
-/>
-
-### Read details of a payment
-
-One payment, and every state it moved through on the way. This is what a servicing rep opens when a customer asks what happened to a particular payment.
-
-<JourneyMap
-  kind="customer"
-  eyebrow="Reads"
-  title="Read details of a payment"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [{icon: 'headset', label: 'Servicing rep'}],
-  }}
-  entry={[{kind: 'function', label: 'ReadPaymentEventsById.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'GET /payments/{payment-id}'}]}
-  status={{
-    kind: 'read-only',
-    note: 'Returns the lifecycle history of a single payment, which is the audit trail written at every state change on the diagrams above. Like the account read, the endpoint pairing is inferred rather than stated.',
-  }}
 />
 
 ## Where to go deeper
