@@ -4,6 +4,7 @@ sidebar_label: State Model
 ---
 
 import Lead from '@site/src/components/Lead';
+import StateLegend from '@site/src/components/StateLegend';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -21,7 +22,8 @@ Consumer and corporate payments share the lifecycle. The one difference: corpora
 ```mermaid
 ---
 config:
-  rankSpacing: 28
+  nodeSpacing: 40
+  rankSpacing: 34
 ---
 stateDiagram-v2
   direction TB
@@ -52,13 +54,16 @@ stateDiagram-v2
   DISALLOWED --> [*]
 ```
 
+<StateLegend />
+
 </TabItem>
 <TabItem value="corporate" label="Corporate">
 
 ```mermaid
 ---
 config:
-  rankSpacing: 28
+  nodeSpacing: 40
+  rankSpacing: 34
 ---
 stateDiagram-v2
   direction TB
@@ -90,6 +95,8 @@ stateDiagram-v2
   DECLINED --> [*]
   CANCELLED --> [*]
 ```
+
+<StateLegend />
 
 :::info[Scheduled vs. immediate]
 After `ALLOCATED`, an immediate corporate payment continues straight to `PROCESSING`. A scheduled one is re-validated on its execution date instead. It moves to `ACCEPTED` if it is still valid, and `DECLINED` if it is not.

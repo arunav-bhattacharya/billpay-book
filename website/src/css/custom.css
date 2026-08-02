@@ -923,10 +923,14 @@ details.alert > summary {
   fill: color-mix(in srgb, var(--amex-state-intermediate) 13%, var(--amex-panel)) !important;
   stroke: var(--amex-state-intermediate) !important;
 }
+/* The state name takes the colour of the box it sits in, so a row of terminal
+   states reads as one thing at a glance rather than as three tinted boxes with
+   the same navy text in them. Every pairing here clears 4.5:1 against its own
+   fill, in both themes. */
 .docusaurus-mermaid-container svg.statediagram .nodeLabel,
 .docusaurus-mermaid-container svg.statediagram .nodeLabel p {
-  fill: var(--amex-txt-strong) !important;
-  color: var(--amex-txt-strong) !important;
+  fill: var(--amex-state-intermediate) !important;
+  color: var(--amex-state-intermediate) !important;
   font-weight: 600;
 }
 
@@ -937,6 +941,15 @@ details.alert > summary {
   fill: color-mix(in srgb, var(--amex-state-success) 15%, var(--amex-panel)) !important;
   stroke: var(--amex-state-success) !important;
 }
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-PAID'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-PAID'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-RETURNED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-RETURNED'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-REPRESENTED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-REPRESENTED'] .nodeLabel p {
+  fill: var(--amex-state-success) !important;
+  color: var(--amex-state-success) !important;
+}
 
 /* Terminal failure — DECLINED, DISALLOWED, CANCELLED (red). */
 .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] > rect.label-container,
@@ -944,6 +957,15 @@ details.alert > summary {
 .docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] > rect.label-container {
   fill: color-mix(in srgb, var(--amex-state-failure) 13%, var(--amex-panel)) !important;
   stroke: var(--amex-state-failure) !important;
+}
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DISALLOWED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DISALLOWED'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] .nodeLabel p {
+  fill: var(--amex-state-failure) !important;
+  color: var(--amex-state-failure) !important;
 }
 
 /* Choice diamonds (<<choice>>) — gold. */
@@ -995,13 +1017,29 @@ details.alert > summary {
 .docusaurus-mermaid-container svg.statediagram .edgeLabel p {
   color: var(--amex-mut) !important;
   fill: var(--amex-mut) !important;
-  background-color: var(--amex-bg) !important;
   font-size: 0.74rem !important;
   letter-spacing: -0.02em !important;
 }
+
+/* The plate behind a label hugs the words, not the box Mermaid measured.
+   Mermaid measures a label at the theme font size and we draw it a quarter
+   smaller, so a background on the outer span paints a rectangle far wider than
+   the text: "eligible (create representment)" was masking the arrows running
+   past it on both sides. Painting the inline text instead keeps the label
+   legible over a line without cutting anything. box-decoration-break carries
+   the padding onto the second line of a label that wraps. */
+.docusaurus-mermaid-container svg.statediagram .edgeLabel {
+  background-color: transparent !important;
+}
+.docusaurus-mermaid-container svg.statediagram .edgeLabel p {
+  display: inline;
+  padding: 0 0.2em;
+  background-color: var(--amex-bg) !important;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
 .docusaurus-mermaid-container svg.statediagram .edgeLabel rect {
-  fill: var(--amex-bg) !important;
-  opacity: 0.85 !important;
+  fill: none !important;
 }
 
 /* ==================================================================== *

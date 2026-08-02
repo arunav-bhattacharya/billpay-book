@@ -1,0 +1,37 @@
+/* StateLegend — the swatches are miniatures of the state boxes in section 13
+   of custom.css, built from the same tokens. See index.js. */
+
+.legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0.2rem 0 1.6rem;
+  font-size: 0.86rem;
+  color: var(--amex-mut);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.swatch {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid var(--amex-state-intermediate);
+  background: color-mix(in srgb, var(--amex-state-intermediate) 13%, var(--amex-panel));
+}
+
+.swatch[data-tone='success'] {
+  border-color: var(--amex-state-success);
+  background: color-mix(in srgb, var(--amex-state-success) 15%, var(--amex-panel));
+}
+
+.swatch[data-tone='failure'] {
+  border-color: var(--amex-state-failure);
+  background: color-mix(in srgb, var(--amex-state-failure) 13%, var(--amex-panel));
+}
