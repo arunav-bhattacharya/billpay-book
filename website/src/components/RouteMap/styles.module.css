@@ -105,15 +105,14 @@
 }
 
 /* Account-type tag on split/allocation rows — the routing behavior, made visible. */
+/* 6px, the badge corner the rest of the site uses. This was the only 5px on
+   the site. */
 .acct {
-  display: inline-block;
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: var(--dt-chip);
+  --chip-pad: 0.05rem 0.42rem;
   margin-right: 0.45rem;
-  padding: 0.05rem 0.42rem;
-  border-radius: 5px;
-  font-size: var(--dt-chip);
-  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   vertical-align: 1px;
 }
 .consumer {

@@ -45,10 +45,11 @@
 }
 
 .behavior {
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: 0.72rem;
+  --chip-weight: 400;
+  --chip-tracking: normal;
   font-family: var(--amex-font-mono);
-  font-size: 0.72rem;
-  padding: 1px 7px;
-  border-radius: 6px;
   color: var(--amex-mut);
   background: color-mix(in srgb, var(--amex-cat-design) 8%, transparent);
   border: 1px solid var(--amex-line);

@@ -111,11 +111,11 @@
 
 .behavior,
 .generic {
-  display: inline-block;
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: 0.76rem;
+  --chip-weight: 400;
+  --chip-tracking: normal;
   margin: 0 0.25rem 0.25rem 0;
-  padding: 1px 7px;
-  font-size: 0.76rem;
-  border-radius: 6px;
   color: var(--amex-mut);
   background: color-mix(in srgb, var(--amex-mut) 8%, transparent);
   border: 1px solid var(--amex-line);

@@ -48,13 +48,10 @@
 }
 
 .tag {
-  display: inline-block;
+  composes: chip from '../../css/recipes.module.css';
+  --chip-radius: 999px;
+  --chip-fs: var(--dt-chip);
   margin-left: 0.45rem;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: var(--dt-chip);
-  font-weight: 700;
-  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--amex-mut);
   background: color-mix(in srgb, var(--amex-mut) 10%, transparent);
@@ -67,16 +64,13 @@
 }
 
 .verb {
-  display: inline-block;
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: var(--dt-chip);
+  --chip-tracking: 0.04em;
   min-width: 62px;
   margin-right: 0.5rem;
-  padding: 1px 7px;
-  border-radius: 6px;
   text-align: center;
   font-family: var(--amex-font-sans);
-  font-size: var(--dt-chip);
-  font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .post {
