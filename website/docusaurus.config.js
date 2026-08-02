@@ -31,6 +31,11 @@ const config = {
 
   onBrokenLinks: 'throw',
 
+  // Holds an anchor link on target while Mermaid renders the diagrams above it.
+  // See the file for why client-side navigation needs this and a full page load
+  // does not.
+  clientModules: ['./src/clientModules/anchorScroll.js'],
+
   // Text uses Benton Sans (the Amex corporate face), self-hosted as WOFF2
   // from src/css/fonts so every browser renders it the same. Code uses SF
   // Mono. See the @font-face block in src/css/custom.css.
