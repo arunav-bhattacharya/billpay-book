@@ -1,66 +1,17 @@
-/* ScheduleTable — the periodic work, in the same panel treatment as the other
-   tables on the page: rounded surface, Amex-blue header, alternating rows. */
-
-.wrap {
-  composes: panel from '../../css/recipes.module.css';
-  margin: 1.2rem 0 2rem;
-  overflow: hidden;
-  overflow-x: auto;
-}
+/* ScheduleTable — the periodic work. Chrome comes from DataTable; this is
+   only what this table does differently. */
 
 .table {
-  width: 100%;
-  margin: 0;
-  border-collapse: collapse;
-  display: table;
-  font-size: 0.92rem;
-}
-
-.table thead tr {
-  background: var(--amex-blue);
-  border: none;
-}
-
-.table thead th {
-  padding: 0.72rem 1rem;
-  text-align: left;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #ffffff;
-  border: none;
-  white-space: nowrap;
-}
-
-.thSchedule {
-  width: 46%;
-}
-
-.table tbody tr {
-  background: none;
-  transition: background-color 0.15s ease;
-}
-
-.table tbody tr:nth-child(2n) {
-  background: var(--amex-row-alt);
-}
-
-.table tbody tr:hover {
-  background: var(--amex-row-hover);
-}
-
-.table tbody th,
-.table tbody td {
-  padding: 0.65rem 1rem;
-  border: none;
-  text-align: left;
-  vertical-align: middle;
+  --dt-margin: 1.2rem 0 2rem;
+  --dt-fs: 0.92rem;
+  --dt-th-fs: 0.82rem;
+  --dt-pad: 0.65rem 1rem;
+  --dt-valign: middle;
 }
 
 .scheduleCell {
-  font-weight: 550;
-  color: var(--amex-txt-strong);
+  --dt-cell-weight: 550;
+  --dt-cell-color: var(--amex-txt-strong);
 }
 
 .wfCell {
@@ -84,13 +35,6 @@
   border-color: color-mix(in srgb, #e0b34e 32%, transparent);
 }
 
-@media (max-width: 640px) {
-  .table {
-    font-size: 0.86rem;
-  }
-  .table thead th,
-  .table tbody th,
-  .table tbody td {
-    padding: 0.6rem 0.7rem;
-  }
-}
+/* The narrow step is DataTable's, at 700px rather than the 640px this table
+   used to carry alone. One breakpoint for every table on a page beats each
+   one reflowing at its own width. */

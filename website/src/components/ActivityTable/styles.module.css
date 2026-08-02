@@ -1,10 +1,6 @@
 /* ActivityTable — the activity catalogue with a behavior filter above it.
-   Same panel treatment as the other tables on the site: rounded surface,
-   Amex-blue header, alternating rows. */
-
-.root {
-  margin: 1.2rem 0 2rem;
-}
+   The filter bar and the result count are passed to DataTable as its toolbar
+   and footer slots, so the whole block moves as one. */
 
 /* ---- filter bar ---- */
 
@@ -80,37 +76,16 @@
   opacity: 0.72;
 }
 
-/* ---- table ---- */
-
-.wrap {
-  composes: panel from '../../css/recipes.module.css';
-
-  overflow: hidden;
-  overflow-x: auto;
-}
+/* ---- table ---- *
+   Chrome comes from DataTable. The column widths are classes rather than the
+   width field, because they have to reset to auto at the narrow step and an
+   inline width cannot be undone by a media query. */
 
 .table {
-  width: 100%;
-  margin: 0;
-  border-collapse: collapse;
-  display: table;
-  font-size: 0.9rem;
-}
-
-.table thead tr {
-  background: var(--amex-blue);
-  border: none;
-}
-
-.table thead th {
-  padding: 0.72rem 1rem;
-  text-align: left;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #ffffff;
-  border: none;
+  --dt-fs: 0.9rem;
+  --dt-th-fs: 0.82rem;
+  --dt-th-wrap: normal;
+  --dt-margin: 1.2rem 0 2rem;
 }
 
 .thName {
@@ -123,36 +98,9 @@
   width: 17%;
 }
 
-.table tbody tr {
-  background: none;
-  transition: background-color 0.15s ease;
-}
-
-.table tbody tr:nth-child(2n) {
-  background: var(--amex-row-alt);
-}
-
-.table tbody tr:hover {
-  background: var(--amex-row-hover);
-}
-
-.table tbody th,
-.table tbody td {
-  padding: 0.7rem 1rem;
-  border: none;
-  border-top: 1px solid var(--amex-line);
-  text-align: left;
-  vertical-align: top;
-}
-
-.table tbody tr:first-child th,
-.table tbody tr:first-child td {
-  border-top: none;
-}
-
 .nameCell {
-  font-weight: 550;
-  color: var(--amex-txt-strong);
+  --dt-cell-weight: 550;
+  --dt-cell-color: var(--amex-txt-strong);
 }
 
 /* ---- behavior cell ---- */
@@ -213,15 +161,7 @@
   color: var(--amex-mut);
 }
 
-@media (max-width: 900px) {
-  .table {
-    font-size: 0.85rem;
-  }
-  .table thead th,
-  .table tbody th,
-  .table tbody td {
-    padding: 0.6rem 0.7rem;
-  }
+@media (max-width: 700px) {
   .thName,
   .thBehaviors,
   .thState {

@@ -1,0 +1,141 @@
+/* DataTable — the house table shell, shared by the table components and by
+   every markdown pipe table (src/theme/MDXComponents.js).
+
+   Every table on the site agrees on the panel, the blue header band and the
+   row rhythm, and disagrees only on size, alignment and how rows are told
+   apart. Those are the tokens below: retune the token, not the rule, so a row
+   stays one tier.
+
+   The base cell rule sits at one class plus one element, which is enough to
+   beat the theme's own `table th` rules and not much else. A per-column class
+   in a caller's module is one class, so it wins any property this file does
+   not set, and loses the ones it does. Rather than have callers reach for the
+   compound selectors that produces (`.table tbody th.whatCell` was a real one),
+   every property worth contesting is read here through var(): set the token on
+   the column's own class and it resolves on that cell, no specificity involved.
+   Those are --dt-cell-weight, --dt-cell-color and --dt-lh. */
+
+.shell {
+  composes: panel from '../../css/recipes.module.css';
+
+  /* Body and header type. The header sits one step above the body, which is
+     enough to name the columns without reopening a three-tier row. */
+  --dt-fs: 0.88rem;
+  --dt-th-fs: 0.94rem;
+  --dt-pad: 0.7rem 1rem;
+  --dt-th-pad: 0.72rem 1rem;
+  --dt-valign: top;
+  /* Chips sit a step below the body text. They are uppercase and tracked, so
+     matching --dt-fs makes them read larger than the prose beside them. */
+  --dt-chip: 0.72rem;
+
+  margin: var(--dt-margin, 1.4rem 0 2rem);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+/* When a toolbar or a footer wraps the table, the margin belongs to that
+   wrapper so the whole block moves as one. */
+.root {
+  margin: var(--dt-margin, 1.2rem 0 2rem);
+}
+.root .shell {
+  margin: 0;
+}
+
+.shell table {
+  width: 100%;
+  min-width: var(--dt-min-width, 0);
+  margin: 0;
+  border: 0;
+  border-collapse: collapse;
+  display: table;
+  box-shadow: none;
+  background: var(--dt-table-bg, transparent);
+  font-size: calc(var(--dt-fs) * var(--dt-shrink, 1));
+}
+
+.shell thead tr {
+  background: var(--dt-head-bg, var(--amex-blue));
+  border: none;
+}
+
+.shell thead th {
+  padding: var(--dt-th-pad);
+  font-size: calc(var(--dt-th-fs) * var(--dt-shrink, 1));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--dt-head-fg, #ffffff);
+  text-align: left;
+  border: none;
+  white-space: var(--dt-th-wrap, nowrap);
+}
+
+.shell tbody tr {
+  background: none;
+  transition: background-color 0.15s ease;
+}
+
+/* :where() keeps this at a single class of specificity, so a per-column class
+   in a caller's own module can win on any property it wants to set. */
+.shell tbody :where(th, td) {
+  padding: var(--dt-pad);
+  border: none;
+  /* A column that divides the row into a before and an after wants a rule down
+     one edge. It has to arrive as a token: the `border: none` above is a
+     shorthand, so it resets every longhand, and a caller's own border-left or
+     border-right would lose to it on specificity. */
+  border-left: var(--dt-divider-left, none);
+  border-right: var(--dt-divider-right, none);
+  text-align: left;
+  vertical-align: var(--dt-valign);
+  font-weight: var(--dt-cell-weight, 400);
+  line-height: var(--dt-lh, 1.5);
+  color: var(--dt-cell-color, var(--amex-txt));
+}
+
+/* ---- telling one row from the next ---- */
+
+.zebra tbody tr:nth-child(2n),
+.both tbody tr:nth-child(2n) {
+  background: var(--amex-row-alt);
+}
+.zebra tbody tr:hover,
+.both tbody tr:hover {
+  background: var(--amex-row-hover);
+}
+
+/* --dt-rule so a row can weigh its own top edge differently: a heavier rule
+   where a group starts, none at all where a row attaches to the one above it.
+   A token rather than a plain border-top on the row's class, which would lose
+   to this rule on specificity. */
+.rules tbody :where(th, td),
+.both tbody :where(th, td) {
+  border-top: var(--dt-rule, 1px solid var(--amex-line));
+}
+.rules tbody tr:first-child :where(th, td),
+.both tbody tr:first-child :where(th, td) {
+  border-top: var(--dt-rule-first, none);
+}
+
+/* Names the table to a screen reader without putting a heading on the page. */
+.caption {
+  composes: srOnly from '../../css/recipes.module.css';
+}
+
+/* The narrow step scales the caller's own sizes and overrides the padding
+   properties directly. It must not reassign --dt-fs and friends: a caller sets
+   those from its own module, at the same single-class specificity and on the
+   same element, so which one won would come down to the order the two modules
+   happen to be emitted in. That is a coin toss the build does not warn about.
+   Scaling through a token no caller sets keeps them out of the fight. */
+@media (max-width: 700px) {
+  .shell {
+    --dt-shrink: 0.93;
+  }
+  .shell thead th,
+  .shell tbody :where(th, td) {
+    padding: var(--dt-pad-sm, 0.6rem 0.7rem);
+  }
+}

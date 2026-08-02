@@ -615,7 +615,7 @@ a {
   font-weight: 600;
 }
 
-/* Markdown tables are in section 15. */
+/* Markdown tables get their chrome from src/components/DataTable. */
 
 .theme-admonition {
   border-radius: 12px;
@@ -1324,100 +1324,6 @@ details.alert > summary {
 }
 [data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
   stroke: rgba(235, 197, 100, 0.85) !important;
-}
-
-/* ---------------------------------------------------------------------------
-   15. Markdown tables — every pipe table in the docs, in the treatment the
-   table components on Components in Detail carry: a rounded panel, a solid
-   Amex-blue header band, rows alternating between the panel and one step off
-   it, and one type size through the body so a row reads as one tier rather
-   than three. The header band sits one step above that, from
-   --md-table-th-fs, which is enough to name the columns without reopening the
-   three-tier row. Resize the body from --md-table-fs.
-
-   A table cannot clip its own corners or scroll sideways, and markdown gives
-   no place to hang a wrapper, so src/theme/MDXComponents.js wraps each one in
-   .mdTable on the way through.
-
-   Emphasis is left to the content. Where a table wants its first column to
-   read as a row header, the markdown bolds it.
---------------------------------------------------------------------------- */
-.mdTable {
-  margin: 1.4rem 0 2rem;
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
-  overflow: hidden;
-  overflow-x: auto;
-
-  --md-table-fs: 0.88rem;
-  --md-table-th-fs: 0.94rem;
-}
-
-.mdTable table {
-  width: 100%;
-  display: table;
-  margin: 0;
-  border: 0;
-  border-collapse: collapse;
-  box-shadow: none;
-  font-size: var(--md-table-fs);
-}
-
-.mdTable table th,
-.mdTable table td {
-  border: 0;
-  text-align: left;
-  vertical-align: top;
-}
-
-.mdTable table thead tr {
-  background: var(--amex-blue);
-}
-
-.mdTable table thead th {
-  padding: 0.72rem 1rem;
-  font-size: var(--md-table-th-fs);
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: #ffffff;
-  white-space: nowrap;
-}
-
-.mdTable table tbody tr {
-  background: none;
-  transition: background-color 0.15s ease;
-}
-.mdTable table tbody tr:nth-child(2n) {
-  background: var(--amex-row-alt);
-}
-.mdTable table tbody tr:hover {
-  background: var(--amex-row-hover);
-}
-
-.mdTable table tbody th,
-.mdTable table tbody td {
-  padding: 0.7rem 1rem;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--amex-txt);
-}
-
-@media (max-width: 700px) {
-  .mdTable {
-    --md-table-fs: 0.82rem;
-    --md-table-th-fs: 0.88rem;
-  }
-  .mdTable table thead th,
-  .mdTable table tbody th,
-  .mdTable table tbody td {
-    padding: 0.6rem 0.7rem;
-  }
 }
 
 /* ---------------------------------------------------------------------------

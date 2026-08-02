@@ -1,5 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import clsx from 'clsx';
+import DataTable from '../DataTable';
+import {ticks} from '../../lib/inlineMarkup';
 import styles from './styles.module.css';
 
 /**
@@ -16,6 +18,12 @@ import styles from './styles.module.css';
  * behaviors each, so an AND of two filters is nearly always the same answer as
  * one of them alone, and an OR is not a question anyone asks.
  *
+ * The filter stays here rather than moving into DataTable. Every part of it is
+ * particular to this catalogue: Generic is a made-up value meaning an empty
+ * list, the chips are ordered by first appearance, a row's own chip lights up
+ * when it is the one being filtered on, and the footer is a three-way
+ * sentence. As a general prop it would need four callbacks to say all that.
+ *
  * rows: [{name, behaviors: string[], transition, does: string[]}]
  *       behaviors: [] means generic. Backticks in transition and does render as code.
  */
@@ -23,118 +31,113 @@ import styles from './styles.module.css';
 const GENERIC = 'Generic';
 const ALL = 'All';
 
-/** Inline `code` spans, so row data stays plain readable strings. */
-function Ticks({children}) {
-  const parts = String(children).split(/`([^`]+)`/);
-  return (
-    <>
-      {parts.map((part, i) =>
-        i % 2 === 1 ? <code key={i}>{part}</code> : <React.Fragment key={i}>{part}</React.Fragment>,
-      )}
-    </>
-  );
-}
-
 export default function ActivityTable({rows = []}) {
   const [active, setActive] = useState(ALL);
+
+  const matches = (r, key) =>
+    key === ALL ? true : key === GENERIC ? !(r.behaviors || []).length : (r.behaviors || []).includes(key);
 
   // Behaviors in the order they first appear, so the chips read in the same
   // order as the prose that introduces them rather than alphabetically.
   const filters = useMemo(() => {
     const seen = [];
-    rows.forEach((r) => (r.behaviors || []).forEach((d) => seen.includes(d) || seen.push(d)));
-    const count = (key) =>
-      rows.filter((r) =>
-        key === ALL ? true : key === GENERIC ? !(r.behaviors || []).length : (r.behaviors || []).includes(key),
-      ).length;
-    return [ALL, GENERIC, ...seen].map((key) => ({key, count: count(key)}));
+    const counts = new Map([
+      [ALL, rows.length],
+      [GENERIC, 0],
+    ]);
+    rows.forEach((r) => {
+      const behaviors = r.behaviors || [];
+      if (!behaviors.length) {
+        counts.set(GENERIC, counts.get(GENERIC) + 1);
+      }
+      behaviors.forEach((d) => {
+        if (!seen.includes(d)) {
+          seen.push(d);
+        }
+        counts.set(d, (counts.get(d) || 0) + 1);
+      });
+    });
+    return [ALL, GENERIC, ...seen].map((key) => ({key, count: counts.get(key) || 0}));
   }, [rows]);
 
-  const shown = useMemo(
-    () =>
-      rows.filter((r) =>
-        active === ALL
-          ? true
-          : active === GENERIC
-            ? !(r.behaviors || []).length
-            : (r.behaviors || []).includes(active),
+  const shown = useMemo(() => rows.filter((r) => matches(r, active)), [rows, active]);
+
+  const columns = [
+    {
+      key: 'name',
+      header: 'Activity / ActivityGroup',
+      headerClassName: styles.thName,
+      rowHeader: true,
+      className: styles.nameCell,
+    },
+    {
+      key: 'behaviors',
+      header: 'Generic / Behaviors',
+      headerClassName: styles.thBehaviors,
+      className: styles.behaviorsCell,
+      render: (r) =>
+        (r.behaviors || []).length ? (
+          r.behaviors.map((d) => (
+            <span key={d} className={clsx(styles.behavior, active === d && styles.behaviorOn)}>
+              {d}
+            </span>
+          ))
+        ) : (
+          <span className={styles.generic}>{GENERIC}</span>
+        ),
+    },
+    {
+      key: 'transition',
+      header: 'State transition',
+      headerClassName: styles.thState,
+      className: styles.stateCell,
+      render: (r) => ticks(r.transition),
+    },
+    {
+      key: 'does',
+      header: 'What it does',
+      render: (r) => (
+        <ul className={styles.does}>
+          {(r.does || []).map((d, i) => (
+            <li key={i}>{ticks(d)}</li>
+          ))}
+        </ul>
       ),
-    [rows, active],
-  );
+    },
+  ];
 
   return (
-    <div className={styles.root}>
-      <div className={styles.bar} role="group" aria-label="Filter by behavior">
-        <span className={styles.barLabel}>Varies by</span>
-        {filters.map(({key, count}) => (
-          <button
-            key={key}
-            type="button"
-            className={clsx(styles.chip, active === key && styles.chipOn)}
-            aria-pressed={active === key}
-            onClick={() => setActive(key)}>
-            {key}
-            <span className={styles.count}>{count}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.wrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.thName}>Activity / ActivityGroup</th>
-              <th className={styles.thBehaviors}>Generic / Behaviors</th>
-              <th className={styles.thState}>State transition</th>
-              <th>What it does</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((r) => (
-              <tr key={r.name}>
-                <th scope="row" className={styles.nameCell}>
-                  {r.name}
-                </th>
-                <td className={styles.behaviorsCell}>
-                  {(r.behaviors || []).length ? (
-                    (r.behaviors || []).map((d) => (
-                      <span
-                        key={d}
-                        className={clsx(styles.behavior, active === d && styles.behaviorOn)}>
-                        {d}
-                      </span>
-                    ))
-                  ) : (
-                    <span className={styles.generic}>{GENERIC}</span>
-                  )}
-                </td>
-                <td className={styles.stateCell}>
-                  <Ticks>{r.transition}</Ticks>
-                </td>
-                <td>
-                  <ul className={styles.does}>
-                    {(r.does || []).map((d, i) => (
-                      <li key={i}>
-                        <Ticks>{d}</Ticks>
-                      </li>
-                    ))}
-                  </ul>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <p className={styles.foot}>
-        {active === ALL
-          ? `All ${shown.length} activities and activity groups.`
-          : `${shown.length} of ${rows.length} ${
-              active === GENERIC
-                ? 'run the same way in every market.'
-                : `vary by ${active}.`
-            }`}
-      </p>
-    </div>
+    <DataTable
+      className={styles.table}
+      columns={columns}
+      rows={shown}
+      rowKey={(r) => r.name}
+      separator="both"
+      toolbar={
+        <div className={styles.bar} role="group" aria-label="Filter by behavior">
+          <span className={styles.barLabel}>Varies by</span>
+          {filters.map(({key, count}) => (
+            <button
+              key={key}
+              type="button"
+              className={clsx(styles.chip, active === key && styles.chipOn)}
+              aria-pressed={active === key}
+              onClick={() => setActive(key)}>
+              {key}
+              <span className={styles.count}>{count}</span>
+            </button>
+          ))}
+        </div>
+      }
+      footer={
+        <p className={styles.foot}>
+          {active === ALL
+            ? `All ${shown.length} activities and activity groups.`
+            : `${shown.length} of ${rows.length} ${
+                active === GENERIC ? 'run the same way in every market.' : `vary by ${active}.`
+              }`}
+        </p>
+      }
+    />
   );
 }

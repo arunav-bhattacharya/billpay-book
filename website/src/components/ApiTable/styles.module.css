@@ -1,93 +1,21 @@
 /* ApiTable — gateway function on the left, the core API it delegates to in the
-   middle, what it is for on the right. Follows the RouteMap table treatment:
-   a rounded panel, tracked small-caps headers, rows alternating on the shared
-   --amex-row-alt, and colour used only where it carries meaning (the HTTP
-   verb).
+   middle, what it is for on the right. Chrome comes from DataTable; this is
+   only what this table does differently.
 
    All three columns set in the body sans. The function name and path were
-   monospaced, but nothing here needs column alignment, and mono at these
-   sizes read smaller and greyer than the prose around it.
+   monospaced, but nothing here needs column alignment, and mono at these sizes
+   read smaller and greyer than the prose around it.
 
-   Every body cell is one size: --api-fs. The column headers, function name,
-   verb badge, path and description each used to carry their own font-size,
-   spanning 0.66rem to 0.92rem, which made a single row read as four different
-   tiers. Emphasis comes from weight, colour and the badge instead. The header
-   band is the one exception, a step up at --api-th-fs. Change the tokens below
-   to resize the table. */
-
-/* The house card, per the recipe in custom.css section 9a. */
-.wrap {
-  composes: panel from '../../css/recipes.module.css';
-
-  margin: 1.4rem 0 2rem;
-  overflow: hidden;
-  overflow-x: auto;
-
-  --api-fs: 0.88rem;
-  --api-th-fs: 0.94rem;
-  /* Chips (the verb badge, the tag) sit a step below the text. They are
-     uppercase and tracked, so matching --api-fs made them read larger than
-     the prose beside them rather than equal to it. */
-  --api-chip: 0.72rem;
-}
+   Every body cell is one size. The column headers, function name, verb badge,
+   path and description each used to carry their own font-size, spanning
+   0.66rem to 0.92rem, which made a single row read as four different tiers.
+   Emphasis comes from weight, colour and the badge instead. Anything inside a
+   cell that should match the body text inherits it rather than naming a size,
+   so it follows the table down at the narrow step. */
 
 .table {
-  width: 100%;
-  margin: 0;
-  border-collapse: collapse;
-  display: table;
-  font-size: var(--api-fs);
+  --dt-valign: middle;
 }
-
-/* Header band: solid Amex blue, white type, a shade larger than the old
-   small-caps so the columns are legible rather than whispered. */
-.table thead tr {
-  background: var(--amex-blue);
-  border: none;
-}
-
-.table th,
-.table td {
-  border: none;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.table thead th {
-  padding: 0.72rem 1rem;
-  font-size: var(--api-th-fs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #ffffff;
-  border: none;
-  white-space: nowrap;
-}
-
-.table tbody tr {
-  background: none;
-  transition: background-color 0.15s ease;
-}
-
-.table tbody tr:nth-child(2n) {
-  background: var(--amex-row-alt);
-}
-
-.table tbody tr:hover {
-  background: var(--amex-row-hover);
-}
-
-.table tbody th,
-.table tbody td {
-  padding: 0.7rem 1rem;
-  font-weight: 400;
-}
-
-/* No explicit column widths. The first two columns are nowrap, so auto
-   layout sizes them to exactly what they need and gives the remainder to
-   the description, which is the only column that can wrap. Pinning them to
-   percentages instead let the browser inflate both and starved the
-   description to 150px. */
 
 /* ---- the function, linked to its contract ---- */
 /* The cell wraps but the name itself does not, so a row carrying a tag lets
@@ -100,7 +28,7 @@
 .fn {
   white-space: nowrap;
   font-family: var(--amex-font-sans);
-  font-size: var(--api-fs);
+  font-size: inherit;
   font-weight: 500;
   color: var(--amex-blue);
   text-decoration: none;
@@ -124,7 +52,7 @@
   margin-left: 0.45rem;
   padding: 1px 7px;
   border-radius: 999px;
-  font-size: var(--api-chip);
+  font-size: var(--dt-chip);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -146,7 +74,7 @@
   border-radius: 6px;
   text-align: center;
   font-family: var(--amex-font-sans);
-  font-size: var(--api-chip);
+  font-size: var(--dt-chip);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -174,7 +102,7 @@
 
 .path {
   font-family: var(--amex-font-sans);
-  font-size: var(--api-fs);
+  font-size: inherit;
   padding: 0;
   border: none;
   background: none;
@@ -182,9 +110,7 @@
 }
 
 .whatCell {
-  color: var(--amex-mut);
-  line-height: 1.5;
-  font-size: var(--api-fs);
+  --dt-cell-color: var(--amex-mut);
 }
 
 /* ---- dark ---- */
@@ -219,18 +145,8 @@
   background: color-mix(in srgb, #57b483 15%, transparent);
   border-color: color-mix(in srgb, #57b483 32%, transparent);
 }
+
 @media (max-width: 700px) {
-  /* Retune the token, not .table, so every cell shrinks together and the
-     row stays one size. */
-  .wrap {
-    --api-fs: 0.82rem;
-    --api-th-fs: 0.88rem;
-  }
-  .table thead th,
-  .table tbody th,
-  .table tbody td {
-    padding: 0.6rem 0.7rem;
-  }
   .whatCell {
     min-width: 220px;
   }

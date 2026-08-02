@@ -1,101 +1,56 @@
 /* RouteMap — the Billpay Router as a grouped, scannable table.
 
-   Set in the body sans throughout, at one size in the body: --rm-fs, with the
-   header band a step above it at --rm-th-fs. The trigger,
-   condition, workflow name, sequence arrow and the two pill labels each used
-   to carry their own font-size, spanning 0.56rem to 0.95rem, and the
-   workflow name was monospaced. Emphasis comes from weight, colour and the
-   pill fills instead. Matches the ApiTable token above it on the page.
-   Change the token to resize the whole table. */
+   Set in the body sans throughout, at one size in the body, with the header
+   band a step above it. The trigger, condition, workflow name, sequence arrow
+   and the two pill labels each used to carry their own font-size, spanning
+   0.56rem to 0.95rem, and the workflow name was monospaced. Emphasis comes
+   from weight, colour and the pill fills instead.
 
-/* The house card, per the recipe in custom.css section 9a. */
-.wrap {
-  composes: panel from '../../css/recipes.module.css';
-
-  margin: 1.4rem 0 2rem;
-  overflow: hidden;
-  overflow-x: auto;
-
-  --rm-fs: 0.88rem;
-  --rm-th-fs: 0.94rem;
-  /* Chips (the Online/Offline worker pill, the account tag) sit a step below
-     the text. They are uppercase and tracked, so matching --rm-fs made them
-     read larger than the prose beside them rather than equal to it. */
-  --rm-chip: 0.72rem;
-}
+   Chrome comes from DataTable; this is only what this table does differently.
+   In dark it swaps the blue header band for the architecture tint the rest of
+   this page carries, which is why --dt-head-bg exists. */
 
 .table {
-  width: 100%;
-  min-width: 660px;
-  border-collapse: collapse;
-  font-size: var(--rm-fs);
-  /* Transparent, so the card's own face shows through rather than a flat panel
-     colour sitting on top of it. */
-  background: transparent;
+  --dt-min-width: 660px;
+  --dt-pad: 0.6rem 0.95rem;
+  --dt-th-pad: 0.72rem 0.95rem;
+  /* This table rules its first row too, so the body starts on a hairline
+     under the header band rather than against it. */
+  --dt-rule-first: 1px solid var(--amex-line);
+  /* Chips (the Online/Offline worker pill, the account tag) sit a step below
+     the text. They are uppercase and tracked, so matching the body size made
+     them read larger than the prose beside them rather than equal to it. */
+  --dt-chip: 0.72rem;
 }
 
-/* ---- header: the Amex-blue band the page's other tables carry ---- */
-.table thead tr {
-  background: var(--amex-blue);
-}
-
-.table thead th {
-  text-align: left;
-  font-size: var(--rm-th-fs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #ffffff;
-  padding: 0.72rem 0.95rem;
-  background: none;
-  border: none;
-  white-space: nowrap;
-}
 .thTrigger { width: 1%; }
 .thCond { width: 24%; }
 
-/* ---- cells ---- */
-.table td,
-.table tbody th {
-  padding: 0.6rem 0.95rem;
-  vertical-align: top;
-  border-top: 1px solid var(--amex-line);
-}
-
 /* Trigger group cell — spans its rows, accented left rail, subtle tint. */
 .triggerCell {
-  vertical-align: middle;
-  text-align: left;
-  font-weight: 650;
-  font-size: var(--rm-fs);
-  color: var(--amex-txt-strong);
+  --dt-valign: middle;
+  --dt-cell-weight: 650;
+  --dt-cell-color: var(--amex-txt-strong);
   white-space: nowrap;
   background: color-mix(in srgb, var(--amex-cat-architecture) 5%, var(--ifm-background-color));
-  border-right: 1px solid var(--amex-line);
+  --dt-divider-right: 1px solid var(--amex-line);
   box-shadow: inset 3px 0 0 var(--amex-cat-architecture);
 }
 
 /* Stronger rule between trigger groups. */
 .groupStart > * {
-  border-top: 2px solid var(--amex-line-strong);
+  --dt-rule: 2px solid var(--amex-line-strong);
 }
 
 /* Divider between conditions within one trigger group, so each condition and
    its account variations read as a single block. */
 .condStart > td {
-  border-top: 1px solid var(--amex-line-strong);
+  --dt-rule: 1px solid var(--amex-line-strong);
 }
 
 /* Condition column. */
 .condCell {
-  color: var(--amex-txt);
-  font-size: var(--rm-fs);
   white-space: nowrap;
-}
-.condChild {
-  padding-left: 1.6rem;
-  color: var(--amex-mut);
-  font-size: var(--rm-fs);
 }
 .branch {
   margin-right: 0.35rem;
@@ -103,10 +58,15 @@
   font-weight: 700;
 }
 
-/* Child (split / allocation) rows attach to their parent — no top rule, faint tint. */
+/* Child (split / allocation) rows attach to their parent — no top rule, faint
+   tint, and the condition indented under the one it branches from. */
 .childRow > td {
-  border-top: none;
+  --dt-rule: none;
   background: color-mix(in srgb, var(--amex-cat-architecture) 4%, transparent);
+}
+.childRow > .condCell {
+  --dt-pad: 0.6rem 0.95rem 0.6rem 1.6rem;
+  --dt-cell-color: var(--amex-mut);
 }
 
 /* ---- workflow pipeline ---- */
@@ -123,7 +83,7 @@
 }
 .wfName {
   font-family: var(--amex-font-sans);
-  font-size: var(--rm-fs);
+  font-size: inherit;
   color: var(--amex-txt);
   background: none;
   border: none;
@@ -132,12 +92,11 @@
 .seq {
   color: var(--amex-mut);
   font-weight: 700;
-  font-size: var(--rm-fs);
 }
 
 /* Online / Offline — calm tinted pills (blue vs amber) rather than solid fills. */
 .worker {
-  font-size: var(--rm-chip);
+  font-size: var(--dt-chip);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -160,7 +119,7 @@
   margin-right: 0.45rem;
   padding: 0.05rem 0.42rem;
   border-radius: 5px;
-  font-size: var(--rm-chip);
+  font-size: var(--dt-chip);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -181,10 +140,8 @@
 
 /* ---- dark theme ---- */
 :global([data-theme='dark']) .table {
-  background: var(--amex-panel);
-}
-:global([data-theme='dark']) .table thead th {
-  background: color-mix(in srgb, var(--amex-cat-architecture) 20%, var(--amex-panel));
+  --dt-table-bg: var(--amex-panel);
+  --dt-head-bg: color-mix(in srgb, var(--amex-cat-architecture) 20%, var(--amex-panel));
 }
 :global([data-theme='dark']) .triggerCell {
   background: color-mix(in srgb, var(--amex-cat-architecture) 16%, var(--amex-panel));
@@ -211,13 +168,4 @@
 :global([data-theme='dark']) .travel {
   color: #e6c060;
   background: color-mix(in srgb, #e0b34e 18%, transparent);
-}
-
-@media (max-width: 640px) {
-  /* Retune the token, not .table, so every cell shrinks together and the
-     row stays one size. */
-  .wrap {
-    --rm-fs: 0.82rem;
-    --rm-th-fs: 0.88rem;
-  }
 }

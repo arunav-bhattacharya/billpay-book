@@ -1,5 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
+import DataTable from '../DataTable';
 import styles from './styles.module.css';
 
 function WfChip({name, worker}) {
@@ -40,6 +41,93 @@ function Pipeline({workflows}) {
 }
 
 /**
+ * Flatten the routes into table rows, collapsing consecutive routes that share
+ * a trigger into one group.
+ *
+ * Each group's first row carries the span for the trigger cell, and every other
+ * row in it omits that cell. The two have to agree exactly: an over-long
+ * rowSpan is not an error in HTML, it is clamped to the end of the row group,
+ * so the trigger would silently swallow the rows of the group below it. Doing
+ * the counting here, in one pass, is what keeps them in step. DataTable checks
+ * the arithmetic again in development.
+ */
+function toRows(routes) {
+  const rows = [];
+  routes.forEach((r, i) => {
+    const isNewGroup = i === 0 || routes[i - 1].trigger !== r.trigger;
+    if (isNewGroup) {
+      rows.push({
+        kind: 'main',
+        spanStart: true,
+        groupStart: rows.length > 0,
+        trigger: r.trigger,
+        label: r.condition,
+        workflows: r.workflows,
+      });
+    } else {
+      rows.push({kind: 'main', label: r.condition, workflows: r.workflows});
+    }
+    (r.children || []).forEach((ch) =>
+      rows.push({
+        kind: 'child',
+        label: ch.when,
+        account: ch.account,
+        workflows: ch.workflows,
+      }),
+    );
+  });
+  // Count each group's height only once every row of it exists.
+  let start = null;
+  rows.forEach((row, i) => {
+    if (row.spanStart) {
+      if (start !== null) {
+        rows[start].span = i - start;
+      }
+      start = i;
+    }
+  });
+  if (start !== null) {
+    rows[start].span = rows.length - start;
+  }
+  return rows;
+}
+
+const COLUMNS = [
+  {
+    key: 'trigger',
+    header: 'Trigger',
+    headerClassName: styles.thTrigger,
+    rowHeader: true,
+    scope: 'rowgroup',
+    className: styles.triggerCell,
+    rowSpan: (r) => r.span,
+    render: (r) => (r.spanStart ? r.trigger : undefined),
+  },
+  {
+    key: 'condition',
+    header: 'Condition',
+    headerClassName: styles.thCond,
+    className: styles.condCell,
+    render: (r) => (
+      <>
+        {r.kind === 'child' && (
+          <span className={styles.branch} aria-hidden="true">
+            ↳
+          </span>
+        )}
+        {r.account && <AccountTag account={r.account} />}
+        {r.label}
+      </>
+    ),
+  },
+  {
+    key: 'routes',
+    header: 'Routes to',
+    render: (r) => <Pipeline workflows={r.workflows} />,
+  },
+];
+
+/**
  * RouteMap: how the Billpay Router turns a request into workflow(s), as a
  * grouped table. Consecutive routes that share a `trigger` collapse into one
  * trigger cell (rowspan); each route's `condition` is a row, and any
@@ -54,73 +142,20 @@ function Pipeline({workflows}) {
  * }]
  */
 export default function RouteMap({routes = []}) {
-  // Collapse consecutive same-trigger routes into groups.
-  const groups = [];
-  routes.forEach((r) => {
-    const last = groups[groups.length - 1];
-    if (last && last.trigger === r.trigger) {
-      last.routes.push(r);
-    } else {
-      groups.push({trigger: r.trigger, routes: [r]});
-    }
-  });
-
+  const rows = toRows(routes);
   return (
-    <div className={styles.wrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th className={styles.thTrigger}>Trigger</th>
-            <th className={styles.thCond}>Condition</th>
-            <th>Routes to</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((g, gi) => {
-            // Flatten the group into rows: each route's main row, then its children.
-            const rows = [];
-            g.routes.forEach((r) => {
-              rows.push({kind: 'main', label: r.condition, workflows: r.workflows});
-              (r.children || []).forEach((ch) =>
-                rows.push({
-                  kind: 'child',
-                  label: ch.when,
-                  account: ch.account,
-                  workflows: ch.workflows,
-                }),
-              );
-            });
-
-            return rows.map((row, rj) => (
-              <tr
-                key={`${gi}-${rj}`}
-                className={clsx(
-                  row.kind === 'child' && styles.childRow,
-                  row.kind === 'main' && rj > 0 && styles.condStart,
-                  rj === 0 && gi > 0 && styles.groupStart,
-                )}>
-                {rj === 0 && (
-                  <th scope="rowgroup" rowSpan={rows.length} className={styles.triggerCell}>
-                    {g.trigger}
-                  </th>
-                )}
-                <td className={clsx(styles.condCell, row.kind === 'child' && styles.condChild)}>
-                  {row.kind === 'child' && (
-                    <span className={styles.branch} aria-hidden="true">
-                      ↳
-                    </span>
-                  )}
-                  {row.account && <AccountTag account={row.account} />}
-                  {row.label}
-                </td>
-                <td>
-                  <Pipeline workflows={row.workflows} />
-                </td>
-              </tr>
-            ));
-          })}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      className={styles.table}
+      columns={COLUMNS}
+      rows={rows}
+      separator="rules"
+      rowProps={(r) => ({
+        className: clsx(
+          r.kind === 'child' && styles.childRow,
+          r.kind === 'main' && !r.spanStart && styles.condStart,
+          r.groupStart && styles.groupStart,
+        ),
+      })}
+    />
   );
 }

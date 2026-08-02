@@ -1,100 +1,33 @@
 /* CompareTable — the dimension on the left, the legacy estate in the middle,
-   the modern platform on the right. Follows the ApiTable treatment: a rounded
-   panel, a solid blue header band with tracked small-caps, rows alternating on
-   the shared --amex-row-alt, and colour used only where it carries meaning
-   (which side a phrase is on). */
-
-/* The house card, per the recipe in custom.css section 9a. */
-.wrap {
-  composes: panel from '../../css/recipes.module.css';
-
-  margin: 1.4rem 0 2rem;
-  overflow: hidden;
-  overflow-x: auto;
-}
+   the modern platform on the right. Chrome comes from DataTable; this is only
+   what this table does differently. */
 
 .table {
-  width: 100%;
-  margin: 0;
-  border-collapse: collapse;
-  display: table;
-  font-size: 0.92rem;
+  --dt-fs: 0.92rem;
+  --dt-th-fs: 0.82rem;
 }
 
-.table thead tr {
-  background: var(--amex-blue);
-  border: none;
-}
-
-.table th,
-.table td {
-  border: none;
-  text-align: left;
-  vertical-align: top;
-}
-
-.table thead th {
-  padding: 0.72rem 1rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #ffffff;
-  border: none;
-  white-space: nowrap;
-}
-
-.table tbody tr {
-  background: none;
-  transition: background-color 0.15s ease;
-}
-
-.table tbody tr:nth-child(2n) {
-  background: var(--amex-row-alt);
-}
-
-.table tbody tr:hover {
-  background: var(--amex-row-hover);
-}
-
-.table tbody th,
-.table tbody td {
-  padding: 0.7rem 1rem;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
-.thWhat {
-  width: 17%;
-}
-.thLegacy,
-.thModern {
-  width: 41.5%;
-}
-
-/* ---- the dimension. The selector carries the table so it outweighs the
-   `tbody th` reset above, which would otherwise flatten it back to regular. ---- */
-.table tbody th.whatCell {
+/* ---- the dimension ---- */
+.whatCell {
+  --dt-cell-weight: 750;
+  --dt-cell-color: var(--amex-txt-strong);
+  --dt-lh: 1.35;
   font-size: 0.78rem;
-  font-weight: 750;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  line-height: 1.35;
-  color: var(--amex-txt-strong);
 }
 
 /* ---- the two sides ---- */
 .legacyCell {
-  color: var(--amex-mut);
+  --dt-cell-color: var(--amex-mut);
   font-size: 0.88rem;
 }
 
 /* a hairline between the two sides, so the row reads as a before and after */
 .modernCell {
+  --dt-divider-left: 1px solid var(--amex-line);
   position: relative;
-  color: var(--amex-txt);
   font-size: 0.88rem;
-  border-left: 1px solid var(--amex-line);
 }
 
 .hiLegacy {
@@ -116,14 +49,6 @@
 }
 
 @media (max-width: 700px) {
-  .table {
-    font-size: 0.86rem;
-  }
-  .table thead th,
-  .table tbody th,
-  .table tbody td {
-    padding: 0.6rem 0.7rem;
-  }
   .legacyCell,
   .modernCell {
     min-width: 190px;

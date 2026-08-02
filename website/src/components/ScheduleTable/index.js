@@ -1,4 +1,5 @@
 import React from 'react';
+import DataTable from '../DataTable';
 import styles from './styles.module.css';
 
 /**
@@ -9,29 +10,29 @@ import styles from './styles.module.css';
  *
  * rows: [{schedule, workflow}]
  */
+const COLUMNS = [
+  {
+    key: 'schedule',
+    header: 'Schedule',
+    width: '46%',
+    rowHeader: true,
+    className: styles.scheduleCell,
+  },
+  {
+    key: 'workflow',
+    header: 'Workflow it fires',
+    className: styles.wfCell,
+    render: (r) => <code className={styles.wf}>{r.workflow}</code>,
+  },
+];
+
 export default function ScheduleTable({rows = []}) {
   return (
-    <div className={styles.wrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th className={styles.thSchedule}>Schedule</th>
-            <th>Workflow it fires</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.schedule}>
-              <th scope="row" className={styles.scheduleCell}>
-                {r.schedule}
-              </th>
-              <td className={styles.wfCell}>
-                <code className={styles.wf}>{r.workflow}</code>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      className={styles.table}
+      columns={COLUMNS}
+      rows={rows}
+      rowKey={(r) => r.schedule}
+    />
   );
 }
