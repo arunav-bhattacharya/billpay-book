@@ -4,6 +4,7 @@ sidebar_label: Principles
 ---
 
 import Lead from '@site/src/components/Lead';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Build Principles
 
@@ -11,5 +12,17 @@ import Lead from '@site/src/components/Lead';
 
 The section has two halves:
 
-- [Tech Stack](./tech-stack/index.md) is what we buy: the third-party libraries and infrastructure we standardise on, each with the alternatives we weighed and why the winner won.
-- [Core Build](./core-build/index.md) is what we write: how our own code is organised into workflows, stages, activity groups, activities, and clients, and the rules that keep those layers honest.
+<SectionIndex
+  items={[
+    {
+      term: 'Tech Stack',
+      to: '/docs/build/principles/tech-stack',
+      desc: `is what we buy: the third-party libraries and infrastructure we standardise on, each with the alternatives we weighed and why the winner won.`,
+    },
+    {
+      term: 'Core Build',
+      to: '/docs/build/principles/core-build',
+      desc: `is what we write: how our own code is organised into workflows, stages, activity groups, activities, and clients, and the rules that keep those layers honest.`,
+    },
+  ]}
+/>

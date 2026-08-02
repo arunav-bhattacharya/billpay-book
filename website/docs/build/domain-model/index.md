@@ -4,6 +4,7 @@ sidebar_label: Domain Model
 ---
 
 import Lead from '@site/src/components/Lead';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Domain Model
 
@@ -32,11 +33,32 @@ Three patterns repeat throughout the model:
 
 Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary. See [Serialization](../principles/tech-stack/serialization.md).
 
-## Pages in this section
+## In this section
 
-- [Payment](./payment.md) covers `Transaction`, `Payment`, the eleven status types, Full and Split, timelines, and the transition functions that are the state machine.
-- [Payment Options](./payment-options.md) covers the eight option types and their Reference to Verified lifecycle.
-- [Instruments](./instruments.md) covers bank accounts, debit cards, and loyalty as funding instruments, with the international identification schemas.
+<SectionIndex
+  items={[
+    {
+      term: 'Payment',
+      to: '/docs/build/domain-model/payment',
+      desc: (
+        <>
+          covers <code>Transaction</code>, <code>Payment</code>, the eleven status types, Full and
+          Split, timelines, and the transition functions that are the state machine.
+        </>
+      ),
+    },
+    {
+      term: 'Payment Options',
+      to: '/docs/build/domain-model/payment-options',
+      desc: `covers the eight option types and their Reference to Verified lifecycle.`,
+    },
+    {
+      term: 'Instruments',
+      to: '/docs/build/domain-model/instruments',
+      desc: `covers bank accounts, debit cards, and loyalty as funding instruments, with the international identification schemas.`,
+    },
+  ]}
+/>
 
 The Oracle tables these types are persisted into, and how the code maps onto them, are on the [Database](../database.md) page.
 

@@ -5,6 +5,9 @@
    two hairlines a few pixels apart read as a mistake. The rows close the block
    from underneath instead. */
 .index {
+  /* One hue for every section index on the site. See index.js. */
+  --sx-accent: var(--amex-cat-vision);
+
   display: grid;
   margin: 1.15rem 0 2.2rem;
 }
@@ -19,9 +22,12 @@
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 15.5rem) minmax(0, 1fr);
-  gap: 0 1.7rem;
-  align-items: start;
+  grid-template-columns: 2.6rem minmax(0, 14rem) minmax(0, 1fr);
+  gap: 0 1.4rem;
+  /* Number, title and the first line of the description all sit on one
+     baseline. Three type sizes in a row will not line up any other way, and
+     padding tuned by eye drifts the moment a size changes. */
+  align-items: baseline;
   padding: 0.95rem 0.9rem 1rem;
   border-radius: 10px;
   color: inherit;
@@ -72,12 +78,42 @@
   opacity: 1;
 }
 
+/* Tabular figures so the column of numbers stays a column: 01 and 11 have to
+   occupy the same width or the titles beside them shift. Grey at rest, the
+   accent under the cursor. */
+.num {
+  font-size: 0.79rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.07em;
+  color: var(--amex-mut);
+  transition: color 0.17s ease;
+}
+
+.row:hover .num,
+.row:focus-visible .num {
+  color: var(--sx-accent);
+}
+
+/* The title is the link, and it is coloured like every other link on the site
+   so it reads as one from across the page. The hue belongs to the number, the
+   rail and the wash; the link keeps the site's blue. */
 .term {
   font-size: 1.06rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.35;
   letter-spacing: -0.004em;
-  color: var(--amex-txt-strong);
+  color: var(--ifm-link-color);
+}
+
+/* The underline sits on the words only. The arrow is a cue, not part of the
+   link text, and a rule running under it just looks like a typo. */
+.row:hover .termText,
+.row:focus-visible .termText {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--ifm-link-color) 45%, transparent);
 }
 
 /* Inline, not inline-block, so a title that wraps never strands the arrow on a
@@ -85,7 +121,7 @@
    there still reads it here. */
 .cue {
   margin-left: 0.4rem;
-  color: var(--sx-accent);
+  color: inherit;
   font-weight: 500;
   position: relative;
   left: 0;
@@ -97,10 +133,10 @@
   left: 3px;
 }
 
-/* Nudged down a hair so its first line sits on the title's baseline rather
-   than above it. */
+/* Held to a readable measure so a collapsed sidebar does not stretch the line
+   to ninety characters. */
 .desc {
-  padding-top: 0.14rem;
+  max-width: 64ch;
   font-size: 0.92rem;
   line-height: 1.55;
   color: var(--amex-mut);
@@ -114,9 +150,18 @@
    The row keeps its hairline, so the block still reads as a contents list. */
 @media (max-width: 996px) {
   .row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.32rem;
+    grid-template-columns: 2.2rem minmax(0, 1fr);
+    gap: 0.32rem 0;
     padding: 0.85rem 0.75rem 0.9rem;
+  }
+
+  .num {
+    grid-row: 1;
+  }
+
+  .term,
+  .desc {
+    grid-column: 2;
   }
 
   .desc {

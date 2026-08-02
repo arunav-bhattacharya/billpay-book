@@ -3,15 +3,15 @@ title: Vision
 ---
 
 import Lead from '@site/src/components/Lead';
-import Highlights from '@site/src/components/Highlights';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Vision
 
 <Lead>American Express's platform for credit card **bill payments and refunds**. One core processes every payment the same way in every market, and absorbs the differences between markets, account types, and processing rules.</Lead>
 
-## Pages in this section
+## In this section
 
-<Highlights
+<SectionIndex
   items={[
     {
       term: 'Payments Overview',

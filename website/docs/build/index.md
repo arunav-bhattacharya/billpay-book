@@ -3,16 +3,15 @@ title: Build
 ---
 
 import Lead from '@site/src/components/Lead';
-import Highlights from '@site/src/components/Highlights';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Build
 
 <Lead>[Design](../design/index.md) describes what the platform does: the lifecycle, the workflows, the component model. This section is how we build it. It covers the stack we chose and why, how the code is organised, and how to write each kind of component.</Lead>
 
-## Pages in this section
+## In this section
 
-<Highlights
-  accent="var(--amex-cat-build)"
+<SectionIndex
   items={[
     {
       term: 'Principles',

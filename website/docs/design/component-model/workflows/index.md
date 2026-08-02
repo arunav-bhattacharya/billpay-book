@@ -3,7 +3,7 @@ title: Workflows
 ---
 
 import Lead from '@site/src/components/Lead';
-import Highlights from '@site/src/components/Highlights';
+import SectionIndex from '@site/src/components/SectionIndex';
 import WorkerSplit from '@site/src/components/WorkerSplit';
 
 export const WORKERS = [
@@ -39,24 +39,9 @@ export const WORKERS = [
 
 <Lead>A workflow orchestrates one payment journey end to end. Every workflow runs on Temporal, falls into one of three kinds, and executes on the Online or Offline worker depending on whether an end user is waiting for it.</Lead>
 
-## Where workflows run
+## In this section
 
-Workflows run on two Temporal worker pools, divided by whether someone is waiting for the answer.
-
-<WorkerSplit workers={WORKERS} />
-
-:::info[Either worker]
-Three workflows run on both, depending on where in the journey they are invoked: **Create Schedule Payment**, **Execute Split Payment**, and **Create Balance Refund**.
-:::
-
-Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../../../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level.
-
-Each workflow on the pages below carries the worker it runs on, alongside the behaviors that select its implementations.
-
-## Pages in this section
-
-<Highlights
-  accent="var(--amex-cat-design)"
+<SectionIndex
   items={[
     {
       term: 'Core',
@@ -75,3 +60,17 @@ Each workflow on the pages below carries the worker it runs on, alongside the be
     },
   ]}
 />
+
+## Workers
+
+Workflows run on two Temporal worker pools, divided by whether someone is waiting for the answer.
+
+<WorkerSplit workers={WORKERS} />
+
+:::info[Either worker]
+Three workflows run on both, depending on where in the journey they are invoked: **Create Schedule Payment**, **Execute Split Payment**, and **Create Balance Refund**.
+:::
+
+Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../../../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level.
+
+Each workflow on the pages in this section carries the worker it runs on, alongside the behaviors that select its implementations.

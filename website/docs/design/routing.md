@@ -58,7 +58,7 @@ Each trigger below arrives through a One-Data function and a core endpoint. Thos
   ]}
 />
 
-The `Online` and `Offline` tags are the [Temporal worker](./component-model/workflows/index.md#where-workflows-run) the workflow runs on. Three workflows appear on both, because the worker depends on where in the journey they are called.
+The `Online` and `Offline` tags are the [Temporal worker](./component-model/workflows/index.md#workers) the workflow runs on. Three workflows appear on both, because the worker depends on where in the journey they are called.
 
 ## Child workflows
 

@@ -3,10 +3,25 @@ title: Operations
 ---
 
 import Lead from '@site/src/components/Lead';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Operations
 
 <Lead>Running Billpay day to day: the **surfaces an operator should be comfortable with**, and the standard procedures for the scenarios that come up.</Lead>
 
-- [Familiarity](./familiarity/index.md) covers the surfaces an operator should be comfortable with, from the everyday UIs down to the infrastructure underneath them.
-- [SOPs](./sops.md) holds the standard operating procedures: step-by-step runbooks for common operational scenarios.
+## In this section
+
+<SectionIndex
+  items={[
+    {
+      term: 'Familiarity',
+      to: '/docs/operations/familiarity',
+      desc: `covers the surfaces an operator should be comfortable with, from the everyday UIs down to the infrastructure underneath them.`,
+    },
+    {
+      term: 'SOPs',
+      to: '/docs/operations/sops',
+      desc: `holds the standard operating procedures: step-by-step runbooks for common operational scenarios.`,
+    },
+  ]}
+/>

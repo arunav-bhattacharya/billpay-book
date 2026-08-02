@@ -19,17 +19,30 @@ import styles from './styles.module.css';
  * bar the sidebar puts against the page you are on. There it means you are
  * here. Here it means you are going here.
  *
- * Props match Highlights (`items` of `{term, to, desc}`, plus `accent`), so a
- * page can move between the two without its content being rewritten.
+ * The numbers are the sidebar's, too. It counts the sections 01 to 08 and the
+ * homepage counts them the same way, so a section counting its own pages is
+ * the same habit one level down. They are grey until the cursor is on the row,
+ * which is the only way a number should ever compete with a page title.
+ *
+ * There is no accent prop. Every section index carries the same Amex blue,
+ * whichever section it is in: the colour here marks the row under the cursor,
+ * and a marker that changes hue from one section to the next has to be learned
+ * again on each page. The section hues still do their work elsewhere.
+ *
+ * `items` are `{term, to, desc}`, matching Highlights, so a page can move
+ * between the two without its content being rewritten.
  */
-export default function SectionIndex({items = [], accent = 'var(--amex-cat-vision)'}) {
+export default function SectionIndex({items = []}) {
   return (
-    <div className={styles.index} style={{'--sx-accent': accent}}>
+    <div className={styles.index}>
       {items.map((it, i) => (
         <Link key={i} to={it.to} className={styles.row}>
           <span className={styles.rail} aria-hidden="true" />
+          <span className={styles.num} aria-hidden="true">
+            {String(i + 1).padStart(2, '0')}
+          </span>
           <span className={styles.term}>
-            {it.term}
+            <span className={styles.termText}>{it.term}</span>
             <span className={styles.cue} aria-hidden="true">→</span>
           </span>
           {it.desc && <span className={styles.desc}>{it.desc}</span>}

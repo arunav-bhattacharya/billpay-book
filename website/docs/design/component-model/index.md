@@ -3,16 +3,15 @@ title: Component Model
 ---
 
 import Lead from '@site/src/components/Lead';
-import Highlights from '@site/src/components/Highlights';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Component Model
 
 <Lead>The [design principles](../principles.md) set out five layered components and the rule that each may only call the layers beneath it. These pages take three of those layers and list what actually exists: every workflow, every stage, and every activity group the platform runs.</Lead>
 
-## Pages in this section
+## In this section
 
-<Highlights
-  accent="var(--amex-cat-design)"
+<SectionIndex
   items={[
     {
       term: 'Workflows',

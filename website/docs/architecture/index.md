@@ -3,16 +3,15 @@ title: Architecture
 ---
 
 import Lead from '@site/src/components/Lead';
-import Highlights from '@site/src/components/Highlights';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Architecture
 
 <Lead>Billpay is **layered so each tier has one responsibility**. A request travels from the API gateway at the top down to the systems that move the money, and async outcomes loop back in through event handlers.</Lead>
 
-## Pages in this section
+## In this section
 
-<Highlights
-  accent="var(--amex-cat-architecture)"
+<SectionIndex
   items={[
     {
       term: 'Overview',

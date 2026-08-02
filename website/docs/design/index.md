@@ -3,16 +3,15 @@ title: Design
 ---
 
 import Lead from '@site/src/components/Lead';
-import Highlights from '@site/src/components/Highlights';
+import SectionIndex from '@site/src/components/SectionIndex';
 
 # Design
 
 <Lead>Design sets out the **precise model** behind the platform: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.</Lead>
 
-## Pages in this section
+## In this section
 
-<Highlights
-  accent="var(--amex-cat-design)"
+<SectionIndex
   items={[
     {
       term: 'Principles',
