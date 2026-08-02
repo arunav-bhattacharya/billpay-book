@@ -43,7 +43,10 @@ export default function CompositionMap({apis = [], behaviors = [], run = {}, foo
           </div>
         </div>
 
-        <div className={styles.row}>
+        {/* The label sits above this row rather than beside it. The behaviors
+            are whole questions, and a fixed label column beside them costs the
+            width the longest one needs to stay on a single line. */}
+        <div className={`${styles.row} ${styles.rowStacked}`}>
           <span className={styles.rowLabel}>Behaviors</span>
           <ul className={styles.behaviors}>
             {behaviors.map((d) => (

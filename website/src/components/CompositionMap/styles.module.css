@@ -72,6 +72,17 @@
   border-top: 1px solid var(--amex-line);
 }
 
+/* Label above, content across the full width of the band. */
+.rowStacked {
+  display: block;
+}
+
+.rowStacked .rowLabel {
+  display: block;
+  width: auto;
+  margin-bottom: 0.6rem;
+}
+
 .rowLabel {
   flex: none;
   width: 132px;
@@ -105,7 +116,12 @@
    in the profile band below, so they are not repeated here. */
 /* The questions and their answers share one grid rather than each row being its
    own flex line. That is what puts every Y / N on the same vertical rule, and
-   it holds however far a long question wraps. */
+   it holds however far a long question wraps.
+
+   The question column is sized to its content rather than to the space
+   available, so the answers sit just past the longest question instead of
+   drifting off to the far edge of the card. `.ask` caps how wide that content
+   is allowed to get, which is what decides where the rule lands. */
 .behaviors {
   flex: 1;
   min-width: 0;
@@ -113,9 +129,10 @@
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, max-content) auto;
+  justify-content: start;
   align-items: baseline;
-  gap: 0.45rem 1.1rem;
+  gap: 0.45rem 1.4rem;
 }
 
 /* The li itself draws nothing. Its two spans are the grid items. */
@@ -136,6 +153,11 @@
 }
 
 .ask {
+  /* Sets where the answer column lands, and so how far the answers sit from the
+     questions. Wide enough for the longest question to stay on one line, which
+     is what the stacked label buys. Narrower and that question wraps; wider and
+     the answers drift away from the text on a roomy screen. */
+  max-width: 46ch;
   font-size: 0.86rem;
   line-height: 1.45;
   color: var(--amex-txt);
@@ -147,8 +169,12 @@
   align-items: baseline;
   gap: 0.5rem;
   font-size: 0.76rem;
+  font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--amex-mut);
+  /* Amex blue. --card-accent, not --amex-blue, because the flat brand blue goes
+     muddy on the dark card and this token already carries the brighter cut the
+     rest of the site uses there. */
+  color: var(--card-accent);
   white-space: nowrap;
 }
 
@@ -159,10 +185,13 @@
   text-align: center;
 }
 
+/* The separator stays quiet so the letters are the coloured thing, but it keeps
+   to the same hue rather than dropping to grey between them. */
 .answer + .answer::before {
   content: '/';
   margin-right: 0.5rem;
-  color: color-mix(in srgb, var(--amex-mut) 60%, transparent);
+  font-weight: 400;
+  color: color-mix(in srgb, var(--card-accent) 45%, transparent);
 }
 
 /* both lists are a sample of what a market picks, so each ends in an ellipsis */

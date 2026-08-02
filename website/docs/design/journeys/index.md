@@ -58,7 +58,7 @@ export const GROUPS = [
     ],
   },
   {
-    label: 'Payments raised elsewhere',
+    label: 'Other Payments',
     journeys: [
       {label: 'A third party pushes a payment', to: '#a-third-party-pushes-a-payment', kind: 'system'},
       {label: 'Accounts Receivable initiates a payment', to: '#accounts-receivable-initiates-a-payment', kind: 'system'},
@@ -1043,7 +1043,7 @@ The retry queued by a return, run on the day it comes due. Billpay checks the re
   reference={{to: '/docs/design/sequence-diagrams#8-representment-workflow', label: 'Sequence diagram'}}
 />
 
-## Payments raised elsewhere
+## Other Payments
 
 ### A third party pushes a payment
 
