@@ -17,7 +17,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Run Locally',
       to: '/docs/contributing/run-locally',
-      desc: `shows how to start the dev server and preview your changes.`,
+      desc: `How to start the dev server and preview your changes.`,
     },
     {
       term: 'Publish',

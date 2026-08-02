@@ -17,22 +17,22 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Unit',
       to: '/docs/testing/functional/unit',
-      desc: `covers workflow and activity tests built on Temporal's testing primitives.`,
+      desc: `Workflow and activity tests built on Temporal's testing primitives.`,
     },
     {
       term: 'Integration',
       to: '/docs/testing/functional/integration',
-      desc: `uses TestContainers where a dependency can run for real, and mocks where it cannot yet.`,
+      desc: `TestContainers where a dependency can run for real, and mocks where it cannot yet.`,
     },
     {
       term: 'Replay',
       to: '/docs/testing/functional/replay',
-      desc: `covers the Temporal replay tests that guard workflow determinism.`,
+      desc: `The Temporal replay tests that guard workflow determinism.`,
     },
     {
       term: 'E2E',
       to: '/docs/testing/functional/e2e',
-      desc: `covers manual or automated runs against actual API integrations.`,
+      desc: `Manual or automated runs against actual API integrations.`,
     },
   ]}
 />

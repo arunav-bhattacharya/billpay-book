@@ -17,7 +17,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Kibana Alerts',
       to: '/docs/observability/alerts/kibana',
-      desc: `covers alert definitions, escalation paths, and how to acknowledge and resolve an alert.`,
+      desc: `Alert definitions, escalation paths, and how to acknowledge and resolve an alert.`,
     },
   ]}
 />

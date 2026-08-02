@@ -51,12 +51,12 @@ Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete
     {
       term: 'Payment Options',
       to: '/docs/build/domain-model/payment-options',
-      desc: `covers the eight option types and their Reference to Verified lifecycle.`,
+      desc: `The eight option types, and the lifecycle each one runs from Reference to Verified.`,
     },
     {
       term: 'Instruments',
       to: '/docs/build/domain-model/instruments',
-      desc: `covers bank accounts, debit cards, and loyalty as funding instruments, with the international identification schemas.`,
+      desc: `Bank accounts, debit cards, and loyalty as funding instruments, with the international identification schemas.`,
     },
   ]}
 />

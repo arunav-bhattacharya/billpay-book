@@ -18,12 +18,12 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'One-Data Functions',
       to: '/docs/build/api-spec/one-data',
-      desc: `is the gateway. Every function, what it is for, and which core API it delegates to, including the event-handler functions that bring asynchronous outcomes back in.`,
+      desc: `The gateway. Every function, what it is for, and which core API it delegates to, including the event-handler functions that bring asynchronous outcomes back in.`,
     },
     {
       term: 'Billpay Core APIs',
       to: '/docs/build/api-spec/billpay-core',
-      desc: `is the REST surface. Each endpoint, how the router branches it to a workflow, and how idempotency is enforced at the boundary.`,
+      desc: `The REST surface. Each endpoint, how the router branches it to a workflow, and how idempotency is enforced at the boundary.`,
     },
   ]}
 />

@@ -17,7 +17,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Performance',
       to: '/docs/testing/non-functional/performance',
-      desc: `covers load profiles, target throughput, and p99 latency targets.`,
+      desc: `Load profiles, target throughput, and p99 latency targets.`,
     },
   ]}
 />

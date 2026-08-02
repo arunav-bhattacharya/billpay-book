@@ -17,27 +17,27 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'One-Data Functions',
       to: '/docs/deployment/deployables/one-data-functions',
-      desc: `API Gateway`,
+      desc: `The API gateway, and the functions it fronts.`,
     },
     {
       term: 'Worker App',
       to: '/docs/deployment/deployables/worker-app',
-      desc: `Online + Offline Temporal Workers, one JVM`,
+      desc: `The Online and Offline Temporal workers, in one JVM.`,
     },
     {
       term: 'Codec Server App',
       to: '/docs/deployment/deployables/codec-server-app',
-      desc: `decrypts Temporal Web UI content`,
+      desc: `Decrypts Temporal Web UI content, so workflow payloads read as plain data when you inspect them there.`,
     },
     {
       term: 'UI App',
       to: '/docs/deployment/deployables/ui-app',
-      desc: `standalone UI on top of Billpay`,
+      desc: `A standalone UI on top of Billpay.`,
     },
     {
       term: 'Mocks App',
       to: '/docs/deployment/deployables/mocks-app',
-      desc: `until the E2E testing environment is ready`,
+      desc: `A stand-in for downstream integrations until an end-to-end testing environment is ready.`,
     },
   ]}
 />

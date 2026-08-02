@@ -20,12 +20,12 @@ The section has two halves:
     {
       term: 'Tech Stack',
       to: '/docs/build/principles/tech-stack',
-      desc: `is what we buy: the third-party libraries and infrastructure we standardise on, each with the alternatives we weighed and why the winner won.`,
+      desc: `What we buy: the third-party libraries and infrastructure we standardise on, each with the alternatives we weighed and why the winner won.`,
     },
     {
       term: 'Core Build',
       to: '/docs/build/principles/core-build',
-      desc: `is what we write: how our own code is organised into workflows, stages, activity groups, activities, and clients, and the rules that keep those layers honest.`,
+      desc: `What we write: how our own code is organised into workflows, stages, activity groups, activities, and clients, and the rules that keep those layers honest.`,
     },
   ]}
 />

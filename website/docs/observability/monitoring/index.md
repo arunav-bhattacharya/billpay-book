@@ -17,17 +17,17 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'App Health',
       to: '/docs/observability/monitoring/app-health',
-      desc: `covers the Hydra console and the Opensearch dashboard.`,
+      desc: `The Hydra console and the Opensearch dashboard.`,
     },
     {
       term: 'Temporal Health',
       to: '/docs/observability/monitoring/temporal-health',
-      desc: `covers the Grafana dashboard for the Temporal cluster.`,
+      desc: `The Grafana dashboard for the Temporal cluster.`,
     },
     {
       term: 'SLA · SLI · SLO',
       to: '/docs/observability/monitoring/sla-sli-slo',
-      desc: `covers the commitments, the targets, and what we measure.`,
+      desc: `The commitments, the targets, and what we measure.`,
     },
   ]}
 />

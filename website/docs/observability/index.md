@@ -17,12 +17,12 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Monitoring',
       to: '/docs/observability/monitoring',
-      desc: `covers app health (Hydra console and the Opensearch dashboard), Temporal health (Grafana), and the SLA, SLI, and SLO targets.`,
+      desc: `App health (the Hydra console and the Opensearch dashboard), Temporal health (Grafana), and the SLA, SLI, and SLO targets.`,
     },
     {
       term: 'Alerts',
       to: '/docs/observability/alerts',
-      desc: `covers Kibana alerts.`,
+      desc: `The Kibana alerts, and what to do when one fires.`,
     },
   ]}
 />

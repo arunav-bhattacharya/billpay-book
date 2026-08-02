@@ -17,12 +17,12 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Functional',
       to: '/docs/testing/functional',
-      desc: `covers unit, integration, replay, and E2E tests.`,
+      desc: `Unit, integration, replay, and E2E tests.`,
     },
     {
       term: 'Non-Functional',
       to: '/docs/testing/non-functional',
-      desc: `covers performance testing.`,
+      desc: `Performance testing: what we run and what we expect from it.`,
     },
   ]}
 />
