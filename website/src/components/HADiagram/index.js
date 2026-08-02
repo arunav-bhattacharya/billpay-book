@@ -280,7 +280,7 @@ export default function HADiagram() {
         viewBox="0 0 1640 880"
         className={styles.svg}
         role="img"
-        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data. US West IPC1 is laid out the same way, but its billpay-core is a standby, so its One-Data routes across to the IPC2 core instead; it also holds the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, landing on the Temporal Frontend service. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster. Frontend sits at the top of that cluster as the only service a client talks to, and it shares one pod-to-pod bus with History, Matching, Worker and the cluster's remaining services, so any of them can call any other. All of them persist to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
+        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data that One-Data parks requests in and RTF replays into the core. US West IPC1 is laid out the same way, but its billpay-core is a standby, so its One-Data routes across to the IPC2 core instead; it also holds the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, running east and then straight into the cluster at the row of the Temporal Frontend service, the only Temporal service a client talks to. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster. Frontend sits at the top of that cluster as the only service a client talks to, and it shares one pod-to-pod bus with History, Matching, Worker and the cluster's remaining services, so any of them can call any other. All of them persist to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
       >
         <defs>
           <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
@@ -352,7 +352,7 @@ export default function HADiagram() {
         <Service x={210} y={218} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
 
         <path d="M300,282 V330" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={314} y={310} className={styles.bufLabel}>park + replay</text>
+        <text x={314} y={310} className={styles.bufLabel}>park · RTF replay</text>
         <RedisMark cx={300} cy={362} w={46} />
         <text x={334} y={358} className={styles.markLabel}>Redis</text>
         <text x={334} y={373} className={styles.markSub}>fallback store</text>
@@ -388,7 +388,7 @@ export default function HADiagram() {
         />
 
         <path d="M300,580 V550" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={314} y={556} className={styles.bufLabel}>park + replay</text>
+        <text x={314} y={556} className={styles.bufLabel}>park · RTF replay</text>
         <RedisMark cx={300} cy={526} w={46} />
         <text x={334} y={522} className={styles.markLabel}>Redis</text>
         <text x={334} y={537} className={styles.markSub}>fallback store</text>
@@ -401,7 +401,7 @@ export default function HADiagram() {
             The riser sits at x=440: clear of One-Data's shadow at 398, clear
             of both "fallback store" captions at 419, clear of the core at 474.
             It turns at y=330 rather than 310 so the run east does not sit on
-            the same line as the "park + replay" caption, then rises into the
+            the same line as the "park · RTF replay" caption, then rises into the
             core's underside at 520. The head stops at 287, five short of the
             box at 282, which is the gap every other request arrow leaves. */}
         <path d="M390,616 H440 V330 H520 V287" className={styles.req} markerEnd="url(#ha-m-req)" />
@@ -445,11 +445,13 @@ export default function HADiagram() {
         <circle cx={574} cy={433} r={4} className={styles.junction} />
         {/* one continuous run, hopping the Data Guard line at x=700 rather than
             breaking for it: a gap in a request path reads as a gap in the path.
-            It comes over the top of the region and drops into Frontend, the
-            only Temporal service a client ever talks to. Entering from above
-            leaves the whole left edge of the stack to the pod-to-pod bus. */}
+            It runs east through the lane between the two sites, rises in the
+            gutter between the two estates at x=1050, and comes in flat at
+            Frontend's row. The head stops at the cluster edge rather than
+            pushing on to the box, since the pod-to-pod bus owns the strip
+            between the two. */}
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V162 H1300 V218"
+          d="M574,433 H686 Q700,412 714,433 H1050 V245 H1117"
           className={styles.req}
           markerEnd="url(#ha-m-req)"
         />
@@ -537,7 +539,8 @@ export default function HADiagram() {
           <text x={90} y={816}>request path</text>
           <path d="M210,812 H250" className={styles.buf} markerEnd="url(#ha-m-buf)" />
           <text x={260} y={816}>
-            fallback: One-Data parks the request in Redis when billpay-core can&apos;t be reached, then replays it
+            fallback: One-Data parks the request in Redis when billpay-core can&apos;t be reached, and RTF picks it up
+            from Redis and replays it into the core
           </text>
           <path d="M40,846 H80" className={styles.rep} markerEnd="url(#ha-m-rep)" />
           <text x={90} y={850}>replication</text>

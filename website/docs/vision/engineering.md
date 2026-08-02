@@ -116,6 +116,10 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       title: 'Auditable execution',
       body: "Every state transition is written to the database and published as a lifecycle event, so a payment's whole history can be reconstructed after the fact.",
     },
+    {
+      title: 'Multi-layer resiliency',
+      body: 'One-Data parks requests in Redis and replays them when the core returns, and RTF retries anything it could not deliver. Temporal keeps every workflow history, so a run resumes where it stopped. Oracle Data Guard holds a standby copy of the data.',
+    },
   ]}
 />
 
@@ -131,7 +135,7 @@ The profile is what composes the workflow. When a request arrives, Billpay reads
   run={RUN}
 />
 
-:::info[When workflow not onboarded]
+:::info[When a profile is not onboarded]
 If the combination on a request was never onboarded, there is nothing to compose, so the request is turned away and no workflow starts. A consumer-only market rejects a corporate payment instead of half-processing it.
 :::
 
