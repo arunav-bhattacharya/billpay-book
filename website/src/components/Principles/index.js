@@ -9,21 +9,21 @@ import ordinal from '../../lib/ordinal';
  * leads the heading line, so the set reads in order without a list marker
  * competing with the rule itself.
  *
- * items: [{title, body}]
+ * items: [{term, desc}]
  */
 export default function Principles({items = [], accent = 'var(--amex-cat-vision)'}) {
   return (
     <div className={styles.wrap} style={{'--pr-accent': accent}}>
       <ol className={styles.rows}>
         {items.map((p, i) => (
-          <li key={p.title} className={styles.row}>
+          <li key={p.term} className={styles.row}>
             <div className={styles.head}>
               <span className={styles.numeral} aria-hidden="true">
                 {ordinal(i + 1)}
               </span>
-              <span className={styles.title}>{p.title}</span>
+              <span className={styles.title}>{p.term}</span>
             </div>
-            <div className={styles.body}>{p.body}</div>
+            <div className={styles.body}>{p.desc}</div>
           </li>
         ))}
       </ol>

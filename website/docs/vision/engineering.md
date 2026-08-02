@@ -79,16 +79,16 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
 <Principles
   items={[
     {
-      title: 'Profile driven market onboarding',
-      body: 'Onboarding a market is picking the APIs it exposes and answering a short list of questions about how it pays, once per account type it supports. Those answers become its profiles, and a market whose answers already have implementations behind them arrives as configuration rather than code.',
+      term: 'Profile driven market onboarding',
+      desc: 'Onboarding a market is picking the APIs it exposes and answering a short list of questions about how it pays, once per account type it supports. Those answers become its profiles, and a market whose answers already have implementations behind them arrives as configuration rather than code.',
     },
     {
-      title: 'Single workflow per journey',
-      body: 'A journey has one workflow, and there is no second copy of it kept for the awkward market. What differs between markets and account types is the stages and activity groups underneath.',
+      term: 'Single workflow per journey',
+      desc: 'A journey has one workflow, and there is no second copy of it kept for the awkward market. What differs between markets and account types is the stages and activity groups underneath.',
     },
     {
-      title: 'Behavior driven workflow composition',
-      body: (
+      term: 'Behavior driven workflow composition',
+      desc: (
         <>
           The behaviors on the request choose the stage and activity group implementations, and the
           workflow is handed those parts before it starts. By the time it runs there is no market
@@ -98,28 +98,28 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       ),
     },
     {
-      title: 'Durable execution',
-      body: `Temporal records each step as it happens, so a payment does not live in a process's memory. One scheduled for a future date waits through deploys and lost hosts, then carries on from the step it had reached.`,
+      term: 'Durable execution',
+      desc: `Temporal records each step as it happens, so a payment does not live in a process's memory. One scheduled for a future date waits through deploys and lost hosts, then carries on from the step it had reached.`,
     },
     {
-      title: 'Check Idempotency',
-      body: 'Every request writes an idempotency key before any work starts. A second submit hits the duplicate and gets the first payment back, so a retry on a dropped connection never moves the money twice.',
+      term: 'Check Idempotency',
+      desc: 'Every request writes an idempotency key before any work starts. A second submit hits the duplicate and gets the first payment back, so a retry on a dropped connection never moves the money twice.',
     },
     {
-      title: 'Deterministic workflows',
-      body: 'Workflow code decides from what Temporal recorded, never from the wall clock or a random number. Replay it on another host a week later and it takes the same path to the same state.',
+      term: 'Deterministic workflows',
+      desc: 'Workflow code decides from what Temporal recorded, never from the wall clock or a random number. Replay it on another host a week later and it takes the same path to the same state.',
     },
     {
-      title: 'Idempotent activities',
-      body: 'Temporal retries an activity until it succeeds, and an activity that timed out after its work landed will run again. Each one is written for that, so a second write or a second downstream call leaves the same result as the first.',
+      term: 'Idempotent activities',
+      desc: 'Temporal retries an activity until it succeeds, and an activity that timed out after its work landed will run again. Each one is written for that, so a second write or a second downstream call leaves the same result as the first.',
     },
     {
-      title: 'Auditable execution',
-      body: `Every state transition is written to the lifecycle log and published as an event. The log is only ever appended to, so a payment's history reads back in order long after it closed.`,
+      term: 'Auditable execution',
+      desc: `Every state transition is written to the lifecycle log and published as an event. The log is only ever appended to, so a payment's history reads back in order long after it closed.`,
     },
     {
-      title: 'Multi-layer resiliency',
-      body: 'No single layer is trusted to stay up. One-Data parks requests in Redis and replays them when the core is back, and the Reliable Transaction Framework (RTF) keeps retrying an event it could not deliver. Temporal holds the workflow history, so a run resumes where it stopped, and Oracle Data Guard keeps a standby copy of the data.',
+      term: 'Multi-layer resiliency',
+      desc: 'No single layer is trusted to stay up. One-Data parks requests in Redis and replays them when the core is back, and the Reliable Transaction Framework (RTF) keeps retrying an event it could not deliver. Temporal holds the workflow history, so a run resumes where it stopped, and Oracle Data Guard keeps a standby copy of the data.',
     },
   ]}
 />

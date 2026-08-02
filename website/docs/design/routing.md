@@ -17,7 +17,7 @@ Each trigger below arrives through a One-Data function and a core endpoint. Thos
 ## Trigger to workflow
 
 <RouteMap
-  routes={[
+  rows={[
     {
       trigger: 'Create payment',
       condition: 'today · single-instruction',

@@ -135,19 +135,19 @@ const COLUMNS = [
  * sub-rows beneath their parent condition, tagged with the account type that
  * selects them.
  *
- * routes: [{
+ * rows: [{
  *   trigger, condition,
  *   workflows: [{name, worker: 'Online'|'Offline'}],
  *   children?: [{when, account?: 'Consumer'|'Corporate'|'Business Travel', workflows: [...]}]
  * }]
  */
-export default function RouteMap({routes = []}) {
-  const rows = toRows(routes);
+export default function RouteMap({rows = []}) {
+  const tableRows = toRows(rows);
   return (
     <DataTable
       className={styles.table}
       columns={COLUMNS}
-      rows={rows}
+      rows={tableRows}
       separator="rules"
       rowProps={(r) => ({
         className: clsx(

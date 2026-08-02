@@ -10,7 +10,7 @@ import styles from './styles.module.css';
  * either worker, goes in an admonition after the component rather than in here.
  * A third band inside the card grid read as a third worker.
  *
- * workers: [{name, tone: 'online' | 'offline', waiting, desc, items: string[]}]
+ * workers: [{term, tone: 'Online' | 'Offline', waiting, desc, items: string[]}]
  */
 export default function WorkerSplit({workers = []}) {
   return (
@@ -18,13 +18,13 @@ export default function WorkerSplit({workers = []}) {
       <div className={styles.pair}>
         {workers.map((w) => (
           <section
-            key={w.name}
+            key={w.term}
             className={clsx(
               styles.card,
               String(w.tone).toLowerCase() === 'offline' ? styles.offline : styles.online,
             )}>
             <header className={styles.head}>
-              <span className={styles.name}>{w.name}</span>
+              <span className={styles.name}>{w.term}</span>
               <span className={styles.waiting}>{w.waiting}</span>
             </header>
             <p className={styles.desc}>{w.desc}</p>

@@ -8,8 +8,8 @@ import WorkerSplit from '@site/src/components/WorkerSplit';
 
 export const WORKERS = [
   {
-    name: 'Online worker',
-    tone: 'online',
+    term: 'Online worker',
+    tone: 'Online',
     waiting: 'someone is waiting',
     desc: 'Request-path workflows, where an end user is waiting for the answer.',
     items: [
@@ -20,8 +20,8 @@ export const WORKERS = [
     ],
   },
   {
-    name: 'Offline worker',
-    tone: 'offline',
+    term: 'Offline worker',
+    tone: 'Offline',
     waiting: 'nobody is blocked',
     desc: 'Everything triggered asynchronously, by events, by async systems such as RTF, or by a scheduler.',
     items: [

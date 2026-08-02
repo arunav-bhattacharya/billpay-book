@@ -56,16 +56,16 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
   accent="var(--amex-cat-architecture)"
   items={[
     {
-      title: 'EKS across Availability Zones',
-      body: "Temporal's services talk to each other constantly, so the cluster needs Kubernetes with pod-to-pod communication left alone. AWS lets us run one EKS cluster across several Availability Zones in a region.",
+      term: 'EKS across Availability Zones',
+      desc: "Temporal's services talk to each other constantly, so the cluster needs Kubernetes with pod-to-pod communication left alone. AWS lets us run one EKS cluster across several Availability Zones in a region.",
     },
     {
-      title: 'Hydra Multi AZ EKS Bottleneck',
-      body: 'Hydra does not form an EKS cluster across zones within a region, so the cluster would sit in a single zone. That caps how available the application can be.',
+      term: 'Hydra Multi AZ EKS Bottleneck',
+      desc: 'Hydra does not form an EKS cluster across zones within a region, so the cluster would sit in a single zone. That caps how available the application can be.',
     },
     {
-      title: 'Istio proxy hindrance',
-      body: 'On Hydra, the istio-proxy sits in the middle of pod traffic. Pod-to-pod is exactly the path Temporal depends on to operate.',
+      term: 'Istio proxy hindrance',
+      desc: 'On Hydra, the istio-proxy sits in the middle of pod traffic. Pod-to-pod is exactly the path Temporal depends on to operate.',
     },
   ]}
 />
