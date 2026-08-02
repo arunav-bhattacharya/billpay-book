@@ -27,17 +27,14 @@
   padding: 1.1rem 1.2rem 1.15rem;
 }
 
+/* This card is tinted end to end rather than carrying a pill, so it reads the
+   worker tokens directly instead of going through WorkerChip. The tokens
+   already swap per theme, so there is nothing to override here. */
 .online {
-  --wk: var(--amex-blue);
+  --wk: var(--amex-worker-online);
 }
 .offline {
-  --wk: #97600c;
-}
-:global([data-theme='dark']) .online {
-  --wk: #6ba6e6;
-}
-:global([data-theme='dark']) .offline {
-  --wk: #e0b34e;
+  --wk: var(--amex-worker-offline);
 }
 
 .head {

@@ -19,7 +19,10 @@ export default function WorkerSplit({workers = []}) {
         {workers.map((w) => (
           <section
             key={w.name}
-            className={clsx(styles.card, w.tone === 'offline' ? styles.offline : styles.online)}>
+            className={clsx(
+              styles.card,
+              String(w.tone).toLowerCase() === 'offline' ? styles.offline : styles.online,
+            )}>
             <header className={styles.head}>
               <span className={styles.name}>{w.name}</span>
               <span className={styles.waiting}>{w.waiting}</span>

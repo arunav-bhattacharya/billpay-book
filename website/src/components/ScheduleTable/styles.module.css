@@ -18,22 +18,18 @@
   white-space: nowrap;
 }
 
-/* Offline gold, the colour the Offline worker card uses. */
+/* Everything here runs on the Offline worker, so the workflow names carry that
+   worker's gold rather than the global code blue. The token swaps per theme,
+   so there is no dark-mode block to keep in step. */
 .wf {
+  composes: chip chipTinted from '../../css/recipes.module.css';
+  --chip-hue: var(--amex-worker-offline);
+  --chip-pad: 2px 8px;
+  --chip-fs: 0.78rem;
+  --chip-tracking: normal;
   font-family: var(--amex-font-mono);
-  font-size: 0.78rem;
-  padding: 2px 8px;
-  border-radius: 6px;
-  color: #97600c;
-  background: color-mix(in srgb, #97600c 11%, transparent);
-  border: 1px solid color-mix(in srgb, #97600c 28%, transparent);
 }
 
-:global([data-theme='dark']) .wf {
-  color: #e0b34e;
-  background: color-mix(in srgb, #e0b34e 14%, transparent);
-  border-color: color-mix(in srgb, #e0b34e 32%, transparent);
-}
 
 /* The narrow step is DataTable's, at 700px rather than the 640px this table
    used to carry alone. One breakpoint for every table on a page beats each

@@ -1,5 +1,5 @@
 import React from 'react';
-import clsx from 'clsx';
+import WorkerChip from '../WorkerChip';
 import styles from './styles.module.css';
 
 // The four processing behaviors, rendered as the exact spec field names so the
@@ -35,14 +35,9 @@ export default function WorkflowMeta({worker = 'Online', behaviors = []}) {
         <span className={styles.label}>Worker</span>
         <div className={styles.values}>
           {workers.map((w) => (
-            <span
-              key={w}
-              className={clsx(
-                styles.worker,
-                w.toLowerCase() === 'offline' ? styles.offline : styles.online,
-              )}>
+            <WorkerChip key={w} worker={w} className={styles.worker}>
               {w} worker
-            </span>
+            </WorkerChip>
           ))}
         </div>
       </div>

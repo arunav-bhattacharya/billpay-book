@@ -1,14 +1,14 @@
 import React from 'react';
 import clsx from 'clsx';
 import DataTable from '../DataTable';
+import WorkerChip from '../WorkerChip';
 import styles from './styles.module.css';
 
 function WfChip({name, worker}) {
-  const tone = (worker || 'Online').toLowerCase() === 'offline' ? styles.offline : styles.online;
   return (
     <span className={styles.wf}>
       <code className={styles.wfName}>{name}</code>
-      <span className={clsx(styles.worker, tone)}>{worker}</span>
+      <WorkerChip worker={worker || 'Online'} className={styles.worker} />
     </span>
   );
 }

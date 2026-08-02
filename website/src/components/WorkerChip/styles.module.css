@@ -1,0 +1,13 @@
+/* WorkerChip — Online blue, Offline gold, from the shared worker tokens.
+   Shape comes from the chip recipe and is retuned by the caller; the tone is
+   one variable so dark mode swaps it in one place instead of five. */
+
+.chip {
+  composes: chip chipTinted from '../../css/recipes.module.css';
+  --chip-hue: var(--amex-worker-online);
+  text-transform: var(--chip-caps, uppercase);
+}
+
+.offline {
+  --chip-hue: var(--amex-worker-offline);
+}

@@ -78,10 +78,16 @@
   white-space: nowrap;
 }
 
+/* The fill and edge percentages differ per theme, because a tint at the light
+   percentages disappears into a dark panel. They arrive as a fallback rather
+   than as a [data-theme] rule of their own, so that a caller which sets
+   --chip-line to nothing still gets nothing on both skins. A dark-mode rule
+   here would outrank that caller and quietly give it a border back. */
 .chipTinted {
   color: var(--chip-hue);
-  background: color-mix(in srgb, var(--chip-hue) var(--chip-fill, 13%), transparent);
-  border: 1px solid color-mix(in srgb, var(--chip-hue) var(--chip-line, 30%), transparent);
+  background: color-mix(in srgb, var(--chip-hue) var(--chip-fill, var(--chip-fill-base)), transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--chip-hue) var(--chip-line, var(--chip-line-base)), transparent);
 }
 
 /* ---- ordinals ---------------------------------------------------------

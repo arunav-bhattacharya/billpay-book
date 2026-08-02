@@ -94,23 +94,14 @@
   font-weight: 700;
 }
 
-/* Online / Offline — calm tinted pills (blue vs amber) rather than solid fills. */
+/* Shape only. The tone is WorkerChip's, from the shared worker tokens. This
+   table used to paint its fill from a different hex than its text on both
+   tones, and a cyan rather than a blue in dark. */
 .worker {
-  font-size: var(--dt-chip);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.1rem 0.4rem;
-  border-radius: 5px;
-  white-space: nowrap;
-}
-.online {
-  color: #0159ad;
-  background: color-mix(in srgb, #0166c8 13%, transparent);
-}
-.offline {
-  color: #97600c;
-  background: color-mix(in srgb, #dca02f 22%, transparent);
+  --chip-radius: 5px;
+  --chip-pad: 0.1rem 0.4rem;
+  --chip-fs: var(--dt-chip);
+  --chip-line: 0%;
 }
 
 /* Account-type tag on split/allocation rows — the routing behavior, made visible. */
@@ -148,14 +139,6 @@
 }
 :global([data-theme='dark']) .childRow > td {
   background: color-mix(in srgb, var(--amex-cat-architecture) 12%, transparent);
-}
-:global([data-theme='dark']) .online {
-  color: #7cc4f2;
-  background: color-mix(in srgb, #35b6e8 20%, transparent);
-}
-:global([data-theme='dark']) .offline {
-  color: #e6c060;
-  background: color-mix(in srgb, #e0b34e 20%, transparent);
 }
 :global([data-theme='dark']) .consumer {
   color: #5eead4;
