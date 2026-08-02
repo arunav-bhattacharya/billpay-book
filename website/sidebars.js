@@ -39,16 +39,7 @@ const sidebars = {
       items: [
         'design/principles',
         'design/payment-state-model',
-        {
-          type: 'category',
-          label: 'Journeys',
-          collapsed: true,
-          link: {type: 'doc', id: 'design/journeys/index'},
-          items: [
-            'design/journeys/customer-initiated',
-            'design/journeys/system-initiated',
-          ],
-        },
+        'design/journeys/index',
         'design/routing',
         {
           type: 'category',

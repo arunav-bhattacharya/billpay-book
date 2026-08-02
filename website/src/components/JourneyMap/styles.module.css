@@ -66,9 +66,56 @@
 /* Signature-blue banner. Both stops are brand tokens rather than theme ones, so
    the white type keeps its contrast in light and dark alike. */
 .head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 1.05rem 1.25rem 0.95rem;
   border-radius: 15px 15px 0 0;
   background: linear-gradient(135deg, var(--amex-blue) 0%, var(--amex-blue-deep) 100%);
+}
+
+.headText {
+  min-width: 0;
+}
+
+/* Who set the journey off, on the same plate for both kinds so neither reads
+   as the important one. The words carry it; the dot repeats it in shape, filled
+   for a customer waiting and hollow for nobody. */
+.kind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.26rem 0.62rem 0.28rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.94);
+  white-space: nowrap;
+}
+
+.kindDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.kind[data-kind='system'] .kindDot {
+  background: transparent;
+  border: 2px solid #ffbd85;
+}
+
+@media (max-width: 560px) {
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
 }
 
 .eyebrow {

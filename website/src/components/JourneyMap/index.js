@@ -79,6 +79,14 @@ const STATUS_KIND = {
   'read-only': 'Read-only, no workflow',
 };
 
+/* Who set the journey off. The same two words the index at the top of the page
+   uses, repeated here so a reader who scrolled straight to a diagram still
+   knows which kind they are looking at. */
+const JOURNEY_KIND = {
+  customer: 'Customer-started',
+  system: 'System-started',
+};
+
 const MODE_NOTE = {
   live: 'the customer is waiting',
   background: 'runs in the background',
@@ -340,6 +348,7 @@ function StepNode({step, index}) {
 export default function JourneyMap({
   eyebrow,
   title,
+  kind,
   topLayer = 'UI & API layer',
   coreLayer = 'Billpay core',
   origin,
@@ -379,8 +388,16 @@ export default function JourneyMap({
   return (
     <figure className={styles.wrap}>
       <header className={styles.head}>
-        {eyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
-        <h3 className={styles.title}>{title}</h3>
+        <div className={styles.headText}>
+          {eyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
+          <h3 className={styles.title}>{title}</h3>
+        </div>
+        {JOURNEY_KIND[kind] && (
+          <span className={styles.kind} data-kind={kind}>
+            <span className={styles.kindDot} aria-hidden="true" />
+            {JOURNEY_KIND[kind]}
+          </span>
+        )}
       </header>
 
       <div className={styles.canvas}>

@@ -17,4 +17,4 @@ Executors work in waves rather than draining everything at once. They pick up **
 
 ## Build-time wiring
 
-Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys. That makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. Where each schedule fires in the life of a payment is in [Design → System Initiated Journeys](../design/journeys/system-initiated.md).
+Schedules are configuration, registered with the Temporal cluster when the Offline worker deploys. That makes changing a cadence a code-reviewed, versioned change like any other, not a box someone edits in a console. Where each schedule fires in the life of a payment is in [Design → Journeys](../design/journeys/index.md).

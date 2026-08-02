@@ -1,0 +1,106 @@
+/* JourneyIndex — see index.js for what the two colours mean and why they are
+   the ones the diagrams below already use. */
+
+.wrap {
+  --ji-cust: var(--amex-blue);
+  --ji-sys: #f4761f;
+  margin: 1.4rem 0 2.4rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --ji-cust: #4da3e6;
+  --ji-sys: #ff9a4d;
+}
+
+/* A filled dot is a person on the line. A ring is an empty seat. The shape
+   carries the difference, so the two stay apart with the colour off. */
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ji-cust);
+}
+
+.dot[data-kind='system'] {
+  background: transparent;
+  border: 2px solid var(--ji-sys);
+}
+
+/* ==================================================================== *
+ * The card grid
+ * ==================================================================== */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  align-self: start;
+  padding: 1.3rem 1.35rem 1.4rem;
+  border: var(--card-bw) solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
+  transition: transform 0.17s ease, box-shadow 0.17s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-sh-hover);
+}
+
+.cardTerm {
+  font-size: 1.2rem;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.004em;
+  color: var(--amex-txt-strong);
+  margin: 0 0 0.6rem;
+}
+
+.cardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.97rem;
+  line-height: 1.4;
+}
+
+.cardList a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ji-sec);
+  text-decoration: none;
+}
+
+.cardList a:hover {
+  text-decoration: underline;
+}
+
+/* ==================================================================== *
+ * Legend
+ * ==================================================================== */
+
+.legend {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 0;
+  font-size: 0.86rem;
+  color: var(--amex-mut);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
