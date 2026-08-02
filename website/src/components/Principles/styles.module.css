@@ -39,11 +39,10 @@
 }
 
 .numeral {
-  flex: none;
+  composes: ordinal from '../../css/recipes.module.css';
   width: 1.2rem;
   font-size: 0.8rem;
   font-weight: 700;
-  line-height: 1;
   letter-spacing: 0.08em;
   color: color-mix(in srgb, var(--pr-accent) 78%, transparent);
 }

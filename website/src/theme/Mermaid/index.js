@@ -18,6 +18,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import clsx from 'clsx';
 import OriginalMermaid from '@theme-original/Mermaid';
+import useOverlay from '@site/src/lib/useOverlay';
 import styles from './styles.module.css';
 
 /**
@@ -123,24 +124,7 @@ export default function Mermaid(props) {
 
   // While the layer is up it owns the window: Escape closes it, and the page
   // behind it stops scrolling so the wheel drives the diagram instead.
-  useEffect(() => {
-    if (!expanded) {
-      return undefined;
-    }
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        collapse();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    const {overflow} = document.body.style;
-    document.body.style.overflow = 'hidden';
-    closeRef.current?.focus();
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = overflow;
-    };
-  }, [expanded, collapse]);
+  useOverlay({open: expanded, onClose: collapse, focusRef: closeRef});
 
   const className = clsx(
     styles.wrap,

@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import clsx from 'clsx';
+import useOverlay from '../../lib/useOverlay';
 import styles from './styles.module.css';
 
 /**
@@ -704,6 +705,7 @@ export default function LegacyEstateMap() {
   const [view, setView] = useState({k: 1, x: 0, y: 0});
   const [expanded, setExpanded] = useState(false);
   const svgRef = useRef(null);
+  const closeRef = useRef(null);
   const drag = useRef(null);
 
   const zoomAt = useCallback((px, py, factor) => {
@@ -732,19 +734,8 @@ export default function LegacyEstateMap() {
     return () => el.removeEventListener('wheel', onWheel);
   }, [zoomAt]);
 
-  useEffect(() => {
-    if (!expanded) return undefined;
-    const onKey = (ev) => {
-      if (ev.key === 'Escape') setExpanded(false);
-    };
-    window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [expanded]);
+  const collapse = useCallback(() => setExpanded(false), []);
+  useOverlay({open: expanded, onClose: collapse, focusRef: closeRef});
 
   const onDown = (ev) => {
     const r = ev.currentTarget.getBoundingClientRect();
@@ -773,7 +764,11 @@ export default function LegacyEstateMap() {
   const edgeDim = (e) => Boolean(layer) && AT[e.a].l !== layer && AT[e.b].l !== layer;
 
   return (
-    <div className={clsx(styles.wrap, expanded && styles.expanded)}>
+    <div
+      className={clsx(styles.wrap, expanded && styles.expanded)}
+      role={expanded ? 'dialog' : undefined}
+      aria-modal={expanded ? true : undefined}
+      aria-label={expanded ? 'Payments estate, full screen' : undefined}>
       <div className={styles.bar}>
         <div className={styles.chips}>
           <button
@@ -808,11 +803,12 @@ export default function LegacyEstateMap() {
             <ToolIcon name="reset" />
           </button>
           <button
+            ref={closeRef}
             type="button"
             className={styles.tool}
             onClick={() => setExpanded((v) => !v)}
             aria-label={expanded ? 'Leave full screen' : 'Full screen'}
-            title={expanded ? 'Leave full screen' : 'Full screen'}>
+            title={expanded ? 'Leave full screen (Esc)' : 'Full screen'}>
             <ToolIcon name={expanded ? 'collapse' : 'expand'} />
           </button>
         </div>

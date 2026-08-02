@@ -20,6 +20,7 @@ import DocItemContent from '@theme/DocItem/Content';
 import DocBreadcrumbs from '@theme/DocBreadcrumbs';
 import ContentVisibility from '@theme/ContentVisibility';
 import styles from './styles.module.css';
+import ordinal from '@site/src/lib/ordinal';
 
 const TOC_STORAGE_KEY = 'billpay:toc-collapsed';
 
@@ -47,7 +48,7 @@ function useDocSection() {
   }
   return {
     slug,
-    number: String(index + 1).padStart(2, '0'),
+    number: ordinal(index + 1),
     label: slug.charAt(0).toUpperCase() + slug.slice(1),
   };
 }

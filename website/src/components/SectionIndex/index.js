@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
 import styles from './styles.module.css';
+import ordinal from '../../lib/ordinal';
 
 /**
  * SectionIndex: the way into a section.
@@ -39,7 +40,7 @@ export default function SectionIndex({items = []}) {
         <Link key={i} to={it.to} className={styles.row}>
           <span className={styles.rail} aria-hidden="true" />
           <span className={styles.num} aria-hidden="true">
-            {String(i + 1).padStart(2, '0')}
+            {ordinal(i + 1)}
           </span>
           <span className={styles.term}>
             <span className={styles.termText}>{it.term}</span>

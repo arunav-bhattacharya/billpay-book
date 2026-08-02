@@ -54,11 +54,10 @@
 }
 
 .tocSectionNum {
+  composes: ordinal from '../../../css/recipes.module.css';
   font-size: 1.35rem;
   font-weight: 700;
-  line-height: 1;
   letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
   color: var(--cat, var(--ifm-color-primary));
 }
 

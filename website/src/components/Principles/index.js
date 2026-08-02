@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './styles.module.css';
+import ordinal from '../../lib/ordinal';
 
 /**
  * Principles: numbered rules, one row each.
@@ -18,7 +19,7 @@ export default function Principles({items = [], accent = 'var(--amex-cat-vision)
           <li key={p.title} className={styles.row}>
             <div className={styles.head}>
               <span className={styles.numeral} aria-hidden="true">
-                {String(i + 1).padStart(2, '0')}
+                {ordinal(i + 1)}
               </span>
               <span className={styles.title}>{p.title}</span>
             </div>

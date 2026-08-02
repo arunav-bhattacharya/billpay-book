@@ -177,11 +177,10 @@
 }
 
 .cardIndex {
-  flex: none;
+  composes: ordinal from '../css/recipes.module.css';
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.09em;
-  font-variant-numeric: tabular-nums;
   color: var(--card-accent);
 }
 

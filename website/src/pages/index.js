@@ -4,6 +4,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 
 import styles from './index.module.css';
+import ordinal from '../lib/ordinal';
 
 const SECTIONS = [
   {to: '/docs/vision', label: 'Vision', blurb: 'Why Billpay exists and what we are building.'},
@@ -55,7 +56,7 @@ export default function Home() {
             <Link key={s.to} to={s.to} className={styles.card}>
               <div className={styles.cardHead}>
                 <span className={styles.cardIndex}>
-                  {String(i + 1).padStart(2, '0')}
+                  {ordinal(i + 1)}
                 </span>
                 <h3 className={styles.cardTitle}>{s.label}</h3>
               </div>

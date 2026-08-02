@@ -82,9 +82,9 @@
    occupy the same width or the titles beside them shift. Grey at rest, the
    accent under the cursor. */
 .num {
+  composes: ordinal from '../../css/recipes.module.css';
   font-size: 0.79rem;
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
   letter-spacing: 0.07em;
   color: var(--amex-mut);
   transition: color 0.17s ease;
