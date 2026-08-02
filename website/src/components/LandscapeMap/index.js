@@ -173,9 +173,10 @@ const RAILS = [
 ];
 
 /* the desk that researches and repairs a payment that went wrong: it works on
-   any of the domains rather than sitting among them, so it runs the full width
-   outside the payments domain box. No channel calls it, so it carries neither a
-   number nor a place behind the Type-A rail. */
+   any of the domains rather than sitting among them, so it is fixed to the
+   bottom edge of the payments domain box instead of taking a place in the row
+   inside it. No channel calls it, so it carries neither a number nor a place
+   behind the Type-A rail. */
 const CONTROL_TOWER = {
   title: 'Control Tower',
   caps: ['Research', 'Repair/Replay'],
@@ -236,6 +237,17 @@ function Card({n, title, caps, store, tier = 'domain', hero}) {
   );
 }
 
+/** Closes a list that is a sample rather than the full set. */
+function More({tier}) {
+  return (
+    <div
+      className={clsx(styles[tier], styles.ext, styles.moreBox)}
+      aria-label="and others">
+      &hellip;
+    </div>
+  );
+}
+
 /** Control Tower: the same card, turned on its side to run under the row. */
 function CrossCard({title, caps}) {
   return (
@@ -266,7 +278,7 @@ export default function LandscapeMap() {
     <div
       className={styles.wrap}
       role="img"
-      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. They reach the payments domain through the Type-A APIs, a rail down its left edge. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway above Money Movement (M3). Control Tower runs the full width underneath, outside the payments domain box and outside the Type-A rail, because it works on all of those domains rather than sitting among them. Money Movement is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services.">
+      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. They reach the payments domain through the Type-A APIs, a rail down its left edge. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway above Money Movement (M3). Control Tower is fixed to the bottom edge of the payments domain box, starting where the Type-A rail ends, because it works on all of those domains rather than sitting among them. Money Movement is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks, among others. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services, among others.">
       <div className={styles.board}>
         <div className={styles.flowScroll}>
           <div className={styles.main}>
@@ -316,7 +328,8 @@ export default function LandscapeMap() {
                 </section>
               </div>
 
-              {/* outside the box on purpose: nothing reaches it through Type-A */}
+              {/* fixed to the bottom of the box, starting where the rail ends:
+                  nothing reaches it through Type-A */}
               <CrossCard {...CONTROL_TOWER} />
             </div>
 
@@ -329,6 +342,7 @@ export default function LandscapeMap() {
                     {label}
                   </div>
                 ))}
+                <More tier="external" />
               </div>
             </section>
 
@@ -343,6 +357,7 @@ export default function LandscapeMap() {
                     {label}
                   </div>
                 ))}
+                <More tier="support" />
               </div>
             </section>
           </div>

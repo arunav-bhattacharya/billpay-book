@@ -42,8 +42,11 @@
   --tier: var(--amex-cat-testing);
   --fill: 20%;
 }
+/* The corporate navy, not the deploy section's grey-blue this used to borrow.
+   That grey-blue sat at the same lightness as the shared payments domain, so
+   the two families read as one. Navy is three stops darker and settles it. */
 .channels {
-  --tier: var(--amex-cat-deployment);
+  --tier: var(--amex-navy);
   --fill: 15%;
 }
 
@@ -63,6 +66,9 @@
 }
 
 .main {
+  /* the width of the Type-A rail, which the two bands below the payments
+     domain are held clear of: neither is reached through it */
+  --rail-w: 40px;
   display: grid;
   grid-template-columns:
     minmax(132px, 0.8fr)
@@ -78,13 +84,12 @@
   grid-row: 1;
 }
 /* The payments domain and the one domain that works on it from outside, stacked
-   so Control Tower lines up with the whole thing rather than sitting in it. */
+   with no gap so Control Tower joins the box rather than floating below it. */
 .domainZone {
   grid-column: 2;
   grid-row: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
   min-width: 0;
 }
 
@@ -101,6 +106,7 @@
 .groupSupport {
   grid-column: 2;
   grid-row: 2;
+  margin-left: var(--rail-w);
 }
 
 /* ---- the group panels ---- */
@@ -133,10 +139,17 @@
 }
 
 .groupChannels {
-  --tier: var(--amex-cat-deployment);
+  --tier: var(--amex-navy);
 }
 .groupExternal {
   --tier: var(--amex-cat-testing);
+}
+
+/* Navy stays navy on the dark skin, because the pills are a solid field of it
+   with white type rather than a tint that would sink into the panel. Only the
+   group title has to be lifted, having nothing but the panel behind it. */
+:global([data-theme='dark']) .groupChannels .groupTitle {
+  color: color-mix(in srgb, #ffffff 62%, var(--tier));
 }
 .groupSupport {
   --tier: var(--amex-cat-build);
@@ -144,14 +157,15 @@
 
 /* The centre of the diagram, so it carries a heavier rule and a deeper field
    than the three groups around it. Its left corners are squared off because the
-   Type-A rail is fixed to that edge. */
+   Type-A rail is fixed to that edge, and its bottom-right because Control Tower
+   is fixed to the bottom. */
 .groupDomain {
   --tier: var(--amex-blue);
   flex: 1 1 auto;
   min-width: 0;
   padding: 0.8rem 0.8rem 0.85rem;
   border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
-  border-radius: 0 16px 16px 0;
+  border-radius: 0 16px 0 0;
   background: color-mix(in srgb, var(--amex-blue) 9%, var(--amex-panel));
   box-shadow: 0 6px 22px color-mix(in srgb, var(--amex-blue) 14%, transparent);
 }
@@ -174,7 +188,7 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 40px;
+  width: var(--rail-w);
   padding: 0.5rem 0;
   border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
   border-right: none;
@@ -226,6 +240,10 @@
   gap: 0.42rem;
 }
 
+/* The one family drawn as a solid field rather than a tint of one. Navy is
+   dark enough that any tint of it comes out grey, which is what made these
+   hard to tell from the shared payments domain, so the pills carry the colour
+   itself and the type goes white on top. */
 .chan {
   display: flex;
   align-items: center;
@@ -235,21 +253,18 @@
   line-height: 1.3;
   padding: 0.28rem 0.5rem 0.28rem 0.44rem;
   border-radius: 8px;
-  color: var(--amex-txt);
-  background: color-mix(in srgb, var(--tier) 14%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--tier) 34%, #d7deea);
-}
-:global([data-theme='dark']) .chan {
-  background: color-mix(in srgb, var(--tier) 26%, #0b2246);
-  border-color: color-mix(in srgb, var(--tier) 44%, #1c355f);
+  color: #fff;
+  background: var(--tier);
+  border: 1px solid color-mix(in srgb, #ffffff 24%, var(--tier));
 }
 
+/* only ever drawn inside a channel pill, so it is set against the navy */
 .icon {
   flex: none;
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: color-mix(in srgb, var(--tier) 78%, var(--amex-txt-strong));
+  stroke: rgba(255, 255, 255, 0.82);
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -295,24 +310,49 @@
 }
 
 /* Control Tower — it works on all of the domains rather than sitting among
-   them, so it runs the full width underneath and outside the payments domain
-   box, with its name and capabilities on one line. Nothing reaches it through
-   the Type-A rail, which is why it is not behind it. */
+   them, so it is fixed to the bottom edge of the payments domain box the way
+   the Type-A rail is fixed to its left, sharing that border and taking the
+   same field. It starts where the rail ends, because nothing reaches it
+   through the rail. Centred, with its name over its capabilities. */
 .cross {
-  flex-direction: row;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.7rem;
-  padding: 0.55rem 0.7rem;
-  border-style: dashed;
-  border-width: 1.5px;
+  gap: 0.4rem;
+  margin-left: var(--rail-w);
+  padding: 0.6rem 0.7rem 0.65rem;
+  border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  background: color-mix(in srgb, var(--amex-blue) 16%, var(--amex-panel));
+  box-shadow: none;
+  text-align: center;
 }
+
+:global([data-theme='dark']) .cross {
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
+  background: color-mix(in srgb, var(--amex-blue-bright) 17%, var(--amex-panel));
+}
+/* Set as a label rather than a card heading: it names the band it runs under
+   rather than a box in the row, so it takes the caps and the tracking the
+   group titles use. Its type is tinted to its own family the way the external
+   systems and the supporting estate are, blue here rather than green or gold. */
+.card.cross .title,
+.crossCaps .cap {
+  color: color-mix(in srgb, var(--tier) 55%, var(--amex-txt-strong));
+}
+:global([data-theme='dark']) .card.cross .title,
+:global([data-theme='dark']) .crossCaps .cap {
+  color: color-mix(in srgb, var(--tier) 40%, var(--amex-txt-strong));
+}
+
 .card.cross .title {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .crossCaps {
   display: flex;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 0.3rem;
 }
@@ -471,27 +511,39 @@
    Named and left at that, the way the external systems are: the name in the
    family's own hue on a field of the same. Eight names, and longer ones than
    the external column carries, so the type sits a step below theirs. */
+/* One row, always: two ragged rows under the payments domain read as an
+   afterthought. The eight share the width evenly and the ellipsis takes only
+   what it needs, so a long name is answered by a taller box rather than by the
+   row breaking. */
 .supportStack {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr)) auto;
   grid-auto-rows: minmax(44px, auto);
   gap: 0.5rem;
   align-items: stretch;
 }
 
 .supportBox {
-  padding-inline: 0.4rem;
-  font-size: 0.74rem;
+  padding-inline: 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  /* the columns are narrow enough that the longest names have to break inside
+     a word rather than push the box wider */
+  overflow-wrap: anywhere;
+}
+
+/* Both lists name what a payment usually reaches, not everything it can, so
+   each one closes on this. Dashed, so it reads as the list carrying on rather
+   than as a system nobody bothered to name. */
+.moreBox {
+  border-style: dashed;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  background: color-mix(in srgb, var(--tier) 7%, var(--amex-panel));
 }
 
 /* eight supporting domains, one row, whenever the field is wide enough to hold
    them: two ragged rows under the payments domain read as an afterthought */
-@container (min-width: 1000px) {
-  .supportStack {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-  }
-}
-
 /* Only worth saying when the row is actually cut off. */
 .hint {
   display: none;
@@ -525,6 +577,12 @@
   border-radius: 4px;
   border: 1px solid color-mix(in srgb, var(--tier) 55%, var(--amex-line));
   background: color-mix(in srgb, var(--tier) 32%, var(--amex-panel));
+}
+
+/* solid, like the pills it stands for, rather than the tint the others take */
+.swatch.channels {
+  background: var(--tier);
+  border-color: color-mix(in srgb, #ffffff 24%, var(--tier));
 }
 
 .heroSwatch {
@@ -563,9 +621,14 @@
     grid-column: 1;
     grid-row: auto;
   }
-  /* no room for a rail beside the panel, so it lies flat on top of it */
+  /* no room for a rail beside the panel, so it lies flat on top of it, and the
+     two bands below have nothing left to clear */
   .domainRow {
     flex-direction: column;
+  }
+  .cross,
+  .groupSupport {
+    margin-left: 0;
   }
   .apiRail {
     width: auto;
@@ -583,7 +646,7 @@
     transform: none;
   }
   .groupDomain {
-    border-radius: 0 0 16px 16px;
+    border-radius: 0;
   }
   .domainGrid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -591,6 +654,11 @@
   .chanRow,
   .extStack {
     grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  }
+  /* eight across on a phone would be four characters wide, so here the row is
+     allowed to wrap after all */
+  .supportStack {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   }
 }
 
