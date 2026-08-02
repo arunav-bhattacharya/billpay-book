@@ -20,37 +20,14 @@ import DocItemContent from '@theme/DocItem/Content';
 import DocBreadcrumbs from '@theme/DocBreadcrumbs';
 import ContentVisibility from '@theme/ContentVisibility';
 import styles from './styles.module.css';
-import ordinal from '@site/src/lib/ordinal';
+import {sectionFromPath} from '@site/src/lib/sections';
 
 const TOC_STORAGE_KEY = 'billpay:toc-collapsed';
-
-/* Top-level section order: the source of truth for section numbering, shared
-   in spirit with the homepage cards and the numbered sidebar. */
-const SECTION_ORDER = [
-  'vision',
-  'architecture',
-  'design',
-  'build',
-  'testing',
-  'deployment',
-  'observability',
-  'operations',
-];
 
 /** Derive the numbered section (01, 02, …) a doc belongs to, from its URL. */
 function useDocSection() {
   const {metadata} = useDoc();
-  const match = (metadata.permalink || '').match(/\/docs\/([^/]+)/);
-  const slug = match ? match[1] : null;
-  const index = slug ? SECTION_ORDER.indexOf(slug) : -1;
-  if (index === -1) {
-    return null;
-  }
-  return {
-    slug,
-    number: ordinal(index + 1),
-    label: slug.charAt(0).toUpperCase() + slug.slice(1),
-  };
+  return sectionFromPath(metadata.permalink);
 }
 
 /**

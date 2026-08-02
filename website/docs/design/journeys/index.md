@@ -68,7 +68,7 @@ export const GROUPS = [
 
 # Payment Journeys
 
-<Lead accent="var(--amex-cat-design)">Every journey through Billpay starts one of two ways. A customer asks for something and waits for the answer, or an event or a timer sets it off with nobody on the line. Both kinds are here, and each one says which it is.</Lead>
+<Lead>Every journey through Billpay starts one of two ways. A customer asks for something and waits for the answer, or an event or a timer sets it off with nobody on the line. Both kinds are here, and each one says which it is.</Lead>
 
 <JourneyIndex groups={GROUPS} />
 

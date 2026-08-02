@@ -283,7 +283,10 @@ h3 {
     radial-gradient(112% 82% at 100% 100%, rgba(1, 111, 208, 0.1), transparent 62%),
     radial-gradient(78% 68% at 0% 0%, rgba(198, 146, 20, 0.06), transparent 60%);
 
-  /* Per-section accent coding (Amex-family hues). */
+  /* Per-section accent coding (Amex-family hues), one per top-level section.
+     Mostly read as var(--amex-cat-${slug}) from src/lib/sections.js, so a
+     search for the literal name will not find every use and two of these look
+     dead when they are not. Keep all eight: the set is the numbering. */
   --amex-cat-vision: #016fd0;
   --amex-cat-architecture: #1e4f8a;
   --amex-cat-design: #0090cf;
