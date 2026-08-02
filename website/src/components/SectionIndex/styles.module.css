@@ -1,0 +1,142 @@
+/* SectionIndex — see index.js for why a section's pages are a contents block
+   rather than a grid of cards. */
+
+/* No rule along the top. The heading above the block already carries one, and
+   two hairlines a few pixels apart read as a mistake. The rows close the block
+   from underneath instead. */
+.index {
+  display: grid;
+  margin: 1.15rem 0 2.2rem;
+}
+
+/* The row is the target, all of it. Two columns: the titles line up down the
+   left so the section can be read as a list of names, and each description
+   sits on the same line as the name it belongs to.
+
+   The bottom hairline is drawn by ::after rather than by a border, because the
+   row corners are rounded for the hover wash and a real border would bend with
+   them. The line has to stay straight: it belongs to the block, not the row. */
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 15.5rem) minmax(0, 1fr);
+  gap: 0 1.7rem;
+  align-items: start;
+  padding: 0.95rem 0.9rem 1rem;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.17s ease;
+}
+
+.row:hover,
+.row:focus-visible {
+  color: inherit;
+  text-decoration: none;
+  background-color: color-mix(in srgb, var(--sx-accent) 6%, transparent);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--sx-accent);
+  outline-offset: -2px;
+}
+
+.row::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--amex-line);
+}
+
+/* The sidebar's active-page rail, borrowed. It grows from the middle of the
+   row under the cursor, which is the only movement in the block. */
+.rail {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--sx-accent);
+  transform: scaleY(0);
+  opacity: 0;
+  transition: transform 0.19s ease, opacity 0.19s ease;
+}
+
+.row:hover .rail,
+.row:focus-visible .rail {
+  transform: scaleY(1);
+  opacity: 1;
+}
+
+.term {
+  font-size: 1.06rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.004em;
+  color: var(--amex-txt-strong);
+}
+
+/* Inline, not inline-block, so a title that wraps never strands the arrow on a
+   line of its own. Same cue the cards carried, so a reader who learned it
+   there still reads it here. */
+.cue {
+  margin-left: 0.4rem;
+  color: var(--sx-accent);
+  font-weight: 500;
+  position: relative;
+  left: 0;
+  transition: left 0.17s ease;
+}
+
+.row:hover .cue,
+.row:focus-visible .cue {
+  left: 3px;
+}
+
+/* Nudged down a hair so its first line sits on the title's baseline rather
+   than above it. */
+.desc {
+  padding-top: 0.14rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--amex-mut);
+}
+
+.desc code {
+  font-size: 0.82em;
+}
+
+/* Under the two-column breakpoint the description drops beneath its title.
+   The row keeps its hairline, so the block still reads as a contents list. */
+@media (max-width: 996px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.32rem;
+    padding: 0.85rem 0.75rem 0.9rem;
+  }
+
+  .desc {
+    padding-top: 0;
+  }
+}
+
+:global([data-theme='dark']) .row:hover,
+:global([data-theme='dark']) .row:focus-visible {
+  background-color: color-mix(in srgb, var(--sx-accent) 13%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .rail,
+  .cue {
+    transition: none;
+  }
+
+  .rail {
+    transform: scaleY(1);
+  }
+}
