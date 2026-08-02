@@ -167,11 +167,17 @@ const config = {
           // + font here, since Mermaid options are shared across light/dark.
           fontFamily:
             "'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          // No rankSpacing here. Mermaid 11 lays state diagrams out through
+          // the shared dagre path, which reads rank separation from the
+          // top-level config and never falls through to this block: setting it
+          // here moved nothing, at any value. The diagrams that need to be
+          // tighter than the 50 default declare `config.rankSpacing` in their
+          // own front matter instead, which does work. See the two lifecycle
+          // diagrams in design/payment-state-model.md.
           state: {
             useMaxWidth: true,
             padding: 18,
             nodeSpacing: 70,
-            rankSpacing: 80,
           },
           // useMaxWidth: false makes Mermaid emit real width and height
           // attributes on the SVG rather than a max-width sized to the

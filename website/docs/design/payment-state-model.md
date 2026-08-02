@@ -19,6 +19,10 @@ Consumer and corporate payments share the lifecycle. The one difference: corpora
 <TabItem value="consumer" label="Consumer" default>
 
 ```mermaid
+---
+config:
+  rankSpacing: 28
+---
 stateDiagram-v2
   direction TB
   [*] --> PENDING
@@ -36,6 +40,7 @@ stateDiagram-v2
   RETURNED --> REPRESENTING: eligible (create representment)
   REPRESENTING --> REPRESENTED: valid
   REPRESENTING --> DECLINED: invalid
+  REPRESENTED --> RETURNED: returned again
   PENDING --> DECLINED: validation failed
   PENDING --> DISALLOWED: inbound declined
   SCHEDULED --> CANCELLED: cancel request
@@ -51,6 +56,10 @@ stateDiagram-v2
 <TabItem value="corporate" label="Corporate">
 
 ```mermaid
+---
+config:
+  rankSpacing: 28
+---
 stateDiagram-v2
   direction TB
   [*] --> PENDING
@@ -72,6 +81,7 @@ stateDiagram-v2
   RETURNED --> REPRESENTING: representable
   REPRESENTING --> REPRESENTED: valid
   REPRESENTING --> DECLINED: invalid
+  REPRESENTED --> RETURNED: returned again
   PENDING --> DECLINED: validation failed
   SCHEDULED --> CANCELLED: cancel request
   ACCEPTED --> CANCELLED
