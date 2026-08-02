@@ -6,6 +6,8 @@
    as one more system. */
 
 .wrap {
+  composes: panel from '../../css/recipes.module.css';
+
   /* One local ramp for the whole map. Every hue is far enough from its
      neighbours to survive being drawn as a 1.6px line on a dark background. */
   --lem-chan: var(--amex-blue);   /* channels: the signature blue the journey banners use */
@@ -21,13 +23,6 @@
   margin: 1.5rem 0 2.4rem;
   padding: 0.9rem 0.9rem 1.1rem;
   /* The house card, per the recipe in custom.css section 9a. */
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
 }
 :global([data-theme='dark']) .wrap {
   --lem-iface: #22d3ee;

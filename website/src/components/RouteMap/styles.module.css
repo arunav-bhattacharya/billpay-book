@@ -10,16 +10,11 @@
 
 /* The house card, per the recipe in custom.css section 9a. */
 .wrap {
+  composes: panel from '../../css/recipes.module.css';
+
   margin: 1.4rem 0 2rem;
   overflow: hidden;
   overflow-x: auto;
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
 
   --rm-fs: 0.88rem;
   --rm-th-fs: 0.94rem;

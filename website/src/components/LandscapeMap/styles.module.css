@@ -11,17 +11,12 @@
    contents is collapsed. */
 
 .wrap {
+  composes: panel from '../../css/recipes.module.css';
+
   container-type: inline-size;
   margin: 1.8rem 0 2.6rem;
   padding: 1.5rem 1.25rem 1.15rem;
   /* The house card, per the recipe in custom.css section 9a. */
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
 }
 
 /* ---- the four families ---- */

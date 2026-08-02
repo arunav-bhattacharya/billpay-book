@@ -3,6 +3,8 @@
    their own brand hues so the diagram reads at a glance. */
 
 .wrap {
+  composes: panel from '../../css/recipes.module.css';
+
   /* product marks */
   --ha-oracle-a: #e2695a;
   --ha-oracle-b: #a8351f;
@@ -24,13 +26,6 @@
   overflow-x: auto;
   /* The house card, exactly per the recipe in custom.css section 9a, so the
      diagram sits on the same paper as every other card on the site. */
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
   padding: 10px 6px 4px;
 }
 

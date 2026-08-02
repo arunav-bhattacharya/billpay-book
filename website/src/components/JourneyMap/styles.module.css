@@ -3,18 +3,13 @@
    colour from a design token so light and dark both render. */
 
 .wrap {
+  composes: panel from '../../css/recipes.module.css';
+
   /* The narrow fallbacks key off this element's width, not the viewport, because
      collapsing the page TOC widens it without the viewport changing at all. */
   container-type: inline-size;
   margin: 1.5rem 0 2.6rem;
   /* The house card, per the recipe in custom.css section 9a. */
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
 
   /* The signature Blue Box blue, not the cyan-leaning section accent. */
   --jm-accent: var(--amex-blue);

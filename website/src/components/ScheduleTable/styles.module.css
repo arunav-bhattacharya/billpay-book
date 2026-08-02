@@ -1,16 +1,9 @@
 /* ScheduleTable — the periodic work, in the same panel treatment as the other
    tables on the page: rounded surface, Amex-blue header, alternating rows. */
 
-/* The house card, per the recipe in custom.css section 9a. */
 .wrap {
+  composes: panel from '../../css/recipes.module.css';
   margin: 1.2rem 0 2rem;
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
   overflow: hidden;
   overflow-x: auto;
 }

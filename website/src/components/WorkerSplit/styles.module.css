@@ -18,18 +18,13 @@
 /* The house card, per the recipe in custom.css section 9a. The worker's hue
    drives the corner, which is where the hairline along the top used to be. */
 .card {
+  composes: panel from '../../css/recipes.module.css';
+
   --card-accent: var(--wk);
 
   position: relative;
   overflow: hidden;
   padding: 1.1rem 1.2rem 1.15rem;
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
 }
 
 .online {

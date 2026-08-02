@@ -83,13 +83,8 @@
 /* ---- table ---- */
 
 .wrap {
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
+  composes: panel from '../../css/recipes.module.css';
+
   overflow: hidden;
   overflow-x: auto;
 }

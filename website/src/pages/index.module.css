@@ -121,18 +121,12 @@
    in, so hover lights the accent and the arrow together. The grid reads as
    eight of one thing rather than eight solid blue fills under a blue hero. */
 .card {
+  composes: panel from '../css/recipes.module.css';
   position: relative;
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
   padding-bottom: 2.1rem;
-  border-radius: var(--card-radius);
-  border: var(--card-bw) solid transparent;
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
   text-decoration: none;
   color: var(--amex-txt-strong);
   isolation: isolate;

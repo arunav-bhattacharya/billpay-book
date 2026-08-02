@@ -1,0 +1,140 @@
+/* ==================================================================== *
+ * Recipes — the shapes this site repeats.
+ *
+ * Component modules pull these in with `composes:`:
+ *
+ *     .wrap {
+ *       composes: panel from '../../css/recipes.module.css';
+ *       margin: 1.4rem 0 2rem;
+ *     }
+ *
+ * These used to be copy-pasted, on the instruction of a comment in
+ * custom.css that told authors to duplicate four properties by hand. That
+ * produced eighteen copies which then drifted apart.
+ *
+ * One rule holds the whole thing together: a recipe declares only what no
+ * consumer overrides, and everything adjustable is a custom property.
+ * Composition does not guarantee source order, so a consumer that tried to
+ * beat a recipe with a plain declaration of its own could lose the tie
+ * silently, in one build and not the next. Nothing here can be in that
+ * position, because there is nothing here to override. Size, colour and
+ * spacing all arrive through var().
+ *
+ * That is also why `panel` carries no margin: margin is the one property
+ * every call site sets differently.
+ * ==================================================================== */
+
+/* ---- the card ---------------------------------------------------------
+   The edge is painted as three background layers rather than as a border
+   colour:
+
+     face   padding-box   the card's own surface, on top
+     edge   border-box    shows only in the border ring
+     face   border-box    fills the rest of the ring, under the edge
+
+   The third layer is what lets a table with a solid header band sit inside
+   this without a seam, and it means --card-border can be a gradient as
+   easily as a flat colour.
+
+   Components that own a hue set --card-accent, which colours their headings
+   and rules but not this edge. Ones that want a different edge or corner
+   override --card-border, --card-bw or --card-radius.
+
+   custom.css keeps a hand-written copy of this for .card, which is Infima's
+   class on components the site does not own and so cannot compose. Change
+   this file first, then mirror it there.
+----------------------------------------------------------------------- */
+.panel {
+  border: var(--card-bw) solid transparent;
+  border-radius: var(--card-radius);
+  background:
+    var(--card-face) padding-box,
+    var(--card-border) border-box,
+    var(--card-face) border-box;
+  box-shadow: var(--card-sh);
+}
+
+.panelHover:hover {
+  background:
+    var(--card-face-hover) padding-box,
+    var(--card-border-hover) border-box,
+    var(--card-face-hover) border-box;
+  box-shadow: var(--card-sh-hover);
+}
+
+/* ---- pills and badges -------------------------------------------------
+   Radius and padding vary by call site, so both are tokens. `chipTinted`
+   mixes one hue three ways, which is what every chip on the site was doing
+   by hand with its own hardcoded pair of hexes.
+----------------------------------------------------------------------- */
+.chip {
+  display: inline-block;
+  padding: var(--chip-pad, 1px 7px);
+  border-radius: var(--chip-radius, 6px);
+  font-size: var(--chip-fs, 0.72rem);
+  font-weight: var(--chip-weight, 700);
+  letter-spacing: var(--chip-tracking, 0.05em);
+  line-height: var(--chip-lh, 1.4);
+  white-space: nowrap;
+}
+
+.chipTinted {
+  color: var(--chip-hue);
+  background: color-mix(in srgb, var(--chip-hue) var(--chip-fill, 13%), transparent);
+  border: 1px solid color-mix(in srgb, var(--chip-hue) var(--chip-line, 30%), transparent);
+}
+
+/* ---- ordinals ---------------------------------------------------------
+   The site numbers sections, principles and cards with a zero-padded index.
+   Size, weight, tracking and colour stay with the caller, because those
+   genuinely differ. Only the thing they all need is here: digits that do
+   not change width, so a numeral in a fixed column does not jog between 1
+   and 8.
+----------------------------------------------------------------------- */
+.ordinal {
+  flex: none;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ---- legends ---------------------------------------------------------- */
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--legend-gap, 0.5rem 1.2rem);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--legend-item-gap, 0.45rem);
+  font-size: var(--legend-fs, 0.8rem);
+  color: var(--amex-mut);
+}
+
+.legendSwatch {
+  flex: none;
+  width: var(--swatch-size, 13px);
+  height: var(--swatch-size, 13px);
+  border-radius: var(--swatch-radius, 4px);
+  border: var(--swatch-bw, 1px) solid var(--swatch-line, var(--amex-line));
+  background: var(--swatch-fill, transparent);
+}
+
+/* ---- announce-only text ----------------------------------------------
+   For a <caption> that names a table to a screen reader without putting a
+   heading above it on the page.
+----------------------------------------------------------------------- */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

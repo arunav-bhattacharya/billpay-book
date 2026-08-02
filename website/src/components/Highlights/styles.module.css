@@ -10,17 +10,12 @@
    live: one accent per card, and it is the same one every card on the site
    carries. */
 .item {
+  composes: panel from '../../css/recipes.module.css';
+
   --card-accent: var(--hl-accent);
 
   position: relative;
   padding: 1.3rem 1.35rem 1.4rem;
-  border: var(--card-bw) solid transparent;
-  border-radius: var(--card-radius);
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
   overflow: hidden;
   transition: transform 0.17s ease, box-shadow 0.17s ease, background 0.17s ease;
 }

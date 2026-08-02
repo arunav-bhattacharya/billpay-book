@@ -2,15 +2,11 @@
    radius is tighter because the strip is only two rows tall, but it carries the
    same face, corner and shadow as every other card on the site. */
 .meta {
+  composes: panel from '../../css/recipes.module.css';
+  --card-radius: 12px;
+
   margin: 0.2rem 0 1.4rem;
   padding: 11px 14px;
-  border: var(--card-bw) solid transparent;
-  border-radius: 12px;
-  background:
-    var(--card-face) padding-box,
-    var(--card-border) border-box,
-    var(--card-face) border-box;
-  box-shadow: var(--card-sh);
   display: flex;
   flex-direction: column;
   gap: 8px;
