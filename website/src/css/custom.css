@@ -296,6 +296,18 @@ h3 {
   --amex-cat-observability: #34519e;
   --amex-cat-operations: #0e7c86;
 
+  /* The channels family on the payments landscape. Every other family on that
+     board reads a token that changes with the theme; this one was pinned to
+     the raw brand navy, so on the dark skin it came out at 1.02 against the
+     panel behind it, which is to say invisible.
+
+     The dark cut stays in the navy family rather than going light. The pills
+     carry the colour with white type on top, so lifting them all the way to a
+     steel would have traded a pill you cannot see for a label you cannot
+     read. The value below sits at 7.96 against white and 2.13 against the
+     panel, which is the same separation the other four families have. */
+  --amex-channels: var(--amex-navy);
+
   /* Map onto Infima surfaces. */
   --ifm-background-color: var(--amex-bg);
   --ifm-background-surface-color: var(--amex-panel);
@@ -399,6 +411,8 @@ h3 {
   --amex-cat-deployment: #93a3bb;
   --amex-cat-observability: #7b93de;
   --amex-cat-operations: #3fb3bd;
+
+  --amex-channels: #215094;
 
   --ifm-background-color: var(--amex-bg);
   --ifm-background-surface-color: var(--amex-panel);

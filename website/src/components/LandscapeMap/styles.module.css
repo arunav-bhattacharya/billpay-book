@@ -16,7 +16,7 @@
   container-type: inline-size;
   margin: 1.8rem 0 2.6rem;
   padding: 1.5rem 1.25rem 1.15rem;
-  /* The house card, per the recipe in custom.css section 9a. */
+  /* The house card, from the recipe in css/recipes.module.css. */
 }
 
 /* ---- the four families ---- */
@@ -39,9 +39,10 @@
 }
 /* The corporate navy, not the deploy section's grey-blue this used to borrow.
    That grey-blue sat at the same lightness as the shared payments domain, so
-   the two families read as one. Navy is three stops darker and settles it. */
+   the two families read as one. Navy is three stops darker and settles it.
+   The token carries the dark cut, so this reads the same either way. */
 .channels {
-  --tier: var(--amex-navy);
+  --tier: var(--amex-channels);
   --fill: 15%;
 }
 
@@ -134,7 +135,7 @@
 }
 
 .groupChannels {
-  --tier: var(--amex-navy);
+  --tier: var(--amex-channels);
 }
 .groupExternal {
   --tier: var(--amex-cat-testing);
