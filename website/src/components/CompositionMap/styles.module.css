@@ -60,12 +60,14 @@
 }
 
 /* ---- labelled rows ---- */
-/* Label above, content across the full width of the band. Both rows are built
-   this way so the API chips and the behavior questions start on the same left
-   edge, and so the questions get the whole band. A label in a fixed column
-   beside them was what made the longest question wrap. */
+/* Label on the left, content beside it. The label column is a fixed width in
+   both rows, so the API chips and the behavior questions start on the same
+   vertical line. It is wide enough that the longest question still has room to
+   stay on one line beside it. */
 .row {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
 }
 
 .row + .row {
@@ -75,8 +77,8 @@
 }
 
 .rowLabel {
-  display: block;
-  margin-bottom: 0.6rem;
+  flex: none;
+  width: 8.5rem;
   font-size: 0.79rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -84,6 +86,8 @@
 }
 
 .chips {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.34rem;
@@ -145,9 +149,9 @@
 
 .ask {
   /* Sets where the answer column lands, and so how far the answers sit from the
-     questions. Wide enough for the longest question to stay on one line, which
-     is what the stacked label buys. Narrower and that question wraps; wider and
-     the answers drift away from the text on a roomy screen. */
+     questions. Wide enough for the longest question to stay on one line beside
+     the label column. Narrower and that question wraps; wider and the answers
+     drift away from the text on a roomy screen. */
   max-width: 46ch;
   font-size: 0.86rem;
   line-height: 1.45;
