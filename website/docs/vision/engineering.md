@@ -125,9 +125,9 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
 
 ## Market Onboarding to Workflow Composition
 
-Onboarding a market to Billpay is pure configuration. The UI collects two things: which One-Data APIs the market exposes, and a set of yes/no questions about payment handling. These questions are answered per supported account type, since consumer and corporate rules differ, creating a unique market profile for each combination.
+A market comes onto the platform through configuration. The UI asks for two things: which One-Data APIs the market exposes, and a short list of questions about how it handles payments. Those questions are answered once per account type the market supports, because consumer and corporate rules differ. Each set of answers is one market profile.
 
-At runtime, Billpay uses this profile to resolve the exact stage and activity implementations needed, composing the workflow before execution. Because all market-specific logic is handled during assembly, the runtime engine remains market-agnostic and executes the same standardized steps everywhere. See the [Product Vision](./product.md) for behavior definitions.
+Billpay composes the workflow from that profile before the run starts. It reads the behaviors on the request, resolves them to the stage and activity implementations onboarded for that combination, and starts the workflow with those parts already in place. Nothing about a market is decided while the workflow runs, so it executes the same business steps everywhere. What each behavior means is on the [Product Vision](./product.md).
 
 <CompositionMap
   apis={['CreatePayment.v3', 'UpdatePayment.v1', 'DeletePayment.v1']}
@@ -139,7 +139,7 @@ At runtime, Billpay uses this profile to resolve the exact stage and activity im
 If the combination on a request was never onboarded, there is nothing to compose, so the request is turned away and no workflow starts. A consumer-only market rejects a corporate payment instead of half-processing it.
 :::
 
-A new way of processing is a new implementation sitting behind one combination of behaviors. The workflow keeps its shape, and no market ever turns into an `if` inside it.
+A new way of processing a payment is a new implementation behind one combination of behaviors. The workflow keeps its shape, and no market ever turns into an `if` inside it.
 
 ## What we optimise for
 

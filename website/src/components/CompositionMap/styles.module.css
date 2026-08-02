@@ -103,6 +103,9 @@
 /* ---- the four behaviors ---- */
 /* The onboarding questions, in plain language. The field names they set live
    in the profile band below, so they are not repeated here. */
+/* The questions and their answers share one grid rather than each row being its
+   own flex line. That is what puts every Y / N on the same vertical rule, and
+   it holds however far a long question wraps. */
 .behaviors {
   flex: 1;
   min-width: 0;
@@ -110,14 +113,14 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 0.45rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.45rem 1.1rem;
 }
 
+/* The li itself draws nothing. Its two spans are the grid items. */
 .behavior {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.15rem 0.7rem;
+  display: contents;
 }
 
 .behavior dt,
@@ -139,10 +142,27 @@
 }
 
 .answers {
+  justify-self: end;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
   font-size: 0.76rem;
   letter-spacing: 0.01em;
   color: var(--amex-mut);
   white-space: nowrap;
+}
+
+/* A fixed width per answer keeps the pair evenly spaced whatever the letters
+   are, so Y / N does not sit tighter than a longer answer would. */
+.answer {
+  min-width: 1ch;
+  text-align: center;
+}
+
+.answer + .answer::before {
+  content: '/';
+  margin-right: 0.5rem;
+  color: color-mix(in srgb, var(--amex-mut) 60%, transparent);
 }
 
 /* both lists are a sample of what a market picks, so each ends in an ellipsis */

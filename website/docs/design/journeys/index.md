@@ -31,7 +31,7 @@ export const GROUPS = [
     ],
   },
   {
-    label: 'Initiate payment intent',
+    label: 'Payment Intent',
     journeys: [{label: 'Intent to pay', to: '#intent-to-pay', kind: 'customer'}],
   },
   {
@@ -521,7 +521,7 @@ When an account carries a credit balance, the money goes back to the customer.
   }}
 />
 
-## Initiate payment intent
+## Payment Intent
 
 ### Intent to pay
 

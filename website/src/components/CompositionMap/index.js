@@ -49,7 +49,15 @@ export default function CompositionMap({apis = [], behaviors = [], run = {}, foo
             {behaviors.map((d) => (
               <li key={d.name} className={styles.behavior}>
                 <span className={styles.ask}>{d.ask}</span>
-                <span className={styles.answers}>{(d.answers || []).join('  /  ')}</span>
+                {/* One span per answer so the separator and the spacing are the
+                    stylesheet's to set, and every answer column lines up. */}
+                <span className={styles.answers}>
+                  {(d.answers || []).map((a) => (
+                    <span key={a} className={styles.answer}>
+                      {a}
+                    </span>
+                  ))}
+                </span>
               </li>
             ))}
             <li className={styles.behavior}>
