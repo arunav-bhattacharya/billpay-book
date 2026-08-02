@@ -20,7 +20,15 @@ The site is built and the eight sections are written. `CONTENT_PLAN.md` holds th
 - Docusaurus, latest stable
 - Light mode default, dark mode supported, gradients via CSS custom properties (not hardcoded per-component)
 - Palette: Amex Blue Box blue with navy ink and a gold secondary, all as `--amex-*` tokens in `website/src/css/custom.css`. Theme-independent brand values sit in the palette block at the top; anything that changes between light and dark belongs in the two theme blocks, as a pair. Components never hardcode a colour.
-- Diagrams: Mermaid via Docusaurus's built-in mermaid support, for every sequence/state diagram the spec calls out
+
+## Diagrams
+Four kinds, in the order to reach for them. Authoring guide: `DIAGRAMS.md`.
+- **Mermaid** fenced blocks for sequence, state and flowchart diagrams. Theming in `website/src/css/mermaid.css`, expand control in `website/src/theme/Mermaid/`.
+- **Components that take data as props**: `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
+- **CSS box diagrams** for grouped boxes and short connectors, as in `LandscapeMap`.
+- **Coordinate SVG** for dense wiring that needs pan, zoom and layer spotlight, as in `LegacyEstateMap` and `HADiagram`.
+
+Reuse before building. Take colour from the `--amex-*` tokens so both themes work, sit the diagram on the `panel` recipe, and give it a `role="img"` with an `aria-label` that describes the picture in prose.
 
 ## Components and CSS
 
@@ -70,6 +78,7 @@ Every doc page under `website/docs/`:
 /docs/Wiki_Spec.md            # source spec, do not edit
 /reference/                   # snapshot of the existing site, read-only reference
 /CONTENT_PLAN.md
+/DIAGRAMS.md                  # diagram authoring guide
 /CLAUDE.md
 /website/                     # Docusaurus project root
   docs/                       # the 85 pages
