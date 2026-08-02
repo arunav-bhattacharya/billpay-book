@@ -181,23 +181,18 @@ const CONTROL_TOWER = {
   caps: ['Research', 'Repair/Replay'],
 };
 
-/* Numbering is reserved for the payments domain, so the supporting estate
-   carries none. */
+/* The estate leans on these but does not own them, so they are named and left
+   at that, the way the external systems are. What each one does for a payment
+   belongs on the pages that describe the calls. */
 const SUPPORTING = [
-  {
-    title: 'Accounts Receivable',
-    caps: ['Product Library', 'Product Arrangement', 'Account Balance', 'Account Posting'],
-  },
-  {title: 'Customer Info & Relationship Management', caps: ['Data Enrichment']},
-  {title: 'Loyalty & Benefits', caps: ['Redemption', 'Eligibility']},
-  {title: 'Fraud & Risk', caps: ['RDE', 'AMP']},
-  {title: 'Finance', caps: ['Report, Invoice Generation', 'Financial Engine']},
-  {title: 'Lumi', caps: ['Reporting', 'Analytics']},
-  {title: 'Raven', caps: ['Customer Notifications']},
-  {
-    title: 'Commercial Card Services',
-    caps: ['Control Account', 'Corporate Hierarchy'],
-  },
+  'Accounts Receivable',
+  'Customer Info & Relationship Management',
+  'Loyalty & Benefits',
+  'Fraud & Risk',
+  'Finance',
+  'Lumi',
+  'Raven',
+  'Commercial Card Services',
 ];
 
 const EXTERNAL = [
@@ -220,34 +215,22 @@ function Store({label}) {
   );
 }
 
-function Card({n, title, caps, store, tier = 'domain', hero, compact}) {
+function Card({n, title, caps, store, tier = 'domain', hero}) {
   return (
-    <article
-      className={clsx(
-        styles.card,
-        styles[tier],
-        hero && styles.hero,
-        compact && styles.compact,
-      )}>
+    <article className={clsx(styles.card, styles[tier], hero && styles.hero)}>
       <header className={styles.head}>
         {n && <span className={styles.num}>{n}</span>}
         <div className={styles.headText}>
           <h4 className={styles.title}>{title}</h4>
         </div>
       </header>
-      {compact ? (
-        /* the supporting estate is context, so its capabilities run as one line
-           instead of a grid of chips */
-        <p className={styles.capLine}>{caps.join(' · ')}</p>
-      ) : (
-        <div className={styles.caps}>
-          {caps.map((c) => (
-            <span key={c} className={styles.cap}>
-              {c}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className={styles.caps}>
+        {caps.map((c) => (
+          <span key={c} className={styles.cap}>
+            {c}
+          </span>
+        ))}
+      </div>
       {store && <Store label={store} />}
     </article>
   );
@@ -353,8 +336,12 @@ export default function LandscapeMap() {
             <section className={clsx(styles.group, styles.groupSupport)}>
               <h4 className={styles.groupTitle}>Supporting domains</h4>
               <div className={styles.supportStack}>
-                {SUPPORTING.map((d) => (
-                  <Card key={d.title} {...d} tier={d.tier || 'support'} compact />
+                {SUPPORTING.map((label) => (
+                  <div
+                    key={label}
+                    className={clsx(styles.support, styles.ext, styles.supportBox)}>
+                    {label}
+                  </div>
                 ))}
               </div>
             </section>
