@@ -36,11 +36,11 @@
   border-color: var(--amex-blue);
   color: #ffffff;
 }
-[data-theme='dark'] .iconButton {
+:global([data-theme='dark']) .iconButton {
   border-color: color-mix(in srgb, var(--amex-blue-bright) 28%, transparent);
   color: color-mix(in srgb, var(--amex-blue-bright) 78%, transparent);
 }
-[data-theme='dark'] .iconButton:hover {
+:global([data-theme='dark']) .iconButton:hover {
   background: var(--amex-blue-bright);
   border-color: var(--amex-blue-bright);
   color: #001327;
@@ -66,16 +66,16 @@
   border-color: color-mix(in srgb, var(--amex-blue) 45%, transparent);
   color: var(--amex-blue);
 }
-[data-theme='dark'] .wrap:hover .expandButton {
+:global([data-theme='dark']) .wrap:hover .expandButton {
   border-color: color-mix(in srgb, var(--amex-blue-bright) 50%, transparent);
   color: var(--amex-blue-bright);
 }
 
-[data-theme='dark'] .expandButton {
+:global([data-theme='dark']) .expandButton {
   border-color: color-mix(in srgb, var(--amex-blue-bright) 40%, transparent);
   color: var(--amex-blue-bright);
 }
-[data-theme='dark'] .expandButton:hover {
+:global([data-theme='dark']) .expandButton:hover {
   background: var(--amex-blue-bright);
   color: #001327;
 }

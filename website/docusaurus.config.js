@@ -136,7 +136,11 @@ const config = {
         },
         blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          // Mermaid theming is its own file: it needs the kind of !important
+          // weight that overriding an injected stylesheet takes, and mixing
+          // that into the site's own design system made custom.css hard to
+          // read. Order matters, since it builds on the tokens above it.
+          customCss: ['./src/css/custom.css', './src/css/mermaid.css'],
         },
       }),
     ],

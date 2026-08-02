@@ -1,0 +1,476 @@
+/* ====================================================================== *
+ * Mermaid diagrams.
+ *
+ * Split out of custom.css, where it was a third of the file and nearly all
+ * of its !important. Mermaid injects its own stylesheet at render time and
+ * styles by generated class, so overriding it takes weight that would be
+ * alarming anywhere else. Keeping that in one file means custom.css can be
+ * read as the site's own design system without it.
+ *
+ * Registered alongside custom.css in docusaurus.config.js.
+ * ====================================================================== */
+
+/* ==================================================================== *
+ * 12. Mermaid — Amex-blue nodes, semantic state colors
+ * ==================================================================== */
+:root {
+  --amex-state-intermediate: #34519e;
+  --amex-state-success: #2f7d54;
+  --amex-state-failure: #c0392b;
+  --amex-state-choice: #c69214;
+}
+[data-theme='dark'] {
+  --amex-state-intermediate: #7b93de;
+  --amex-state-success: #57b483;
+  --amex-state-failure: #e2685c;
+  --amex-state-choice: #e0b34e;
+}
+
+/* ==================================================================== *
+ * 13. Mermaid state diagrams
+ * Colours read from the theme-aware --amex-state-* tokens above, so one
+ * rule set covers light and dark. Mermaid scopes its own styles under a
+ * random svg #id, so node fills need !important to win.
+ * ==================================================================== */
+.docusaurus-mermaid-container {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+
+/* State-diagram text uses the monospace stack, forced over Mermaid's inline
+   font. Sequence diagrams are excluded on purpose: they set their own face in
+   per-diagram front matter so Mermaid measures and draws in the same font, and
+   overriding it here would push their labels out of the boxes Mermaid sized. */
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) text,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .nodeLabel,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .nodeLabel p,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .edgeLabel,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .edgeLabel p,
+.docusaurus-mermaid-container svg:not([aria-roledescription='sequence']) .cluster .nodeLabel {
+  font-family: var(--amex-font-mono) !important;
+}
+
+/* State boxes — rounded; default (in-flight) is the navy-blue bucket. */
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state > rect.label-container {
+  rx: 9px !important;
+  ry: 9px !important;
+  stroke-width: 1.5px !important;
+  fill: color-mix(in srgb, var(--amex-state-intermediate) 13%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-intermediate) !important;
+}
+/* The state name takes the colour of the box it sits in, so a row of terminal
+   states reads as one thing at a glance rather than as three tinted boxes with
+   the same navy text in them. Every pairing here clears 4.5:1 against its own
+   fill, in both themes. */
+.docusaurus-mermaid-container svg.statediagram .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .nodeLabel p {
+  fill: var(--amex-state-intermediate) !important;
+  color: var(--amex-state-intermediate) !important;
+  font-weight: 600;
+}
+
+/* Terminal success — PAID, RETURNED, REPRESENTED (green). */
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-PAID'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-RETURNED'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-REPRESENTED'] > rect.label-container {
+  fill: color-mix(in srgb, var(--amex-state-success) 15%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-success) !important;
+}
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-PAID'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-PAID'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-RETURNED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-RETURNED'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-REPRESENTED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-REPRESENTED'] .nodeLabel p {
+  fill: var(--amex-state-success) !important;
+  color: var(--amex-state-success) !important;
+}
+
+/* Terminal failure — DECLINED, DISALLOWED, CANCELLED (red). */
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DISALLOWED'] > rect.label-container,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] > rect.label-container {
+  fill: color-mix(in srgb, var(--amex-state-failure) 13%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-failure) !important;
+}
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DECLINED'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DISALLOWED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-DISALLOWED'] .nodeLabel p,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .node.statediagram-state[id*='state-CANCELLED'] .nodeLabel p {
+  fill: var(--amex-state-failure) !important;
+  color: var(--amex-state-failure) !important;
+}
+
+/* Choice diamonds (<<choice>>) — gold. */
+.docusaurus-mermaid-container svg.statediagram .node.default > rect:not(.label-container),
+.docusaurus-mermaid-container svg.statediagram .node.default polygon {
+  fill: color-mix(in srgb, var(--amex-state-choice) 16%, var(--amex-panel)) !important;
+  stroke: var(--amex-state-choice) !important;
+  stroke-width: 1.5px !important;
+}
+
+/* Start dot, end ring, transitions and arrowheads — Amex blue. */
+.docusaurus-mermaid-container svg.statediagram .start-state,
+.docusaurus-mermaid-container svg.statediagram circle.state-start,
+.docusaurus-mermaid-container svg.statediagram .end-state-outer,
+.docusaurus-mermaid-container svg.statediagram .end-state-inner {
+  fill: var(--amex-blue) !important;
+  stroke: var(--amex-blue) !important;
+}
+.docusaurus-mermaid-container svg.statediagram .transition,
+.docusaurus-mermaid-container svg.statediagram path.transition {
+  stroke: var(--amex-blue) !important;
+  stroke-width: 1.6px !important;
+}
+.docusaurus-mermaid-container svg.statediagram marker path {
+  fill: var(--amex-blue) !important;
+  stroke: var(--amex-blue) !important;
+}
+
+/* Composite-state clusters — dashed Amex-blue frame, labelled in blue. */
+.docusaurus-mermaid-container svg.statediagram .cluster > rect,
+.docusaurus-mermaid-container svg.statediagram .statediagram-cluster rect {
+  fill: color-mix(in srgb, var(--amex-blue) 5%, transparent) !important;
+  stroke: var(--amex-blue) !important;
+  stroke-dasharray: 5 4 !important;
+  stroke-width: 1.3px !important;
+  rx: 12px !important;
+  ry: 12px !important;
+}
+.docusaurus-mermaid-container svg.statediagram .cluster .nodeLabel,
+.docusaurus-mermaid-container svg.statediagram .statediagram-cluster .nodeLabel {
+  fill: var(--amex-blue) !important;
+  color: var(--amex-blue) !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Transition labels — smaller and tighter than the state text, on the page bg. */
+.docusaurus-mermaid-container svg.statediagram .edgeLabel,
+.docusaurus-mermaid-container svg.statediagram .edgeLabel p {
+  color: var(--amex-mut) !important;
+  fill: var(--amex-mut) !important;
+  font-size: 0.74rem !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* The plate behind a label hugs the words, not the box Mermaid measured.
+   Mermaid measures a label at the theme font size and we draw it a quarter
+   smaller, so a background on the outer span paints a rectangle far wider than
+   the text: "eligible (create representment)" was masking the arrows running
+   past it on both sides. Painting the inline text instead keeps the label
+   legible over a line without cutting anything. box-decoration-break carries
+   the padding onto the second line of a label that wraps. */
+.docusaurus-mermaid-container svg.statediagram .edgeLabel {
+  background-color: transparent !important;
+}
+.docusaurus-mermaid-container svg.statediagram .edgeLabel p {
+  display: inline;
+  padding: 0 0.2em;
+  background-color: var(--amex-bg) !important;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.docusaurus-mermaid-container svg.statediagram .edgeLabel rect {
+  fill: none !important;
+}
+
+/* ==================================================================== *
+ * 14. Sequence diagrams — Amex-branded, theme-aware.
+ *
+ * The mermaid source carries light-tuned rgba() "sentinel" fills on its
+ * box / rect regions; every role uses a unique RGB triple, so dark mode
+ * re-tints each role here via [fill^=...] attribute selectors (CSS wins
+ * over SVG presentation attributes; !important wins over mermaid's own
+ * injected #id-scoped stylesheet). Everything else — actors, lifelines,
+ * notes, alt/opt frames, message lines, autonumber badges — is styled
+ * below. Selectors are scoped to the sequence svg so state diagrams are
+ * untouched.
+ * ==================================================================== */
+:root {
+  --seq-ink: rgba(11, 27, 52, 0.6); /* message lines + arrowheads */
+}
+[data-theme='dark'] {
+  --seq-ink: #a6c6ec;
+}
+
+/* --- Size and frame ------------------------------------------------------
+ * Mermaid emits these at natural size (sequence.useMaxWidth: false in
+ * docusaurus.config.js), which gives the SVG real width and height
+ * attributes. Sizing is then left entirely to CSS: fitted to the column
+ * here, and re-sized by src/theme/Mermaid when a diagram is expanded.
+ *
+ * A diagram wide enough to be shrunk by this rule grows an Expand button.
+ * See the note at the top of src/theme/Mermaid/index.js for why fitting is
+ * still the default when it costs this much legibility.
+ *
+ * Nothing here sets font-size or font-family on a sequence diagram. Mermaid
+ * sized every box around the text it measured at layout time; restyling the
+ * text now would push it out of those boxes. Per-diagram front matter is the
+ * one place sequence type is set.
+ * ------------------------------------------------------------------------ */
+.docusaurus-mermaid-container:has(svg[aria-roledescription='sequence']) {
+  display: block;
+  padding: 14px 12px 10px;
+  border: 1px solid var(--amex-line);
+  border-radius: var(--card-radius);
+  background: var(--amex-panel);
+}
+.docusaurus-mermaid-container > svg[aria-roledescription='sequence'] {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Participant (actor) boxes — solid Amex Blue Box, white labels. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.actor {
+  fill: #016fd0 !important;
+  stroke: #01488f !important;
+  stroke-width: 1px !important;
+  rx: 8px !important;
+  ry: 8px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.actor {
+  fill: #1670bc !important;
+  stroke: #4da3e6 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.actor,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.actor > tspan {
+  fill: #ffffff !important;
+  font-weight: 600 !important;
+}
+/* Lifelines — faint blue threads. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .actor-line {
+  stroke: color-mix(in srgb, #016fd0 40%, transparent) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .actor-line {
+  stroke: color-mix(in srgb, #4da3e6 40%, transparent) !important;
+}
+
+/* Notes — pale blue caption panels. They carry the running commentary, so
+   they sit in the blue family and leave gold free to mean something. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
+  fill: #e3f0fc !important;
+  stroke: #7fb4e4 !important;
+  stroke-width: 1px !important;
+  rx: 6px !important;
+  ry: 6px !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText > tspan {
+  fill: #0b2748 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
+  fill: #10294c !important;
+  stroke: #34689f !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText,
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.noteText > tspan {
+  fill: #d6e7fa !important;
+}
+
+/* alt / opt / loop frames — blue label pentagon, dashed hairline frame. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelBox {
+  fill: #016fd0 !important;
+  stroke: #01488f !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelBox {
+  fill: #1670bc !important;
+  stroke: #4da3e6 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelText,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .labelText > tspan {
+  fill: #ffffff !important;
+  font-weight: 600 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopLine {
+  stroke: color-mix(in srgb, #016fd0 45%, transparent) !important;
+  stroke-dasharray: 3, 3 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopLine {
+  stroke: color-mix(in srgb, #4da3e6 45%, transparent) !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .loopText > tspan,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .sectionTitle,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .sectionTitle > tspan {
+  fill: var(--amex-mut) !important;
+}
+
+/* Titles of the participant groups (`box Caller`, `box Billpay Platform`).
+   Mermaid draws them in its default grey. The group fills come from the
+   sentinels further down. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.text {
+  fill: #01488f !important;
+  letter-spacing: 0.05em !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.text {
+  fill: #7fb4e4 !important;
+}
+
+/* Messages — theme ink for lines, arrowheads, and labels. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .messageLine0,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .messageLine1 {
+  stroke: var(--seq-ink) !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.messageText {
+  fill: var(--amex-txt) !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] marker path {
+  fill: var(--seq-ink) !important;
+  stroke: var(--seq-ink) !important;
+}
+/* Autonumber badges — Amex-blue disc, white numeral. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] marker circle {
+  fill: #016fd0 !important;
+  stroke: none !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.sequenceNumber {
+  fill: #ffffff !important;
+}
+
+/* --- Region-rect fills + chip chrome ------------------------------------
+ * The palette is Amex blue throughout, with one gold.
+ *
+ * Two distinctions do the work. Which worker ran the block: Amex blue for
+ * online, electric blue for offline. And whether the caller has already been
+ * answered: gold, dashed, for the async span. Everything else is a tint of
+ * the same blue and carries only nesting.
+ *
+ * State-transition chips are deliberately all one colour. Colour-coding them
+ * by outcome competed with the worker distinction for the reader's attention,
+ * and the chip already spells the state out (`state → DECLINED`).
+ *
+ * Every fill here is OPAQUE, and the source rgba() values in the markdown are
+ * only sentinels for these selectors to match on. Translucent fills looked
+ * fine in isolation and wrong in combination: Mermaid paints these regions
+ * back to front, so an offline block nested inside the gold async span
+ * composited cyan over gold and came out green. Opaque fills mean a block is
+ * the same colour wherever it is nested. Safe to do, because Mermaid draws
+ * every region before the lifelines, actor boxes, arrows and labels, so
+ * nothing readable sits underneath one.
+ *
+ * Sentinel key (unique RGB triples, matched on prefix):
+ *   0,23,90     caller box       | 1,111,208  platform box
+ *   1,91,179    online worker    | 0,163,224  offline worker
+ *   96,165,224  nested sub-workflow
+ *   198,146,20  async span       | 90,112,145 event-ingestion strip
+ *   0,98,182    state chip, every transition
+ */
+.docusaurus-mermaid-container rect[fill^='rgba(0,23,90'] {
+  fill: #eff2f7 !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  fill: #f2f6fc !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  fill: #bfd6f5 !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  fill: #d3f0fa !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(96,165,224'] {
+  fill: #e4edfb !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  fill: #f8e6bd !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
+  fill: #edeff4 !important;
+}
+.docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  fill: #8fb8e8 !important;
+}
+
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,23,90'] {
+  fill: #16294a !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  fill: #102546 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  fill: #123f7d !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  fill: #0b5f7d !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(96,165,224'] {
+  fill: #1d4372 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  fill: #4a3f22 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
+  fill: #16253d !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  fill: #2f6fb8 !important;
+}
+
+/* State-transition chips read as rounded, hairline-stroked pills. */
+.docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  rx: 6px !important;
+  ry: 6px !important;
+  stroke: rgba(0, 98, 182, 0.55) !important;
+  stroke-width: 1px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
+  stroke: rgba(120, 180, 240, 0.55) !important;
+}
+
+/* Worker regions. Each takes a hairline in its own hue, so the two read apart
+   at a glance rather than only once you reach the note at the top. */
+.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'],
+.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'],
+.docusaurus-mermaid-container rect[fill^='rgba(96,165,224'],
+.docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
+  rx: 8px !important;
+  ry: 8px !important;
+}
+/* Online worker: Amex Blue Box. */
+.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  stroke: #015bb3 !important;
+  stroke-width: 1.6px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
+  stroke: #4d94dd !important;
+}
+/* Offline worker: electric blue. */
+.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  stroke: #0090c6 !important;
+  stroke-width: 1.6px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
+  stroke: #26b6e8 !important;
+}
+
+/* The two participant-group frames. Mermaid outlines them in its default
+   grey, which is the last non-Amex colour in the diagram. */
+.docusaurus-mermaid-container rect[fill^='rgba(0,23,90'],
+.docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  rx: 10px !important;
+  ry: 10px !important;
+  stroke: color-mix(in srgb, #016fd0 28%, transparent) !important;
+  stroke-width: 1px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,23,90'],
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+  stroke: color-mix(in srgb, #4da3e6 26%, transparent) !important;
+}
+
+/* The async span. It is the one thing in a diagram that is not simply the next
+   step, so it gets the only gold and the only dashed frame. */
+.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  rx: 8px !important;
+  ry: 8px !important;
+  stroke: #c69214 !important;
+  stroke-width: 1.6px !important;
+  stroke-dasharray: 7 4 !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+  stroke: rgba(235, 197, 100, 0.85) !important;
+}
