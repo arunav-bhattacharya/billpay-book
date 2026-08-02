@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import clsx from 'clsx';
 import styles from './styles.module.css';
 
@@ -57,11 +57,34 @@ const ICONS = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </>
   ),
+  /* every caller on one side, one gate, one way on from it */
+  gateway: (
+    <>
+      <path d="M2.5 5.5h4.6M2.5 12h4.6M2.5 18.5h4.6" />
+      <rect x="9" y="3" width="4.6" height="18" rx="1.8" />
+      <path d="M15 12h4.4" />
+      <path d="M17 9.2 19.8 12 17 14.8" />
+    </>
+  ),
+  /* someone on a headset: the IVR glyph is the headset alone, so this one has
+     the person in it */
+  operator: (
+    <>
+      <path d="M5.4 13.6v-2.4a6.6 6.6 0 0 1 13.2 0v2.4" />
+      <rect x="3.1" y="12.2" width="3.4" height="5" rx="1.5" />
+      <rect x="17.5" y="12.2" width="3.4" height="5" rx="1.5" />
+      <circle cx="12" cy="11.4" r="3" />
+      <path d="M7 21.4a5 5 0 0 1 10 0" />
+    </>
+  ),
 };
 
-function Icon({name}) {
+function Icon({name, className}) {
   return (
-    <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className={clsx(styles.icon, className)}
+      aria-hidden="true">
       {ICONS[name]}
     </svg>
   );
@@ -237,6 +260,35 @@ function Card({n, title, caps, store, tier = 'domain', hero}) {
   );
 }
 
+/* Corner marks, the same pair the legacy map's toolbar carries, so the two
+   diagrams offer the reader the same affordance in the same shape. */
+const TOOL_ICONS = {
+  expand: (
+    <>
+      <path d="M6.2 2.3H2.3v3.9" />
+      <path d="M9.8 2.3h3.9v3.9" />
+      <path d="M13.7 9.8v3.9H9.8" />
+      <path d="M2.3 9.8v3.9h3.9" />
+    </>
+  ),
+  collapse: (
+    <>
+      <path d="M2.3 6.2h3.9V2.3" />
+      <path d="M13.7 6.2H9.8V2.3" />
+      <path d="M9.8 13.7V9.8h3.9" />
+      <path d="M6.2 13.7V9.8H2.3" />
+    </>
+  ),
+};
+
+function ToolIcon({name}) {
+  return (
+    <svg viewBox="0 0 16 16" className={styles.toolIcon} aria-hidden="true">
+      {TOOL_ICONS[name]}
+    </svg>
+  );
+}
+
 /** Closes a list that is a sample rather than the full set. */
 function More({tier}) {
   return (
@@ -252,7 +304,10 @@ function More({tier}) {
 function CrossCard({title, caps}) {
   return (
     <article className={clsx(styles.card, styles.domain, styles.cross)}>
-      <h4 className={styles.title}>{title}</h4>
+      <h4 className={styles.title}>
+        <Icon name="operator" className={styles.crossIcon} />
+        {title}
+      </h4>
       <div className={styles.crossCaps}>
         {caps.map((c) => (
           <span key={c} className={styles.cap}>
@@ -274,12 +329,41 @@ const LEGEND = [
 ];
 
 export default function LandscapeMap() {
+  /* The board is wider than the doc column, so full screen is the one place
+     the whole estate fits without a sideways scroll. */
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [expanded]);
+
   return (
-    <div
-      className={styles.wrap}
-      role="img"
-      aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. They reach the payments domain through the Type-A APIs, a rail down its left edge. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway above Money Movement (M3). Control Tower is fixed to the bottom edge of the payments domain box, starting where the Type-A rail ends, because it works on all of those domains rather than sitting among them. Money Movement is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks, among others. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services, among others.">
-      <div className={styles.board}>
+    <div className={clsx(styles.wrap, expanded && styles.expanded)}>
+      <div className={styles.bar}>
+        <button
+          type="button"
+          className={styles.tool}
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? 'Leave full screen' : 'Full screen'}
+          title={expanded ? 'Leave full screen' : 'Full screen'}>
+          <ToolIcon name={expanded ? 'collapse' : 'expand'} />
+        </button>
+      </div>
+
+      <div
+        className={styles.board}
+        role="img"
+        aria-label="The Amex payments estate, left to right. Channels (Myca, Mobile, IVR, ISP and others) enter on the left. They reach the payments domain through the Type-A APIs, a rail down its left edge. The payments domain runs across the middle: Bill Pay Core, then Plans, the Bill Pay Inbound Processor and the Allocation Manager, then Payment Instruments and Mandates, then the Multirail Gateway above Money Movement (M3). Control Tower is fixed to the bottom edge of the payments domain box, starting where the Type-A rail ends, because it works on all of those domains rather than sitting among them. Money Movement is the route to every external party on the right: partner banks, TPSPs, P2P networks, third-party account verification and the payment networks, among others. Underneath sit the supporting domains: Accounts Receivable, Customer Info and Relationship Management, Loyalty and Benefits, Fraud and Risk, Finance, Lumi, Raven and Commercial Card Services, among others.">
         <div className={styles.flowScroll}>
           <div className={styles.main}>
             {/* ---- group 1: channels, on the left ---- */}
@@ -300,6 +384,7 @@ export default function LandscapeMap() {
             <div className={styles.domainZone}>
               <div className={styles.domainRow}>
                 <aside className={styles.apiRail} aria-hidden="true">
+                  <Icon name="gateway" className={styles.railIcon} />
                   <span className={styles.apiRailText}>Type-A APIs</span>
                 </aside>
 
@@ -364,8 +449,8 @@ export default function LandscapeMap() {
         </div>
 
         <p className={styles.hint}>
-          Scroll the row sideways for the rest of it, or collapse the contents panel to
-          see the whole estate at once.
+          Scroll the row sideways for the rest of it, or expand it to see the whole
+          estate at once.
         </p>
       </div>
 

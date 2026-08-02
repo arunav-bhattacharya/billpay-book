@@ -46,6 +46,56 @@
   --fill: 15%;
 }
 
+/* Full screen, because the board is wider than the doc column and this is the
+   one place the whole estate fits without a sideways scroll. Same treatment the
+   legacy map uses. */
+.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  overflow-y: auto;
+  background: var(--amex-bg);
+}
+
+/* ---- toolbar ---- */
+.bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.55rem;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0.28rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--amex-line-strong);
+  background: transparent;
+  color: var(--amex-mut);
+  cursor: pointer;
+}
+.tool:hover {
+  color: var(--amex-txt-strong);
+  border-color: color-mix(in srgb, var(--amex-blue) 45%, var(--amex-line-strong));
+  background: color-mix(in srgb, var(--amex-blue) 8%, transparent);
+}
+
+.toolIcon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* ---- the board ---- */
 .board {
   display: flex;
@@ -180,34 +230,41 @@
    Every domain behind it exposes the same house-standard interface, so the fact
    is stated once on the wall the channels come through rather than repeated on
    each box. Fixed to the panel's left edge, sharing its border. */
+/* The glyph and the label are one group, centred down the rail: the icon reads
+   at a glance and the words say which interface it is. The label runs bottom to
+   top, so column-reverse is what puts the glyph ahead of it rather than after.
+   Colour is set once here and both inherit it. */
 .apiRail {
   flex: none;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   width: var(--rail-w);
   padding: 0.5rem 0;
   border: 2px solid color-mix(in srgb, var(--amex-blue) 55%, transparent);
   border-right: none;
   border-radius: 16px 0 0 16px;
   background: color-mix(in srgb, var(--amex-blue) 16%, var(--amex-panel));
+  color: var(--amex-blue);
 }
 
+/* tracked out to the same 0.12em Control Tower carries: the two labels fixed to
+   the box read as a pair */
 .apiRailText {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   white-space: nowrap;
   font-size: 0.76rem;
   font-weight: 550;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--amex-blue);
 }
 
 :global([data-theme='dark']) .apiRail {
   border-color: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
   background: color-mix(in srgb, var(--amex-blue-bright) 17%, var(--amex-panel));
-}
-:global([data-theme='dark']) .apiRailText {
   color: var(--amex-blue-bright);
 }
 
@@ -255,15 +312,36 @@
 }
 
 /* only ever drawn inside a channel pill, so it is set against the navy */
+/* drawn in whatever colour it is set in, so one glyph serves the navy pills,
+   the Type-A rail and Control Tower */
 .icon {
   flex: none;
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: rgba(255, 255, 255, 0.82);
+  stroke: currentColor;
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* softened against the navy, so the name stays the brighter thing in the pill */
+.chan .icon {
+  opacity: 0.82;
+}
+
+/* Sized to carry the same weight as the label beside it rather than to sit
+   inside the line, which is what a 14px glyph does next to a tracked-out cap. */
+.railIcon {
+  width: 26px;
+  height: 26px;
+  stroke-width: 1.4;
+}
+
+.crossIcon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.4;
 }
 
 /* ---- external systems, and the supporting estate that is drawn the same way
@@ -341,6 +419,10 @@
 }
 
 .card.cross .title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   font-size: 0.78rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
