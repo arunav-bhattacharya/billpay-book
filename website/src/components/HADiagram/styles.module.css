@@ -24,7 +24,7 @@
 
   margin: 1.5rem 0 2rem;
   overflow-x: auto;
-  /* The house card, exactly per the recipe in custom.css section 9a, so the
+  /* The house card, from the recipe in css/recipes.module.css, so the
      diagram sits on the same paper as every other card on the site. */
   padding: 10px 6px 4px;
 }

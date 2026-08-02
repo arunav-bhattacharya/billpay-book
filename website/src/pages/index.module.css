@@ -115,7 +115,7 @@
 }
 
 /* ---- Section card ----
-   The house card, straight off the recipe in custom.css section 9a: paper face,
+   The house card, straight off the recipe in css/recipes.module.css: paper face,
    no outline, uplifted navy shadow, and the accent solid at the bottom-right
    corner and gone a third of the way round. That is the corner the arrow lives
    in, so hover lights the accent and the arrow together. The grid reads as

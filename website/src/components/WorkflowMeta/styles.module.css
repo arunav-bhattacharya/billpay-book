@@ -1,4 +1,4 @@
-/* The house card, per the recipe in custom.css section 9a, at strip scale: the
+/* The house card, from the recipe in css/recipes.module.css, at strip scale: the
    radius is tighter because the strip is only two rows tall, but it carries the
    same face, corner and shadow as every other card on the site. */
 .meta {

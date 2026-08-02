@@ -15,7 +15,7 @@
   gap: 0.9rem;
 }
 
-/* The house card, per the recipe in custom.css section 9a. The worker's hue
+/* The house card, from the recipe in css/recipes.module.css. The worker's hue
    drives the corner, which is where the hairline along the top used to be. */
 .card {
   composes: panel from '../../css/recipes.module.css';

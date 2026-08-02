@@ -1,0 +1,13 @@
+{
+  "//": "Makes the @theme/* and @docusaurus/* module specifiers resolve, so the // @ts-check in docusaurus.config.js and the editor both know what they are. Without this the @docusaurus/module-type-aliases dependency did nothing.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "checkJs": false,
+    "types": ["@docusaurus/module-type-aliases", "@docusaurus/theme-classic"],
+    "paths": {
+      "@site/*": ["./*"]
+    }
+  },
+  "include": ["src/**/*", "docusaurus.config.js", "sidebars.js"],
+  "exclude": ["build", ".docusaurus", "node_modules"]
+}

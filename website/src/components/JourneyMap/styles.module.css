@@ -9,7 +9,7 @@
      collapsing the page TOC widens it without the viewport changing at all. */
   container-type: inline-size;
   margin: 1.5rem 0 2.6rem;
-  /* The house card, per the recipe in custom.css section 9a. */
+  /* The house card, from the recipe in css/recipes.module.css. */
 
   /* The signature Blue Box blue, not the cyan-leaning section accent. */
   --jm-accent: var(--amex-blue);

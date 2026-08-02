@@ -5,7 +5,7 @@
   margin: 1.4rem 0 2.2rem;
 }
 
-/* The house card, per the recipe in custom.css section 9a. The section hue
+/* The house card, from the recipe in css/recipes.module.css. The section hue
    drives the corner, which is where the accent hairline along the top used to
    live: one accent per card, and it is the same one every card on the site
    carries. */

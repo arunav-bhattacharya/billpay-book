@@ -5,7 +5,7 @@
 
 import {themes as prismThemes} from 'prism-react-renderer';
 
-// Update these before deploying to GitHub Pages.
+// The GitHub Pages coordinates. The deploy workflow reads the same values.
 const GH_USER = 'arunav-bhattacharya';
 const REPO_NAME = 'billpay-book';
 
@@ -187,8 +187,8 @@ const config = {
           // attributes on the SVG rather than a max-width sized to the
           // column. Sizing then belongs entirely to CSS, which is what lets
           // the same rendered diagram fit the column inline and open at
-          // window width or actual size when expanded. See section 14 of
-          // custom.css and src/theme/Mermaid.
+          // window width or actual size when expanded. See src/css/mermaid.css
+          // and src/theme/Mermaid.
           //
           // Font size and family are deliberately absent here. Mermaid
           // resolves every *FontSize / *FontFamily from the global fontSize
@@ -288,7 +288,9 @@ const config = {
       prism: {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
-        additionalLanguages: ['bash', 'json', 'yaml', 'kotlin', 'sql'],
+        // Only what the docs actually fence. Every grammar listed here ships
+        // to every page, and json, yaml and sql were paying for nothing.
+        additionalLanguages: ['bash', 'kotlin'],
       },
       tableOfContents: {
         minHeadingLevel: 2,

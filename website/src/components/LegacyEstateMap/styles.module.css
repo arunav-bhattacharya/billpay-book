@@ -22,7 +22,7 @@
   --lem-new: #6d4aca;    /* added on top: violet, used nowhere else */
   margin: 1.5rem 0 2.4rem;
   padding: 0.9rem 0.9rem 1.1rem;
-  /* The house card, per the recipe in custom.css section 9a. */
+  /* The house card, from the recipe in css/recipes.module.css. */
 }
 :global([data-theme='dark']) .wrap {
   --lem-iface: #22d3ee;

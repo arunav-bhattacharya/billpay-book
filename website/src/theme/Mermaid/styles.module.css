@@ -1,6 +1,6 @@
 /**
  * Chrome for the expandable diagram figure. The diagram's own colours live in
- * section 14 of src/css/custom.css; everything here is the frame around it.
+ * src/css/mermaid.css; everything here is the frame around it.
  */
 
 .wrap {

@@ -1,7 +1,7 @@
 /* CompositionMap — onboarding, profile, composed workflow. One accent for the
    whole map, quiet surfaces, and monospace kept for literals only. */
 
-/* The house card, per the recipe in custom.css section 9a. */
+/* The house card, from the recipe in css/recipes.module.css. */
 .wrap {
   composes: panel from '../../css/recipes.module.css';
 
