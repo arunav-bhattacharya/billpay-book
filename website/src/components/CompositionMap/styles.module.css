@@ -60,10 +60,12 @@
 }
 
 /* ---- labelled rows ---- */
+/* Label above, content across the full width of the band. Both rows are built
+   this way so the API chips and the behavior questions start on the same left
+   edge, and so the questions get the whole band. A label in a fixed column
+   beside them was what made the longest question wrap. */
 .row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.9rem;
+  display: block;
 }
 
 .row + .row {
@@ -72,20 +74,9 @@
   border-top: 1px solid var(--amex-line);
 }
 
-/* Label above, content across the full width of the band. */
-.rowStacked {
-  display: block;
-}
-
-.rowStacked .rowLabel {
-  display: block;
-  width: auto;
-  margin-bottom: 0.6rem;
-}
-
 .rowLabel {
-  flex: none;
-  width: 132px;
+  display: block;
+  margin-bottom: 0.6rem;
   font-size: 0.79rem;
   font-weight: 700;
   letter-spacing: 0.02em;
