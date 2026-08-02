@@ -331,7 +331,7 @@ const EDGES = [
   ...CHANNEL_IDS.map((id) => {
     const n = AT[id];
     const y = n.y + n.h / 2;
-    return {a: id, b: 'p_hop', s: 'svc', bare: true, d: `M${n.x + n.w},${y} L240,${y}`, mx: 0, my: 0};
+    return {a: id, b: 'p_hop', s: 'svc', d: `M${n.x + n.w},${y} L240,${y}`, mx: 0, my: 0};
   }),
   /* the original path: the interface thicket reaches AM directly, under the
      modernisation layer rather than through it */
@@ -339,8 +339,8 @@ const EDGES = [
 
   /* ---- modernisation layer. Lanes 824 / 838 / 852 / 866 keep the runs
      between the facade and the caches side by side. ---- */
-  link('apigee', 'r', 'sf', 't', {s: 'svc', bare: true}),
-  link('sf', 'rt', 'sorc', 'l', {s: 'svc', bare: true, stub: 8, trunk: 824}),
+  link('apigee', 'r', 'sf', 't', {s: 'svc'}),
+  link('sf', 'rt', 'sorc', 'l', {s: 'svc', stub: 8, trunk: 824}),
   link('sf', 'rb', 'pec', 'l', {s: 'svc', p: 'max_amount', dy: -44}),
   link('pec', 'b', 'elig', 't', {s: 'svc', p: 'on cache miss', ly: 490}),
   link('elig', 'lb', 'pec', 'lb', {s: 'svc', p: 'insert pre-eligibility data', stub: 8, trunk: 852, ly: 478}),
@@ -349,28 +349,28 @@ const EDGES = [
      off the channels, it did not replace the app underneath */
   link('sf', 'r', 'am', 'l', {s: 'svc', p: '/inquiry · /payment', ay: 424, by: 452, trunk: 810, lx: 1000, ly: 452}),
   link('cb', 'b', 'altpay', 't', {s: 'fb', p: '/standin', bx: 547}),
-  link('altpay', 'b', 'boom', 't', {s: 'svc', bare: true}),
+  link('altpay', 'b', 'boom', 't', {s: 'svc'}),
   /* dead straight into Eligibility: AlternatePayment sits at the same height.
      The gap is only 84px, so the call keeps its label on the facade edge above
      rather than burying the arrow under a second identical pill. */
-  link('altpay', 'r', 'elig', 'l', {s: 'svc', bare: true, by: 545}),
-  link('altpay', 'l', 'ghdb', 'l', {s: 'svc', bare: true, via: [[442, 1060], [1150, 1060], [1150, 317]]}),
-  link('elig', 'bl', 'gar', 't', {s: 'svc', bare: true, ax: 938}),
-  link('elig', 'br', 'lbridge', 't', {s: 'svc', bare: true, ax: 1062}),
+  link('altpay', 'r', 'elig', 'l', {s: 'svc', by: 545}),
+  link('altpay', 'l', 'ghdb', 'l', {s: 'svc', via: [[442, 1060], [1150, 1060], [1150, 317]]}),
+  link('elig', 'bl', 'gar', 't', {s: 'svc', ax: 938}),
+  link('elig', 'br', 'lbridge', 't', {s: 'svc', ax: 1062}),
   link('lbridge', 'b', 'cas', 't', {s: 'svc', p: 'MQ'}),
   link('elig', 'r', 'sorc', 'r', {s: 'fb', p: 'fallback', trunk: 1134, dy: -110}),
-  link('cas', 'b', 'sorc', 'b', {s: 'fb', bare: true, via: [[1062, 1100], [866, 1100], [866, 334]]}),
+  link('cas', 'b', 'sorc', 'b', {s: 'fb', via: [[1062, 1100], [866, 1100], [866, 334]]}),
 
   /* ---- AM core ---- */
   link('am', 't', 'ghdb', 'b', {s: 'svc', p: 'WS'}),
-  link('ghdb', 't', 'ghdb_e', 'b', {s: 'data', bare: true, ax: 1265}),
-  link('ghdb', 't', 'ghdb_w', 'b', {s: 'data', bare: true, ax: 1425}),
+  link('ghdb', 't', 'ghdb_e', 'b', {s: 'data', ax: 1265}),
+  link('ghdb', 't', 'ghdb_w', 'b', {s: 'data', ax: 1425}),
   link('ghdb_e', 'r', 'ghdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
-  link('am', 'b', 'amdb_e', 't', {s: 'data', bare: true, ax: 1260}),
-  link('am', 'b', 'amdb_w', 't', {s: 'data', bare: true, ax: 1430}),
+  link('am', 'b', 'amdb_e', 't', {s: 'data', ax: 1260}),
+  link('am', 'b', 'amdb_w', 't', {s: 'data', ax: 1430}),
   link('amdb_e', 'r', 'amdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
-  link('wcr', 'b', 'wcrdb_e', 't', {s: 'data', bare: true, ax: 1880}),
-  link('wcr', 'b', 'wcrdb_w', 't', {s: 'data', bare: true, ax: 2010}),
+  link('wcr', 'b', 'wcrdb_e', 't', {s: 'data', ax: 1880}),
+  link('wcr', 'b', 'wcrdb_w', 't', {s: 'data', ax: 2010}),
   link('wcrdb_e', 'r', 'wcrdb_w', 'l', {s: 'repl', p: 'QREP', dy: -40}),
   /* WCR keeps its DB2 in the same two centres, reached over the top */
   /* corporate allocations feed the arrangement they belong to */
@@ -386,36 +386,36 @@ const EDGES = [
   link('am', 'rb', 'globestar', 'b', {s: 'svc', p: 'DataPower', via: [[1555, 492], [1555, 812], [1885, 812]]}),
 
   /* ---- processing & clearing ---- */
-  link('il', 'r', 'igor', 'l', {s: 'svc', bare: true}),
-  link('igor', 'r', 'tl', 'l', {s: 'svc', bare: true}),
+  link('il', 'r', 'igor', 'l', {s: 'svc'}),
+  link('igor', 'r', 'tl', 'l', {s: 'svc'}),
   link('gpp', 'tl', 'il', 'b', {s: 'svc', p: 'ControlM', ax: 1643}),
   link('tl', 'b', 'gpp', 'tr', {s: 'svc', p: 'ControlM', bx: 1917}),
-  link('gpp', 'bl', 'gppdb1', 't', {s: 'data', bare: true, ax: 1675}),
-  link('gpp', 'br', 'gppdb2', 't', {s: 'data', bare: true, ax: 1885}),
+  link('gpp', 'bl', 'gppdb1', 't', {s: 'data', ax: 1675}),
+  link('gpp', 'br', 'gppdb2', 't', {s: 'data', ax: 1885}),
   link('gppdb1', 'r', 'gppdb2', 'l', {s: 'repl', p: 'Golden Gate', dy: -48}),
-  link('gppdb2', 'rt', 'webfocus', 'l', {s: 'data', bare: true, stub: 12, trunk: 1992}),
+  link('gppdb2', 'rt', 'webfocus', 'l', {s: 'data', stub: 12, trunk: 1992}),
   link('gpp', 'l', 'bank', 'r', {s: 'file', p: 'SFT', trunk: 1568}),
 
   /* ---- into and out of FTN ---- */
   link('tl', 'r', 'ftn', 'lt', {s: 'file', p: 'SFT', trunk: 2006}),
   link('extract', 't', 'ftn', 'l', {s: 'file', p: 'SFT', via: [[1675, 640], [2020, 640], [2020, 468]]}),
-  link('balmsg', 'r', 'ftn', 'br', {s: 'file', bare: true}),
+  link('balmsg', 'r', 'ftn', 'br', {s: 'file'}),
   link('imgfiles', 'r', 'ftn', 'lb', {s: 'file', p: 'SFT', via: [[2046, 1023], [2046, 492]]}),
   link('ftn', 'bl', 'globestar', 'r', {s: 'file', p: 'Mainframe Batch', via: [[2125, 768]]}),
 
   /* ---- card rails, and the inbound chain: bank to homebanking to WCR to FTN ---- */
-  link('gateway', 'b', 'firewall', 't', {s: 'svc', bare: true}),
+  link('gateway', 'b', 'firewall', 't', {s: 'svc'}),
   link('firewall', 'b', 'datacash', 't', {s: 'svc', p: 'DataPower'}),
-  link('datacash', 'b', 'bank', 't', {s: 'svc', bare: true}),
+  link('datacash', 'b', 'bank', 't', {s: 'svc'}),
   link('bank', 'rb', 'hba', 'l', {s: 'file', p: 'SFT', trunk: 1516, dy: -40}),
   link('hba', 'r', 'wcr', 'l', {s: 'file', p: 'SFT'}),
   link('wcr', 'r', 'ftn', 'b', {s: 'file', p: 'SFT', bx: 2085, via: [[2085, 1123]]}),
 
   /* ---- image and payment files ---- */
   link('il', 'l', 'infoimage', 't', {s: 'svc', p: 'WS', via: [[1542, 288], [1542, 790], [1675, 790]]}),
-  link('igor', 'b', 'infoimage', 'tr', {s: 'svc', bare: true, via: [[2034, 330], [2034, 826]]}),
+  link('igor', 'b', 'infoimage', 'tr', {s: 'svc', via: [[2034, 330], [2034, 826]]}),
   link('infoimage', 'b', 'payfiles', 't', {s: 'file', p: 'SFT'}),
-  link('payfiles', 'b', 'imgfiles', 't', {s: 'file', bare: true}),
+  link('payfiles', 'b', 'imgfiles', 't', {s: 'file'}),
 
   /* ---- mainframe chain, one straight column under FTN ---- */
   link('ftn', 'b', 'fincap', 't', {s: 'file', p: 'Mainframe Batch', ax: 2215, dy: 80}),
@@ -431,11 +431,11 @@ const EDGES = [
      y=441, runs to a shared spine, and combs off into its own system. The
      transport is labelled once, above the top of the spine. */
   link('ftn', 'r', 'cornerstone', 'l', {s: 'file', p: 'Mainframe Batch', ay: 441, trunk: 2370, lx: 2358, ly: 244}),
-  link('ftn', 'r', 'ablm', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
-  link('ftn', 'r', 'rcps', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
-  link('ftn', 'r', 'ccs', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
-  link('ftn', 'r', 'payaware', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
-  link('ftn', 'r', 'idn', 'l', {s: 'file', bare: true, ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'ablm', 'l', {s: 'file', ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'rcps', 'l', {s: 'file', ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'ccs', 'l', {s: 'file', ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'payaware', 'l', {s: 'file', ay: 441, trunk: 2370}),
+  link('ftn', 'r', 'idn', 'l', {s: 'file', ay: 441, trunk: 2370}),
 ];
 
 const KIND_LABEL = [
@@ -529,8 +529,8 @@ function Glyph({name, x, y, size = 15}) {
 /* rough advance width per character, by the type size each kind is set at */
 const CHAR_W = {db: 7, note: 5.3, iface: 6.8, sub: 5.6};
 
-function Shape({n, dimmed, showNew}) {
-  const isNew = showNew && n.neu;
+function Shape({n, dimmed}) {
+  const isNew = n.neu;
   const hasSub = Boolean(n.s);
   const isDb = n.k === 'db';
   const glyph = n.g || (isDb ? 'db' : null);
@@ -597,8 +597,8 @@ function Shape({n, dimmed, showNew}) {
   );
 }
 
-function PanelShape({n, dimmed, showNew}) {
-  const isNew = showNew && n.neu;
+function PanelShape({n, dimmed}) {
+  const isNew = n.neu;
   return (
     <g
       className={clsx(
@@ -699,7 +699,7 @@ function ToolIcon({name}) {
   );
 }
 
-export default function LegacyEstateMap({showIncremental = true}) {
+export default function LegacyEstateMap() {
   const [layer, setLayer] = useState(null);
   const [view, setView] = useState({k: 1, x: 0, y: 0});
   const [expanded, setExpanded] = useState(false);
@@ -850,10 +850,10 @@ export default function LegacyEstateMap({showIncremental = true}) {
 
         <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
           {PANELS.map((p) => (
-            <PanelShape key={p.id} n={p} dimmed={nodeDim(p)} showNew={showIncremental} />
+            <PanelShape key={p.id} n={p} dimmed={nodeDim(p)} />
           ))}
 
-          <g className={styles.edges}>
+          <g>
             {EDGES.map((e, i) => (
               <path
                 key={`${e.a}-${e.b}-${i}`}
@@ -865,7 +865,7 @@ export default function LegacyEstateMap({showIncremental = true}) {
           </g>
 
           {NODES.map((n) => (
-            <Shape key={n.id} n={n} dimmed={nodeDim(n)} showNew={showIncremental} />
+            <Shape key={n.id} n={n} dimmed={nodeDim(n)} />
           ))}
 
           <g>
@@ -882,13 +882,7 @@ export default function LegacyEstateMap({showIncremental = true}) {
           <div className={styles.lrow}>
             {KIND_LABEL.map((l) => (
               <span key={l.k} className={styles.li}>
-                {l.g ? (
-                  <svg viewBox="0 0 14 16" className={clsx(styles.swIcon, styles[`k_${l.k}`])} aria-hidden="true">
-                    <g className={styles.glyph}>{GLYPHS[l.g]}</g>
-                  </svg>
-                ) : (
-                  <i className={clsx(styles.sw, styles[`k_${l.k}`])} />
-                )}
+                <i className={clsx(styles.sw, styles[`k_${l.k}`])} />
                 {l.label}
               </span>
             ))}

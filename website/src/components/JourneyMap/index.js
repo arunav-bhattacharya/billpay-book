@@ -26,9 +26,6 @@ import styles from './styles.module.css';
  * Passing no `steps` renders the compact form: the layers and route only, with a
  * panel saying why there is no journey to draw. That is for the APIs the spec
  * names but does not describe.
- *
- * This folder also exports `JourneyLegend` (named), which renders live chips from
- * this stylesheet so the legend cannot drift from the diagrams it explains.
  */
 
 /* Green means the money landed, so the last pill in a journey reads as the
@@ -46,7 +43,7 @@ const STATE_TONE = {
 const TERMINAL = new Set(Object.keys(STATE_TONE));
 const toneFor = (state) => STATE_TONE[state] || 'flight';
 
-/* Short names on the diagram, full names on hover. The legend lists them once. */
+/* Short names on the diagram, full names on hover. */
 const SYSTEMS = {
   GAR: 'Accounts Receivable (GAR), which holds the statement balance',
   AR: 'Accounts Receivable, which holds the statement balance',
@@ -67,7 +64,6 @@ const SYSTEMS = {
 const ROUTE_KIND = {
   function: {cls: 'kFunction', label: 'One-Data function'},
   api: {cls: 'kApi', label: 'Billpay core API'},
-  router: {cls: 'kRouter', label: 'Billpay Router'},
   workflow: {cls: 'kWorkflow', label: 'Temporal workflow'},
   schedule: {cls: 'kSchedule', label: 'Temporal Schedule'},
   event: {cls: 'kEvent', label: 'Inbound event'},
@@ -117,7 +113,6 @@ const PATHS = {
   // claimed for this run, so nothing else can take it
   lock: ['M6.8 10.4h10.4a1.6 1.6 0 0 1 1.6 1.6v6.4a1.6 1.6 0 0 1-1.6 1.6H6.8a1.6 1.6 0 0 1-1.6-1.6V12a1.6 1.6 0 0 1 1.6-1.6z', 'M8.4 10.4V7.6a3.6 3.6 0 0 1 7.2 0v2.8', 'M12 14.2v2.2'],
   calendar: ['M5.4 6.4h13.2a1.4 1.4 0 0 1 1.4 1.4v11a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 18.8v-11a1.4 1.4 0 0 1 1.4-1.4z', 'M4 10.6h16', 'M8.4 3.6v3.4', 'M15.6 3.6v3.4'],
-  repeat: ['M4.4 9.6a5 5 0 0 1 5-5h9.2', 'M15.8 1.8l3 2.8-3 2.8', 'M19.6 14.4a5 5 0 0 1-5 5H5.4', 'M8.6 22.2l-3-2.8 3-2.8'],
   // money coming back the way it went out
   undo: ['M4.2 9.6h9.8a5.2 5.2 0 1 1 0 10.4H7.8', 'M8.2 5.4L4 9.6l4.2 4.2'],
   // checked again, later
@@ -586,55 +581,5 @@ export default function JourneyMap({
         </figcaption>
       )}
     </figure>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * JourneyLegend: how to read a diagram, in one compact block.
- * ------------------------------------------------------------------ */
-
-export function JourneyLegend({channelNote}) {
-  return (
-    <div className={styles.legend}>
-      <ul className={styles.legendKeys}>
-        <li>
-          <StatePill state="PROCESSING" />
-          <span>in flight, not finished</span>
-        </li>
-        <li>
-          <StatePill state="PAID" />
-          <span>done, and the money landed</span>
-        </li>
-        <li>
-          <StatePill state="RETURNED" />
-          <span>done, but the money came back</span>
-        </li>
-        <li>
-          <StatePill state="DECLINED" />
-          <span>done, and the payment never happened</span>
-        </li>
-      </ul>
-      <ul className={styles.legendKeys}>
-        <li>
-          <span className={styles.legendFan} aria-hidden="true" />
-          <span>systems a step calls. Hover a name for what it does</span>
-        </li>
-        <li>
-          <span className={styles.legendExit} aria-hidden="true" />
-          <span>an exception, branching above the step it leaves from</span>
-        </li>
-        <li>
-          <span className={styles.legendBand} aria-hidden="true" />
-          <span>shaded steps run in the background, with nobody waiting</span>
-        </li>
-        <li>
-          <span className={styles.legendNum} aria-hidden="true">
-            1
-          </span>
-          <span>step numbers match the numbered notes under each diagram</span>
-        </li>
-      </ul>
-      {channelNote && <p className={styles.legendNote}>{channelNote}</p>}
-    </div>
   );
 }

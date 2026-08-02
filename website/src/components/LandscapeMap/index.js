@@ -306,7 +306,7 @@ export default function LandscapeMap() {
                 <section className={clsx(styles.group, styles.groupDomain)}>
                   <h4 className={styles.groupTitle}>Payments domain</h4>
                   <div className={styles.domainGrid}>
-                    <div className={clsx(styles.col, styles.colCore)}>
+                    <div className={styles.col}>
                       <Card {...CORE} />
                     </div>
                     <div className={styles.col}>

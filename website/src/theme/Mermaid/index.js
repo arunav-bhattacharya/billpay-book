@@ -16,6 +16,7 @@
  * so Mermaid renders each diagram exactly once.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import clsx from 'clsx';
 import OriginalMermaid from '@theme-original/Mermaid';
 import styles from './styles.module.css';
 
@@ -141,13 +142,11 @@ export default function Mermaid(props) {
     };
   }, [expanded, collapse]);
 
-  const className = [
+  const className = clsx(
     styles.wrap,
     expanded && styles.expanded,
     expanded && actualSize && styles.actualSize,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  );
 
   return (
     <div

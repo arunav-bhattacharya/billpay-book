@@ -27,9 +27,9 @@ export default function ApiTable({rows = [], base = BASE}) {
       <table className={styles.table}>
         <thead>
           <tr>
-            <th className={styles.thFn}>One-Data function</th>
-            <th className={styles.thApi}>Core API</th>
-            <th className={styles.thWhat}>What it does</th>
+            <th>One-Data function</th>
+            <th>Core API</th>
+            <th>What it does</th>
           </tr>
         </thead>
         <tbody>

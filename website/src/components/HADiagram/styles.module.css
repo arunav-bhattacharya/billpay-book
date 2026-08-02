@@ -125,11 +125,6 @@
   letter-spacing: 0.1em;
   fill: var(--amex-txt-strong);
 }
-.regionNote {
-  font-size: 13.7px;
-  fill: var(--amex-mut);
-}
-
 /* ---------------------------------------------------------------- icons */
 .icon {
   fill: none;
@@ -391,31 +386,6 @@
 .pStandby text {
   fill: var(--amex-state-choice);
 }
-.pTemporal rect {
-  fill: color-mix(in srgb, var(--amex-temporal) 15%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-temporal) 70%, transparent);
-}
-.pTemporal text {
-  fill: var(--amex-temporal);
-}
-:global([data-theme='dark']) .pTemporal text {
-  fill: #a48bff;
-}
-.pApi rect {
-  fill: color-mix(in srgb, var(--amex-blue) 9%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-blue) 42%, transparent);
-}
-.pApi text {
-  font-family: var(--amex-font-mono);
-  font-size: 10.9px;
-  font-weight: 600;
-  letter-spacing: 0;
-  fill: var(--amex-blue);
-}
-:global([data-theme='dark']) .pApi text {
-  fill: var(--amex-blue-bright);
-}
-
 /* ---------------------------------------------------------------- chips */
 .chip rect {
   fill: var(--ha-chip);
@@ -424,12 +394,6 @@
 .chip text {
   font-size: 13.7px;
   font-weight: 600;
-}
-.chipTray rect {
-  stroke: var(--amex-line-strong);
-}
-.chipTray text {
-  fill: var(--amex-mut);
 }
 .chipReq rect {
   stroke: color-mix(in srgb, var(--amex-blue) 45%, transparent);

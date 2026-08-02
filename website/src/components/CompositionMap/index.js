@@ -13,7 +13,7 @@ import styles from './styles.module.css';
  * behaviors: [{name, ask, answers: string[]}]
  * run:  {title, note}
  */
-export default function CompositionMap({apis = [], behaviors = [], run = {}, footnote}) {
+export default function CompositionMap({apis = [], behaviors = [], run = {}}) {
   return (
     <div className={styles.wrap}>
       {/* 1. what onboarding asks for */}
@@ -100,8 +100,6 @@ export default function CompositionMap({apis = [], behaviors = [], run = {}, foo
           </div>
         </div>
       </section>
-
-      {footnote && <div className={styles.foot}>{footnote}</div>}
     </div>
   );
 }

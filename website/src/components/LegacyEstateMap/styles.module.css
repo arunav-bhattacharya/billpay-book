@@ -275,12 +275,6 @@
 .pill .glyph .solid { fill: color-mix(in srgb, var(--ec) 26%, var(--amex-panel)); }
 
 /* traceability marker */
-.dot {
-  fill: var(--lem-fail);
-  stroke: var(--amex-panel);
-  stroke-width: 1.6;
-}
-
 /* added on top of the legacy estate */
 .newRing {
   fill: none;
@@ -436,11 +430,6 @@
   border: 1px solid color-mix(in srgb, var(--kind) 62%, transparent);
   background: color-mix(in srgb, var(--kind) 26%, var(--amex-panel));
 }
-.swNew {
-  border-color: var(--lem-new);
-  border-width: 2px;
-  background: color-mix(in srgb, var(--lem-new) 16%, var(--amex-panel));
-}
 .swLine {
   width: 20px;
   height: 0;
@@ -461,9 +450,3 @@
 }
 
 /* legend glyphs reuse the drawing's own icons, so the key cannot drift */
-.swIcon {
-  width: 14px;
-  height: 16px;
-  flex: none;
-  overflow: visible;
-}

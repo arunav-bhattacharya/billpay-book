@@ -36,13 +36,8 @@
   --amex-blue-deep: #01488f;
   --amex-midnight: #002663;      /* Amex Midnight Blue */
   --amex-navy: #00175a;
-  --amex-ink: #010f2b;           /* near-black navy */
 
-  --amex-gold: #c69214;          /* Gold Card family */
-  --amex-gold-bright: #e6bf5a;
-  --amex-green: #2f7d54;         /* classic Green Card */
   --amex-platinum: #6f7c8f;      /* Platinum slate */
-  --amex-teal: #0e7c86;
   --amex-indigo: #34519e;
   --amex-temporal: #7b5cf0;      /* Temporal violet, for the Billpay Core tier */
 }
@@ -60,13 +55,8 @@
   /* Button gradient. */
   --amex-grad-btn: linear-gradient(135deg, #0164c4 0%, #018ad6 55%, #00a3e0 100%);
   --amex-grad-btn-hover: linear-gradient(135deg, #01579f 0%, #0176bd 55%, #0d94cf 100%);
-  /* Premium accents. */
-  --amex-grad-gold: linear-gradient(135deg, #9c6f14 0%, #e6bf5a 100%);
-  --amex-grad-platinum: linear-gradient(135deg, #58616e 0%, #aeb8c6 100%);
   /* Thin shimmer rule for dividers / underlines: blue → cyan → gold. */
   --amex-grad-rule: linear-gradient(90deg, #016fd0 0%, #12a7dd 55%, #d7c690 100%);
-  /* Warm gold wash for backgrounds / accents. */
-  --amex-gold-soft: #f5edd7;
 }
 
 /* ==================================================================== *
@@ -226,7 +216,6 @@ h3 {
   /* Navy-tinted layered shadow (subtle depth, not flat). */
   --amex-sh-sm: 0 2px 6px rgba(0, 38, 99, 0.07);
   --amex-sh: 0 10px 28px rgba(0, 38, 99, 0.1), 0 2px 6px rgba(0, 38, 99, 0.06);
-  --amex-sh-lg: 0 22px 48px rgba(0, 38, 99, 0.16), 0 4px 12px rgba(0, 38, 99, 0.08);
   /* The lift under the primary button. It is the only thing that reads it, so
      it is tuned there rather than shared. */
   --amex-glow: 0 4px 13px rgba(1, 111, 208, 0.17);
@@ -343,7 +332,6 @@ h3 {
 
   --amex-sh-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
   --amex-sh: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(90, 160, 230, 0.07);
-  --amex-sh-lg: 0 26px 60px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(90, 160, 230, 0.09);
   --amex-glow: 0 5px 16px rgba(0, 130, 224, 0.26);
 
   /* Same card, dark skin. The face is Amex navy rather than paper, so it reads
@@ -564,9 +552,10 @@ html[data-theme='light'] .navbar__link--active {
  * ==================================================================== */
 
 /* ---- 9a. The card recipe ----------------------------------------------
-   Every panel on the site wears this: docs components, tables, the homepage
-   grid. Apply it with the .amexCard class below, or, inside a CSS module where
-   the class name is local, by copying the four properties.
+   The recipe itself lives in src/css/recipes.module.css, which every component
+   composes from. This copy exists only for .card, which is Infima's own class
+   on components the site does not own, so it cannot compose and has to stay a
+   global rule. Change recipes.module.css first, then mirror it here.
 
    The edge is painted as three background layers rather than as a border
    colour:
@@ -584,7 +573,6 @@ html[data-theme='light'] .navbar__link--active {
    and rules but not this edge. Ones that want a different edge or corner
    override --card-border, --card-bw or --card-radius.
 --------------------------------------------------------------------------- */
-.amexCard,
 .card {
   border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
@@ -595,7 +583,6 @@ html[data-theme='light'] .navbar__link--active {
   box-shadow: var(--card-sh);
 }
 
-.amexCard--hover:hover,
 a.card:hover {
   background:
     var(--card-face-hover) padding-box,
@@ -628,7 +615,7 @@ a {
   font-weight: 600;
 }
 
-/* Markdown tables are in section 16. */
+/* Markdown tables are in section 15. */
 
 .theme-admonition {
   border-radius: 12px;
@@ -1430,76 +1417,6 @@ details.alert > summary {
   .mdTable table tbody th,
   .mdTable table tbody td {
     padding: 0.6rem 0.7rem;
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   16. Worker table — the Online/Offline split under Architecture ▸ Overview.
-   The panel comes from .mdTable above; this adds the one thing that table
-   does differently, which is that the row's colour carries the meaning:
-   Online takes the Billpay Core violet from the system map, Offline the
-   architecture accent it shares with the async band that feeds it. The rows
-   are addressed by position because the table is a fixed pair, not a list
-   that grows.
---------------------------------------------------------------------------- */
-.workerTable .mdTable {
-  margin: 0.85rem 0 1.15rem;
-}
-
-.workerTable .mdTable table tbody tr:nth-child(1) { --wk-row: var(--amex-temporal); }
-.workerTable .mdTable table tbody tr:nth-child(2) { --wk-row: var(--amex-cat-architecture); }
-
-.workerTable .mdTable table tbody td {
-  padding: 0.9rem 0.95rem;
-}
-
-/* the name column reads as a row header, on its own rail */
-.workerTable .mdTable table tbody td:first-child {
-  position: relative;
-  width: 8rem;
-  padding-left: 1.2rem;
-  font-weight: 700;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--wk-row) 62%, var(--amex-txt-strong));
-  background: color-mix(in srgb, var(--wk-row) 8%, transparent);
-}
-[data-theme='dark'] .workerTable .mdTable table tbody td:first-child {
-  color: color-mix(in srgb, var(--wk-row) 55%, #ffffff);
-  background: color-mix(in srgb, var(--wk-row) 14%, transparent);
-}
-.workerTable .mdTable table tbody td:first-child::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(
-    180deg,
-    var(--wk-row),
-    color-mix(in srgb, var(--wk-row) 30%, transparent)
-  );
-}
-
-/* workflow names pick up their row's colour instead of the global code blue */
-.workerTable .mdTable table tbody td:last-child code {
-  background: color-mix(in srgb, var(--wk-row) 10%, transparent);
-  border-color: color-mix(in srgb, var(--wk-row) 30%, var(--amex-line));
-  color: var(--amex-txt-strong);
-  white-space: nowrap;
-}
-[data-theme='dark'] .workerTable .mdTable table tbody td:last-child code {
-  background: color-mix(in srgb, var(--wk-row) 22%, transparent);
-  color: #e8f0fb;
-}
-
-@media (max-width: 620px) {
-  .workerTable .mdTable table tbody td:first-child {
-    width: auto;
-  }
-  .workerTable .mdTable table tbody td,
-  .workerTable .mdTable table thead th {
-    padding: 0.7rem;
   }
 }
 

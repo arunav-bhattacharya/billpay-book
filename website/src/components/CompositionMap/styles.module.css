@@ -252,17 +252,6 @@
 }
 
 /* ---- footnote ---- */
-.foot {
-  margin-top: 0.95rem;
-  padding: 0.7rem 0.95rem;
-  border-radius: 11px;
-  border: 1px solid var(--amex-line);
-  background: color-mix(in srgb, var(--amex-mut) 6%, transparent);
-  font-size: 0.85rem;
-  line-height: 1.55;
-  color: var(--amex-txt);
-}
-
 /* ---- dark tuning: the global inline-code rule is more specific in dark ---- */
 :global([data-theme='dark']) .api {
   color: var(--amex-cat-vision);

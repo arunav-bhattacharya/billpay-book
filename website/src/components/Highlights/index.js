@@ -1,4 +1,5 @@
 import React from 'react';
+import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import styles from './styles.module.css';
 
@@ -9,10 +10,8 @@ import styles from './styles.module.css';
  * Give it `links` instead, as `{to, label}`, and the card holds a list of
  * them: one card per group, one line per destination.
  * `accent` is any CSS color/expression (defaults to the Vision section hue).
- * `variant="solid"` swaps the neutral card for a signature-blue gradient card.
  */
-export default function Highlights({items = [], accent = 'var(--amex-cat-vision)', variant}) {
-  const itemClass = variant === 'solid' ? `${styles.item} ${styles.itemSolid}` : styles.item;
+export default function Highlights({items = [], accent = 'var(--amex-cat-vision)'}) {
   return (
     <div className={styles.grid} style={{'--hl-accent': accent}}>
       {items.map((it, i) => {
@@ -34,9 +33,9 @@ export default function Highlights({items = [], accent = 'var(--amex-cat-vision)
             )}
           </>
         );
-        const cardClass = it.links ? `${itemClass} ${styles.itemLinks}` : itemClass;
+        const cardClass = clsx(styles.item, it.links && styles.itemLinks);
         return it.to ? (
-          <Link key={i} to={it.to} className={`${cardClass} ${styles.itemLink}`}>
+          <Link key={i} to={it.to} className={clsx(cardClass, styles.itemLink)}>
             {body}
           </Link>
         ) : (

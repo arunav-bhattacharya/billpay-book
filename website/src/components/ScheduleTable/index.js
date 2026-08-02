@@ -7,7 +7,7 @@ import styles from './styles.module.css';
  * Every one of these runs on the Offline worker, so the workflow names carry
  * the same gold the Offline card uses rather than the global code blue.
  *
- * rows: [{schedule, workflow, cadence?}]
+ * rows: [{schedule, workflow}]
  */
 export default function ScheduleTable({rows = []}) {
   return (

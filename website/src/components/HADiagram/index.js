@@ -47,13 +47,6 @@ const ICON = {
       <path d="M3.2 7.4 12 12l8.8-4.6M12 12v9.2" />
     </>
   ),
-  hub: (
-    <>
-      <circle cx="12" cy="12" r="8.4" />
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 3.6v3.2M12 17.2v3.2M3.6 12h3.2M17.2 12h3.2" />
-    </>
-  ),
 };
 
 function Icon({name, x, y, size = 22, cls}) {
@@ -254,7 +247,7 @@ function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTon
 }
 
 /* A site or region inside one of the owner groups. */
-function Region({x, y, w, h, cls, label, note, icon}) {
+function Region({x, y, w, h, cls, label, icon}) {
   return (
     <g>
       <rect x={x} y={y} width={w} height={h} rx={16} className={cls} />
@@ -262,11 +255,6 @@ function Region({x, y, w, h, cls, label, note, icon}) {
       <text x={x + (icon ? 40 : 20)} y={y + 26} className={styles.regionLabel}>
         {label}
       </text>
-      {note && (
-        <text x={x + (icon ? 40 : 20)} y={y + 43} className={styles.regionNote}>
-          {note}
-        </text>
-      )}
     </g>
   );
 }

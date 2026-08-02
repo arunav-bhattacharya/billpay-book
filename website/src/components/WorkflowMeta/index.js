@@ -2,8 +2,8 @@ import React from 'react';
 import clsx from 'clsx';
 import styles from './styles.module.css';
 
-// The four processing behaviors, plus instrumentType (used by Payment Intent).
-// Rendered as the exact spec field names so the page stays grounded.
+// The four processing behaviors, rendered as the exact spec field names so the
+// page stays grounded.
 const ALL = [
   'accountType',
   'requiresArPosting',

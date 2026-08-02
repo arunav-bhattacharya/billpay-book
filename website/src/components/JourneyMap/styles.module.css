@@ -462,12 +462,6 @@
   border-color: color-mix(in srgb, var(--jm-accent) 40%, transparent);
   background: color-mix(in srgb, var(--jm-accent) 10%, transparent);
 }
-.kRouter {
-  font-family: var(--amex-font-sans);
-  font-weight: 650;
-  border-color: color-mix(in srgb, var(--amex-cat-architecture) 45%, transparent);
-  background: color-mix(in srgb, var(--amex-cat-architecture) 12%, transparent);
-}
 .kWorkflow {
   border-color: color-mix(in srgb, var(--amex-state-intermediate) 45%, transparent);
   background: color-mix(in srgb, var(--amex-state-intermediate) 12%, transparent);
@@ -1457,97 +1451,6 @@
   font-size: 0.92rem;
   font-weight: 400;
   color: var(--jm-accent);
-}
-
-/* ==================================================================== *
- * Legend
- * ==================================================================== */
-
-.legend {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 0.5rem 1.6rem;
-  margin: 1.3rem 0 2rem;
-  padding: 1rem 1.2rem;
-  border: 1px solid var(--amex-line);
-  border-radius: 14px;
-  background: var(--amex-panel);
-  box-shadow: var(--amex-sh-sm);
-
-  --jm-num: #6d4aca;
-  --jm-accent: var(--amex-cat-design);
-  --jm-soft: color-mix(in srgb, var(--amex-mut) 60%, transparent);
-}
-:global([data-theme='dark']) .legend {
-  --jm-num: #a78bfa;
-}
-
-.legendKeys {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.legendKeys li {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin: 0 0 0.4rem;
-  font-size: 0.76rem;
-  color: var(--amex-mut);
-}
-.legendKeys li > :first-child {
-  flex: 0 0 auto;
-}
-
-.legendFan,
-.legendExit,
-.legendBand {
-  display: inline-block;
-  width: 26px;
-  height: 13px;
-  transform: translateY(2px);
-}
-.legendFan {
-  border-left: 1px solid var(--jm-soft);
-  border-bottom: 1px solid var(--jm-soft);
-  width: 14px;
-  margin-left: 6px;
-}
-.legendExit {
-  border-left: 1.5px dashed color-mix(in srgb, var(--amex-state-failure) 60%, transparent);
-  border-top: 1.5px dashed color-mix(in srgb, var(--amex-state-failure) 60%, transparent);
-  width: 14px;
-  margin-left: 6px;
-}
-.legendBand {
-  border: 1px dashed color-mix(in srgb, var(--amex-state-choice) 45%, transparent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--amex-state-choice) 12%, transparent);
-}
-.legendNum {
-  display: grid;
-  place-items: center;
-  width: 19px;
-  height: 19px;
-  border-radius: 7px;
-  font-size: 0.66rem;
-  font-weight: 750;
-  color: #fff;
-  background: var(--jm-num);
-  transform: translateY(3px);
-}
-:global([data-theme='dark']) .legendNum {
-  color: #17123a;
-}
-
-.legendNote {
-  grid-column: 1 / -1;
-  margin: 0.3rem 0 0;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--amex-line);
-  font-size: 0.73rem;
-  font-style: italic;
-  color: var(--amex-mut);
 }
 
 /* ==================================================================== *

@@ -72,7 +72,7 @@ export default function RouteMap({routes = []}) {
           <tr>
             <th className={styles.thTrigger}>Trigger</th>
             <th className={styles.thCond}>Condition</th>
-            <th className={styles.thRoute}>Routes to</th>
+            <th>Routes to</th>
           </tr>
         </thead>
         <tbody>
@@ -113,7 +113,7 @@ export default function RouteMap({routes = []}) {
                   {row.account && <AccountTag account={row.account} />}
                   {row.label}
                 </td>
-                <td className={styles.routeCell}>
+                <td>
                   <Pipeline workflows={row.workflows} />
                 </td>
               </tr>
