@@ -1,11 +1,14 @@
 ---
 title: Sequence Diagrams
+description: "End-to-end traces from a caller's perspective."
 sidebar_label: Sequence Diagrams
 ---
 
+import Lead from '@site/src/components/Lead';
+
 # Sequence Diagrams
 
-End-to-end traces from a caller's perspective. Each one follows a single Billpay flow from the caller through the Core API and the Router to the Workflows, and on to the ActivityGroups and Activities that do the work.
+<Lead>**End-to-end traces from a caller's perspective.** Each one follows a single Billpay flow from the caller through the Core API and the Router to the Workflows, and on to the ActivityGroups and Activities that do the work.</Lead>
 
 <details>
 <summary>How to read these diagrams</summary>

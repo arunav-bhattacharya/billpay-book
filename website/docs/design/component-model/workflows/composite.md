@@ -1,5 +1,6 @@
 ---
 title: Composite Workflows
+description: 'Composite workflows wrap one or more core workflows and add logic that spans domains.'
 sidebar_label: Composite
 ---
 

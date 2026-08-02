@@ -1,5 +1,6 @@
 ---
 title: Code Merge Strategy
+description: 'How PRs are reviewed, approved, and merged: the branch model, reviewer rotation, and squash versus merge policy.'
 ---
 
 import Lead from '@site/src/components/Lead';

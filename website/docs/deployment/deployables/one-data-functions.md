@@ -1,5 +1,6 @@
 ---
 title: One-Data Functions
+description: 'The API Gateway deployable that hosts the One-Data Functions.'
 ---
 
 import Lead from '@site/src/components/Lead';

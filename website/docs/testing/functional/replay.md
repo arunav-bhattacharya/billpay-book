@@ -1,5 +1,6 @@
 ---
 title: Replay Tests
+description: 'Replay tests guard workflow determinism, making sure a code change cannot derail a workflow already in flight.'
 ---
 
 import Lead from '@site/src/components/Lead';

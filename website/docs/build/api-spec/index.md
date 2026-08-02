@@ -1,5 +1,6 @@
 ---
 title: API Spec
+description: 'Two contract layers stand between a channel and a workflow.'
 sidebar_label: API Spec
 ---
 
@@ -9,6 +10,8 @@ import SectionIndex from '@site/src/components/SectionIndex';
 # API Spec
 
 <Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data Functions</strong> are the versioned public contracts the rest of Amex integrates with; each delegates to a <strong>Billpay core REST API</strong>, where the router decides which workflow runs. Most integration questions come down to knowing which of the two layers you are in.</Lead>
+
+## In this section
 
 <SectionIndex
   items={[

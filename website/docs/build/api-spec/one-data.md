@@ -1,5 +1,6 @@
 ---
 title: One-Data Functions
+description: "One-Data Functions are the platform's front door."
 sidebar_label: One-Data
 ---
 

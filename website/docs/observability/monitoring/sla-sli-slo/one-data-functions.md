@@ -1,5 +1,6 @@
 ---
 title: One-Data Functions SLAs
+description: 'The public contracts consumers integrate against.'
 sidebar_label: One-Data Functions
 ---
 

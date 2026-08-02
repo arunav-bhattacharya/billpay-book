@@ -1,5 +1,6 @@
 ---
 title: Temporal Server on AWS
+description: 'The Temporal server deployment on AWS: namespaces, task queues, and scaling considerations.'
 sidebar_label: Temporal Server (AWS)
 ---
 

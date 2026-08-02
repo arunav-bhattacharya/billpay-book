@@ -1,5 +1,6 @@
 ---
 title: Building Stages
+description: 'A stage is one state transition, as code: a Kotlin class with a single function that takes the payment in one state and returns it in the next, doing the persistence and event publication for exactly that move.'
 sidebar_label: Stages
 ---
 

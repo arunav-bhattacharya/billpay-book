@@ -1,5 +1,6 @@
 ---
 title: OpenSearch Logs
+description: 'Querying logs in OpenSearch: saved searches, common queries, and retention.'
 ---
 
 import Lead from '@site/src/components/Lead';

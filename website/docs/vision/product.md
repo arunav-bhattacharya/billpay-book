@@ -1,5 +1,6 @@
 ---
 title: Product Vision
+description: 'Billpay is the platform American Express uses to process credit card bill payments, and the refunds that send money back the other way.'
 sidebar_label: Product
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Periodic Workflows
+description: 'Two kinds of thing run on a timer here: schedules that re-trigger core workflows in waves, and a few standalone workflows that reconcile settlement and tidy up.'
 sidebar_label: Periodic
 ---
 

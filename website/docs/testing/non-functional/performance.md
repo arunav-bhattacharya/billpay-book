@@ -1,5 +1,6 @@
 ---
 title: Performance Testing
+description: 'Performance tests hold the platform to its load profiles, target throughput, and p99 latency targets.'
 sidebar_label: Performance
 ---
 

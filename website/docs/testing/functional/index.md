@@ -1,5 +1,6 @@
 ---
 title: Functional Testing
+description: 'Four layers of functional tests, from the innermost out: unit, integration, replay, and end-to-end.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,6 +9,8 @@ import SectionIndex from '@site/src/components/SectionIndex';
 # Functional Testing
 
 <Lead>Four layers of functional tests, from the innermost out: **unit**, **integration**, **replay**, and **end-to-end**.</Lead>
+
+## In this section
 
 <SectionIndex
   items={[

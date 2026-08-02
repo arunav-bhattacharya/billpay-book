@@ -1,5 +1,6 @@
 ---
 title: Operations
+description: 'Running Billpay day to day: the surfaces an operator should be comfortable with, and the standard procedures for the scenarios that come up.'
 ---
 
 import Lead from '@site/src/components/Lead';

@@ -1,5 +1,6 @@
 ---
 title: Tech Stack
+description: 'These are load-bearing choices, not defaults we drifted into.'
 sidebar_label: Tech Stack
 ---
 

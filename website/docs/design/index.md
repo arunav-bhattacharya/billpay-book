@@ -1,5 +1,6 @@
 ---
 title: Design
+description: 'Design sets out the precise model behind the platform: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.'
 ---
 
 import Lead from '@site/src/components/Lead';

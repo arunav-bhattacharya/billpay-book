@@ -1,5 +1,6 @@
 ---
 title: Building Workflows
+description: 'A workflow is the durable spine of one payment journey.'
 sidebar_label: Workflows
 ---
 

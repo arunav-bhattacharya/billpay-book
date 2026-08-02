@@ -1,5 +1,6 @@
 ---
-title: 'HTTP Client: OkHttp'
+title: 'HTTP Client: OkHttpClient'
+description: 'Every outbound HTTP call goes through OkHttp: clearing, Accounts Receivable, Open-To-Buy, validation lookups, notifications.'
 sidebar_label: HTTP Client
 ---
 

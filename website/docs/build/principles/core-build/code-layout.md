@@ -1,5 +1,6 @@
 ---
 title: Code Layout
+description: 'billpay-core is one Gradle monorepo.'
 sidebar_label: Code Layout
 ---
 

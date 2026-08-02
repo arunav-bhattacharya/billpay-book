@@ -1,5 +1,6 @@
 ---
 title: Routing
+description: 'Between the core APIs and the workflows sits the Billpay Router.'
 sidebar_label: Routing
 ---
 

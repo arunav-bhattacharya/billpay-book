@@ -1,5 +1,6 @@
 ---
 title: Serialization
+description: 'A payment crosses process boundaries constantly: REST requests in, Temporal workflow payloads between workers, lifecycle events out.'
 sidebar_label: Serialization
 ---
 

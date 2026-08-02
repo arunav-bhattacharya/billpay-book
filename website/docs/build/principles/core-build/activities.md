@@ -1,5 +1,6 @@
 ---
 title: Building Activities & ActivityGroups
+description: 'Activities are where the platform touches the world.'
 sidebar_label: Activities
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Introduction
+description: "Billpay is American Express's enterprise platform for executing and orchestrating customer bill payments, mostly credit card payments."
 ---
 
 import Lead from '@site/src/components/Lead';

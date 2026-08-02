@@ -1,5 +1,6 @@
 ---
 title: High Availability
+description: 'Billpay runs from two on-prem Hydra sites, IPC2 in the east and IPC1 in the west, against a self-hosted Temporal cluster in AWS us-east-1.'
 sidebar_label: High Availability
 ---
 
@@ -57,15 +58,15 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
   items={[
     {
       term: 'EKS across Availability Zones',
-      desc: "Temporal's services talk to each other constantly, so the cluster needs Kubernetes with pod-to-pod communication left alone. AWS lets us run one EKS cluster across several Availability Zones in a region.",
+      desc: `Temporal's services talk to each other constantly, so the cluster needs Kubernetes with pod-to-pod communication left alone. AWS lets us run one EKS cluster across several Availability Zones in a region.`,
     },
     {
       term: 'Hydra Multi AZ EKS Bottleneck',
-      desc: 'Hydra does not form an EKS cluster across zones within a region, so the cluster would sit in a single zone. That caps how available the application can be.',
+      desc: `Hydra does not form an EKS cluster across zones within a region, so the cluster would sit in a single zone. That caps how available the application can be.`,
     },
     {
       term: 'Istio proxy hindrance',
-      desc: 'On Hydra, the istio-proxy sits in the middle of pod traffic. Pod-to-pod is exactly the path Temporal depends on to operate.',
+      desc: `On Hydra, the istio-proxy sits in the middle of pod traffic. Pod-to-pod is exactly the path Temporal depends on to operate.`,
     },
   ]}
 />

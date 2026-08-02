@@ -1,5 +1,6 @@
 ---
 title: Workflows
+description: 'A workflow orchestrates one payment journey end to end.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -11,7 +12,7 @@ export const WORKERS = [
     term: 'Online worker',
     tone: 'Online',
     waiting: 'someone is waiting',
-    desc: 'Request-path workflows, where an end user is waiting for the answer.',
+    desc: `Request-path workflows, where an end user is waiting for the answer.`,
     items: [
       'Create Immediate Payment',
       'Update Payment',
@@ -23,7 +24,7 @@ export const WORKERS = [
     term: 'Offline worker',
     tone: 'Offline',
     waiting: 'nobody is blocked',
-    desc: 'Everything triggered asynchronously, by events, by async systems such as RTF, or by a scheduler.',
+    desc: `Everything triggered asynchronously, by events, by async systems such as RTF, or by a scheduler.`,
     items: [
       'Execute Scheduled Payment',
       'Process Inbound Payment',

@@ -1,5 +1,6 @@
 ---
 title: Schedules
+description: 'The periodic workflows do not run on cron jobs bolted to a host.'
 sidebar_label: Schedules
 ---
 

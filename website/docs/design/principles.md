@@ -1,5 +1,6 @@
 ---
 title: Design Principles
+description: 'The design keeps business decisions separate from transport and infrastructure.'
 sidebar_label: Principles
 ---
 
@@ -17,7 +18,7 @@ import Highlights from '@site/src/components/Highlights';
   items={[
     {
       term: 'Workflow',
-      desc: 'Orchestrates one complete journey: a payment, a refund, or a return. It sequences the business decision points and owns no external-system mapping.',
+      desc: `Orchestrates one complete journey: a payment, a refund, or a return. It sequences the business decision points and owns no external-system mapping.`,
     },
     {
       term: 'Stage',
@@ -29,15 +30,15 @@ import Highlights from '@site/src/components/Highlights';
     },
     {
       term: 'ActivityGroup',
-      desc: 'Coordinates a set of related business actions: validation, lifecycle-event publication, balance updates. Named for the concern, not the mechanism.',
+      desc: `Coordinates a set of related business actions: validation, lifecycle-event publication, balance updates. Named for the concern, not the mechanism.`,
     },
     {
       term: 'Activity',
-      desc: 'One retryable business action, such as publishing an event, persisting a record, reading an option, or updating a downstream balance. It stays thin and leaves protocol mapping to Clients.',
+      desc: `One retryable business action, such as publishing an event, persisting a record, reading an option, or updating a downstream balance. It stays thin and leaves protocol mapping to Clients.`,
     },
     {
       term: 'Client',
-      desc: "Encapsulates communication with one external system; translates between Billpay's payment language and that system's contract.",
+      desc: `Encapsulates communication with one external system; translates between Billpay's payment language and that system's contract.`,
     },
   ]}
 />

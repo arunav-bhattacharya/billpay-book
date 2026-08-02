@@ -1,5 +1,6 @@
 ---
 title: Familiarity
+description: 'The surfaces an operator should be comfortable with, from the UIs used every day down to the infrastructure underneath them.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,6 +9,8 @@ import SectionIndex from '@site/src/components/SectionIndex';
 # Familiarity
 
 <Lead>The surfaces an operator should be comfortable with, from the **UIs used every day** down to the **infrastructure underneath** them.</Lead>
+
+## In this section
 
 <SectionIndex
   items={[

@@ -1,5 +1,6 @@
 ---
 title: Billpay Core API SLAs
+description: 'These sit one layer below the One-Data functions.'
 sidebar_label: Billpay Core APIs
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: CI Checks
+description: 'The checks every PR must pass: build, unit, integration, and replay tests, linting, and security scans.'
 ---
 
 import Lead from '@site/src/components/Lead';

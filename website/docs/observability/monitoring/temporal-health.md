@@ -1,5 +1,6 @@
 ---
 title: Temporal Health
+description: 'The Grafana dashboard for Temporal cluster health.'
 ---
 
 import Lead from '@site/src/components/Lead';

@@ -1,5 +1,6 @@
 ---
 title: Database
+description: "One row in trans_dtl is the truth about a payment's current state."
 sidebar_label: Database
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Deployment
+description: 'How code moves from a PR to production: the artifacts we ship, the checks every change must pass, and the pipeline that promotes it.'
 ---
 
 import Lead from '@site/src/components/Lead';

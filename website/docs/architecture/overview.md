@@ -1,5 +1,6 @@
 ---
 title: Architecture Overview
+description: 'Billpay sits in three tiers: what callers talk to, what Billpay runs, and what sits outside it.'
 sidebar_label: Overview
 ---
 

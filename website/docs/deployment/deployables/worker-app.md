@@ -1,5 +1,6 @@
 ---
 title: Worker App
+description: 'One deployable, one JVM, both worker pools.'
 ---
 
 import Lead from '@site/src/components/Lead';

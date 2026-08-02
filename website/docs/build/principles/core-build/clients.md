@@ -1,5 +1,6 @@
 ---
 title: Building Clients
+description: 'A client is the adapter to exactly one external system: SystemClient, in core/lib/clients/.'
 sidebar_label: Clients
 ---
 

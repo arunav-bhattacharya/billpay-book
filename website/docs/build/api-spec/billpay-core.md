@@ -1,5 +1,6 @@
 ---
 title: Billpay Core APIs
+description: 'The REST surface behind the gateway.'
 sidebar_label: Billpay Core
 ---
 

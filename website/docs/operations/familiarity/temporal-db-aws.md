@@ -1,5 +1,6 @@
 ---
 title: Temporal DB on AWS
+description: 'The Temporal persistence layer on AWS.'
 sidebar_label: Temporal DB (AWS)
 ---
 

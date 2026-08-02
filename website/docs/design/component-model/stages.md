@@ -1,5 +1,6 @@
 ---
 title: Stages
+description: 'A stage is one state-transition decision point: a Kotlin class with a single function that does the validation, persistence, and event publication for that transition.'
 ---
 
 import Lead from '@site/src/components/Lead';

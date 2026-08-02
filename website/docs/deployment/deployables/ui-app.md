@@ -1,5 +1,6 @@
 ---
 title: UI App
+description: 'The standalone UI built on top of Billpay.'
 ---
 
 import Lead from '@site/src/components/Lead';

@@ -1,5 +1,6 @@
 ---
 title: Billpay UI
+description: 'The standalone Billpay UI: what each screen does and when to reach for it.'
 ---
 
 import Lead from '@site/src/components/Lead';

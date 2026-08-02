@@ -1,5 +1,6 @@
 ---
 title: Engineering Vision
+description: 'Billpay runs each payment as a durable, resumable workflow on Temporal, and keeps the parts that differ by market or account type in small, swappable components rather than in the workflow itself.'
 sidebar_label: Engineering
 ---
 
@@ -80,11 +81,11 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
   items={[
     {
       term: 'Profile driven market onboarding',
-      desc: 'Onboarding a market is picking the APIs it exposes and answering a short list of questions about how it pays, once per account type it supports. Those answers become its profiles, and a market whose answers already have implementations behind them arrives as configuration rather than code.',
+      desc: `Onboarding a market is picking the APIs it exposes and answering a short list of questions about how it pays, once per account type it supports. Those answers become its profiles, and a market whose answers already have implementations behind them arrives as configuration rather than code.`,
     },
     {
       term: 'Single workflow per journey',
-      desc: 'A journey has one workflow, and there is no second copy of it kept for the awkward market. What differs between markets and account types is the stages and activity groups underneath.',
+      desc: `A journey has one workflow, and there is no second copy of it kept for the awkward market. What differs between markets and account types is the stages and activity groups underneath.`,
     },
     {
       term: 'Behavior driven workflow composition',
@@ -103,15 +104,15 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
     },
     {
       term: 'Check Idempotency',
-      desc: 'Every request writes an idempotency key before any work starts. A second submit hits the duplicate and gets the first payment back, so a retry on a dropped connection never moves the money twice.',
+      desc: `Every request writes an idempotency key before any work starts. A second submit hits the duplicate and gets the first payment back, so a retry on a dropped connection never moves the money twice.`,
     },
     {
       term: 'Deterministic workflows',
-      desc: 'Workflow code decides from what Temporal recorded, never from the wall clock or a random number. Replay it on another host a week later and it takes the same path to the same state.',
+      desc: `Workflow code decides from what Temporal recorded, never from the wall clock or a random number. Replay it on another host a week later and it takes the same path to the same state.`,
     },
     {
       term: 'Idempotent activities',
-      desc: 'Temporal retries an activity until it succeeds, and an activity that timed out after its work landed will run again. Each one is written for that, so a second write or a second downstream call leaves the same result as the first.',
+      desc: `Temporal retries an activity until it succeeds, and an activity that timed out after its work landed will run again. Each one is written for that, so a second write or a second downstream call leaves the same result as the first.`,
     },
     {
       term: 'Auditable execution',
@@ -119,7 +120,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
     },
     {
       term: 'Multi-layer resiliency',
-      desc: 'No single layer is trusted to stay up. One-Data parks requests in Redis and replays them when the core is back, and the Reliable Transaction Framework (RTF) keeps retrying an event it could not deliver. Temporal holds the workflow history, so a run resumes where it stopped, and Oracle Data Guard keeps a standby copy of the data.',
+      desc: `No single layer is trusted to stay up. One-Data parks requests in Redis and replays them when the core is back, and the Reliable Transaction Framework (RTF) keeps retrying an event it could not deliver. Temporal holds the workflow history, so a run resumes where it stopped, and Oracle Data Guard keeps a standby copy of the data.`,
     },
   ]}
 />
@@ -148,23 +149,23 @@ A new way of processing a payment is a new implementation behind one combination
   items={[
     {
       term: 'Correctness',
-      desc: 'A payment has to be right before it is fast. Duplicates are caught before any work begins, and a workflow decides only from what Temporal recorded, so re-running one lands the same result instead of a second payment.',
+      desc: `A payment has to be right before it is fast. Duplicates are caught before any work begins, and a workflow decides only from what Temporal recorded, so re-running one lands the same result instead of a second payment.`,
     },
     {
       term: 'Traceability',
-      desc: 'Every state transition is written down and published as it happens. An operator asking where a payment stopped reads the trail: the states it went through, in order, and the downstream systems it had already notified.',
+      desc: `Every state transition is written down and published as it happens. An operator asking where a payment stopped reads the trail: the states it went through, in order, and the downstream systems it had already notified.`,
     },
     {
       term: 'Latency',
-      desc: 'The caller does not wait for the slow parts. A payment answers as soon as it is accepted, and where the market allows it, clearing, Accounts Receivable, and Open-To-Buy (the amount the cardmember can still spend) go out together instead of one after another. Settlement comes back later as an event, and the workflow is still there to take it.',
+      desc: `The caller does not wait for the slow parts. A payment answers as soon as it is accepted, and where the market allows it, clearing, Accounts Receivable, and Open-To-Buy (the amount the cardmember can still spend) go out together instead of one after another. Settlement comes back later as an event, and the workflow is still there to take it.`,
     },
     {
       term: 'Change safety',
-      desc: 'Onboarding a market is answering questions and mapping a profile. The code that runs a live payment is the same before and after, so nobody has to open a working orchestration to bring a market on.',
+      desc: `Onboarding a market is answering questions and mapping a profile. The code that runs a live payment is the same before and after, so nobody has to open a working orchestration to bring a market on.`,
     },
     {
       term: 'Reliability',
-      desc: 'Hosts restart and downstream systems go quiet, and a payment survives both. Temporal resumes the workflow where it stopped and retries the activity that failed. Behind that, a sweep closes out payments once settlement and posting have both arrived, and raises an alert for the events that never did.',
+      desc: `Hosts restart and downstream systems go quiet, and a payment survives both. Temporal resumes the workflow where it stopped and retries the activity that failed. Behind that, a sweep closes out payments once settlement and posting have both arrived, and raises an alert for the events that never did.`,
     },
   ]}
 />

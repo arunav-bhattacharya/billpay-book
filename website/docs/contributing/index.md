@@ -1,5 +1,6 @@
 ---
 title: Contributing
+description: 'Two pages cover everything you need: how to run the site on your machine, and how a change gets published.'
 ---
 
 import Lead from '@site/src/components/Lead';

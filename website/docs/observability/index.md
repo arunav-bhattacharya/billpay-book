@@ -1,5 +1,6 @@
 ---
 title: Observability
+description: 'How we watch Billpay in production: the dashboards that show the platform is healthy, the service-level targets it is held to, and the alerts that fire when it is not.'
 ---
 
 import Lead from '@site/src/components/Lead';

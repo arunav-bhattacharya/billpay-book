@@ -1,5 +1,6 @@
 ---
 title: Codec Server App
+description: 'The codec server that decrypts Temporal Web UI content, so workflow payloads read as plain data when you inspect them there.'
 ---
 
 import Lead from '@site/src/components/Lead';

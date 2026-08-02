@@ -1,5 +1,6 @@
 ---
 title: Domain Model
+description: 'The domain model lives in com.aexp.billpay.core.domain.transaction and is built around one idea: make illegal payment states unrepresentable.'
 sidebar_label: Domain Model
 ---
 
@@ -62,7 +63,7 @@ Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete
 
 The Oracle tables these types are persisted into, and how the code maps onto them, are on the [Database](../database.md) page.
 
-:::note[Still to be modelled]
+:::info[Still to be modelled]
 The code does not yet cover everything the [spec's state model](../../design/payment-state-model.md) defines. These gaps are tracked deliberately rather than papered over.
 
 - No payment types for **`DISALLOWED`** (inbound), or corporate **`ALLOCATING`** / **`ALLOCATED`**.

@@ -1,5 +1,6 @@
 ---
 title: Run Locally
+description: 'The site is a standard Docusaurus 3 project living in the website/ directory of the billpay-book repo.'
 ---
 
 import Lead from '@site/src/components/Lead';

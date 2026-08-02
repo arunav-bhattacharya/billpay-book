@@ -1,5 +1,6 @@
 ---
 title: Oracle DB
+description: 'How to escalate Oracle DB issues. #oracle-dbo-support is the channel.'
 ---
 
 import Lead from '@site/src/components/Lead';

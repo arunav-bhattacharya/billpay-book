@@ -1,5 +1,6 @@
 ---
 title: Mocks App
+description: 'A stand-in for downstream integrations until an end-to-end testing environment is ready.'
 ---
 
 import Lead from '@site/src/components/Lead';

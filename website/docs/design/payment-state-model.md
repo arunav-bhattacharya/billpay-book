@@ -1,5 +1,6 @@
 ---
 title: Payment State Model
+description: 'Every payment moves through one canonical set of states, whatever its market or account type.'
 sidebar_label: State Model
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Build
+description: 'Design describes what the platform does: the lifecycle, the workflows, the component model.'
 ---
 
 import Lead from '@site/src/components/Lead';

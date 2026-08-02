@@ -1,5 +1,6 @@
 ---
 title: SLA, SLI, SLO
+description: 'Internal targets and external commitments for everything the Billpay platform exposes.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -16,15 +17,15 @@ import Highlights from '@site/src/components/Highlights';
   items={[
     {
       term: 'SLA, the Service Level Agreement',
-      desc: "The external commitment to consumers. A breach is incident-grade and contractually visible.",
+      desc: `The external commitment to consumers. A breach is incident-grade and contractually visible.`,
     },
     {
       term: 'SLO, the Service Level Objective',
-      desc: 'The internal target engineering steers to. It is tighter than the SLA by design, which gives us headroom before customers notice.',
+      desc: `The internal target engineering steers to. It is tighter than the SLA by design, which gives us headroom before customers notice.`,
     },
     {
       term: 'SLI, the Service Level Indicator',
-      desc: "The signal we actually measure: the metric that proves whether we are meeting the SLO.",
+      desc: `The signal we actually measure: the metric that proves whether we are meeting the SLO.`,
     },
   ]}
 />

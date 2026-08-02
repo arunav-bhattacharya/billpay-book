@@ -1,5 +1,6 @@
 ---
 title: Unit Tests
+description: "Workflows and activities are unit-tested with Temporal's testing primitives, so each can be verified on its own before anything is wired together."
 ---
 
 import Lead from '@site/src/components/Lead';

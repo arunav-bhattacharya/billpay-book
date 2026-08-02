@@ -1,5 +1,6 @@
 ---
 title: End-to-End Tests
+description: 'End-to-end tests, manual or automated, exercise the platform against its actual API integrations.'
 sidebar_label: E2E Tests
 ---
 

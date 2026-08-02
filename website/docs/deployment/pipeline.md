@@ -1,5 +1,6 @@
 ---
 title: Pipeline
+description: 'The pipeline that promotes a merged commit through environments to production.'
 ---
 
 import Lead from '@site/src/components/Lead';

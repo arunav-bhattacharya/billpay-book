@@ -1,5 +1,6 @@
 ---
 title: Instruments
+description: 'An instrument is where the money comes from: a bank account, a debit card, or a loyalty balance.'
 sidebar_label: Instruments
 ---
 

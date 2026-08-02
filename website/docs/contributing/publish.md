@@ -1,5 +1,6 @@
 ---
 title: Publish
+description: 'Publishing is automatic: every push to main triggers the Deploy to GitHub Pages workflow, which builds the site and deploys it to https://arunav-bhattacharya.github.io/billpay-book/.'
 ---
 
 import Lead from '@site/src/components/Lead';

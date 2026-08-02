@@ -1,5 +1,6 @@
 ---
 title: Core Workflows
+description: 'The business workflows, one per request type.'
 sidebar_label: Core
 ---
 

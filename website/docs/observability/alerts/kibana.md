@@ -1,5 +1,6 @@
 ---
 title: Kibana
+description: "Billpay's alerting runs through Kibana: alert definitions, escalation paths, and how to acknowledge and resolve an alert."
 ---
 
 import Lead from '@site/src/components/Lead';

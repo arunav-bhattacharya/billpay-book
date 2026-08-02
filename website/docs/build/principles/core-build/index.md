@@ -1,5 +1,6 @@
 ---
 title: Core Build
+description: 'Tech Stack covers what we buy.'
 sidebar_label: Core Build
 ---
 
@@ -11,6 +12,8 @@ import SectionIndex from '@site/src/components/SectionIndex';
 <Lead>[Tech Stack](../tech-stack/index.md) covers what we buy. This covers what we write: how the component model from Design becomes code, one layer at a time, and the rules that keep each layer doing only its own job.</Lead>
 
 The call chain is strict, **Workflow → Stage → ActivityGroup → Activity → Client → external system**, exactly as the [component model](../../../design/principles.md) defines it. Each page below is a how-to for one link in it.
+
+## In this section
 
 <SectionIndex
   items={[

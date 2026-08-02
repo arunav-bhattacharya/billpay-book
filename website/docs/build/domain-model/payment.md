@@ -1,5 +1,6 @@
 ---
 title: Payment
+description: 'One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions.'
 sidebar_label: Payment
 ---
 

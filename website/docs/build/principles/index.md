@@ -1,5 +1,6 @@
 ---
 title: Build Principles
+description: 'The decisions that hold across billpay-core.'
 sidebar_label: Principles
 ---
 
@@ -11,6 +12,8 @@ import SectionIndex from '@site/src/components/SectionIndex';
 <Lead>The decisions that hold across billpay-core. Each page records the alternatives we weighed and why the winner won, because knowing *why* Exposed beat Hibernate is what tells you how to use it well.</Lead>
 
 The section has two halves:
+
+## In this section
 
 <SectionIndex
   items={[

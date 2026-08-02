@@ -1,5 +1,6 @@
 ---
 title: ActivityGroups & Activities
+description: 'An activity is one retryable action: publish an event, persist a record, update a downstream balance.'
 sidebar_label: ActivityGroups & Activities
 ---
 

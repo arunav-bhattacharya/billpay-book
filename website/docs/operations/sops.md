@@ -1,5 +1,6 @@
 ---
 title: Standard Operating Procedures
+description: 'Step-by-step runbooks for common operational scenarios.'
 sidebar_label: SOPs
 ---
 

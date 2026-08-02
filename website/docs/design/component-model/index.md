@@ -1,5 +1,6 @@
 ---
 title: Component Model
+description: 'The design principles set out five layered components and the rule that each may only call the layers beneath it.'
 ---
 
 import Lead from '@site/src/components/Lead';

@@ -1,5 +1,6 @@
 ---
 title: Temporal Server
+description: 'Temporal is self-hosted on AWS, with PostgreSQL as its persistence backend.'
 ---
 
 import Lead from '@site/src/components/Lead';

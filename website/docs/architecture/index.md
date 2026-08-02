@@ -1,5 +1,6 @@
 ---
 title: Architecture
+description: 'Billpay is layered so each tier has one responsibility.'
 ---
 
 import Lead from '@site/src/components/Lead';

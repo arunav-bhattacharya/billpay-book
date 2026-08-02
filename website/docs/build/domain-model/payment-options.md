@@ -1,5 +1,6 @@
 ---
 title: Payment Options
+description: 'A payment option is what the customer chose to pay: the minimum due, the full statement balance, an amount they typed in.'
 sidebar_label: Payment Options
 ---
 

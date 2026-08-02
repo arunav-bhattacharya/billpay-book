@@ -1,5 +1,6 @@
 ---
 title: Deployables
+description: 'Every artifact the platform ships to production.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,6 +9,8 @@ import SectionIndex from '@site/src/components/SectionIndex';
 # Deployables
 
 <Lead>Every artifact the platform **ships to production**. There are five, and the worker app that runs the workflows is the one most changes touch.</Lead>
+
+## In this section
 
 <SectionIndex
   items={[

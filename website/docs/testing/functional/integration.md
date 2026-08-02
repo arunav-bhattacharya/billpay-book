@@ -1,5 +1,6 @@
 ---
 title: Integration Tests
+description: 'Integration tests run against real dependencies in TestContainers, falling back to mocks for the integrations not yet containerised.'
 ---
 
 import Lead from '@site/src/components/Lead';

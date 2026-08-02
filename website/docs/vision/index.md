@@ -1,5 +1,6 @@
 ---
 title: Vision
+description: "American Express's platform for credit card bill payments and refunds."
 ---
 
 import Lead from '@site/src/components/Lead';

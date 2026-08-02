@@ -1,5 +1,6 @@
 ---
 title: App Health
+description: 'Where to look for app health: the Hydra console and the Opensearch dashboard.'
 ---
 
 import Lead from '@site/src/components/Lead';

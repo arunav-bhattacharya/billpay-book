@@ -1,5 +1,6 @@
 ---
 title: Payment Journeys
+description: 'Every journey through Billpay starts one of two ways.'
 sidebar_label: Journeys
 ---
 
