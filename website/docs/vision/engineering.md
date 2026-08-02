@@ -12,22 +12,22 @@ export const BEHAVIORS = [
   {
     name: 'requiresArPosting',
     ask: 'Should the cardmember get credit before the money settles?',
-    answers: ['yes', 'no'],
+    answers: ['Y', 'N'],
   },
   {
     name: 'requiresRealtimeClearing',
     ask: 'Should clearing happen in realtime?',
-    answers: ['yes', 'no'],
+    answers: ['Y', 'N'],
   },
   {
     name: 'requiresMandateAuthorization',
     ask: 'Should a mandate be verified?',
-    answers: ['yes', 'no'],
+    answers: ['Y', 'N'],
   },
   {
     name: 'representableReturn',
     ask: 'Can a returned payment be re-attempted?',
-    answers: ['yes', 'no'],
+    answers: ['Y', 'N'],
   },
 ];
 
@@ -125,9 +125,9 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
 
 ## Market Onboarding to Workflow Composition
 
-Markets come onto the platform through configuration. Someone picks the One-Data APIs the market will use, then answers a few questions about how it processes payments, once for each account type it supports. Those selections build a profile for that market and account type, held as one combination of behaviors.
+Onboarding a market to Billpay is pure configuration. The UI collects two things: which One-Data APIs the market exposes, and a set of yes/no questions about payment handling. These questions are answered per supported account type, since consumer and corporate rules differ, creating a unique market profile for each combination.
 
-The profile is what composes the workflow. When a request arrives, Billpay reads the behaviors on it, resolves them to the implementations onboarded for that combination, and starts the workflow with those parts already in place. All of that happens before the run begins, so the workflow itself carries no market logic. It runs the same sequence of business steps everywhere. What each behavior means is on the [Product Vision](./product.md).
+At runtime, Billpay uses this profile to resolve the exact stage and activity implementations needed, composing the workflow before execution. Because all market-specific logic is handled during assembly, the runtime engine remains market-agnostic and executes the same standardized steps everywhere. See the [Product Vision](./product.md) for behavior definitions.
 
 <CompositionMap
   apis={['CreatePayment.v3', 'UpdatePayment.v1', 'DeletePayment.v1']}
@@ -139,7 +139,7 @@ The profile is what composes the workflow. When a request arrives, Billpay reads
 If the combination on a request was never onboarded, there is nothing to compose, so the request is turned away and no workflow starts. A consumer-only market rejects a corporate payment instead of half-processing it.
 :::
 
-A new variant is a new implementation behind one combination. The workflow keeps its shape, and no market ends up as a branch inside it.
+A new way of processing is a new implementation sitting behind one combination of behaviors. The workflow keeps its shape, and no market ever turns into an `if` inside it.
 
 ## What we optimise for
 
