@@ -101,7 +101,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       body: 'Every payment runs as a Temporal workflow, and Temporal saves its progress as it goes. A scheduled payment can sit for weeks, survive restarts and host failures, and resume exactly where it left off.',
     },
     {
-      title: 'Idempotent entry',
+      title: 'Check Idempotency',
       body: 'Every request is checked for a duplicate before anything happens, so the same payment submitted twice becomes one payment, not two.',
     },
     {
@@ -141,7 +141,7 @@ If the combination on a request was never onboarded, there is nothing to compose
 
 A new way of processing a payment is a new implementation behind one combination of behaviors. The workflow keeps its shape, and no market ever turns into an `if` inside it.
 
-## What we optimise for
+## Optimize for 
 
 <Highlights
   items={[

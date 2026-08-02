@@ -36,7 +36,7 @@ Every payment is either full or split. A **full payment** settles as one amount 
 
 A market comes onto Billpay through an **onboarding journey**: a UI where the team picks which Billpay APIs the market will use, then answers a short set of questions about how payments should be processed.
 
-Those questions are answered for a market and an account type together, not for the market on its own. Consumer, corporate, and business travel payments are processed differently, so a market that runs all three answers the questions three times. Each answer sets a **behavior**, a yes or no choice that changes how a payment is handled, and the behaviors travel with every payment.
+Those questions are answered for a **market and an account type** together, not for the market on its own. Consumer, corporate, and business travel account payments are processed differently, so a market that runs all three answers the questions three times. Each answer sets a **behavior**, a yes or no choice that changes how a payment is handled, and the behaviors travel with every payment.
 
 <Highlights
   items={[
