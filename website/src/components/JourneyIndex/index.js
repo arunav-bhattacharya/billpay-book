@@ -18,8 +18,8 @@ import styles from './styles.module.css';
  */
 
 export const KINDS = {
-  customer: {label: 'Customer initiated', gloss: 'someone is waiting'},
-  system: {label: 'System initiated', gloss: 'nobody is waiting'},
+  customer: {label: 'Customer initiated'},
+  system: {label: 'System initiated'},
 };
 
 function Dot({kind}) {
@@ -32,7 +32,7 @@ export function Legend() {
       {['customer', 'system'].map((k) => (
         <span className={styles.legendItem} key={k}>
           <Dot kind={k} />
-          {KINDS[k].label}, {KINDS[k].gloss}
+          {KINDS[k].label}
         </span>
       ))}
     </p>
