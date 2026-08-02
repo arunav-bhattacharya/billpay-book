@@ -12,7 +12,7 @@ function WfChip({name, worker}) {
   );
 }
 
-/** An account-type tag on a split/allocation branch, which is the routing dimension. */
+/** An account-type tag on a split/allocation branch, which is the routing behavior. */
 function AccountTag({account}) {
   if (!account) return null;
   const key = account.toLowerCase();

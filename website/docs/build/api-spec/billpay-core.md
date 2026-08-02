@@ -7,7 +7,7 @@ import Lead from '@site/src/components/Lead';
 
 # Billpay Core APIs
 
-<Lead>The REST surface behind the gateway. Every request lands on the <strong>Billpay Router</strong>, which reads the payment date, the instruction count, and the market's dimensions, then invokes the right workflow with the right stage implementations. The endpoint defines the contract, and the router decides what runs.</Lead>
+<Lead>The REST surface behind the gateway. Every request lands on the <strong>Billpay Router</strong>, which reads the payment date, the instruction count, and the market's behaviors, then invokes the right workflow with the right stage implementations. The endpoint defines the contract, and the router decides what runs.</Lead>
 
 ## Endpoints → workflows
 

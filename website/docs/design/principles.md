@@ -67,7 +67,7 @@ Work flows in one direction, **Workflow → Stage → ActivityGroup → Activity
 ## Composition, not inheritance
 
 - There is **one workflow per journey** and no alternate implementations of it. A workflow is composed from different **Stage** and **ActivityGroup** implementations, never subclassed. Workflows and Stages are never `abstract`.
-- The market's dimensions select the implementation. A profile is a combination of `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, and `requiresMandateAuthorization`, and at runtime that combination maps to the right Stage and ActivityGroup implementations.
+- The market's behaviors select the implementation. A profile is a combination of `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, and `requiresMandateAuthorization`, and at runtime that combination maps to the right Stage and ActivityGroup implementations.
 - Every Stage and ActivityGroup has a default implementation per combination. A combination a market has not onboarded has no implementation at all, so the workflow is rejected before it starts.
-- Implementations are **named for the behaviour they encode, not the market**, so a rule several markets share is written once.
+- Implementations are **named for the behavior they encode, not the market**, so a rule several markets share is written once.
 - The same Activity is reused across markets and stays thin. Callers pass only the fields it needs, never the full `Payment` object, and set the retry and timeout options per call.

@@ -21,7 +21,7 @@ import Highlights from '@site/src/components/Highlights';
     {
       term: 'Product Vision',
       to: '/docs/vision/product',
-      desc: `What a payment can be, the markets and dimensions the platform absorbs, and what actually happens between a customer submitting a payment and the money settling.`,
+      desc: `What a payment can be, the markets and behaviors the platform absorbs, and what actually happens between a customer submitting a payment and the money settling.`,
     },
     {
       term: 'Engineering Vision',

@@ -15,7 +15,7 @@
   margin: 1.8rem 0 2.6rem;
   padding: 1.5rem 1.25rem 1.15rem;
   /* The house card, per the recipe in custom.css section 9a. */
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
@@ -338,9 +338,13 @@
   color: var(--amex-blue-deep);
   background: #fff;
 }
+/* 450, not the 550 this used to carry: 400 to 500 is the Regular bucket of the
+   two Benton cuts and 501 up is Medium, so these chips now set in the same
+   face as every other cap chip in the map. Bill Pay Core is already marked out
+   by the blue field it sits on. */
 .hero .cap {
   color: #fff;
-  font-weight: 550;
+  font-weight: 450;
   background: rgba(255, 255, 255, 0.18);
   border-color: rgba(255, 255, 255, 0.42);
 }

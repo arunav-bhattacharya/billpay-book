@@ -8,13 +8,13 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 # Core Workflows
 
-<Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle. The row under each heading shows the Temporal worker it runs on and the dimensions that select its stage and activity-group implementations.</Lead>
+<Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle. The row under each heading shows the Temporal worker it runs on and the behaviors that select its stage and activity-group implementations.</Lead>
 
 The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, the [state model](../../payment-state-model.md) covers the states themselves, and the [sequence diagrams](../../sequence-diagrams.md) trace the same flows across the participants.
 
 ## Create Immediate Payment
 
-<WorkflowMeta worker="Online" dimensions="all" />
+<WorkflowMeta worker="Online" behaviors="all" />
 
 Runs when a payment is submitted to go out today. It records the request, validates it, replies to the caller as soon as the outcome is known, and then completes the money movement in the background.
 
@@ -29,7 +29,7 @@ Runs when a payment is submitted to go out today. It records the request, valida
 
 ## Create Schedule Payment
 
-<WorkflowMeta worker="Online / Offline" dimensions={['accountType', 'requiresArPosting', 'requiresMandateAuthorization']} />
+<WorkflowMeta worker="Online / Offline" behaviors={['accountType', 'requiresArPosting', 'requiresMandateAuthorization']} />
 
 Runs when a payment is booked for a future date. It validates the request now and parks the payment until its run date.
 
@@ -40,7 +40,7 @@ Runs when a payment is booked for a future date. It validates the request now an
 
 ## Execute Scheduled Payment
 
-<WorkflowMeta worker="Offline" dimensions="all" />
+<WorkflowMeta worker="Offline" behaviors="all" />
 
 Runs on the payment's execution date, picked up in batches by the Scheduled Payments Executor. It re-checks the payment before moving any money, because time has passed since it was scheduled.
 
@@ -53,7 +53,7 @@ Runs on the payment's execution date, picked up in batches by the Scheduled Paym
 
 ## Execute Split Payment
 
-<WorkflowMeta worker="Online / Offline" dimensions={['accountType', 'requiresArPosting', 'requiresRealtimeClearing']} />
+<WorkflowMeta worker="Online / Offline" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing']} />
 
 Processes a single leg of a split payment. It runs the same two stages as a full payment, scoped to one allocation.
 
@@ -64,7 +64,7 @@ The first stage varies by account type. A **corporate** leg only updates balance
 
 ## Cancel Payment
 
-<WorkflowMeta worker="Online" dimensions={['accountType', 'requiresArPosting']} />
+<WorkflowMeta worker="Online" behaviors={['accountType', 'requiresArPosting']} />
 
 Withdraws a payment that has not yet gone out.
 
@@ -76,7 +76,7 @@ Withdraws a payment that has not yet gone out.
 
 ## Update Payment
 
-<WorkflowMeta worker="Online" dimensions="all" />
+<WorkflowMeta worker="Online" behaviors="all" />
 
 Changes a scheduled payment. Rather than editing it in place, Billpay cancels the original and creates a replacement, so the history stays clean.
 
@@ -110,7 +110,7 @@ stateDiagram-v2
 
 ## Process Returned Payment
 
-<WorkflowMeta worker="Offline" dimensions={['accountType']} />
+<WorkflowMeta worker="Offline" behaviors={['accountType']} />
 
 Handles a payment the bank sends back after it was processed, and decides whether it can be re-attempted.
 
@@ -123,7 +123,7 @@ Handles a payment the bank sends back after it was processed, and decides whethe
 
 ## Process Representment
 
-<WorkflowMeta worker="Offline" dimensions="all" />
+<WorkflowMeta worker="Offline" behaviors="all" />
 
 Re-attempts a returned payment on its representment date.
 
@@ -133,7 +133,7 @@ Re-attempts a returned payment on its representment date.
 
 ## Get Corporate Payment Allocations
 
-<WorkflowMeta worker="Offline" dimensions="generic" />
+<WorkflowMeta worker="Offline" behaviors="generic" />
 
 Fetches how a corporate payment splits across the accounts it covers, then kicks off the per-allocation execution. It waits on a signal, because the breakdown comes back asynchronously from the allocation-processing system.
 
@@ -145,7 +145,7 @@ There are two signals here, and they are not the same one. *AllocationsReady* co
 
 ## Process Inbound Payment
 
-<WorkflowMeta worker="Offline" dimensions={['TBD']} />
+<WorkflowMeta worker="Offline" behaviors={['TBD']} />
 
 Posts a payment that a third party initiated on the customer's behalf into Billpay.
 
@@ -158,12 +158,12 @@ Posts a payment that a third party initiated on the customer's behalf into Billp
 
 ## Create Payment Intent
 
-<WorkflowMeta worker="Online" dimensions={['accountType', 'instrumentType', 'requiresMandateAuthorization']} />
+<WorkflowMeta worker="Online" behaviors={['accountType', 'instrumentType', 'requiresMandateAuthorization']} />
 
 Registers that a customer means to pay. It becomes a real payment only once the customer's financial institution confirms it. The detailed step logic is still being defined in the spec.
 
 ## Create Balance Refund
 
-<WorkflowMeta worker="Online / Offline" dimensions={['TBD']} />
+<WorkflowMeta worker="Online / Offline" behaviors={['TBD']} />
 
 Sends money back to the customer from a credit balance on the card, following the same validate, process and fulfil path as a payment. Its detailed step logic is still being defined in the spec. Which worker runs it depends on where in the journey it is invoked.

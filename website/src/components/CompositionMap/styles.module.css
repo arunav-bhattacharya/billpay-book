@@ -5,7 +5,7 @@
 .wrap {
   margin: 1.8rem 0 2.4rem;
   padding: 1.4rem 1.35rem 1.25rem;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
@@ -100,10 +100,10 @@
   border: 1px solid color-mix(in srgb, var(--amex-blue) 30%, transparent);
 }
 
-/* ---- the four dimensions ---- */
+/* ---- the four behaviors ---- */
 /* The onboarding questions, in plain language. The field names they set live
    in the profile band below, so they are not repeated here. */
-.dims {
+.behaviors {
   flex: 1;
   min-width: 0;
   margin: 0;
@@ -113,19 +113,19 @@
   gap: 0.45rem;
 }
 
-.dim {
+.behavior {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.15rem 0.7rem;
 }
 
-.dim dt,
-.dim dd {
+.behavior dt,
+.behavior dd {
   margin: 0;
 }
 
-.dim dd {
+.behavior dd {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -238,7 +238,7 @@
   .rowLabel {
     width: auto;
   }
-  .dims {
+  .behaviors {
     gap: 0.7rem;
   }
   .answers {

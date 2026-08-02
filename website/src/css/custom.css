@@ -227,25 +227,26 @@ h3 {
   --amex-sh-sm: 0 2px 6px rgba(0, 38, 99, 0.07);
   --amex-sh: 0 10px 28px rgba(0, 38, 99, 0.1), 0 2px 6px rgba(0, 38, 99, 0.06);
   --amex-sh-lg: 0 22px 48px rgba(0, 38, 99, 0.16), 0 4px 12px rgba(0, 38, 99, 0.08);
-  --amex-glow: 0 8px 26px rgba(1, 111, 208, 0.28);
+  /* The lift under the primary button. It is the only thing that reads it, so
+     it is tuned there rather than shared. */
+  --amex-glow: 0 4px 13px rgba(1, 111, 208, 0.17);
 
   /* ---- Card system ----
-     Every card on the site is one thing: a paper face, no outline, an uplifted
-     navy shadow, and an accent that is solid at the bottom-right corner and
-     gone a third of the way round. Section 9a has the recipe and how to apply
-     it.
+     Every card on the site is one thing: a paper face, a quiet hairline edge,
+     and a shallow navy shadow. Section 9a has the recipe and how to apply it.
 
      The homepage cards arrived here first. They used to be eight solid blue
      faces, which put a second blue slab under the hero and a third above the
      footer. A blue tinted face was tried and reverted (a wash across eight
-     cards puts the colour back where it was doing the damage), and so was a
-     full gradient border, which drew a hard outline around every card. The
-     corner is what survived, and it now runs everywhere.
+     cards puts the colour back where it was doing the damage), then a full
+     gradient border, then a blue corner ramp that faded out a third of the way
+     round. All of them drew the eye to the frame instead of the content, so
+     the edge is now a flat neutral line and the shadow is shallow enough to
+     separate the card from the page without announcing itself.
 
-     Every stop mixes off --card-accent, so a component that owns a hue sets
-     that one property and the corner follows. The fade ends on 2% of the
-     accent rather than on `transparent`, because `transparent` is transparent
-     black and interpolating toward it puts a grey haze mid-ramp.
+     --card-accent still exists and components still set it, because the hue
+     drives headings, icons and rules inside the card. It no longer paints the
+     edge.
 
      The shadow is navy rather than neutral grey, which is what keeps it in the
      palette rather than reading as a generic drop shadow. */
@@ -253,30 +254,27 @@ h3 {
   --card-face: linear-gradient(160deg, #ffffff 0%, #fdfcfa 55%, #faf9f4 100%);
   --card-face-hover: linear-gradient(160deg, #ffffff 0%, #ffffff 55%, #fdfcf8 100%);
   --card-radius: 16px;
-  /* 315deg points the gradient line at the top-left corner, which puts the 0%
-     stop, and so the solid end of the accent, at the bottom right. */
-  --card-border: linear-gradient(
-    315deg,
-    color-mix(in srgb, var(--card-accent) 58%, #ffffff) 0%,
-    var(--card-accent) 10%,
-    color-mix(in srgb, var(--card-accent) 34%, transparent) 20%,
-    color-mix(in srgb, var(--card-accent) 2%, transparent) 32%
-  );
+  /* Edge width. A hairline, where the corner ramp needed 2.5px to read. */
+  --card-bw: 1px;
+  /* Painted as a background layer, not a border colour, because the recipe in
+     section 9a stacks three layers and this is the middle one. It has to stay
+     an <image>: CSS allows a background-color in the last layer only, so a
+     bare `var(--amex-line)` here makes the whole shorthand invalid and the
+     card loses its face as well as its edge. A one-stop gradient is the flat
+     colour expressed as an image, which is what keeps the recipe working. */
+  --card-border: linear-gradient(var(--amex-line), var(--amex-line));
   --card-border-hover: linear-gradient(
-    315deg,
-    color-mix(in srgb, var(--card-accent) 42%, #ffffff) 0%,
-    var(--card-accent) 14%,
-    color-mix(in srgb, var(--card-accent) 46%, transparent) 28%,
-    color-mix(in srgb, var(--card-accent) 2%, transparent) 44%
+    var(--amex-line-strong),
+    var(--amex-line-strong)
   );
   --card-sh:
-    0 22px 42px rgba(0, 38, 99, 0.14),
-    0 9px 18px rgba(0, 38, 99, 0.09),
-    0 2px 4px rgba(0, 38, 99, 0.06);
+    0 11px 24px rgba(0, 38, 99, 0.085),
+    0 3px 8px rgba(0, 38, 99, 0.055),
+    0 1px 2px rgba(0, 38, 99, 0.04);
   --card-sh-hover:
-    0 36px 66px rgba(0, 38, 99, 0.24),
-    0 15px 28px rgba(0, 38, 99, 0.15),
-    0 3px 7px rgba(1, 111, 208, 0.12);
+    0 18px 36px rgba(0, 38, 99, 0.135),
+    0 6px 13px rgba(0, 38, 99, 0.085),
+    0 1px 3px rgba(0, 38, 99, 0.05);
   /* Corner lighting for cards that want it, banked on the same corner as the
      accent so hover lights the card from where the brand already touches it.
      Gold answers from the opposite corner. */
@@ -346,26 +344,40 @@ h3 {
   --amex-sh-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
   --amex-sh: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(90, 160, 230, 0.07);
   --amex-sh-lg: 0 26px 60px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(90, 160, 230, 0.09);
-  --amex-glow: 0 10px 34px rgba(0, 130, 224, 0.4);
+  --amex-glow: 0 5px 16px rgba(0, 130, 224, 0.26);
 
-  /* Same card, dark skin. The face is the navy panel rather than paper, so it
-     reads as lit against the near-black canvas, and the accent steps up to the
-     brighter blue to stay legible on it. The ramp geometry is shared with
-     light: only the colours and the shadows change. */
+  /* Same card, dark skin. The face is Amex navy rather than paper, so it reads
+     as lit against the near-black canvas, and the accent steps up to the
+     brighter blue to stay legible on it. Geometry is shared with light: only
+     the colours and the shadows change.
+
+     The ramp runs Midnight Blue at the lit corner, through --amex-navy in the
+     middle, to one step under it at the far corner. It is the corporate navy
+     rather than the desaturated slate that used to sit here, which is a
+     deeper, warmer blue and closer to the footer the page closes on. It stays
+     well under the hero: navy is the card, Blue Box blue is still rationed to
+     the one full-strength block per page. */
   --card-accent: var(--amex-blue-bright);
-  --card-face: linear-gradient(158deg, #123061 0%, #0c1f42 55%, #0a1730 100%);
-  --card-face-hover: linear-gradient(158deg, #17386a 0%, #102649 55%, #0d1c37 100%);
+  --card-face: linear-gradient(158deg, #002663 0%, #00175a 55%, #001243 100%);
+  --card-face-hover: linear-gradient(158deg, #013378 0%, #00216c 55%, #001a55 100%);
+  /* No edge in dark. The navy face already separates from the near-black
+     canvas on its own, and a hairline on top of that just outlines it. The
+     ring still has to be painted with an <image> for the reasons in the light
+     block, so it is a transparent one: the face underneath shows through and
+     the geometry stays identical across the two themes. */
+  --card-border: linear-gradient(transparent, transparent);
+  --card-border-hover: linear-gradient(transparent, transparent);
   /* On the near-black canvas a cast shadow has almost nothing to fall on, so
-     the inset top highlight is what gives the panel its edge. */
+     the inset top highlight, not the cast, is what gives the panel its edge.
+     It survives the trim; the cast below it is what came down. */
   --card-sh:
-    0 16px 34px rgba(0, 0, 0, 0.6),
-    0 5px 12px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(140, 195, 245, 0.12);
+    0 10px 24px rgba(0, 0, 0, 0.48),
+    0 3px 8px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(140, 195, 245, 0.11);
   --card-sh-hover:
-    0 30px 60px rgba(0, 0, 0, 0.7),
-    0 10px 24px rgba(0, 0, 0, 0.5),
-    0 3px 12px rgba(0, 130, 224, 0.24),
-    inset 0 1px 0 rgba(140, 195, 245, 0.2);
+    0 18px 38px rgba(0, 0, 0, 0.56),
+    0 6px 14px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(140, 195, 245, 0.17);
   --card-glow:
     radial-gradient(112% 84% at 100% 100%, rgba(0, 163, 224, 0.2), transparent 64%),
     radial-gradient(78% 68% at 0% 0%, rgba(230, 191, 90, 0.07), transparent 62%);
@@ -466,18 +478,37 @@ hr {
   letter-spacing: 0.005em;
 }
 
-/* Everything else in the bar sits at Regular. Infima ships every navbar item at
-   semibold, which makes seven section links compete with the wordmark and read
-   as headings rather than as navigation. The wordmark is the only thing up here
-   that carries weight; the current section is marked by colour and the
-   underline below, not by stepping back up. */
+/* The section links sit at Regular. Infima ships every navbar item at semibold,
+   which makes seven section links compete with the wordmark and read as
+   headings rather than as navigation. */
 .navbar__link,
 .navbar__item {
   font-weight: 400;
 }
 
+/* In light mode the links take Blue Box blue rather than the ink, so the bar
+   reads as navigation at a glance and the brand runs along the top of every
+   page. It is --amex-blue exactly, the same value every table header band on
+   the site is filled with, so the blue a reader meets in the navbar is the
+   blue they meet in the content. Hover drops to the deep blue. Dark keeps its
+   default ink: the links already separate from that surface without help. */
+html[data-theme='light'] .navbar__link {
+  color: var(--amex-blue);
+}
+html[data-theme='light'] .navbar__link:hover {
+  color: var(--amex-blue-deep);
+}
+
+/* The current section steps up to Medium. 600 lands in the 501-and-up bucket of
+   the two Benton cuts, so it renders the Medium face. Colour and the underline
+   below still mark it too; the weight is what makes it findable without
+   hunting for which link is a shade different from its neighbours. */
 .navbar__link--active {
   color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+html[data-theme='light'] .navbar__link--active {
+  color: var(--amex-blue);
 }
 /* Gradient underline under the active/hover navbar item. */
 .navbar__link {
@@ -498,11 +529,15 @@ hr {
 /* ==================================================================== *
  * 8. Buttons — rich gradient with lift
  * ==================================================================== */
+/* 450 rather than 600 on purpose. The two static Benton cuts bucket 400 to 500
+   as Regular and 501 up as Medium (see the @font-face block), so this renders
+   Regular, and the button gets its emphasis from the gradient field and the
+   size rather than from a second step of weight. */
 .button--primary {
   background: var(--amex-grad-btn);
   border: none;
   color: #fff;
-  font-weight: 600;
+  font-weight: 450;
   letter-spacing: 0.01em;
   box-shadow: var(--amex-glow);
   transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
@@ -511,7 +546,7 @@ hr {
   background: var(--amex-grad-btn-hover);
   color: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 14px 34px rgba(1, 111, 208, 0.42);
+  box-shadow: 0 8px 20px rgba(1, 111, 208, 0.26);
 }
 .button--secondary {
   background: transparent;
@@ -533,23 +568,25 @@ hr {
    grid. Apply it with the .amexCard class below, or, inside a CSS module where
    the class name is local, by copying the four properties.
 
-   The accent is a border, and a border cannot take a gradient, so it is
-   painted as three background layers instead:
+   The edge is painted as three background layers rather than as a border
+   colour:
 
      face   padding-box   the card's own surface, on top
-     ramp   border-box    shows only in the border ring
-     face   border-box    fills the rest of the ring, under the ramp
+     edge   border-box    shows only in the border ring
+     face   border-box    fills the rest of the ring, under the edge
 
-   Without that third layer the ring would be transparent everywhere the ramp
-   has faded out, and the page would show through as a hairline gap. It is what
-   lets a table with a solid header band sit inside this without a seam.
+   The third layer is what lets a table with a solid header band sit inside
+   this without a seam, and it means --card-border can be a gradient as easily
+   as a flat colour. It is flat today: the blue corner ramp that used to live
+   there framed the card harder than the content inside it.
 
-   Components that own a hue set --card-accent and nothing else. Ones that want
-   more or less of the corner set --card-radius or override --card-border.
+   Components that own a hue set --card-accent, which colours their headings
+   and rules but not this edge. Ones that want a different edge or corner
+   override --card-border, --card-bw or --card-radius.
 --------------------------------------------------------------------------- */
 .amexCard,
 .card {
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
@@ -596,6 +633,30 @@ a {
 .theme-admonition {
   border-radius: 12px;
   box-shadow: var(--amex-sh-sm);
+}
+
+/* Collapsible blocks. Docusaurus renders <details> as an info alert, which
+   brings Infima's cyan in with it. The surface, the rule and the arrow all
+   take the same Amex blue the table headers use, and the text inside stays
+   ordinary body colour so a closed block reads as part of the page. */
+details.alert {
+  --ifm-alert-background-color: color-mix(in srgb, var(--amex-blue) 6%, transparent);
+  --ifm-alert-background-color-highlight: color-mix(in srgb, var(--amex-blue) 14%, transparent);
+  --ifm-alert-border-color: var(--amex-blue);
+  --ifm-alert-foreground-color: var(--ifm-font-color-base);
+  --docusaurus-details-decoration-color: var(--amex-blue);
+
+  border-radius: 12px;
+  box-shadow: var(--amex-sh-sm);
+}
+
+details.alert > summary {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+[data-theme='dark'] details.alert {
+  --ifm-alert-background-color: color-mix(in srgb, var(--amex-blue) 14%, transparent);
 }
 
 /* Sidebar weight tiers. Docusaurus ships every .menu__link at semibold,
@@ -779,7 +840,10 @@ a {
   background-image:
     radial-gradient(80% 120% at 88% 0%, rgba(0, 163, 224, 0.1), transparent 60%),
     linear-gradient(160deg, #01306f 0%, #002663 48%, #001a48 100%);
-  color: #ece7da; /* creamish white */
+  /* White, not the warm off-white this used to carry. The cream picked up the
+     gold that runs through the rest of the palette, which on the navy field
+     read as a tint rather than as a neutral. */
+  color: #ffffff;
 }
 .footer::before {
   content: '';
@@ -791,19 +855,23 @@ a {
   background: var(--amex-grad-rule);
 }
 .footer__title {
-  color: #f7f3ea;
+  color: #ffffff;
   letter-spacing: 0.03em;
 }
 .footer__link-item {
-  color: #ddd7c9;
-  transition: color 0.16s ease;
+  color: #ffffff;
+  transition: opacity 0.16s ease;
 }
+/* Links are already white at rest, so hover cannot brighten them. It underlines
+   instead, which is the one affordance still available. */
 .footer__link-item:hover {
-  color: #fdfbf5;
-  text-decoration: none;
+  color: #ffffff;
+  text-decoration: underline;
 }
+/* Also white, just held back, so the copyright still reads as the quietest
+   line down there without going warm again. */
 .footer__copyright {
-  color: #b3ac9d;
+  color: rgba(255, 255, 255, 0.62);
 }
 
 /* ==================================================================== *
@@ -1251,7 +1319,7 @@ a {
 --------------------------------------------------------------------------- */
 .mdTable {
   margin: 1.4rem 0 2rem;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
@@ -1395,4 +1463,109 @@ a {
   .workerTable .mdTable table thead th {
     padding: 0.7rem;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   17. Search — the offline index in the navbar, and the results page behind it.
+
+   The theme ships its own styling, most of it already driven from custom
+   properties, so this sets those rather than overriding rules. Two things it
+   does not cover:
+
+     - the results page highlights each match with a bare <mark>, which the
+       browser paints its default yellow. That is the one colour on the site
+       that belongs to nothing, and on the near-black dark canvas it glares.
+       Both surfaces get the same treatment instead: the brand blue on a wash
+       of itself.
+     - the divider between two results is a fixed light grey, which is close
+       to invisible in dark. It moves onto --amex-line, like every other rule.
+
+   Selectors on the results page match a class prefix because those class
+   names are CSS modules: the prefix is stable across builds, the hash after
+   it is not.
+--------------------------------------------------------------------------- */
+:root {
+  --search-local-highlight-color: var(--amex-blue);
+  --search-local-hit-active-color: #ffffff;
+  --search-local-hit-background: var(--amex-panel);
+  --search-local-hit-color: var(--amex-txt);
+  --search-local-hit-shadow: var(--card-sh);
+  --search-local-modal-background: var(--amex-panel);
+  --search-local-modal-shadow: var(--card-sh-hover);
+  --search-local-muted-color: var(--amex-mut);
+  --search-local-input-active-border-color: var(--amex-blue);
+}
+[data-theme='dark'] {
+  --search-local-highlight-color: var(--amex-blue-bright);
+  --search-local-input-active-border-color: var(--amex-blue-bright);
+}
+
+/* The navbar box. Infima gives it a pill; this puts it on the same surface
+   and hairline as everything else in the bar, and lights the edge on focus
+   rather than drawing a second ring around it. */
+.navbar__search-input {
+  background-color: color-mix(in srgb, var(--amex-line) 40%, transparent);
+  border: 1px solid var(--amex-line);
+  color: var(--amex-txt);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.navbar__search-input:focus {
+  border-color: var(--amex-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amex-blue) 16%, transparent);
+  outline: none;
+}
+[data-theme='dark'] .navbar__search-input:focus {
+  border-color: var(--amex-blue-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amex-blue-bright) 20%, transparent);
+}
+
+/* Results page. */
+[class*='searchQueryInput_'] {
+  background: var(--amex-panel);
+  border: 1px solid var(--amex-line);
+  border-radius: 10px;
+  color: var(--amex-txt);
+  padding: 0.65rem 0.85rem;
+}
+[class*='searchQueryInput_']:focus {
+  border-color: var(--amex-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amex-blue) 16%, transparent);
+  outline: none;
+}
+[data-theme='dark'] [class*='searchQueryInput_']:focus {
+  border-color: var(--amex-blue-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amex-blue-bright) 20%, transparent);
+}
+
+[class*='searchResultItem_'] {
+  border-bottom: 1px solid var(--amex-line);
+}
+[class*='searchResultItemPath_'] {
+  color: var(--amex-mut);
+}
+
+[class*='searchResultItem_'] mark,
+[class*='searchResultItemSummary_'] mark {
+  background: color-mix(in srgb, var(--amex-blue) 14%, transparent);
+  border-radius: 3px;
+  color: inherit;
+  font-weight: 550;
+  padding: 0 2px;
+}
+[data-theme='dark'] [class*='searchResultItem_'] mark,
+[data-theme='dark'] [class*='searchResultItemSummary_'] mark {
+  background: color-mix(in srgb, var(--amex-blue-bright) 22%, transparent);
+}
+
+/* highlightSearchTermsOnTargetPage wraps the term in <mark> in the article you
+   land on, so the page you arrive at matches the list you came from. Scoped to
+   the article, since nothing else on the site uses <mark>. */
+article mark {
+  background: color-mix(in srgb, var(--amex-blue) 14%, transparent);
+  border-radius: 3px;
+  color: inherit;
+  padding: 0 2px;
+}
+[data-theme='dark'] article mark {
+  background: color-mix(in srgb, var(--amex-blue-bright) 22%, transparent);
 }

@@ -8,7 +8,7 @@
   container-type: inline-size;
   margin: 1.5rem 0 2.6rem;
   /* The house card, per the recipe in custom.css section 9a. */
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,

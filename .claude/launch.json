@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "website", "run", "start"],
       "port": 3100
+    },
+    {
+      "name": "billpay-wiki-build",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "website", "run", "serve"],
+      "port": 3101
     }
   ]
 }

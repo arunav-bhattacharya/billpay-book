@@ -38,7 +38,7 @@ export const GROUPS = [
         title: 'Billpay Core APIs & Router',
         role: 'The REST surface, and the choice of which workflow runs',
         icon: 'router',
-        items: ['REST APIs', 'Date routing', 'Single / multi-instruction', 'Dimensions'],
+        items: ['REST APIs', 'Date routing', 'Single / multi-instruction', 'Behaviors'],
       },
       {
         title: 'Workflows',
@@ -48,7 +48,7 @@ export const GROUPS = [
       },
       {
         title: 'Components',
-        role: 'Composed per market dimensions',
+        role: 'Composed per market behaviors',
         icon: 'components',
         items: ['Stages', 'ActivityGroups', 'Activities', 'Clients'],
       },
@@ -96,7 +96,7 @@ export const ASIDE = {
 ### Billpay Core layer
 
 - The core REST APIs shape the request. Duplicates are caught on the way in against an idempotency record, so a retried call cannot pay twice.
-- The router picks the workflow. It reads the payment date (today runs now, a future date gets scheduled), whether the request carries one instruction or several, and the request type: create, update, cancel, return, inbound, or intent. It then fetches the stages that match the market's dimensions and passes them into the workflow it starts. [Design → Routing](../design/routing.md) has the full map of trigger to workflow.
+- The router picks the workflow. It reads the payment date (today runs now, a future date gets scheduled), whether the request carries one instruction or several, and the request type: create, update, cancel, return, inbound, or intent. It then fetches the stages that match the market's behaviors and passes them into the workflow it starts. [Design → Routing](../design/routing.md) has the full map of trigger to workflow.
 - Workflows are the durable part. Each runs on one of two Temporal worker pools, split by whether an end user is waiting for the answer. [Design → Workflows](../design/component-model/workflows/index.md) shows the two pools and what runs on each.
 - A workflow never calls an external system itself. It composes components instead, in a strict order: **Workflow → Stage → ActivityGroup → Activity → Client → external system**. What each layer is responsible for, and the rules on what it may call, are in [Design → Principles](../design/principles.md).
 

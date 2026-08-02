@@ -36,7 +36,7 @@ The first three executors work in batches rather than starting everything at onc
 
 ## Paid Events Processing
 
-<WorkflowMeta worker="Offline" dimensions="generic" />
+<WorkflowMeta worker="Offline" behaviors="generic" />
 
 Closes a payment out to the terminal `PAID` state, but only once **both** halves of settlement have been confirmed. Billpay does not mark a payment paid on the strength of one event. It waits for the money to settle at the bank *and* for Accounts Receivable to post it.
 
@@ -48,7 +48,7 @@ Closes a payment out to the terminal `PAID` state, but only once **both** halves
 
 ## Missing Paid Events Processing
 
-<WorkflowMeta worker="Offline" dimensions="generic" />
+<WorkflowMeta worker="Offline" behaviors="generic" />
 
 Catches payments that stalled on their way to `PAID` because an expected event never arrived, and either recovers the event or flags it.
 
@@ -59,7 +59,7 @@ Catches payments that stalled on their way to `PAID` because an expected event n
 
 ## Data Purger
 
-<WorkflowMeta worker="Offline" dimensions="generic" />
+<WorkflowMeta worker="Offline" behaviors="generic" />
 
 Keeps the transactional tables from growing without bound.
 

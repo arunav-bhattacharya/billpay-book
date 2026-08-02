@@ -1,67 +1,68 @@
-/* Principles — an ordered set of rules as cards. The numeral sits in the top
-   right at low contrast, so the eye reads the rule first and the order second. */
+/* Principles — an ordered set of rules as the rows of a single-column table.
+   No header and no columns: the numeral leads each heading line and the rule
+   sits underneath it, so the set reads straight down the page. */
 
-.grid {
-  list-style: none;
+/* The house panel the other tables use, per the recipe in custom.css 9a. */
+.wrap {
   margin: 1.4rem 0 2.2rem;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 0.85rem;
-}
-
-/* The house card, per the recipe in custom.css section 9a. The section hue
-   drives the corner, so the rule keeps the colour coding it always had: it
-   used to be a left rail, and it is the top-right corner now. */
-.card {
-  --card-accent: var(--pr-accent);
-
-  position: relative;
-  overflow: hidden;
-  padding: 1.25rem 1.35rem 1.35rem;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
     var(--card-border) border-box,
     var(--card-face) border-box;
   box-shadow: var(--card-sh);
-  transition: transform 0.17s ease, box-shadow 0.17s ease, background 0.17s ease;
+  overflow: hidden;
 }
 
-.card:hover {
-  transform: translateY(-4px);
-  background:
-    var(--card-face-hover) padding-box,
-    var(--card-border-hover) border-box,
-    var(--card-face-hover) border-box;
-  box-shadow: var(--card-sh-hover);
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-/* The numeral sits in the flow at the top left, well clear of the corner, and
-   reads as a quiet label rather than a background decoration. */
+.row {
+  padding: 0.9rem 1.15rem 1rem;
+  transition: background-color 0.15s ease;
+}
+
+.row:nth-child(2n) {
+  background: var(--amex-row-alt);
+}
+
+.row:hover {
+  background: var(--amex-row-hover);
+}
+
+/* Numeral and rule share one line. The numeral is fixed width so every rule
+   starts at the same place, and the body below lines up under the rule. */
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.28rem;
+}
+
 .numeral {
-  display: block;
+  flex: none;
+  width: 1.2rem;
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.08em;
   color: color-mix(in srgb, var(--pr-accent) 78%, transparent);
-  margin-bottom: 0.55rem;
 }
 
 .title {
-  position: relative;
   font-size: 1.02rem;
   font-weight: 650;
   line-height: 1.3;
   letter-spacing: -0.004em;
   color: var(--amex-txt-strong);
-  margin-bottom: 0.4rem;
 }
 
 .body {
-  position: relative;
+  padding-left: calc(1.2rem + 0.6rem);
   font-size: 0.9rem;
   line-height: 1.58;
   color: var(--amex-mut);
@@ -73,4 +74,13 @@
 
 :global([data-theme='dark']) .numeral {
   color: color-mix(in srgb, var(--pr-accent) 88%, transparent);
+}
+
+@media (max-width: 640px) {
+  .row {
+    padding: 0.85rem 0.8rem 0.9rem;
+  }
+  .body {
+    padding-left: 0;
+  }
 }

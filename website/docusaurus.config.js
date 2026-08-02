@@ -41,7 +41,35 @@ const config = {
       onBrokenMarkdownLinks: 'warn',
     },
   },
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: [
+    '@docusaurus/theme-mermaid',
+    // Offline search. The site is static on GitHub Pages, so there is no
+    // search service to call: this theme builds a Lucene-style index at build
+    // time and ships it with the site, and the navbar search box queries it in
+    // the browser. The `{type: 'search'}` navbar item below is what places the
+    // box; without it the theme appends one at the end of the right-hand
+    // items. The dev server serves a live index too, so search works under
+    // `npm start` as well as in a production build.
+    [
+      '@easyops-cn/docusaurus-search-local',
+      /** @type {import('@easyops-cn/docusaurus-search-local').PluginOptions} */
+      ({
+        hashed: true,
+        language: ['en'],
+        docsRouteBasePath: '/docs',
+        indexDocs: true,
+        indexBlog: false,
+        // The homepage carries real copy (the section grid, the hero), so it
+        // is worth having in the index alongside the docs.
+        indexPages: true,
+        highlightSearchTermsOnTargetPage: true,
+        searchResultLimits: 10,
+        searchResultContextMaxLength: 60,
+        searchBarShortcut: true,
+        searchBarShortcutHint: true,
+      }),
+    ],
+  ],
 
   plugins: [
     [
@@ -112,7 +140,10 @@ const config = {
     ({
       image: 'img/social-card.svg',
       colorMode: {
-        defaultMode: 'dark',
+        // Light on a first visit, whatever the visitor's OS is set to, which
+        // is what respectPrefersColorScheme: false buys. Dark is a click away
+        // and the choice is remembered from then on.
+        defaultMode: 'light',
         disableSwitch: false,
         respectPrefersColorScheme: false,
       },
@@ -192,6 +223,7 @@ const config = {
           {to: '/docs/architecture', label: 'Architecture', position: 'left'},
           {to: '/docs/design', label: 'Design', position: 'left'},
           {to: '/docs/build', label: 'Build', position: 'left'},
+          {type: 'search', position: 'right'},
           {
             href: `https://github.com/${GH_USER}/${REPO_NAME}`,
             label: 'GitHub',

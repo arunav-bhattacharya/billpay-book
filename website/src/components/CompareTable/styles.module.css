@@ -7,7 +7,7 @@
 /* The house card, per the recipe in custom.css section 9a. */
 .wrap {
   margin: 1.4rem 0 2rem;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,

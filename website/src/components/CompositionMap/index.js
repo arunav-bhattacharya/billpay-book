@@ -3,17 +3,17 @@ import styles from './styles.module.css';
 
 /**
  * CompositionMap: the high-level path from onboarding a market to a running
- * workflow: the One-Data APIs and dimensions someone picks, the profile those
+ * workflow: the One-Data APIs and behaviors someone picks, the profile those
  * selections create, and the workflows that profile composes.
  *
  * Deliberately quiet: one accent for the whole map, and monospace only for the
  * API names, which are literals.
  *
  * apis: string[]
- * dims: [{name, ask, answers: string[]}]
+ * behaviors: [{name, ask, answers: string[]}]
  * run:  {title, note}
  */
-export default function CompositionMap({apis = [], dims = [], run = {}, footnote}) {
+export default function CompositionMap({apis = [], behaviors = [], run = {}, footnote}) {
   return (
     <div className={styles.wrap}>
       {/* 1. what onboarding asks for */}
@@ -37,22 +37,22 @@ export default function CompositionMap({apis = [], dims = [], run = {}, footnote
               </code>
             ))}
             {/* the list is a sample, not the full set */}
-            <span className={styles.more} aria-label="and more">
+            <code className={styles.api} aria-label="and more">
               &hellip;
-            </span>
+            </code>
           </div>
         </div>
 
         <div className={styles.row}>
-          <span className={styles.rowLabel}>Dimensions</span>
-          <ul className={styles.dims}>
-            {dims.map((d) => (
-              <li key={d.name} className={styles.dim}>
+          <span className={styles.rowLabel}>Behaviors</span>
+          <ul className={styles.behaviors}>
+            {behaviors.map((d) => (
+              <li key={d.name} className={styles.behavior}>
                 <span className={styles.ask}>{d.ask}</span>
                 <span className={styles.answers}>{(d.answers || []).join('  /  ')}</span>
               </li>
             ))}
-            <li className={styles.dim}>
+            <li className={styles.behavior}>
               <span className={styles.more} aria-label="and more">
                 &hellip;
               </span>

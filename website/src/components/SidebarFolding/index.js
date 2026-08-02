@@ -4,7 +4,7 @@ import {useLocation} from '@docusaurus/router';
 import styles from './styles.module.css';
 
 /**
- * Folding behaviour for the doc sidebar: one toggle that opens or shuts every
+ * Folding behavior for the doc sidebar: one toggle that opens or shuts every
  * section, and a rule that keeps only the section you are reading open when
  * you arrive from the navbar.
  *

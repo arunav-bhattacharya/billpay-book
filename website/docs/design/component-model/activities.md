@@ -9,7 +9,7 @@ import ActivityTable from '@site/src/components/ActivityTable';
 export const ACTIVITIES = [
   {
     name: 'PersistPendingPaymentActivity',
-    dims: [],
+    behaviors: [],
     transition: 'input → `PENDING`',
     does: [
       'Inserts the payment into the `idempotency_checker`, `trans_dtl` (transaction detail), and `trans_lfcyc_event` (transaction lifecycle event) tables.',
@@ -20,7 +20,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'IdempotencyCheckActivity',
-    dims: [],
+    behaviors: [],
     transition: 'None',
     does: [
       'Attempts to insert a row into the `idempotency_checker` table for the API being called.',
@@ -30,7 +30,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentValidationActivityGroup',
-    dims: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
+    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
     transition: '`PENDING` → `ACCEPTED` / `SCHEDULED` / `DECLINED`',
     does: [
       'Makes external calls where needed and evaluates the data to decide whether the payment is valid.',
@@ -40,7 +40,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentValidationOnExecutionActivityGroup',
-    dims: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
+    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
     transition: '`SCHEDULED` / `ALLOCATED` → `ACCEPTED` / `DECLINED`',
     does: [
       'Runs when a scheduled payment is due to execute.',
@@ -51,7 +51,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentStateTransitionActivity',
-    dims: [],
+    behaviors: [],
     transition: 'Various (payment level)',
     does: [
       'Given a payment id with its current and previous states, updates the `trans_dtl` table to the new status.',
@@ -62,7 +62,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentSplitStateTransitionActivity',
-    dims: [],
+    behaviors: [],
     transition: 'Various (split level)',
     does: [
       'The split-level counterpart: updates the `split_trans_dtl` table to the new status for a split-payment id.',
@@ -73,7 +73,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentScheduledNotificationActivityGroup',
-    dims: ['accountType', 'requiresArPosting'],
+    behaviors: ['accountType', 'requiresArPosting'],
     transition: 'None',
     does: [
       'Notifies the relevant downstream systems once a payment has been scheduled.',
@@ -82,7 +82,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentDeclinedNotificationActivityGroup',
-    dims: ['accountType', 'requiresArPosting'],
+    behaviors: ['accountType', 'requiresArPosting'],
     transition: 'None',
     does: [
       'Notifies the relevant downstream systems when a payment is declined, whether that happened during an immediate payment or while it was being scheduled.',
@@ -91,7 +91,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentAllocatingActivityGroup',
-    dims: [],
+    behaviors: [],
     transition: '`PENDING` / `SCHEDULED` → `ALLOCATING`',
     does: [
       'Requests the allocations for a corporate payment.',
@@ -102,7 +102,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentAllocatedActivityGroup',
-    dims: [],
+    behaviors: [],
     transition: '`ALLOCATING` → `ALLOCATED`',
     does: [
       'Receives the allocations back from GPA (Get Corporate Payment Allocations).',
@@ -112,17 +112,17 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentExecutionActivityGroup',
-    dims: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing'],
+    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing'],
     transition: '`ACCEPTED` → `PROCESSING`',
     does: [
       'Runs three actions in parallel, recording each in the notification tracker table: sends the payment to the clearing system, decreases the Accounts Receivable balance, and increases Open-To-Buy in Authorization.',
-      'These steps can vary depending on the payment\'s dimensions.',
+      'These steps can vary depending on the payment\'s behaviors.',
       'Invoked from `AcceptedToProcessingStage`.',
     ],
   },
   {
     name: 'PaymentFulfillmentActivityGroup',
-    dims: ['accountType'],
+    behaviors: ['accountType'],
     transition: '`PROCESSING` → `PROCESSED`',
     does: [
       'In parallel, notifies Accounting and Balance & Control, recording each in the notification tracker table.',
@@ -132,7 +132,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentSplitsCreationActivity',
-    dims: [],
+    behaviors: [],
     transition: '`ACCEPTED` (full) → `ACCEPTED` (split)',
     does: [
       'For each split, creates a row in the split transaction-detail and `split_trans_lfcyc_event` tables in the `ACCEPTED` state.',
@@ -142,7 +142,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentCancelValidationActivityGroup',
-    dims: ['accountType'],
+    behaviors: ['accountType'],
     transition: 'None',
     does: [
       'Checks the payment\'s current state in the database.',
@@ -152,7 +152,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentCancellationActivityGroup',
-    dims: ['accountType', 'requiresArPosting'],
+    behaviors: ['accountType', 'requiresArPosting'],
     transition: '`SCHEDULED` / `ACCEPTED` → `CANCELLED`',
     does: [
       'Notifies the various downstream systems once a payment has been cancelled.',
@@ -161,7 +161,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentReturnValidationActivity',
-    dims: [],
+    behaviors: [],
     transition: 'None',
     does: [
       'Checks the returned payment\'s current state in the database, continuing only if it is valid.',
@@ -170,7 +170,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentReturnExecutionActivityGroup',
-    dims: ['accountType'],
+    behaviors: ['accountType'],
     transition: '`PROCESSING` / `PROCESSED` / `PAID` → `RETURNED`',
     does: [
       'Notifies the various downstream systems once a payment has been marked `RETURNED` in the database.',
@@ -179,7 +179,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentRepresentmentEligibilityActivityGroup',
-    dims: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
+    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
     transition: 'None',
     does: [
       'Makes the external calls needed to decide whether a returned payment can be re-presented (retried for settlement).',
@@ -189,7 +189,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentRepresentmentCreationActivityGroup',
-    dims: [],
+    behaviors: [],
     transition: '`RETURNED` (presentment seq 1) → `REPRESENTING` (presentment seq 2)',
     does: [
       'Creates a new row in the `trans_dtl` and `trans_lfcyc_event` tables in the `REPRESENTING` status and publishes a lifecycle event.',
@@ -199,7 +199,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentRepresentmentValidationActivityGroup',
-    dims: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
+    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
     transition: 'None',
     does: [
       'Makes the external calls needed to confirm, on the day the representment is due to run, that it is still valid to execute.',
@@ -209,7 +209,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PaymentRepresentmentExecutionActivityGroup',
-    dims: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
+    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
     transition: '`REPRESENTING` → `REPRESENTED`',
     does: [
       'Sends the payment to the clearing system.',
@@ -219,7 +219,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'MapNewPaymentIdToPreviousIdActivity',
-    dims: [],
+    behaviors: [],
     transition: 'None',
     does: [
       'Writes a row into the `ORIG_TRANS_REFER_MAP` table linking the old and new payment ids.',
@@ -233,7 +233,7 @@ export const ACTIVITIES = [
 
 <Lead>An activity is one retryable action: publish an event, persist a record, update a downstream balance. An activity group coordinates a set of them for a single business concern. Activities are shared across markets and stay thin, leaving protocol details to clients.</Lead>
 
-Groups whose behaviour varies by market carry their dimensions in the second column. The rest are generic and run the same way everywhere. Filter by a dimension to see only what changes when a market answers that question differently.
+Groups whose behavior varies by market carry their behaviors in the second column. The rest are generic and run the same way everywhere. Filter by a behavior to see only what changes when a market answers that question differently.
 
 <ActivityTable rows={ACTIVITIES} />
 

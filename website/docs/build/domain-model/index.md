@@ -45,6 +45,6 @@ The code does not yet cover everything the [spec's state model](../../design/pay
 
 - No payment types for **`DISALLOWED`** (inbound), or corporate **`ALLOCATING`** / **`ALLOCATED`**.
 - No first-class **Allocation** entity. Corporate allocations are represented today as `SplitPayment` legs plus `SplitSlice`.
-- The four **processing dimensions** (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) live in the payment *context* used for routing, not on these domain types.
+- The four **processing behaviors** (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) live in the payment *context* used for routing, not on these domain types.
 - **Idempotency and lifecycle events** are persistence-layer concerns (`idempotency_checker`, `trans_lfcyc_event`) with no domain type of their own.
 :::

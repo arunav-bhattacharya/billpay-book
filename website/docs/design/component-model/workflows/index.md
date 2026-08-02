@@ -51,7 +51,7 @@ Three workflows run on both, depending on where in the journey they are invoked:
 
 Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../../../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level.
 
-Each workflow on the pages below carries the worker it runs on, alongside the dimensions that select its implementations.
+Each workflow on the pages below carries the worker it runs on, alongside the behaviors that select its implementations.
 
 ## Pages in this section
 
@@ -61,7 +61,7 @@ Each workflow on the pages below carries the worker it runs on, alongside the di
     {
       term: 'Core',
       to: '/docs/design/component-model/workflows/core',
-      desc: `Triggered per request: create, update, cancel, execute, return, represent, allocate. Each one carries the worker it runs on and the dimensions it varies by.`,
+      desc: `Triggered per request: create, update, cancel, execute, return, represent, allocate. Each one carries the worker it runs on and the behaviors it varies by.`,
     },
     {
       term: 'Composite',

@@ -40,8 +40,8 @@ Design sets the [rules a stage obeys](../../../design/principles.md). What they 
 
 - The constructor takes activity groups and activities, and nothing else. There is no workflow, stage, or client to inject, so the call rule holds by construction.
 - End every `execute` with `PaymentStateTransitionActivity`, or its split-level twin for a leg. That single call does the detail-row update, the lifecycle-event append, and the publish to Lumi via RTF. A transition that skips it is a state change nobody can trace.
-- Write a concrete class per dimension combination rather than an `abstract` base with overrides. A combination that makes no sense, say a corporate account with no AR posting, simply has no class, which is what stops a workflow starting with it.
-- Put the behaviour in the class name. If the UK and Singapore share a non-realtime clearing rule, they share one file. A market name in a class name usually means the rule was written in the wrong place.
+- Write a concrete class per behavior combination rather than an `abstract` base with overrides. A combination that makes no sense, say a corporate account with no AR posting, simply has no class, which is what stops a workflow starting with it.
+- Put the behavior in the class name. If the UK and Singapore share a non-realtime clearing rule, they share one file. A market name in a class name usually means the rule was written in the wrong place.
 
 ## Where they live
 

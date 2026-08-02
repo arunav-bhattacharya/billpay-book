@@ -31,44 +31,46 @@
   flex-direction: column;
 }
 
-/* the accent still reads in the label, but the ink is pulled toward the body
-   colour so 11px caps clear AA on the page background in both themes */
 .groupLabel {
-  font-size: 0.72rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ly-accent) 42%, var(--amex-txt-strong));
-}
-:global([data-theme='dark']) .groupLabel {
-  color: color-mix(in srgb, var(--ly-accent) 68%, var(--amex-txt-strong));
 }
 
-/* a rail down the left, with the group name set along it */
+/* The tier name is a filled band down the left, and the blocks butt straight
+   up against it: one object per tier rather than a floating label beside a
+   stack of cards. The band is solid accent with white type, which is the one
+   place in the map the accent gets to be the surface instead of a hairline.
+   It runs past the connectors between blocks, so it reads as the spine the
+   blocks hang off. */
 .group {
   display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 0.95rem;
+  grid-template-columns: 40px 1fr;
+  gap: 0;
   align-items: stretch;
 }
 .group > .groupLabel {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-}
-.group > .groupLabel::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 2px;
-  bottom: 2px;
-  width: 3px;
-  border-radius: 3px;
+  justify-content: center;
+  border-radius: 15px 0 0 15px;
+  color: #fff;
   background: linear-gradient(
     180deg,
-    var(--ly-accent),
-    color-mix(in srgb, var(--ly-accent) 28%, transparent)
+    var(--ly-accent) 0%,
+    color-mix(in srgb, var(--ly-accent) 74%, #00133d) 100%
+  );
+  box-shadow: var(--card-sh);
+}
+/* pulled back off full strength, since a saturated band on the near-black
+   canvas outshines the blocks it is meant to introduce */
+:global([data-theme='dark']) .group > .groupLabel {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ly-accent) 86%, #02050e) 0%,
+    color-mix(in srgb, var(--ly-accent) 54%, #02050e) 100%
   );
 }
 .group > .groupLabel span {
@@ -77,43 +79,25 @@
   line-height: 1;
 }
 
-/* A dashed rule separates the tiers, and the chevron on it keeps the flow
-   reading downward. Dashes and a stronger ink set it apart from the dotted
-   connectors that run between blocks inside a group. */
-.divider {
-  position: relative;
-  /* the rule is centred in the box with no margin, so the gap it leaves above
-     and below is the same */
-  height: 52px;
-  margin: 0;
-  --ly-rule: color-mix(in srgb, var(--amex-line-strong) 72%, var(--amex-txt-strong));
-  /* a gradient rather than border-style: dashed, so the dash and the gap
-     between dashes are both under our control */
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--ly-rule) 0 10px,
-    transparent 10px 17px
-  );
-  background-repeat: no-repeat;
-  background-size: 100% 2px;
-  background-position: left center;
+/* Blocks inside a group give up their left edge to the band: square corners
+   on that side, no border, and no accent rail of their own, since the band is
+   now doing that job at full height. */
+.group .layer {
+  border-radius: 0 15px 15px 0;
+  border-left: 0;
 }
-/* the rule above the async aside: no direction marker, since that band loops
-   back into the workflows rather than carrying the request onward */
-.dividerPlain::after {
+.group .layer::before {
   content: none;
 }
 
-.divider::after {
-  content: '▾';
-  position: absolute;
-  left: calc(34px + 0.95rem + 23px);
-  top: 50%;
-  margin-top: 3px;
-  transform: translateX(-50%);
-  color: var(--ly-rule);
-  font-size: 0.85rem;
-  line-height: 1;
+/* Plain air between the tiers. A dashed rule and a ▾ used to sit here, from
+   when every tier was the same colour and the map needed something to say
+   where one ended. The filled bands do that now, and the rule on top of them
+   was a second boundary drawn over a boundary that already read. The height
+   is what it was, so the rhythm down the map is unchanged. */
+.tierGap {
+  height: 52px;
+  margin: 0;
 }
 
 /* ---- a block ---- */
@@ -253,7 +237,7 @@
 }
 
 /* ---- the async return path ---- */
-/* the divider above the aside carries the gap, so the wrap adds none */
+/* the gap above the aside carries the space, so the wrap adds none */
 .asideWrap {
   margin-top: 0;
 }
@@ -308,7 +292,8 @@
     margin-left: 20px;
   }
 
-  /* vertical type is unreadable at phone widths, so the label lies down */
+  /* vertical type is unreadable at phone widths, so the band lies down and
+     caps the stack instead of running beside it */
   .group {
     display: block;
   }
@@ -316,20 +301,17 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 0.55rem;
+    padding: 0.4rem 0.9rem;
     margin-bottom: 0.7rem;
-  }
-  .group > .groupLabel::before {
-    position: static;
-    width: 20px;
-    height: 3px;
-    background: var(--ly-accent);
+    border-radius: 11px;
+    font-size: 0.8rem;
   }
   .group > .groupLabel span {
     writing-mode: horizontal-tb;
     transform: none;
   }
-  .divider::after {
-    left: 20px;
+  /* nothing to butt against once the band is above rather than beside */
+  .group .layer {
+    border-radius: 15px;
   }
 }

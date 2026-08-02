@@ -23,7 +23,7 @@
   position: relative;
   overflow: hidden;
   padding: 1.1rem 1.2rem 1.15rem;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,

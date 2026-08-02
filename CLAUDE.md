@@ -18,7 +18,7 @@ Repo currently contains only `docs/Wiki_Spec.md`. Everything else — reference 
 
 ## Design system
 - Docusaurus, latest stable
-- Dark mode default, light mode supported, gradients via CSS custom properties (not hardcoded per-component)
+- Light mode default, dark mode supported, gradients via CSS custom properties (not hardcoded per-component)
 - Palette: *(fill in once chosen — reuse the warm-orange/teal/gold gradient system from other projects if you want visual consistency, or specify a fresh one)*
 - Diagrams: Mermaid via Docusaurus's built-in mermaid support, for every sequence/state diagram the spec calls out
 

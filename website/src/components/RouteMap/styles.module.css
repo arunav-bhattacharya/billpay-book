@@ -13,7 +13,7 @@
   margin: 1.4rem 0 2rem;
   overflow: hidden;
   overflow-x: auto;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
@@ -159,7 +159,7 @@
   background: color-mix(in srgb, #dca02f 22%, transparent);
 }
 
-/* Account-type tag on split/allocation rows — the routing dimension, made visible. */
+/* Account-type tag on split/allocation rows — the routing behavior, made visible. */
 .acct {
   display: inline-block;
   margin-right: 0.45rem;

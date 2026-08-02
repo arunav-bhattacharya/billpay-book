@@ -61,6 +61,6 @@ class PaymentExecutionActivityGroup(/* … */) {
 }
 ```
 
-*(Shape, simplified.)* Which groups carry dimensions and which are generic, all 22 of them with their transitions and invoking stages, is catalogued in [Design → ActivityGroups & Activities](../../../design/component-model/activities.md).
+*(Shape, simplified.)* Which groups carry behaviors and which are generic, all 22 of them with their transitions and invoking stages, is catalogued in [Design → ActivityGroups & Activities](../../../design/component-model/activities.md).
 
 When in doubt about granularity, prefer several short activities composed by a group over one long activity. Short activities retry cheaply. Long ones repeat work.

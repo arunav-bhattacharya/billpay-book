@@ -137,7 +137,7 @@ export default function LayerStack({groups = [], aside}) {
         const layers = g.layers || [];
         return (
           <React.Fragment key={g.label || gi}>
-            {gi > 0 && <div className={styles.divider} aria-hidden="true" />}
+            {gi > 0 && <div className={styles.tierGap} aria-hidden="true" />}
             <div
               className={styles.group}
               style={{'--ly-accent': g.accent}}
@@ -161,9 +161,9 @@ export default function LayerStack({groups = [], aside}) {
 
       {aside && (
         <>
-          {/* the same rule that separates the groups, minus the ▾: the aside
-              feeds work back up rather than continuing the flow down */}
-          <div className={clsx(styles.divider, styles.dividerPlain)} aria-hidden="true" />
+          {/* the same air that separates the tiers, so the aside sits off the
+              stack rather than reading as a fourth tier of it */}
+          <div className={styles.tierGap} aria-hidden="true" />
           <div className={styles.asideWrap} style={{'--ly-accent': aside.accent}}>
             {aside.connectorLabel && (
               <div className={styles.loopConnector}>

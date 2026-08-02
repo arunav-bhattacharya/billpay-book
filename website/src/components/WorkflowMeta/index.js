@@ -2,7 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 import styles from './styles.module.css';
 
-// The four processing dimensions, plus instrumentType (used by Payment Intent).
+// The four processing behaviors, plus instrumentType (used by Payment Intent).
 // Rendered as the exact spec field names so the page stays grounded.
 const ALL = [
   'accountType',
@@ -14,20 +14,20 @@ const ALL = [
 /**
  * Meta block for a workflow, in two labelled rows:
  *   Worker      the Temporal worker(s) it runs on
- *   Dimensions  the dimensions that select its stage / activity-group impls
+ *   Behaviors   the behaviors that select its stage / activity-group impls
  *
  * Props:
  *   worker      'Online' | 'Offline' | 'Online / Offline'
- *   dimensions  'all' (the four) | 'generic' (none) | string[] of field names
+ *   behaviors   'all' (the four) | 'generic' (none) | string[] of field names
  */
-export default function WorkflowMeta({worker = 'Online', dimensions = []}) {
+export default function WorkflowMeta({worker = 'Online', behaviors = []}) {
   const workers = String(worker)
     .split('/')
     .map((w) => w.trim())
     .filter(Boolean);
 
-  const dims =
-    dimensions === 'all' ? ALL : dimensions === 'generic' ? [] : dimensions;
+  const list =
+    behaviors === 'all' ? ALL : behaviors === 'generic' ? [] : behaviors;
 
   return (
     <div className={styles.meta}>
@@ -47,14 +47,14 @@ export default function WorkflowMeta({worker = 'Online', dimensions = []}) {
         </div>
       </div>
       <div className={styles.row}>
-        <span className={styles.label}>Dimensions</span>
+        <span className={styles.label}>Behaviors</span>
         <div className={styles.values}>
-          {dims.length === 0 ? (
-            <span className={styles.generic}>Generic, no dimensions</span>
+          {list.length === 0 ? (
+            <span className={styles.generic}>Generic, no behaviors</span>
           ) : (
-            dims.map((d) => (
-              <code key={d} className={styles.dim}>
-                {d}
+            list.map((b) => (
+              <code key={b} className={styles.behavior}>
+                {b}
               </code>
             ))
           )}

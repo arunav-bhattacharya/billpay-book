@@ -21,4 +21,4 @@ import Lead from '@site/src/components/Lead';
 | **No transitive framework baggage** | A single focused JAR, no Spring pulled in behind it. Same philosophy as our [HTTP client](./http-client.md). |
 | **Indifferent to the ORM** | It is a plain `javax.sql.DataSource`, so [Exposed](./orm.md) neither knows nor cares which pool sits underneath. |
 
-HikariCP was the runner-up. It is excellent and well proven, and the decision was close. Agroal won on richer instrumentation and cleaner integration with our metrics stack, not because Hikari is deficient. C3P0 and the DBCP family lost on age and noisy behaviour under load. Running with no pool at all was never an option, given Oracle connection costs.
+HikariCP was the runner-up. It is excellent and well proven, and the decision was close. Agroal won on richer instrumentation and cleaner integration with our metrics stack, not because Hikari is deficient. C3P0 and the DBCP family lost on age and noisy behavior under load. Running with no pool at all was never an option, given Oracle connection costs.

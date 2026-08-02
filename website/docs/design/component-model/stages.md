@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>A stage is one state-transition decision point: a Kotlin class with a single function that does the validation, persistence, and event publication for that transition. It consumes one payment state and emits the next. Workflows call stages, and a stage never calls a workflow or an external system directly.</Lead>
 
-Sixteen stages cover every workflow. Most are shared, so the same stage runs in several workflows and behaves the same way in each. Which implementation runs is chosen from the market's dimensions.
+Sixteen stages cover every workflow. Most are shared, so the same stage runs in several workflows and behaves the same way in each. Which implementation runs is chosen from the market's behaviors.
 
 Every stage writes its new state to the transaction-detail table, adds a row to the transaction-lifecycle-event table, and publishes a lifecycle event to Lumi (the analytics platform) via RTF (the Reliable Transaction Framework). The sections below note only what each stage does on top of that.
 

@@ -21,7 +21,7 @@
   margin: 1.5rem 0 2.4rem;
   padding: 0.9rem 0.9rem 1.1rem;
   /* The house card, per the recipe in custom.css section 9a. */
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,

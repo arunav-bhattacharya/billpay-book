@@ -4,7 +4,7 @@
 .meta {
   margin: 0.2rem 0 1.4rem;
   padding: 11px 14px;
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: 12px;
   background:
     var(--card-face) padding-box,
@@ -73,7 +73,7 @@
   border-color: color-mix(in srgb, #e0b34e 34%, transparent);
 }
 
-.dim {
+.behavior {
   font-family: var(--amex-font-mono);
   font-size: 0.72rem;
   padding: 1px 7px;

@@ -8,11 +8,11 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 # Composite Workflows
 
-<Lead>Composite workflows wrap one or more core workflows and add logic that spans domains. They run on the Online worker and take their dimensions from the create workflow they wrap.</Lead>
+<Lead>Composite workflows wrap one or more core workflows and add logic that spans domains. They run on the Online worker and take their behaviors from the create workflow they wrap.</Lead>
 
 ## Create Payment & Installments
 
-<WorkflowMeta worker="Online" dimensions="generic" />
+<WorkflowMeta worker="Online" behaviors="generic" />
 
 Combines a one-time payment with an installment plan, so the customer pays now and sets up a plan in the same request.
 
@@ -23,7 +23,7 @@ Combines a one-time payment with an installment plan, so the customer pays now a
 
 ## Create Payment with Multiple Instructions
 
-<WorkflowMeta worker="Online" dimensions="generic" />
+<WorkflowMeta worker="Online" behaviors="generic" />
 
 Handles a request that carries several payment instructions at once, for example paying more than one account in a single call.
 

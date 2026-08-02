@@ -17,7 +17,7 @@ import Highlights from '@site/src/components/Highlights';
     {
       term: 'Workflows',
       to: '/docs/design/component-model/workflows',
-      desc: `Every payment journey the platform orchestrates, split into core, composite, and periodic, with the worker each one runs on and the dimensions it varies by.`,
+      desc: `Every payment journey the platform orchestrates, split into core, composite, and periodic, with the worker each one runs on and the behaviors it varies by.`,
     },
     {
       term: 'Stages',
@@ -27,7 +27,7 @@ import Highlights from '@site/src/components/Highlights';
     {
       term: 'ActivityGroups & Activities',
       to: '/docs/design/component-model/activities',
-      desc: `The retryable actions the stages call: what each one does, which stage or workflow invokes it, and whether its behaviour varies by market.`,
+      desc: `The retryable actions the stages call: what each one does, which stage or workflow invokes it, and whether its behavior varies by market.`,
     },
   ]}
 />

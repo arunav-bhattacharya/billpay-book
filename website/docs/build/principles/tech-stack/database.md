@@ -13,7 +13,7 @@ import Lead from '@site/src/components/Lead';
 
 | Reason | Why it matters for Billpay |
 | --- | --- |
-| **Strong ACID guarantees** | Money movement cannot tolerate phantom reads, lost writes, or partial commits. Serialisable isolation and well-understood locking behaviour are the table stakes everything else builds on. |
+| **Strong ACID guarantees** | Money movement cannot tolerate phantom reads, lost writes, or partial commits. Serialisable isolation and well-understood locking behavior are the table stakes everything else builds on. |
 | **Operations we don't have to build** | A dedicated Amex DBO team covers HA, backup, restore, patching, and capacity. Picking a datastore nobody else at Amex runs would mean carrying that whole layer ourselves. |
 | **Fits our load shape** | Billpay is mixed OLTP: short, hot transactions on `trans_dtl` and `idempotency_checker` next to append-heavy logs (`trans_lfcyc_event`, the notification tracker). Oracle handles that shape predictably with the right indexes and partitioning. |
 | **Partitioning is how we purge** | The event logs grow without bound, and dropping a date partition retires a month of them instantly. |

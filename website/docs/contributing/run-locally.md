@@ -38,6 +38,10 @@ The static site lands in `./build/`. The build fails on broken internal links (`
 npm run serve
 ```
 
+That serves the built site on port **3101**, so it can run next to the dev server rather than fighting it for 3100.
+
+Search is the one thing `npm start` cannot show you. The index is built from the finished pages, so it only exists after `npm run build`. Under the dev server the box is there but reports that the index is missing. Build and serve to try a query.
+
 ## Adding content
 
 | Want to add… | Do this |

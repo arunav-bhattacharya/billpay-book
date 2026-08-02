@@ -24,7 +24,7 @@
   overflow-x: auto;
   /* The house card, exactly per the recipe in custom.css section 9a, so the
      diagram sits on the same paper as every other card on the site. */
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,

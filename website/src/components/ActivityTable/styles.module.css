@@ -1,4 +1,4 @@
-/* ActivityTable — the activity catalogue with a dimension filter above it.
+/* ActivityTable — the activity catalogue with a behavior filter above it.
    Same panel treatment as the other tables on the site: rounded surface,
    Amex-blue header, alternating rows. */
 
@@ -83,7 +83,7 @@
 /* ---- table ---- */
 
 .wrap {
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   border-radius: var(--card-radius);
   background:
     var(--card-face) padding-box,
@@ -121,7 +121,7 @@
 .thName {
   width: 20%;
 }
-.thDims {
+.thBehaviors {
   width: 17%;
 }
 .thState {
@@ -160,13 +160,13 @@
   color: var(--amex-txt-strong);
 }
 
-/* ---- dimension cell ---- */
+/* ---- behavior cell ---- */
 
-.dimsCell {
+.behaviorsCell {
   display: table-cell;
 }
 
-.dim,
+.behavior,
 .generic {
   display: inline-block;
   margin: 0 0.25rem 0.25rem 0;
@@ -178,15 +178,15 @@
   border: 1px solid var(--amex-line);
 }
 
-/* The dimension being filtered on is lit up, so a filtered row shows at a
-   glance which of its dimensions matched. */
-.dimOn {
+/* The behavior being filtered on is lit up, so a filtered row shows at a
+   glance which of its behaviors matched. */
+.behaviorOn {
   color: var(--amex-blue);
   background: color-mix(in srgb, var(--amex-blue) 12%, transparent);
   border-color: color-mix(in srgb, var(--amex-blue) 34%, transparent);
 }
 
-:global([data-theme='dark']) .dimOn {
+:global([data-theme='dark']) .behaviorOn {
   color: var(--amex-blue-bright);
   background: color-mix(in srgb, var(--amex-blue-bright) 15%, transparent);
   border-color: color-mix(in srgb, var(--amex-blue-bright) 36%, transparent);
@@ -228,7 +228,7 @@
     padding: 0.6rem 0.7rem;
   }
   .thName,
-  .thDims,
+  .thBehaviors,
   .thState {
     width: auto;
   }

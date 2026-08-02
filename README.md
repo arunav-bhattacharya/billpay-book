@@ -53,11 +53,13 @@ npm run build
 
 The static site lands in `website/build/`. Broken internal links fail the build (`onBrokenLinks: 'throw'`). Fix the link rather than lowering the setting.
 
-To check the production bundle before pushing:
+To check the production bundle before pushing, on port 3101 so it does not collide with the dev server:
 
 ```bash
 npm run serve
 ```
+
+Site search is offline: the index is generated during `build` and shipped with the site, so it works only in the built bundle, not under `npm start`.
 
 If a stale cache is confusing you, `npm run clear` wipes `.docusaurus` and `build`.
 

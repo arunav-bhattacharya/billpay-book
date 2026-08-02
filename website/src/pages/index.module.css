@@ -66,12 +66,14 @@
   gap: 1rem;
 }
 
-/* Ghost button reads correctly on the dark hero regardless of theme. */
+/* Ghost button reads correctly on the dark hero regardless of theme. Weight
+   matches the primary button beside it: 450 lands in the Regular bucket of the
+   two Benton cuts, so neither hero button sits a step above body copy. */
 .heroGhost {
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.55);
   color: #fff;
-  font-weight: 600;
+  font-weight: 450;
   backdrop-filter: blur(6px);
   transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
@@ -130,7 +132,7 @@
   padding: 1.5rem;
   padding-bottom: 2.1rem;
   border-radius: var(--card-radius);
-  border: 2.5px solid transparent;
+  border: var(--card-bw) solid transparent;
   background:
     var(--card-face) padding-box,
     var(--card-border) border-box,
