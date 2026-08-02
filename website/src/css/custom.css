@@ -1502,8 +1502,13 @@ details.alert > summary {
 
 /* The navbar box. Infima gives it a pill; this puts it on the same surface
    and hairline as everything else in the bar, and lights the edge on focus
-   rather than drawing a second ring around it. */
+   rather than drawing a second ring around it. Infima sizes it at 12.5rem by
+   2rem, which the shortcut hint eats into, so the field is wider and a little
+   taller here and shrinks with the bar rather than overflowing it. */
 .navbar__search-input {
+  width: 18rem;
+  max-width: 100%;
+  height: 2.25rem;
   background-color: color-mix(in srgb, var(--amex-line) 40%, transparent);
   border: 1px solid var(--amex-line);
   color: var(--amex-txt);
