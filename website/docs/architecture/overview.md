@@ -6,6 +6,7 @@ sidebar_label: Overview
 
 import Lead from '@site/src/components/Lead';
 import LayerStack from '@site/src/components/LayerStack';
+import ClusterMap from '@site/src/components/ClusterMap';
 
 export const GROUPS = [
   {
@@ -14,9 +15,9 @@ export const GROUPS = [
     layers: [
       {
         title: 'Channels & Upstream',
-        role: 'Where requests and async events start',
+        role: 'Where requests and events start',
         icon: 'channels',
-        items: ['Customer & servicing channels', 'AR platform', 'Third-party inbound', 'Async events (RTF)'],
+        items: ['Customer & servicing channels', 'AR platform', 'Third-party inbound', 'Allocations manager', 'Platform events'],
       },
       {
         title: 'One-Data Functions',
@@ -37,21 +38,27 @@ export const GROUPS = [
     layers: [
       {
         title: 'Billpay Core APIs & Router',
-        role: 'The REST surface, and the choice of which workflow runs',
+        role: 'The REST surface, and the Router that admits, routes and places every payment',
         icon: 'router',
-        items: ['REST APIs', 'Date routing', 'Single / multi-instruction', 'Behaviors'],
+        items: ['REST APIs', 'Admission: 422 / 429', 'Journey & plan key', 'Placement & start'],
       },
       {
-        title: 'Workflows',
-        role: 'Durable orchestration on Temporal',
+        title: 'Temporal Clusters',
+        role: 'Online for callers who wait, Offline for work that can be paced',
         icon: 'workflow',
-        items: ['Workers', 'Core', 'Composite', 'Periodic'],
+        items: ['Online cluster', 'Offline cluster', 'Dispatchers', 'Governor'],
       },
       {
         title: 'Components',
-        role: 'Composed per market behaviors',
+        role: 'One workflow per journey, built from stages',
         icon: 'components',
-        items: ['Stages', 'ActivityGroups', 'Activities', 'Clients'],
+        items: ['Workflows', 'Stages', 'Activities', 'Clients'],
+      },
+      {
+        title: 'Oracle',
+        role: 'The source of truth, and the only hand-off between the clusters',
+        icon: 'database',
+        items: ['Payments', 'Work Tracker', 'Outbox', 'Inbox'],
       },
     ],
   },
@@ -63,24 +70,24 @@ export const GROUPS = [
         title: 'External Systems',
         role: 'Where the money and the side effects land',
         icon: 'external',
-        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'Audit', 'Risk', 'Comms', 'Allocations'],
+        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager'],
       },
     ],
   },
 ];
 
 export const ASIDE = {
-  title: 'Async Event Handlers & Schedules',
-  role: 'Async outcomes and periodic sweeps come back in',
+  title: 'Event Handlers & Schedules',
+  role: 'Late outcomes land in the inbox; Schedules start the dispatchers and jobs',
   accent: 'var(--amex-cat-architecture)',
   icon: 'async',
-  items: ['Money movement', 'AR posting', 'OTB updates', 'Periodic sweeps'],
-  connectorLabel: 'async events & schedules loop back to Workflows',
+  items: ['Returns', 'Settlement', 'AR posting', 'Dispatchers', 'Periodic jobs'],
+  connectorLabel: 'events and due work come back in at the clusters',
 };
 
 # Architecture Overview
 
-<Lead>Billpay sits in three tiers: what callers talk to, what Billpay runs, and what sits outside it. A request travels down the stack. Async outcomes and scheduled sweeps come back in at the workflow layer.</Lead>
+<Lead>Billpay sits in three tiers: what callers talk to, what Billpay runs, and what sits outside it. A request travels down the stack. Outcomes that arrive later, and work that falls due on a date, come back in at the clusters.</Lead>
 
 ## A layered architecture
 
@@ -90,34 +97,59 @@ export const ASIDE = {
 
 ### UI and API layer
 
-- Requests start at the customer and servicing channels, the Accounts Receivable platform, and third parties pushing money in. Async systems such as RTF trigger work here too.
+- Requests start at the customer and servicing channels, the Accounts Receivable platform, third parties pushing money in, and the allocations manager sending a corporate payment's breakdown. Events from other platforms arrive here too.
 - One-Data Functions are the contracts upstream integrates with. They are versioned, so `CreatePayment.v3` keeps working while what sits behind it changes.
-- The functions do none of the work themselves. Each one delegates to a Billpay core API. Every function and the endpoint it delegates to is listed in [Build → API Spec](../build/api-spec/one-data.md).
+- The functions do none of the work themselves. Each one delegates to a Billpay core API. Every function and the endpoint it calls is listed in [Build → API Spec](../build/api-spec/one-data.md).
 
 ### Billpay Core layer
 
-- The core REST APIs shape the request. Duplicates are caught on the way in against an idempotency record, so a retried call cannot pay twice.
-- The router picks the workflow. It reads the payment date (today runs now, a future date gets scheduled), whether the request carries one instruction or several, and the request type: create, update, cancel, return, inbound, or intent. It then fetches the stages that match the market's behaviors and passes them into the workflow it starts. [Design → Routing](../design/routing.md) has the full map of trigger to workflow.
-- Workflows are the durable part. Each runs on one of two Temporal worker pools, split by whether an end user is waiting for the answer. [Design → Workflows](../design/component-model/workflows/index.md) shows the two pools and what runs on each.
-- A workflow never calls an external system itself. It composes components instead, in a strict order: **Workflow → Stage → ActivityGroup → Activity → Client → external system**. What each layer is responsible for, and the rules on what it may call, are in [Design → Principles](../design/principles.md).
+The core REST APIs shape the request, and the payment's first step checks it against an idempotency record, so a retried call can never pay twice. Then every payment, whether a channel sent it or a dispatcher released it, starts through the **Billpay Router**. The Router is a library inside the core APIs and the dispatchers, and it runs the same six steps every time:
+
+1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. The traffic must be inside its budget, or the answer is 429 with `Retry-After`.
+2. Pick the journey from the routing table.
+3. Resolve the behaviors from the market's active release. A behavior set to BOTH becomes Y or N for this journey.
+4. Pin the plan key: the journey, the resolved behaviors and the config version.
+5. Place the work: cluster, task queue, priority and workflow ID.
+6. Start it. When a caller is waiting that means Update-With-Start, so the answer comes back the moment the payment is decided. When nobody is, it means an async start, and the API replies 202 once the workflow exists.
+
+[Design → Routing](../design/routing.md) has the full map of trigger to workflow. Below the Router:
+
+- Workflows run on one of two Temporal clusters. Online takes the journeys where someone is waiting for an answer, and Offline takes everything that can be paced. [The next section](#two-clusters-one-hand-off) shows what runs where.
+- A workflow never calls an external system itself. It is built from components in a strict order, **Workflow → Stage → Activity → Client → external system**, and stages are the only layer that changes with a market's behaviors. The rules are in [Design → Principles](../design/principles.md).
+- Oracle is the source of truth. Every status change is a guarded update that applies only if the status is still what the writer expected, and each stage commits its state, its timeline entry and its outgoing events in one transaction. Oracle is also the only hand-off between the two clusters.
 
 ### External systems
 
-- Clearing moves the money out to the bank.
-- Accounts Receivable reduces the statement balance and Authorization raises open-to-buy. For a generic payment these run in parallel with clearing.
-- Once the payment is processed, accounting, audit and balance control, risk, and customer communications are all told. Comms goes last.
-- Corporate payments fetch their allocations first, then run one split per allocation.
+- Clearing moves the money out to the customer's bank. Accounts Receivable reduces the statement balance, and Authorization raises open-to-buy. These three run in parallel in the Execute stage.
+- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage. All six must succeed before the payment is `PROCESSED`.
+- Customer communications (Raven) and the lifecycle events other systems consume (RTF) never hold a payment up. The stage's commit writes them to an outbox, and a relay sends them afterwards.
+- A corporate payment clears once, at payment level, on its due date. Its allocations arrive separately, by callback from the allocations manager, and each one posts as a leg of its own, in parallel with the clearing.
 
 ### Event handlers and schedules
 
-- Event handlers take async outcomes back in: money movement for returns and settlement, Accounts Receivable posting, and open-to-buy updates. Each writes to the external-events tracker, which is what lets a payment close out to `PAID`. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
-- Temporal Schedules drive the periodic Offline workflows in waves. Which schedule fires which workflow is in [Design → Periodic Workflows](../design/component-model/workflows/periodic.md).
+- Event handlers take late outcomes back in. A return starts `ProcessReturnedPaymentWorkflow`. Settlement and Accounts Receivable posting events land in the inbox, and `ProcessPaidEventsWorkflow` marks the payment `PAID` once both have arrived. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
+- Work that falls due on a date waits in Oracle as a Work Tracker row. One dispatcher per kind of work releases it, each with its own Schedule and budget, at rates the governor resets every 15 seconds. Three periodic jobs, for paid events, missing paid events and the purge, run on Schedules too. [Design → Periodic Workflows](../design/component-model/workflows/periodic.md) has the list.
+
+## Two clusters, one hand-off
+
+The split comes from one question: is anyone waiting? A cardmember paying their bill needs an answer in under a second. A million payments due at midnight need to be done by morning, and nobody is watching each one.
+
+<ClusterMap />
+
+- The Online cluster runs the journeys where a caller is waiting: paying today, scheduling, updating or cancelling from a channel, payment intents, refunds a customer asks for, and the composite flows. At its busiest it handles about 100 payments a second.
+- The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, the periodic jobs, and the control workflows that do the pacing.
+- Each cluster has its own Aurora database, so no amount of midnight work on Offline can slow a payment on Online inside Temporal. What the two share is Oracle and the downstream systems, and the governor watches both. When either comes under pressure, offline work slows down and online traffic doesn't.
+- Nothing calls across. A payment scheduled on Online reaches Offline as a Work Tracker row, written in the same Oracle commit as its `SCHEDULED` state. On the due date a dispatcher on Offline claims the row and starts the execution there.
+- Two apps host the workers. The Online app runs the core APIs, the Router and the Online workers, and its core APIs hold a Temporal client for each cluster. The Offline app runs the dispatchers, the outbox relays, the governor, the Offline workflows and one worker deployment per downstream queue. Where each physically runs is on [High Availability](./high-availability.md).
 
 ## Why Temporal
 
-We looked at several durable execution engines and picked Temporal as the best fit for long-running business processes. The layering above rests on four of its guarantees.
+We looked at several durable execution engines and picked Temporal as the best fit for long-running business processes. The layering above rests on what it guarantees.
 
-- Money movement must not lose state across restarts, deploys, or downstream outages. A workflow replays from its event history back to a deterministic state, so we never hand-rolled a checkpoint table.
-- A payment scheduled months out is a workflow waiting on a timer. There is no cron plus poll glue around it.
-- Downstream systems flap, clearing is often batch, and a corporate payment waits on an *AllocationsReceived* signal before it continues. Retries, timers, signals, and queries are all Temporal primitives, so none of that is ours to build.
+- Money movement must not lose state across restarts, deploys or downstream outages. A workflow replays from its event history back to a deterministic state, so we never hand-rolled a checkpoint table.
+- A caller who is waiting gets the answer at the decision point. Update-With-Start starts the workflow and waits on one update in a single call, so a channel hears `ACCEPTED` or `DECLINED` while the workflow carries on with clearing.
+- Downstream systems flap and push back with 429s. Retries with backoff, a retry delay taken from `Retry-After`, rate-limited task queues, priority and fairness all come with Temporal, so none of that is ours to build.
+- Schedules start the dispatchers and the periodic jobs, and Worker Versioning pins a running payment to the build it started on.
 - Temporal requires deterministic workflow code. That constraint is why the work is factored the way it is: workflows orchestrate, activities do the I/O.
+
+Waiting is the one thing we keep out of Temporal. Sleeping on a timer for days costs its database real work, so a payment due next month waits in Oracle as a row, and a dispatcher starts its workflow on the day.

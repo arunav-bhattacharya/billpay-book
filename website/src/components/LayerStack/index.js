@@ -21,8 +21,8 @@ import styles from './styles.module.css';
 
 /* Line glyphs, drawn on a 20x20 box in currentColor so one set serves every
    accent and both themes. Each says what its block does with the payment: many
-   ways in, one contract, a decision, a durable run, composed parts, and the
-   world outside. */
+   ways in, one contract, a decision, a durable run, composed parts, kept
+   state, and the world outside. */
 const GLYPHS = {
   /* four channels fanning into a single path in */
   channels: (
@@ -62,6 +62,14 @@ const GLYPHS = {
       <rect x="6.2" y="2.2" width="7.6" height="7.6" rx="1.5" />
       <rect x="1.9" y="10.4" width="7.6" height="7.6" rx="1.5" />
       <rect x="10.5" y="10.4" width="7.6" height="7.6" rx="1.5" />
+    </>
+  ),
+  /* a database drum: where state is kept, and handed from one part to another */
+  database: (
+    <>
+      <ellipse cx="10" cy="4.4" rx="7" ry="2.6" />
+      <path d="M3,4.4 V15.6 C3,17 6.1,18.2 10,18.2 C13.9,18.2 17,17 17,15.6 V4.4" />
+      <path d="M3,10 C3,11.4 6.1,12.6 10,12.6 C13.9,12.6 17,11.4 17,10" />
     </>
   ),
   /* where the money lands, and what leaves the estate with it */

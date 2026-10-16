@@ -16,7 +16,7 @@ Four kinds of diagram, in the order you should reach for them.
 | --- | --- | --- |
 | **Mermaid** | A fenced ` ```mermaid ` block in the page | Sequence diagrams, the payment state model, the domain model |
 | **Data-driven components** | React, props | `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, and the table set |
-| **CSS box diagrams** | React, CSS grid or flex | `LandscapeMap` |
+| **CSS box diagrams** | React, CSS grid or flex | `LandscapeMap`, `ClusterMap` |
 | **Coordinate SVG** | React, hand-placed coordinates | `LegacyEstateMap`, `HADiagram` |
 
 Nothing on the site uses a charting or graph-layout library. Everything is either
@@ -103,9 +103,10 @@ without worrying about the rest of the site.
 
 Two more things you will see in existing files:
 
-- **Props** are the arguments a component takes: `function Lead({children, accent})`,
-  called as `<Lead accent="red">text</Lead>`. `children` is whatever sits between the
-  opening and closing tags.
+- **Props** are the arguments a component takes: `function Highlights({items, accent})`,
+  called as `<Highlights items={[...]} accent="var(--amex-cat-design)" />`. A component
+  can also take `children`, which is whatever sits between its opening and closing tags,
+  as `Lead` does with its text.
 - **`clsx`** joins class names conditionally: `clsx(styles.box, isBig && styles.big)`
   gives `"box big"` when `isBig` is true and `"box"` when it is not.
 
@@ -186,17 +187,18 @@ Pass the array, get the component.
 | `ScheduleTable` | `rows: [{schedule, workflow}]` | Cron-style schedules. |
 | `CompareTable` | `rows: [{what, legacy, modern}]` | Before-and-after comparisons. `**bold**` works inside cells. |
 | `Highlights` | `items: [{term, desc, to?, links?}]`, `accent` | A grid of key-message cards. |
-| `Principles` | `items: [{title, body}]`, `accent` | A numbered list of principles. |
+| `Principles` | `items: [{term, desc}]` | A numbered list of principles. |
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
 | `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more | One payment journey as a banded process flow. |
-| `CompositionMap` | `apis`, `behaviors`, `run` | A three-band "inputs, profile, output" flow. |
+| `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
 | `RouteMap` | `rows` | Trigger-to-workflow routing tables. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
 | `WorkflowMeta` | `worker`, `behaviors` | The metadata strip above a workflow section. |
 | `WorkerChip` | `worker`, `children` | The Online or Offline tag, inline. |
-| `Lead` | `children`, `accent?` | The thesis paragraph at the top of a page. |
+| `Lead` | `children` | The thesis paragraph at the top of a page. With the H1 it forms the page banner. |
+| `ClusterMap` | none | The two Temporal clusters, Oracle as the only hand-off between them, and the shared downstreams. |
 
 Two of these are worth a second look before you build anything new.
 
@@ -241,19 +243,12 @@ rule.
 | File | What it does |
 | --- | --- |
 | [`src/lib/useOverlay.js`](website/src/lib/useOverlay.js) | Everything a full-screen layer owes the page: Escape closes it, the page behind stops scrolling, focus moves in and returns on close. Never hand-roll this. |
-| [`src/lib/sections.js`](website/src/lib/sections.js) | `sectionFromPath` and `accentFromPath` work out which of the eight sections a page belongs to, and its hue, from the URL. Use it instead of asking every page to pass a colour. |
+| [`src/lib/sections.js`](website/src/lib/sections.js) | `sectionFromPath` works out which section a page belongs to, with its number and label, from the URL. The page banner reads it, so no page passes its own number or colour. |
 | [`src/lib/inlineMarkup.js`](website/src/lib/inlineMarkup.js) | Renders `**bold**` and `` `code` `` inside a plain string, so data arrays can carry light formatting. |
 | [`src/lib/ordinal.js`](website/src/lib/ordinal.js) | `1` becomes `"01"`, for the site's numbering. |
 
-`Lead` is the pattern to copy for anything section-coloured:
-
-```jsx
-import {useLocation} from '@docusaurus/router';
-import {accentFromPath} from '../../lib/sections';
-
-const {pathname} = useLocation();
-const accent = accentFromPath(pathname);   // the hue of whatever section the page is in
-```
+Section numbering is the Bright Blue badge everywhere, so a component never needs a
+per-section hue to look like it belongs.
 
 ### 3.5 Design tokens
 
@@ -267,7 +262,8 @@ the same file. Use tokens and both themes work for free.
 | `--amex-bg`, `--amex-panel`, `--amex-card` | Surfaces. |
 | `--amex-txt`, `--amex-txt-strong`, `--amex-mut` | Text, in three weights of emphasis. |
 | `--amex-line`, `--amex-line-strong` | Borders and rules. |
-| `--amex-cat-vision`, `--amex-cat-architecture`, `--amex-cat-design`, `--amex-cat-build`, `--amex-cat-testing`, `--amex-cat-deployment`, `--amex-cat-observability`, `--amex-cat-operations` | One hue per section of the site. |
+| `--amex-cat-vision`, `--amex-cat-architecture`, `--amex-cat-design`, `--amex-cat-onboarding`, `--amex-cat-build`, `--amex-cat-testing`, `--amex-cat-deployment`, `--amex-cat-observability`, `--amex-cat-operations` | One hue per section of the site. |
+| `--amex-worker-online`, `--amex-worker-offline` | The two Temporal clusters: anything Online is Bright Blue, anything Offline the deeper navy. |
 | `--amex-sh-sm`, `--amex-sh`, `--amex-glow` | Shadows. |
 | `--amex-font-sans`, `--amex-font-mono` | Type. |
 

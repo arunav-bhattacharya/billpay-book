@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Vision
 
-<Lead>American Express's platform for credit card **bill payments and refunds**. One core processes every payment the same way in every market, and absorbs the differences between markets, account types, and processing rules.</Lead>
+<Lead>American Express's platform for credit card **bill payments and refunds**. One core runs every payment the same way in every market. What differs between markets, account types and processing rules lives in configuration, so a new market is set up rather than built.</Lead>
 
 ## In this section
 
@@ -22,12 +22,12 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Product Vision',
       to: '/docs/vision/product',
-      desc: `What a payment can be, the markets and behaviors the platform absorbs, and what actually happens between a customer submitting a payment and the money settling.`,
+      desc: `What a payment can be, how a market describes the way it pays, and what happens between a customer pressing pay and the money settling.`,
     },
     {
       term: 'Engineering Vision',
       to: '/docs/vision/engineering',
-      desc: `The three parts the platform is built from, the principles behind them, and how a workflow is composed from stages and activities rather than branched per market.`,
+      desc: `The moving parts, the rules they follow, and how a market's release becomes the stages a workflow runs, without a line of market code.`,
     },
   ]}
 />

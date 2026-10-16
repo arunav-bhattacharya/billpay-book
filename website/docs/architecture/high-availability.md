@@ -1,6 +1,6 @@
 ---
 title: High Availability
-description: 'Billpay runs from two on-prem Hydra sites, IPC2 in the east and IPC1 in the west, against a self-hosted Temporal cluster in AWS us-east-1.'
+description: 'Billpay runs from two on-prem Hydra sites, IPC2 in the east and IPC1 in the west, against two self-hosted Temporal clusters in AWS us-east-1.'
 sidebar_label: High Availability
 ---
 
@@ -10,7 +10,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 # High Availability
 
-<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against a **self-hosted Temporal cluster** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: billpay-core, the write side of the database and Temporal each have a standby that does nothing until someone promotes it. And when billpay-core can't be reached, One-Data parks the request in **Redis** rather than turning the caller away, for **RTF** to replay later.</Lead>
+<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against **two self-hosted Temporal clusters** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: the Online and Offline apps, the write side of the database and each Temporal cluster have a standby that does nothing until someone promotes it. And when the core APIs can't be reached, One-Data parks the request in **Redis** rather than turning the caller away, for **RTF** to replay later.</Lead>
 
 ## Topology
 
@@ -19,45 +19,50 @@ import HADiagram from '@site/src/components/HADiagram';
 ## Front door
 
 - One-Data Functions run active in both sites, so losing a site doesn't close the front door.
-- Both of them call the same billpay-core, the one in IPC2. IPC1's One-Data routes across.
-- Each site also has a **Redis** store that sits empty most of the time. It's there for one case: billpay-core is unreachable.
-- When that happens, One-Data writes the request into Redis instead of failing the caller. **RTF** (the Reliable Transaction Framework) then picks it up from Redis and replays it into billpay-core once the core is healthy again.
+- Both of them call the same core APIs, the ones in IPC2's Online app. IPC1's One-Data routes across.
+- Each site also has a **Redis** store that sits empty most of the time. It's there for one case: the core APIs can't be reached.
+- When that happens, One-Data writes the request into Redis instead of failing the caller. **RTF** (the Reliable Transaction Framework) then picks it up from Redis and replays it into the core once the core is healthy again.
 - The two Redis instances are one active-active database (Redis calls this a CRDB), so a request parked on one site is visible from the other.
-- The trade is on purpose. The caller gets an answer now and the payment processes a little later. A core outage becomes a delay instead of a dropped payment.
+- The trade is on purpose. The caller gets an answer now and the payment processes a little later. An outage in the core becomes a delay instead of a dropped payment.
 
-## Core
+## The two apps
 
-- billpay-core is the REST APIs, the [Billpay Router](../design/routing.md), and the [Worker App](../deployment/deployables/worker-app.md) hosting both Temporal worker pools. An instance is deployed in each site, but only IPC2's takes traffic.
-- It reads and writes the Oracle primary next to it in IPC2, and it is the only component talking to the **Temporal** cluster in us-east-1.
-- The IPC1 instance is a standby. It stays deployed and ready, and an operator promotes it if IPC2 goes.
-- So there is one write path and one worker pool, which is also one place to look when a payment is stuck.
+billpay-core is two apps, one for each Temporal cluster.
+
+- The **Online app** runs the REST APIs, the [Billpay Router](../design/routing.md) and the Online cluster's workers. Its core APIs hold a Temporal client for each cluster, because an async start from Accounts Receivable or a return goes straight to Offline.
+- The **Offline app** runs the dispatchers, the outbox relays, the governor, the Offline cluster's workflows, and one worker deployment per downstream task queue, so each downstream system's workers scale on their own.
+- Each app is deployed in both sites, and only IPC2's take traffic. The IPC1 instances stay deployed and ready, and an operator promotes them if IPC2 goes.
+- Both apps read and write the Oracle primary next to them in IPC2, and they are the only components that talk to Temporal.
+- So each kind of work runs in exactly one place, which is also one place to look when a payment is stuck. Deployment detail is on the [apps' deployable page](../deployment/deployables/worker-app.md).
 
 ## Oracle
 
 - The payments schema is active-passive. The read/write primary is in IPC2, with two read-only replicas next to it carrying read and reporting traffic.
 - IPC1 holds the **Oracle Data Guard** standby plus one more read-only replica. Data Guard ships redo from the primary to it continuously, and the standby stays read-only until someone promotes it.
 - Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
+- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work, and the outbox and inbox.
+- Short outages and patching windows don't fail payments. `PaymentStore`, the only code that touches Oracle, keeps retrying and then waits on a durable timer, so a payment pauses and carries on when the database is back. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
 - This is the [same Oracle setup](../build/principles/tech-stack/database.md) the DBO team runs day to day.
 
 ## Temporal
 
-- **Temporal** is self-hosted on an **EKS** cluster in AWS us-east-1. The frontend, history, matching and worker services all run as pods there. This is the active cluster, and the only one taking traffic.
-- Frontend is the only service billpay-core talks to. Behind it, history, matching, worker and the rest reach each other over the cluster's pod-to-pod network.
-- Persistence is PostgreSQL: one writer with two read replicas. This is Temporal's own database, not Billpay's Oracle.
-- **us-west-1 holds a passive standby**, with its Postgres replicated from the east. It serves nothing in normal operation. Promoting it is a manual call, the same rule as the Oracle standby in IPC1: one write site at a time, no split brain.
-- Only IPC2's billpay-core talks to the cluster, over gRPC, to start workflows and poll for work. IPC1's core is wired the same way but carries nothing until it is promoted.
-- Workflow state lives in that Postgres, never in worker memory. Restart the workers and in-flight payments carry on from their event histories.
-- Cluster detail is on the [Temporal Server](../deployment/temporal-server.md) page.
+- **Temporal** is self-hosted on **EKS** in AWS us-east-1, as two separate clusters: Online, for journeys where a caller waits, and Offline, for work that can be paced. The frontend, history, matching and worker services of each run as pods there.
+- Each cluster has its own **Aurora PostgreSQL** database for its histories and its own **OpenSearch 2** store for visibility, the search behind the Temporal UI. Online runs 2,000 history shards and Offline 4,000, a number fixed when a cluster is created.
+- Nothing calls from one cluster to the other. A payment scheduled on Online reaches Offline through Oracle, so either cluster can go down while the other keeps working.
+- **us-west-1 holds a passive standby for each cluster**, with its database replicated from the east. Neither serves anything in normal operation. Each is promoted on its own, by hand, the same rule as the Oracle standby in IPC1: one write site at a time, no split brain.
+- Only IPC2's apps talk to the clusters, over gRPC: the Online app to both, the Offline app to Offline. IPC1's apps are wired the same way but carry nothing until they're promoted.
+- Workflow state lives in each cluster's database, never in worker memory. Restart the workers and in-flight payments carry on from their event histories.
+- Cluster settings are on the [Temporal Server](../deployment/temporal-server.md) page.
 
 ### Why AWS and not Hydra
 
-Temporal is the only part of the platform that does not run on Hydra. Its cluster sits in AWS instead, and the three reasons for that are all about the way Kubernetes runs in each place.
+Temporal is the only part of the platform that does not run on Hydra. Its clusters sit in AWS instead, and the three reasons for that are all about the way Kubernetes runs in each place.
 
 <Principles
   items={[
     {
       term: 'EKS across Availability Zones',
-      desc: `Temporal's services talk to each other constantly, so the cluster needs Kubernetes with pod-to-pod communication left alone. AWS lets us run one EKS cluster across several Availability Zones in a region.`,
+      desc: `Temporal's services talk to each other constantly, so a cluster needs Kubernetes with pod-to-pod communication left alone. AWS lets us run EKS across several Availability Zones in a region.`,
     },
     {
       term: 'Hydra Multi AZ EKS Bottleneck',
@@ -74,9 +79,13 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
 
 | What fails | What happens |
 | --- | --- |
-| **billpay-core in IPC2** | Both One-Data instances keep answering callers and park their requests in **Redis**. **RTF** picks them up from Redis and replays them into the core once it is back. Nothing is dropped, it just processes late. |
-| **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and parking in Redis until an operator promotes the billpay-core and the **Data Guard** standby there. |
-| **Oracle primary** | The standby in IPC1 is promoted. Until it is, reads still work off the read-only replicas, but nothing new can be written. |
-| **Temporal in us-east-1** | No workflow can start or advance until either the cluster returns or an operator promotes the us-west-1 standby and billpay-core reconnects to it. Either way nothing is lost: every history is in Postgres rather than in a worker, so workflows resume exactly where they stopped. This is the durability Temporal was [chosen for](./overview.md#why-temporal). |
+| **The Online app in IPC2** | Both One-Data instances keep answering callers and park their requests in **Redis**. **RTF** replays them into the core APIs once they're back, or once an operator promotes the IPC1 app. Nothing is dropped, it just processes late. |
+| **The Offline app in IPC2** | Dispatchers and relays stop, so dated work, notifications and events wait in Oracle. Nothing is lost. Work resumes when the app returns or its IPC1 standby is promoted. |
+| **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and parking in Redis until an operator promotes the apps and the **Data Guard** standby there. |
+| **Oracle primary** | `PaymentStore` waits out a short outage or a patch on its own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
+| **The Online cluster** | Journeys where a caller waits can't start until the cluster returns or an operator promotes its us-west-1 standby. The Offline cluster carries on, since nothing calls across. |
+| **The Offline cluster** | Dated work waits in Oracle, async starts get 503 with `Retry-After` and their senders retry, and relays pause, so notifications and events wait in the outbox. The Online cluster keeps serving. The fix is to restore the cluster or promote its standby. |
 
-Two rules hold this together. The front door stays open on both sites, and everything behind it runs in one place at a time. Moving that place is a call someone makes, not something that happens by itself.
+Either way, a Temporal outage loses nothing: every history is in the cluster's database rather than in a worker, so workflows resume exactly where they stopped. That is the durability Temporal was [chosen for](./overview.md#why-temporal).
+
+The front door stays open in both sites, and everything behind it runs in one place at a time. Moving that place is a call someone makes, and each cluster's standby is promoted on its own.

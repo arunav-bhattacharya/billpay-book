@@ -4,536 +4,401 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './styles.module.css';
 
 /**
- * HADiagram: the high-availability topology as two owned estates side by side.
- * Left, in Amex blue, the two on-prem Hydra sites. Right, in AWS orange, the
- * cloud, with everything Temporal inside a violet group of its own.
+ * HADiagram: where Billpay physically runs, and what stands behind what.
  *
- * Laid out wide rather than tall on purpose. The canvas scales to the column,
- * so a portrait canvas renders taller than the viewport and the reader has to
- * scroll a diagram whose whole point is to be seen at once. At roughly 16:9
- * it lands around half the viewport height in a normal doc column.
+ * Two estates side by side, on-prem on the left and AWS on the right, each cut
+ * into an east band (live) and a west band (standby). The west band mirrors
+ * the east one across the gap between them, so every replication link, Redis
+ * CRDB, Oracle Data Guard and each cluster's Aurora, crosses that gap
+ * vertically and the gap itself reads as the line between live and standby.
  *
- * Hand-authored SVG: the product marks carry their own brand colours and
- * everything else comes from the design tokens, so light and dark both render.
+ * Colour follows the Blue Box rules: tinted fields, filled boxes, no
+ * outlines, and the two cluster tones from the worker tokens, so anything
+ * Online is Bright Blue and anything Offline is the deeper navy, as in
+ * ClusterMap and WorkerChip. Every colour is a token; the only artwork is the
+ * Amex logo.
+ *
+ * Coordinates are hand-placed on a 1400 x 860 canvas. Lines run in lanes
+ * chosen so that only one crossing remains, the Offline app's gRPC run over
+ * the Data Guard line, and it hops rather than breaks.
  */
+
+const W = 1400;
+const H = 860;
+
+/* the west band is the east band mirrored about this line */
+const AXIS = 416;
+const m = (y) => 2 * AXIS - y;
 
 /* ---------------------------------------------------------------- icons -- */
 
-const ICON = {
-  user: (
-    <>
+function User({cx, cy}) {
+  const s = 26 / 24;
+  return (
+    <g transform={`translate(${cx - 13} ${cy - 13}) scale(${s})`} className={styles.icon}>
       <circle cx="12" cy="8" r="4.1" />
       <path d="M3.9 20.6a8.1 8.1 0 0 1 16.2 0" />
-    </>
-  ),
-  rack: (
-    <>
-      <rect x="3" y="4" width="18" height="6.4" rx="1.6" />
-      <rect x="3" y="13.6" width="18" height="6.4" rx="1.6" />
-      <circle cx="6.6" cy="7.2" r="1" />
-      <circle cx="6.6" cy="16.8" r="1" />
-      <path d="M10 7.2h7.4M10 16.8h7.4" />
-    </>
-  ),
-  gateway: (
-    <>
-      <path d="M12 2.6 20 6.3v6c0 4.9-3.4 7.9-8 9.1-4.6-1.2-8-4.2-8-9.1v-6z" />
-      <path d="M8.4 12h6.3M12.5 9.7 14.9 12l-2.4 2.3" />
-    </>
-  ),
-  cube: (
-    <>
-      <path d="M12 2.8 20.8 7.4v9.2L12 21.2 3.2 16.6V7.4z" />
-      <path d="M3.2 7.4 12 12l8.8-4.6M12 12v9.2" />
-    </>
-  ),
-};
-
-function Icon({name, x, y, size = 22, cls}) {
-  const s = size / 24;
-  /* The Temporal glyph is a filled brand path, not a stroked outline like the
-     rest, so it takes its own class and skips the ICON map. */
-  if (name === 'temporal') {
-    return (
-      <g transform={`translate(${x} ${y}) scale(${s})`} className={clsx(styles.iconFilled, cls)}>
-        <path d={TEMPORAL_PATH} />
-      </g>
-    );
-  }
-  return (
-    <g transform={`translate(${x} ${y}) scale(${s})`} className={clsx(styles.icon, cls)}>
-      {ICON[name]}
     </g>
   );
 }
 
-/* ---- product marks ------------------------------------------------------ */
-
-/* Amex: the real logo, the one already shipping as the site favicon. */
-function AmexMark({x, y, size = 34}) {
-  const src = useBaseUrl('/img/amex-logo.png');
-  return <image href={src} x={x} y={y} width={size} height={size} className={styles.amexMark} />;
-}
-
-/* AWS: the official mark, path data from the Amazon Web Services logo
-   (Wikimedia Commons, viewBox 304x182), vendored at static/img/aws-logo.svg.
-   Inlined rather than <image> so the wordmark can take a light fill in dark
-   mode: the shipped artwork is navy, which disappears on a dark panel. */
-const AWS_PATHS = [
-  {kind: 'word', d: 'M86.4,66.4c0,3.7,0.4,6.7,1.1,8.9c0.8,2.2,1.8,4.6,3.2,7.2c0.5,0.8,0.7,1.6,0.7,2.3c0,1-0.6,2-1.9,3l-6.3,4.2 c-0.9,0.6-1.8,0.9-2.6,0.9c-1,0-2-0.5-3-1.4C76.2,90,75,88.4,74,86.8c-1-1.7-2-3.6-3.1-5.9c-7.8,9.2-17.6,13.8-29.4,13.8 c-8.4,0-15.1-2.4-20-7.2c-4.9-4.8-7.4-11.2-7.4-19.2c0-8.5,3-15.4,9.1-20.6c6.1-5.2,14.2-7.8,24.5-7.8c3.4,0,6.9,0.3,10.6,0.8 c3.7,0.5,7.5,1.3,11.5,2.2v-7.3c0-7.6-1.6-12.9-4.7-16c-3.2-3.1-8.6-4.6-16.3-4.6c-3.5,0-7.1,0.4-10.8,1.3c-3.7,0.9-7.3,2-10.8,3.4 c-1.6,0.7-2.8,1.1-3.5,1.3c-0.7,0.2-1.2,0.3-1.6,0.3c-1.4,0-2.1-1-2.1-3.1v-4.9c0-1.6,0.2-2.8,0.7-3.5c0.5-0.7,1.4-1.4,2.8-2.1 c3.5-1.8,7.7-3.3,12.6-4.5c4.9-1.3,10.1-1.9,15.6-1.9c11.9,0,20.6,2.7,26.2,8.1c5.5,5.4,8.3,13.6,8.3,24.6V66.4z M45.8,81.6 c3.3,0,6.7-0.6,10.3-1.8c3.6-1.2,6.8-3.4,9.5-6.4c1.6-1.9,2.8-4,3.4-6.4c0.6-2.4,1-5.3,1-8.7v-4.2c-2.9-0.7-6-1.3-9.2-1.7 c-3.2-0.4-6.3-0.6-9.4-0.6c-6.7,0-11.6,1.3-14.9,4c-3.3,2.7-4.9,6.5-4.9,11.5c0,4.7,1.2,8.2,3.7,10.6 C37.7,80.4,41.2,81.6,45.8,81.6z M126.1,92.4c-1.8,0-3-0.3-3.8-1c-0.8-0.6-1.5-2-2.1-3.9L96.7,10.2c-0.6-2-0.9-3.3-0.9-4 c0-1.6,0.8-2.5,2.4-2.5h9.8c1.9,0,3.2,0.3,3.9,1c0.8,0.6,1.4,2,2,3.9l16.8,66.2l15.6-66.2c0.5-2,1.1-3.3,1.9-3.9c0.8-0.6,2.2-1,4-1 h8c1.9,0,3.2,0.3,4,1c0.8,0.6,1.5,2,1.9,3.9l15.8,67l17.3-67c0.6-2,1.3-3.3,2-3.9c0.8-0.6,2.1-1,3.9-1h9.3c1.6,0,2.5,0.8,2.5,2.5 c0,0.5-0.1,1-0.2,1.6c-0.1,0.6-0.3,1.4-0.7,2.5l-24.1,77.3c-0.6,2-1.3,3.3-2.1,3.9c-0.8,0.6-2.1,1-3.8,1h-8.6c-1.9,0-3.2-0.3-4-1 c-0.8-0.7-1.5-2-1.9-4L156,23l-15.4,64.4c-0.5,2-1.1,3.3-1.9,4c-0.8,0.7-2.2,1-4,1H126.1z M254.6,95.1c-5.2,0-10.4-0.6-15.4-1.8 c-5-1.2-8.9-2.5-11.5-4c-1.6-0.9-2.7-1.9-3.1-2.8c-0.4-0.9-0.6-1.9-0.6-2.8v-5.1c0-2.1,0.8-3.1,2.3-3.1c0.6,0,1.2,0.1,1.8,0.3 c0.6,0.2,1.5,0.6,2.5,1c3.4,1.5,7.1,2.7,11,3.5c4,0.8,7.9,1.2,11.9,1.2c6.3,0,11.2-1.1,14.6-3.3c3.4-2.2,5.2-5.4,5.2-9.5 c0-2.8-0.9-5.1-2.7-7c-1.8-1.9-5.2-3.6-10.1-5.2L246,52c-7.3-2.3-12.7-5.7-16-10.2c-3.3-4.4-5-9.3-5-14.5c0-4.2,0.9-7.9,2.7-11.1 c1.8-3.2,4.2-6,7.2-8.2c3-2.3,6.4-4,10.4-5.2c4-1.2,8.2-1.7,12.6-1.7c2.2,0,4.5,0.1,6.7,0.4c2.3,0.3,4.4,0.7,6.5,1.1 c2,0.5,3.9,1,5.7,1.6c1.8,0.6,3.2,1.2,4.2,1.8c1.4,0.8,2.4,1.6,3,2.5c0.6,0.8,0.9,1.9,0.9,3.3v4.7c0,2.1-0.8,3.2-2.3,3.2 c-0.8,0-2.1-0.4-3.8-1.2c-5.7-2.6-12.1-3.9-19.2-3.9c-5.7,0-10.2,0.9-13.3,2.8c-3.1,1.9-4.7,4.8-4.7,8.9c0,2.8,1,5.2,3,7.1 c2,1.9,5.7,3.8,11,5.5l14.2,4.5c7.2,2.3,12.4,5.5,15.5,9.6c3.1,4.1,4.6,8.8,4.6,14c0,4.3-0.9,8.2-2.6,11.6 c-1.8,3.4-4.2,6.4-7.3,8.8c-3.1,2.5-6.8,4.3-11.1,5.6C264.4,94.4,259.7,95.1,254.6,95.1z'},
-  {kind: 'smile', d: 'M273.5,143.7c-32.9,24.3-80.7,37.2-121.8,37.2c-57.6,0-109.5-21.3-148.7-56.7c-3.1-2.8-0.3-6.6,3.4-4.4 c42.4,24.6,94.7,39.5,148.8,39.5c36.5,0,76.6-7.6,113.5-23.2C274.2,133.6,278.9,139.7,273.5,143.7z'},
-  {kind: 'smile', d: 'M287.2,128.1c-4.2-5.4-27.8-2.6-38.5-1.3c-3.2,0.4-3.7-2.4-0.8-4.5c18.8-13.2,49.7-9.4,53.3-5 c3.6,4.5-1,35.4-18.6,50.2c-2.7,2.3-5.3,1.1-4.1-1.9C282.5,155.7,291.4,133.4,287.2,128.1z'},
-];
-
-function AwsMark({x, y, w = 44}) {
-  const h = (w * 182) / 304;
-  return (
-    <svg x={x} y={y} width={w} height={h} viewBox="0 0 304 182" overflow="visible">
-      {AWS_PATHS.map((p) => (
-        <path
-          key={p.d.slice(0, 24)}
-          d={p.d}
-          className={p.kind === 'word' ? styles.awsWord : styles.awsSmile}
-          fillRule={p.kind === 'smile' ? 'evenodd' : undefined}
-        />
-      ))}
-    </svg>
-  );
-}
-
-/* Temporal: the official mark, path data from Temporal's own
-   temporal-no-text.svg (24x24), vendored at static/img/temporal-logo.svg.
-   Inlined rather than <image> so it can take the brand violet in light mode
-   and a lifted violet in dark, and so the service cards can tint it. */
 const TEMPORAL_PATH =
   'M16.206 7.794C15.64 3.546 14.204 0 12 0 9.796 0 8.361 3.546 7.794 7.794 3.546 8.36 0 9.796 0 12c0 2.204 3.546 3.639 7.794 4.206C8.36 20.453 9.796 24 12 24c2.204 0 3.639-3.546 4.206-7.794C20.454 15.64 24 14.204 24 12c0-2.204-3.547-3.64-7.794-4.206Zm-8.55 7.174c-4.069-.587-6.44-1.932-6.44-2.969 0-1.036 2.372-2.381 6.44-2.969-.09.98-.137 1.98-.137 2.97 0 .99.047 1.99.137 2.968zM12 1.215c1.036 0 2.381 2.372 2.969 6.44a32.718 32.718 0 0 0-5.938 0c.587-4.068 1.932-6.44 2.969-6.44Zm4.344 13.753c-.2.03-1.022.126-1.23.146-.02.209-.117 1.03-.145 1.23-.588 4.068-1.933 6.44-2.97 6.44-1.036 0-2.38-2.372-2.968-6.44-.03-.2-.126-1.022-.147-1.23a31.833 31.833 0 0 1 0-6.23 31.813 31.813 0 0 1 7.46.146c4.068.587 6.442 1.933 6.442 2.969-.001 1.036-2.374 2.382-6.442 2.97z';
 
-function TemporalMark({cx, cy, size = 28}) {
-  const s = size / 24;
+function TemporalMark({x, y, size = 18}) {
   return (
-    <g transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}>
-      <path d={TEMPORAL_PATH} className={styles.temporalMark} />
+    <g transform={`translate(${x} ${y}) scale(${size / 24})`} className={styles.temporalMark}>
+      <path d={TEMPORAL_PATH} />
     </g>
   );
 }
 
-/* Redis: the stack of discs. */
-function RedisMark({cx, cy, w = 58}) {
-  const rx = w / 2;
-  const ry = rx * 0.38;
-  const gap = ry * 1.35;
-  return (
-    <g>
-      {[1, 0, -1].map((k) => (
-        <g key={k}>
-          <ellipse cx={cx} cy={cy + k * gap} rx={rx} ry={ry} fill="url(#ha-g-redis)" />
-          <ellipse cx={cx} cy={cy + k * gap} rx={rx} ry={ry} className={styles.discEdge} />
-        </g>
-      ))}
-      <ellipse cx={cx} cy={cy - gap} rx={rx * 0.52} ry={ry * 0.42} className={styles.discGloss} />
-    </g>
-  );
-}
-
-/* Kubernetes: the blue heptagon with the ship's helm inside. Seven spokes off
-   a hub, a ring around them, and seven handle pegs poking out past the ring,
-   each peg lined up with a spoke. Generated round the circle rather than
-   hand-listed, so the sevenfold symmetry is exact. */
-function K8sMark({cx, cy, size = 34}) {
-  const s = size / 24;
-  const pts = '12,2.6 19.5,6.2 21.36,14.3 16.16,20.8 7.84,20.8 2.64,14.3 4.5,6.2';
-  const wheel = {x: 12, y: 12.4};
-  const arms = Array.from({length: 7}, (_, i) => {
-    const a = ((-90 + i * (360 / 7)) * Math.PI) / 180;
-    const at = (r) => `${(wheel.x + r * Math.cos(a)).toFixed(2)},${(wheel.y + r * Math.sin(a)).toFixed(2)}`;
-    return {spoke: `M${at(1.7)} L${at(5.5)}`, peg: `M${at(6.1)} L${at(7.5)}`};
-  });
-  return (
-    <g transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${s})`}>
-      <polygon points={pts} className={styles.k8sBody} />
-      <circle cx={wheel.x} cy={wheel.y} r="5.9" className={styles.k8sRing} />
-      {arms.map((a) => (
-        <path key={a.spoke} d={a.spoke} className={styles.k8sSpoke} />
-      ))}
-      {arms.map((a) => (
-        <path key={a.peg} d={a.peg} className={styles.k8sPeg} />
-      ))}
-      <circle cx={wheel.x} cy={wheel.y} r="1.55" className={styles.k8sHub} />
-    </g>
-  );
-}
-
-/* A database drum. No boxes for data, since the shape does the labelling. */
-function Drum({cx, cy, rx = 34, h = 44, grad, dim, glossCls}) {
-  const ry = rx * 0.35;
-  const top = cy - h / 2;
-  const bot = cy + h / 2;
-  return (
-    <g className={clsx(styles.drum, dim && styles.dim)}>
-      <path
-        d={`M${cx - rx},${top} L${cx - rx},${bot} A${rx},${ry} 0 0 0 ${cx + rx},${bot} L${cx + rx},${top} Z`}
-        fill={`url(#${grad})`}
-      />
-      <ellipse cx={cx} cy={bot} rx={rx} ry={ry} fill={`url(#${grad})`} />
-      <ellipse cx={cx} cy={top} rx={rx} ry={ry} className={clsx(styles.drumTop, glossCls)} />
-      <ellipse cx={cx} cy={top + h * 0.34} rx={rx} ry={ry} className={styles.drumBand} />
-      <ellipse cx={cx} cy={top + h * 0.67} rx={rx} ry={ry} className={styles.drumBand} />
-      <path
-        d={`M${cx - rx},${top} L${cx - rx},${bot} A${rx},${ry} 0 0 0 ${cx + rx},${bot} L${cx + rx},${top}`}
-        className={styles.drumEdge}
-      />
-    </g>
-  );
+function AmexMark({x, y, size}) {
+  const src = useBaseUrl('/img/amex-logo.png');
+  return <image href={src} x={x} y={y} width={size} height={size} />;
 }
 
 /* ---------------------------------------------------------------- parts -- */
 
-function Pill({x, y, label, tone, anchor = 'middle', wf = 7.5}) {
-  const w = label.length * wf + 18;
-  const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+/* A label in a small box: the Blue Box badge, stretched to fit a word. */
+function Pill({x, y, label, tone, anchor = 'middle'}) {
+  const w = label.length * 7.6 + 16;
+  const left = anchor === 'end' ? x - w : anchor === 'start' ? x : x - w / 2;
   return (
     <g className={clsx(styles.pill, styles[tone])}>
-      <rect x={left} y={y - 11} width={w} height={22} rx={11} />
-      <text x={left + w / 2} y={y + 4} textAnchor="middle">
+      <rect x={left} y={y - 10} width={w} height={20} rx={4} />
+      <text x={left + w / 2} y={y + 4.5} textAnchor="middle">
         {label}
       </text>
     </g>
   );
 }
 
-/* An opaque chip that sits on top of a connector so the label never collides. */
-function Chip({x, y, label, tone = 'chipTray'}) {
-  const w = label.length * 7.8 + 24;
+/* An opaque label laid on a connector, so the line never runs through text. */
+function Chip({x, y, label, tone}) {
+  const w = label.length * 7.4 + 22;
   return (
     <g className={clsx(styles.chip, styles[tone])}>
       <rect x={x - w / 2} y={y - 12} width={w} height={24} rx={12} />
-      <text x={x} y={y + 4} textAnchor="middle">
+      <text x={x} y={y + 4.5} textAnchor="middle">
         {label}
       </text>
     </g>
   );
 }
 
-/* A service box, drawn as a small stack so "more than one instance" reads.
-   The badge rides above the box by default; `badgeAt="bottom"` drops it under
-   the box, for rows where something already sits in the space above. */
-function Service({x, y, w = 180, h = 64, tint, icon, title, sub, badge, badgeTone, badgeAt = 'top', dim}) {
+/* A filled box with a solid block down its left edge in the box's tone. The
+   block is a half-rounded shape exactly as wide as the corner radius, so it
+   follows the box's corners without a clip path. */
+const R = 9;
+function Box({x, y, w, h, tone, title, sub, dim, mark}) {
+  const block = `M${x + R},${y} A${R},${R} 0 0 0 ${x},${y + R} V${y + h - R} A${R},${R} 0 0 0 ${x + R},${y + h} Z`;
+  const tx = mark ? x + 44 : x + 22;
   return (
-    <g className={clsx(styles.svc, styles[tint], dim && styles.dim)}>
-      <rect x={x + 8} y={y - 8} width={w} height={h} rx={13} className={styles.svcGhost} />
-      <rect x={x + 4} y={y - 4} width={w} height={h} rx={13} className={styles.svcGhost2} />
-      <rect x={x} y={y} width={w} height={h} rx={13} className={styles.svcBody} />
-      <rect x={x + 1} y={y + 1} width={w - 2} height={h / 2} rx={12} className={styles.svcGloss} />
-      <Icon name={icon} x={x + 12} y={y + h / 2 - 11} size={22} cls={styles.svcIcon} />
-      <text x={x + 42} y={y + (sub ? 27 : h / 2 + 5)} className={styles.svcTitle}>
+    <g className={clsx(styles.box, styles[tone], dim && styles.dim)}>
+      <rect x={x} y={y} width={w} height={h} rx={R} className={styles.boxBody} />
+      <path d={block} className={styles.boxBlock} />
+      {mark && <TemporalMark x={x + 18} y={y + h / 2 - 20} />}
+      <text x={tx} y={y + (sub ? h / 2 - 3 : h / 2 + 6)} className={styles.boxTitle}>
         {title}
       </text>
       {sub && (
-        <text x={x + 42} y={y + 46} className={styles.svcSub}>
+        <text x={tx} y={y + h / 2 + 17} className={styles.boxSub}>
           {sub}
         </text>
       )}
-      {badge && (
-        <Pill
-          x={x + w - 6}
-          y={badgeAt === 'bottom' ? y + h + 12 : y - 12}
-          label={badge}
-          tone={badgeTone}
-          anchor="end"
-        />
-      )}
     </g>
   );
 }
 
-/* A site or region inside one of the owner groups. */
-function Region({x, y, w, h, cls, label, icon}) {
+/* A database drum, flat-filled: body, a lighter lid, two cut lines. */
+function Drum({cx, cy, rx, h, tone, dim}) {
+  const ry = rx * 0.34;
+  const top = cy - h / 2;
+  const bot = cy + h / 2;
   return (
-    <g>
-      <rect x={x} y={y} width={w} height={h} rx={16} className={cls} />
-      {icon}
-      <text x={x + (icon ? 40 : 20)} y={y + 26} className={styles.regionLabel}>
-        {label}
-      </text>
+    <g className={clsx(styles.drum, styles[tone], dim && styles.dim)}>
+      <path
+        d={`M${cx - rx},${top} V${bot} A${rx},${ry} 0 0 0 ${cx + rx},${bot} V${top} Z`}
+        className={styles.drumBody}
+      />
+      <ellipse cx={cx} cy={top} rx={rx} ry={ry} className={styles.drumLid} />
+      <path d={`M${cx - rx},${top + h * 0.36} A${rx},${ry} 0 0 0 ${cx + rx},${top + h * 0.36}`} className={styles.drumCut} />
+      <path d={`M${cx - rx},${top + h * 0.7} A${rx},${ry} 0 0 0 ${cx + rx},${top + h * 0.7}`} className={styles.drumCut} />
     </g>
   );
 }
 
-/* ------------------------------------------------------------- diagram --- */
+/* Redis: three stacked discs in Light Blue. */
+function Redis({cx, cy}) {
+  const rx = 20;
+  const ry = 7;
+  return (
+    <g className={styles.redis}>
+      {[1, 0, -1].map((k) => (
+        <ellipse key={k} cx={cx} cy={cy + k * 9.5} rx={rx} ry={ry} />
+      ))}
+    </g>
+  );
+}
+
+function Label({x, y, children, cls = 'markLabel', anchor = 'middle'}) {
+  return (
+    <text x={x} y={y} textAnchor={anchor} className={styles[cls]}>
+      {children}
+    </text>
+  );
+}
+
+/* ------------------------------------------------------------- layout --- */
+
+/* estates and bands */
+const PREM = {x: 16, y: 16, w: 920, h: 756};
+const AWS = {x: 956, y: 16, w: 428, h: 756};
+const BAND_H = 320;
+const EAST_Y = 76;
+const WEST_Y = m(EAST_Y + BAND_H); /* 436 */
+
+/* the on-prem columns */
+const CALLER_X = 54;
+const OD = {x: 96, w: 166, h: 64}; /* One-Data */
+const REDIS_X = 179;
+const CROSS_X = 318; /* the cross-site riser */
+const GROUP = {x: 330, w: 290, h: 212};
+const APP = {x: 342, w: 266, h: 66};
+const BUS_X = 634; /* apps to Oracle */
+const GUARD_X = 660; /* Data Guard */
+const ORA = {cx: 714, rx: 30, h: 40};
+const REP = [808, 864];
+
+/* the AWS column */
+const CL = {x: 984, w: 300, h: 70};
+const LANE_ON = 946; /* the Online app's gRPC, in the gutter */
+const LANE_OFF = 962; /* the Offline app's gRPC */
+const REPL_IN = 1300; /* Offline cluster replication, inner lane */
+const REPL_OUT = 1318; /* Online cluster replication, outer lane */
+
+/* east rows */
+const ROW = 181; /* caller, One-Data, Online app, Online cluster */
+const OFF_APP_Y = 240;
+const ORA_Y = 227;
+const OFF_CL_Y = 270;
+
+const LABEL =
+  'High-availability topology, two estates side by side. Left, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: a caller reaches the One-Data gateway, active, which calls the core APIs in the Online app. The Online app and the Offline app sit together as billpay-core, active, and both read and write the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis fallback store: One-Data parks a request there when the core APIs cannot be reached, and RTF replays it later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to the Online app in IPC2, its billpay-core apps are standbys, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. Right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with its own Aurora database and OpenSearch 2 visibility. Over gRPC, the Online app talks to both clusters and the Offline app to the Offline cluster. us-west-1 holds a passive standby of each cluster, its database replicated from the east, each promoted on its own.';
 
 export default function HADiagram() {
+  const eastOD = {x: OD.x, y: ROW - OD.h / 2};
+  const westOD = {x: OD.x, y: m(ROW) - OD.h / 2};
+  const eastGroupY = 110;
+  const westGroupY = 500;
+  const onApp = {y: ROW - APP.h / 2};
+  const offApp = {y: OFF_APP_Y};
+  const westOnApp = {y: westGroupY + 38};
+  const westOffApp = {y: westGroupY + 130};
+  const onCl = {y: ROW - CL.h / 2};
+  const offCl = {y: OFF_CL_Y};
+  const westOffCl = {y: m(OFF_CL_Y + CL.h)};
+  const westOnCl = {y: m(ROW + CL.h / 2)};
+  const appMidX = APP.x + APP.w / 2;
+  const westOra = m(ORA_Y); /* 605 */
+
   return (
     <div className={styles.wrap}>
-      <svg
-        viewBox="0 0 1640 880"
-        className={styles.svg}
-        role="img"
-        aria-label="High-availability topology, two estates side by side. Left, in Amex blue, the on-prem sites: US East IPC2 is the write site, with a caller reaching the One-Data gateway, then the active billpay-core, then the read-write Oracle primary and two read-only replicas, and a Redis fallback store above One-Data that One-Data parks requests in and RTF replays into the core. US West IPC1 is laid out the same way, but its billpay-core is a standby, so its One-Data routes across to the IPC2 core instead; it also holds the Data Guard Oracle standby and one read-only replica. The two Redis stores replicate active-active over CRDB. billpay-core reaches the cloud over gRPC, running east and then straight into the cluster at the row of the Temporal Frontend service, the only Temporal service a client talks to. Right, in AWS orange, the AWS estate: us-east-1 is the active region, holding a violet EKS cluster. Frontend sits at the top of that cluster as the only service a client talks to, and it shares one pod-to-pod bus with History, Matching, Worker and the cluster's remaining services, so any of them can call any other. All of them persist to a PostgreSQL writer with two read replicas outside the cluster; us-west-1 below it is a passive standby whose PostgreSQL is replicated from the east and promoted by hand."
-      >
+      <svg viewBox={`0 0 ${W} ${H}`} className={styles.svg} role="img" aria-label={LABEL}>
         <defs>
-          <linearGradient id="ha-g-oracle" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" className={styles.oraA} />
-            <stop offset="1" className={styles.oraB} />
-          </linearGradient>
-          <linearGradient id="ha-g-oracle-dim" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" className={styles.oraDimA} />
-            <stop offset="1" className={styles.oraDimB} />
-          </linearGradient>
-          <linearGradient id="ha-g-pg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" className={styles.pgA} />
-            <stop offset="1" className={styles.pgB} />
-          </linearGradient>
-          <linearGradient id="ha-g-redis" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" className={styles.redA} />
-            <stop offset="1" className={styles.redB} />
-          </linearGradient>
-          <marker id="ha-m-req" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.6" markerHeight="6.6" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" className={styles.mReq} />
-          </marker>
-          <marker id="ha-m-buf" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.6" markerHeight="6.6" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" className={styles.mBuf} />
-          </marker>
-          <marker id="ha-m-rep" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" className={styles.mRep} />
-          </marker>
-          {/* the pod-to-pod links run in 22-unit gaps, so they need a head
-              small enough to leave some line showing between two of them */}
-          <marker id="ha-m-pod" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" className={styles.mPod} />
-          </marker>
-          <marker id="ha-m-idle" viewBox="0 0 10 10" refX="8.4" refY="5" markerWidth="6.6" markerHeight="6.6" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 z" className={styles.mIdle} />
-          </marker>
+          {['req', 'buf', 'rep', 'idle'].map((k) => (
+            <marker
+              key={k}
+              id={`had-${k}`}
+              viewBox="0 0 10 10"
+              refX="8.6"
+              refY="5"
+              markerWidth="6.4"
+              markerHeight="6.4"
+              orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" className={styles[`head_${k}`]} />
+            </marker>
+          ))}
         </defs>
 
-        {/* ================= the Amex estate ================= */}
+        {/* ======================= estates and bands ======================= */}
+        <rect x={PREM.x} y={PREM.y} width={PREM.w} height={PREM.h} rx={18} className={styles.estatePrem} />
+        <AmexMark x={34} y={30} size={30} />
+        <Label x={76} y={44} cls="estateLabel" anchor="start">AMERICAN EXPRESS</Label>
+        <Label x={76} y={61} cls="estateNote" anchor="start">on-prem Hydra</Label>
 
-        <rect x={28} y={52} width={1012} height={712} rx={22} className={styles.groupAmex} />
-        <AmexMark x={48} y={66} size={32} />
-        <text x={92} y={82} className={styles.groupLabel}>AMERICAN EXPRESS</text>
-        <text x={92} y={99} className={styles.groupNote}>on-prem</text>
+        <rect x={AWS.x} y={AWS.y} width={AWS.w} height={AWS.h} rx={18} className={styles.estateAws} />
+        <Label x={974} y={44} cls="estateLabel" anchor="start">AWS</Label>
+        <Label x={974} y={61} cls="estateNote" anchor="start">self-hosted Temporal</Label>
 
-        <Region
-          x={46}
-          y={118}
-          w={976}
-          h={296}
-          cls={styles.regionPrem}
-          label="US EAST · IPC2"
-          icon={<Icon name="rack" x={62} y={128} size={20} cls={styles.siteIcon} />}
-        />
-        <Region
-          x={46}
-          y={452}
-          w={976}
-          h={296}
-          cls={styles.regionPrem}
-          label="US WEST · IPC1"
-          icon={<Icon name="rack" x={62} y={462} size={20} cls={styles.siteIcon} />}
-        />
+        <rect x={30} y={EAST_Y} width={892} height={BAND_H} rx={13} className={styles.band} />
+        <rect x={30} y={WEST_Y} width={892} height={BAND_H} rx={13} className={styles.band} />
+        <rect x={970} y={EAST_Y} width={400} height={BAND_H} rx={13} className={styles.band} />
+        <rect x={970} y={WEST_Y} width={400} height={BAND_H} rx={13} className={styles.band} />
+        <Label x={48} y={101} cls="bandLabel" anchor="start">US EAST · IPC2</Label>
+        <Label x={48} y={WEST_Y + 25} cls="bandLabel" anchor="start">US WEST · IPC1</Label>
+        <Label x={988} y={101} cls="bandLabel" anchor="start">US-EAST-1 · EKS</Label>
+        <Label x={988} y={WEST_Y + 25} cls="bandLabel" anchor="start">US-WEST-1</Label>
+        {/* each region's state rides beside its name, clear of the
+            replication lanes that run down the right-hand side */}
+        <Pill x={1140} y={96} label="ACTIVE" tone="pActive" anchor="start" />
+        <Pill x={1086} y={WEST_Y + 20} label="STANDBY" tone="pStandby" anchor="start" />
 
-        {/* ---- east site ---- */}
-        <Icon name="user" x={79} y={236} size={26} cls={styles.userIcon} />
-        <text x={92} y={284} textAnchor="middle" className={styles.userLabel}>caller</text>
-        <text x={92} y={297} textAnchor="middle" className={styles.userLabel}>near IPC2</text>
-        <path d="M112,250 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service x={210} y={218} tint="tGw" icon="gateway" title="One-Data" sub="API gateway" badge="ACTIVE" badgeTone="pOk" />
+        {/* ============================ lines ============================ */}
+        {/* drawn first, so every box and label sits on top of them */}
 
-        <path d="M300,282 V330" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={314} y={310} className={styles.bufLabel}>park · RTF replay</text>
-        <RedisMark cx={300} cy={362} w={46} />
-        <text x={334} y={358} className={styles.markLabel}>Redis</text>
-        <text x={334} y={373} className={styles.markSub}>fallback store</text>
-
-        <path d="M390,250 H470" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service x={474} y={218} w={200} tint="tCore" icon="cube" title="billpay-core" sub="APIs · Router · Workers" badge="ACTIVE" badgeTone="pOk" />
-
-        <path d="M682,240 H716" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Drum cx={752} cy={250} rx={30} h={38} grad="ha-g-oracle" />
-        <text x={752} y={296} textAnchor="middle" className={styles.markLabel}>Oracle</text>
-        <text x={752} y={312} textAnchor="middle" className={styles.markSub}>read + write</text>
-        <Pill x={752} y={332} label="PRIMARY" tone="pPrimary" />
-        <path d="M782,246 H852" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={880} cy={252} rx={20} h={26} grad="ha-g-oracle" />
-        <Drum cx={946} cy={252} rx={20} h={26} grad="ha-g-oracle" />
-        <text x={913} y={300} textAnchor="middle" className={styles.markSub}>read-only × 2</text>
-
-        {/* ---- west site ---- */}
-        <Icon name="user" x={79} y={602} size={26} cls={styles.userIcon} />
-        <text x={92} y={650} textAnchor="middle" className={styles.userLabel}>caller</text>
-        <text x={92} y={663} textAnchor="middle" className={styles.userLabel}>near IPC1</text>
-        <path d="M112,616 H204" className={styles.req} markerEnd="url(#ha-m-req)" />
-        <Service
-          x={210}
-          y={584}
-          tint="tGw"
-          icon="gateway"
-          title="One-Data"
-          sub="API gateway"
-          badge="ACTIVE"
-          badgeTone="pOk"
-          badgeAt="bottom"
-        />
-
-        <path d="M300,580 V550" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <text x={314} y={556} className={styles.bufLabel}>park · RTF replay</text>
-        <RedisMark cx={300} cy={526} w={46} />
-        <text x={334} y={522} className={styles.markLabel}>Redis</text>
-        <text x={334} y={537} className={styles.markSub}>fallback store</text>
-
-        {/* the two Redis stores are one active-active database */}
-        <path d="M300,382 V500" className={styles.buf} markerEnd="url(#ha-m-buf)" markerStart="url(#ha-m-buf)" />
-        <Chip x={300} y={441} label="CRDB · active-active" tone="chipBuf" />
-
-        {/* IPC1's core is a standby, so IPC1's One-Data crosses to IPC2's.
-            The riser sits at x=440: clear of One-Data's shadow at 398, clear
-            of both "fallback store" captions at 419, clear of the core at 474.
-            It turns at y=330 rather than 310 so the run east does not sit on
-            the same line as the "park · RTF replay" caption, then rises into the
-            core's underside at 520. The head stops at 287, five short of the
-            box at 282, which is the gap every other request arrow leaves. */}
-        <path d="M390,616 H440 V330 H520 V287" className={styles.req} markerEnd="url(#ha-m-req)" />
-        {/* on the long straight stretch of the riser, not over a corner */}
-        <Chip x={440} y={490} label="cross-site" tone="chipReq" />
-
-        <Service
-          x={474}
-          y={584}
-          w={200}
-          tint="tCore"
-          icon="cube"
-          title="billpay-core"
-          sub="APIs · Router · Workers"
-          badge="STANDBY"
-          badgeTone="pStandby"
-          badgeAt="bottom"
-          dim
-        />
-
-        {/* wired, but carrying nothing until the standby is promoted */}
-        <path d="M682,606 H716" className={styles.reqIdle} markerEnd="url(#ha-m-idle)" />
-        <Drum cx={752} cy={616} rx={30} h={38} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
-        <text x={752} y={662} textAnchor="middle" className={styles.markLabel}>Oracle</text>
-        <text x={752} y={678} textAnchor="middle" className={styles.markSub}>read only</text>
-        <Pill x={752} y={698} label="STANDBY" tone="pStandby" />
-        <path d="M782,612 H852" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={880} cy={618} rx={20} h={26} grad="ha-g-oracle-dim" glossCls={styles.drumTopDim} />
-        <text x={880} y={666} textAnchor="middle" className={styles.markSub}>read-only</text>
-
-        {/* Data Guard runs down the left of the Oracle column, at x=700: the
-            drums start at 722, so this is the clear lane between them and
-            billpay-core. The gRPC bus hops over it in the gap. */}
-        <path d="M722,258 H700 V608 H716" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Chip x={700} y={506} label="Data Guard" tone="chipRep" />
-
-        {/* ================= the gRPC bus out to the cloud ================= */}
-
-        <path d="M574,282 V433" className={styles.req} />
-        <path d="M574,584 V433" className={styles.reqIdle} />
-        <circle cx={574} cy={433} r={4} className={styles.junction} />
-        {/* one continuous run, hopping the Data Guard line at x=700 rather than
-            breaking for it: a gap in a request path reads as a gap in the path.
-            It runs east through the lane between the two sites, rises in the
-            gutter between the two estates at x=1050, and comes in flat at
-            Frontend's row. The head stops at the cluster edge rather than
-            pushing on to the box, since the pod-to-pod bus owns the strip
-            between the two. */}
+        {/* east: caller to One-Data to the Online app */}
+        <path d={`M${CALLER_X + 18},${ROW} H${OD.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
+        <path d={`M${OD.x + OD.w},${ROW} H${APP.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
+        {/* west: caller to One-Data, then across to IPC2's Online app */}
+        <path d={`M${CALLER_X + 18},${m(ROW)} H${OD.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
         <path
-          d="M574,433 H686 Q700,412 714,433 H1050 V245 H1117"
+          d={`M${OD.x + OD.w},${m(ROW)} H${CROSS_X} V${ROW + 15} H${APP.x - 4}`}
           className={styles.req}
-          markerEnd="url(#ha-m-req)"
+          markerEnd="url(#had-req)"
         />
-        <Chip x={880} y={433} label="gRPC to Frontend" tone="chipReq" />
 
-        {/* ================= the AWS estate ================= */}
+        {/* One-Data parks in Redis; RTF replays */}
+        <path d={`M${REDIS_X},${eastOD.y + OD.h + 2} V${ROW + 64}`} className={styles.buf} markerStart="url(#had-buf)" markerEnd="url(#had-buf)" />
+        <path d={`M${REDIS_X},${westOD.y - 2} V${m(ROW + 64)}`} className={styles.buf} markerStart="url(#had-buf)" markerEnd="url(#had-buf)" />
+        {/* the two Redis stores are one active-active database */}
+        <path d={`M${REDIS_X},${ROW + 114} V${m(ROW + 114)}`} className={styles.buf} markerStart="url(#had-buf)" markerEnd="url(#had-buf)" />
 
-        <rect x={1076} y={52} width={536} height={712} rx={22} className={styles.groupAws} />
-        <AwsMark x={1096} y={66} w={56} />
+        {/* apps to Oracle: one bus off both apps */}
+        <path d={`M${APP.x + APP.w},${ROW} H${BUS_X} M${APP.x + APP.w},${OFF_APP_Y + APP.h / 2} H${BUS_X} M${BUS_X},${ROW} V${OFF_APP_Y + APP.h / 2}`} className={styles.req} />
+        <path d={`M${BUS_X},${ORA_Y} H${ORA.cx - ORA.rx - 4}`} className={styles.req} markerEnd="url(#had-req)" />
+        {/* the IPC1 apps are wired the same way, idle until promoted */}
+        <path
+          d={`M${APP.x + APP.w},${westOnApp.y + APP.h / 2} H${BUS_X} M${APP.x + APP.w},${westOffApp.y + APP.h / 2} H${BUS_X} M${BUS_X},${westOnApp.y + APP.h / 2} V${westOffApp.y + APP.h / 2}`}
+          className={styles.idle}
+        />
+        <path d={`M${BUS_X},${westOra} H${ORA.cx - ORA.rx - 4}`} className={styles.idle} markerEnd="url(#had-idle)" />
 
-        {/* ---- us-east-1, the active region. The ACTIVE / STANDBY pills say
-             which is which, so the regions carry no note of their own. ---- */}
-        <Region x={1110} y={118} w={468} h={434} cls={styles.regionAws} label="us-east-1" />
-        <Pill x={1524} y={144} label="ACTIVE" tone="pOk" anchor="end" />
+        {/* Oracle replication */}
+        <path d={`M${ORA.cx + ORA.rx},${ORA_Y - 2} H${REP[0] - 23}`} className={styles.rep} markerEnd="url(#had-rep)" />
+        <path d={`M${ORA.cx + ORA.rx},${westOra - 2} H${REP[0] - 23}`} className={styles.rep} markerEnd="url(#had-rep)" />
+        <path
+          d={`M${ORA.cx - ORA.rx},${ORA_Y + 11} H${GUARD_X} V${westOra - 11} H${ORA.cx - ORA.rx - 4}`}
+          className={styles.rep}
+          markerEnd="url(#had-rep)"
+        />
 
-        {/* Everything Temporal is pods on one cluster, so the cluster box is
-            where the Temporal mark and the violet live. Postgres sits outside
-            it: it is a managed database, not something running on the cluster. */}
-        <rect x={1122} y={176} width={246} height={356} rx={14} className={styles.groupEks} />
-        <TemporalMark cx={1146} cy={196} size={26} />
-        <K8sMark cx={1176} cy={196} size={24} />
-        <text x={1198} y={201} className={styles.markLabel}>EKS cluster</text>
+        {/* gRPC: the Online app to both clusters, the Offline app to Offline.
+            The Online app's run leaves over the top of the band; the Offline
+            app's leaves under it and hops the Data Guard line. */}
+        <path
+          d={`M${appMidX},${onApp.y} V96 H${LANE_ON} V${ROW} H${CL.x - 4}`}
+          className={styles.req}
+          markerEnd="url(#had-req)"
+        />
+        <path d={`M${LANE_ON},${ROW} V${OFF_CL_Y + 22} H${CL.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
+        <circle cx={LANE_ON} cy={ROW} r={3.6} className={styles.junction} />
+        <path
+          d={`M${appMidX},${offApp.y + APP.h} V350 H${GUARD_X - 14} Q${GUARD_X},330 ${GUARD_X + 14},350 H${LANE_OFF} V${OFF_CL_Y + 48} H${CL.x - 4}`}
+          className={styles.req}
+          markerEnd="url(#had-req)"
+        />
 
-        {/* Even pitch: nothing about one service makes it deserve more room
-            than the next. The last box stands for the cluster's remaining
-            services, so it is a service like the others. */}
-        <Service x={1188} y={228} w={148} h={34} tint="tTemporal" icon="temporal" title="Frontend" />
-        <Service x={1188} y={291} w={148} h={34} tint="tTemporal" icon="temporal" title="History" />
-        <Service x={1188} y={354} w={148} h={34} tint="tTemporal" icon="temporal" title="Matching" />
-        <Service x={1188} y={417} w={148} h={34} tint="tTemporal" icon="temporal" title="Worker" />
-        <Service x={1188} y={480} w={148} h={34} tint="tTemporal" icon="temporal" title="…" />
+        {/* each cluster's database replicates to its own standby, in nested
+            lanes so the two never cross */}
+        <path
+          d={`M${CL.x + CL.w},${offCl.y + CL.h / 2} H${REPL_IN} V${westOffCl.y + CL.h / 2} H${CL.x + CL.w + 4}`}
+          className={styles.rep}
+          markerEnd="url(#had-rep)"
+        />
+        <path
+          d={`M${CL.x + CL.w},${ROW} H${REPL_OUT} V${westOnCl.y + CL.h / 2} H${CL.x + CL.w + 4}`}
+          className={styles.rep}
+          markerEnd="url(#had-rep)"
+        />
 
-        {/* One bus down the side of the stack rather than a link per pair.
-            Every service taps it, Frontend included, so any of them can call
-            any other and it stays one shape. It is inset 16 from the cluster's
-            left edge, near enough the 18 it leaves at the bottom, so it does
-            not read as pinned to the border. */}
-        <g className={styles.podBus}>
-          <rect x={1138} y={220} width={28} height={294} rx={14} />
-          <text x={1152} y={367} textAnchor="middle" dominantBaseline="central" transform="rotate(-90 1152 367)">
-            pod-to-pod
-          </text>
+        {/* ============================ boxes ============================ */}
+
+        {/* ---- callers ---- */}
+        <g className={styles.caller}>
+          <User cx={CALLER_X} cy={ROW} />
+          <User cx={CALLER_X} cy={m(ROW)} />
         </g>
-        {[245, 308, 371, 434, 497].map((cy) => (
-          <path
-            key={cy}
-            d={`M1167,${cy} H1187`}
-            className={styles.pod}
-            markerStart="url(#ha-m-pod)"
-            markerEnd="url(#ha-m-pod)"
-          />
+        <Label x={CALLER_X} y={ROW + 34} cls="small">caller</Label>
+        <Label x={CALLER_X} y={ROW + 49} cls="small">near IPC2</Label>
+        <Label x={CALLER_X} y={m(ROW) + 34} cls="small">caller</Label>
+        <Label x={CALLER_X} y={m(ROW) + 49} cls="small">near IPC1</Label>
+
+        {/* ---- One-Data, both sites live ---- */}
+        <Box x={OD.x} y={eastOD.y} w={OD.w} h={OD.h} tone="tGate" title="One-Data" sub="API gateway" />
+        <Pill x={OD.x + OD.w - 6} y={eastOD.y - 14} label="ACTIVE" tone="pActive" anchor="end" />
+        <Box x={OD.x} y={westOD.y} w={OD.w} h={OD.h} tone="tGate" title="One-Data" sub="API gateway" />
+        <Pill x={OD.x + OD.w - 6} y={westOD.y + OD.h + 14} label="ACTIVE" tone="pActive" anchor="end" />
+
+        {/* ---- Redis ---- */}
+        <Redis cx={REDIS_X} cy={ROW + 93} />
+        <Label x={REDIS_X + 27} y={ROW + 91} cls="markLabel" anchor="start">Redis</Label>
+        <Label x={REDIS_X + 27} y={ROW + 107} cls="markSub" anchor="start">fallback store</Label>
+        <Redis cx={REDIS_X} cy={m(ROW + 93)} />
+        <Label x={REDIS_X + 27} y={m(ROW + 93) - 2} cls="markLabel" anchor="start">Redis</Label>
+        <Label x={REDIS_X + 27} y={m(ROW + 93) + 14} cls="markSub" anchor="start">fallback store</Label>
+        <Label x={REDIS_X + 11} y={ROW + 55} cls="bufLabel" anchor="start">park · RTF replay</Label>
+        <Label x={REDIS_X + 11} y={m(ROW + 55) + 9} cls="bufLabel" anchor="start">park · RTF replay</Label>
+
+        {/* ---- billpay-core: the two apps ---- */}
+        <rect x={GROUP.x} y={eastGroupY} width={GROUP.w} height={GROUP.h} rx={12} className={styles.group} />
+        <Label x={GROUP.x + 16} y={eastGroupY + 22} cls="groupLabel" anchor="start">billpay-core</Label>
+        <Pill x={GROUP.x + GROUP.w - 10} y={eastGroupY + 17} label="ACTIVE" tone="pActive" anchor="end" />
+        <Box x={APP.x} y={onApp.y} w={APP.w} h={APP.h} tone="tOnline" title="Online app" sub="Core APIs · Router · workers" />
+        <Box x={APP.x} y={offApp.y} w={APP.w} h={APP.h} tone="tOffline" title="Offline app" sub="Dispatchers · governor · workers" />
+
+        <g className={styles.dim}>
+          <rect x={GROUP.x} y={westGroupY} width={GROUP.w} height={GROUP.h} rx={12} className={styles.group} />
+          <Label x={GROUP.x + 16} y={westGroupY + 22} cls="groupLabel" anchor="start">billpay-core</Label>
+        </g>
+        <Pill x={GROUP.x + GROUP.w - 10} y={westGroupY + 17} label="STANDBY" tone="pStandby" anchor="end" />
+        <Box x={APP.x} y={westOnApp.y} w={APP.w} h={APP.h} tone="tOnline" title="Online app" sub="Core APIs · Router · workers" dim />
+        <Box x={APP.x} y={westOffApp.y} w={APP.w} h={APP.h} tone="tOffline" title="Offline app" sub="Dispatchers · governor · workers" dim />
+
+        {/* ---- Oracle ---- */}
+        <Drum cx={ORA.cx} cy={ORA_Y} rx={ORA.rx} h={ORA.h} tone="tOracle" />
+        <Label x={ORA.cx} y={ORA_Y + 48}>Oracle</Label>
+        <Label x={ORA.cx} y={ORA_Y + 64} cls="markSub">read + write</Label>
+        <Pill x={ORA.cx} y={ORA_Y + 85} label="PRIMARY" tone="pPrimary" />
+        {REP.map((cx) => (
+          <Drum key={cx} cx={cx} cy={ORA_Y + 2} rx={19} h={26} tone="tOracle" />
         ))}
+        <Label x={(REP[0] + REP[1]) / 2} y={ORA_Y + 48} cls="markSub">read-only × 2</Label>
 
-        {/* persistence: out of the cluster, into the managed Postgres */}
-        <path d="M1336,245 H1390" className={styles.req} />
-        <path d="M1336,308 H1390" className={styles.req} />
-        <path d="M1336,371 H1390" className={styles.req} />
-        <path d="M1336,434 H1390" className={styles.req} />
-        <path d="M1336,497 H1390" className={styles.req} />
-        <path d="M1390,245 V497" className={styles.req} />
-        <path d="M1390,296 H1438" className={styles.req} markerEnd="url(#ha-m-req)" />
+        <Drum cx={ORA.cx} cy={westOra} rx={ORA.rx} h={ORA.h} tone="tOracle" dim />
+        <Label x={ORA.cx} y={westOra + 48}>Oracle</Label>
+        <Label x={ORA.cx} y={westOra + 64} cls="markSub">read only</Label>
+        <Pill x={ORA.cx} y={westOra + 85} label="STANDBY" tone="pStandby" />
+        <Drum cx={REP[0]} cy={westOra + 2} rx={19} h={26} tone="tOracle" dim />
+        <Label x={REP[0]} y={westOra + 48} cls="markSub">read-only</Label>
 
-        <Pill x={1470} y={226} label="WRITER" tone="pPrimary" />
-        <text x={1470} y={250} textAnchor="middle" className={styles.markLabel}>Postgres</text>
-        <Drum cx={1470} cy={296} rx={30} h={40} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <path d="M1470,328 V352 H1436 V371" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <path d="M1470,352 H1504 V371" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={1436} cy={390} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <Drum cx={1504} cy={390} rx={20} h={26} grad="ha-g-pg" glossCls={styles.drumTopPg} />
-        <text x={1470} y={432} textAnchor="middle" className={styles.markSub}>read replicas × 2</text>
+        {/* ---- Temporal ---- */}
+        <Box x={CL.x} y={onCl.y} w={CL.w} h={CL.h} tone="tOnline" mark title="Online cluster" sub="2K shards · Aurora · OpenSearch 2" />
+        <Box x={CL.x} y={offCl.y} w={CL.w} h={CL.h} tone="tOffline" mark title="Offline cluster" sub="4K shards · Aurora · OpenSearch 2" />
+        <Box x={CL.x} y={westOffCl.y} w={CL.w} h={CL.h} tone="tOffline" mark dim title="Offline standby" sub="Replica · promoted on its own" />
+        <Box x={CL.x} y={westOnCl.y} w={CL.w} h={CL.h} tone="tOnline" mark dim title="Online standby" sub="Replica · promoted on its own" />
 
-        {/* ---- us-west-1, the passive region ---- */}
-        <Region x={1110} y={580} w={468} h={150} cls={styles.regionAws} label="us-west-1" />
-        <Pill x={1524} y={606} label="STANDBY" tone="pStandby" anchor="end" />
-
-        {/* down x=1546: the replicas reach 1524 and their label 1526, so this
-            is the clear lane between them and the region edge. */}
-        <path d="M1500,306 H1546 V680 H1214" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-        <Drum cx={1180} cy={680} rx={28} h={36} grad="ha-g-pg" dim glossCls={styles.drumTopDim} />
-        <text x={1230} y={700} className={styles.markSub}>Replicated from the east. Promoted by hand.</text>
+        {/* ---- labels laid on lines ---- */}
+        <Chip x={REDIS_X} y={AXIS} label="CRDB · active-active" tone="cBuf" />
+        <Chip x={CROSS_X} y={WEST_Y + 34} label="cross-site" tone="cReq" />
+        <Chip x={GUARD_X} y={AXIS} label="Data Guard" tone="cRep" />
+        <Chip x={800} y={350} label="gRPC" tone="cReq" />
+        <Chip x={800} y={96} label="gRPC" tone="cReq" />
+        <Label x={1127} y={AXIS + 5} cls="gapLabel">each database replicated east to west</Label>
 
         {/* ---- legend ---- */}
         <g className={styles.legend}>
-          <path d="M40,812 H80" className={styles.req} markerEnd="url(#ha-m-req)" />
-          <text x={90} y={816}>request path</text>
-          <path d="M210,812 H250" className={styles.buf} markerEnd="url(#ha-m-buf)" />
-          <text x={260} y={816}>
-            fallback: One-Data parks the request in Redis when billpay-core can&apos;t be reached, and RTF picks it up
-            from Redis and replays it into the core
+          <path d="M30,800 H66" className={styles.req} markerEnd="url(#had-req)" />
+          <text x={76} y={805}>request path, and gRPC to Temporal</text>
+          <path d="M372,800 H408" className={styles.buf} markerEnd="url(#had-buf)" />
+          <text x={418} y={805}>
+            fallback: One-Data parks the request in Redis when the core APIs can&apos;t be reached, and RTF replays it
           </text>
-          <path d="M40,846 H80" className={styles.rep} markerEnd="url(#ha-m-rep)" />
-          <text x={90} y={850}>replication</text>
-          <text x={260} y={850} className={styles.legendMut}>
-            dimmed components and faded links are standbys, idle until promoted: IPC1&apos;s billpay-core and Oracle, and the us-west-1 cluster
+          <path d="M30,830 H66" className={styles.rep} markerEnd="url(#had-rep)" />
+          <text x={76} y={835}>replication</text>
+          <text x={372} y={835} className={styles.legendMut}>
+            dimmed parts are standbys, idle until promoted: IPC1&apos;s apps and Oracle, and each cluster&apos;s standby in us-west-1
           </text>
         </g>
       </svg>

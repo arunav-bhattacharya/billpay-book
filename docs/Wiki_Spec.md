@@ -168,7 +168,7 @@ Separate databases mean offline load can never slow realtime traffic at the Temp
 ### Kinds of workflow
 
 - **Core workflows:** one business journey each, such as paying today, executing a scheduled payment or processing a return.
-- **Composite workflows:** a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), multiple instructions. They run on the Online cluster, with their children on the same cluster.
+- **Composite workflows:** a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), multiple instructions. They run on the Online cluster, with their children on the same cluster.
 - **Periodic workflows:** jobs started by Temporal Schedules on the Offline cluster.
 - **Control workflows:** the dispatchers, the governor and market provisioning. They pace and configure payment work; they are not payment journeys.
 

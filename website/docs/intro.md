@@ -1,26 +1,27 @@
 ---
 title: Introduction
-description: "Billpay is American Express's enterprise platform for executing and orchestrating customer bill payments, mostly credit card payments."
+description: "Billpay is American Express's platform for running customer bill payments, mostly credit card payments."
 ---
 
 import Lead from '@site/src/components/Lead';
 
 # Welcome to the Billpay Wiki
 
-<Lead>Billpay is **American Express's enterprise platform for executing and orchestrating customer bill payments**, mostly credit card payments. It runs the whole lifecycle: initiation, validation, money movement, posting, settlement, and the financial updates that follow. Every enterprise domain that needs a payment's state can see the same version of it.</Lead>
+<Lead>Billpay is **American Express's platform for running customer bill payments**, mostly credit card payments. It takes a payment from the moment a customer submits it to the moment the money settles, and every Amex system that asks where a payment stands gets the same answer.</Lead>
 
-The site is organised around the layers a payment passes through:
+A payment passes through a handful of layers on its way in, and each one has a single job. Once you know which layer you're looking at, you know which page to read.
 
-| Layer | What it is | Where to read |
+| Layer | What it does | Where to read |
 | --- | --- | --- |
-| **One-Data Functions** | The public, contract-level entry points (e.g. `CreatePayment.v3`) | [API Spec › One-Data](build/api-spec/one-data.md) |
-| **Billpay Core APIs** | The REST endpoints behind the gateway (`POST /payments`, …) | [API Spec › Billpay Core](build/api-spec/billpay-core.md) |
-| **Billpay Router** | Picks the right workflow from the request's date, instructions, and behaviors | [Design › Routing](design/routing.md) |
-| **Temporal Workflows** | Long-running, durable orchestrations on the Online and Offline workers | [Design › Workflows](design/component-model/workflows/index.md) |
-| **Stages** | One state transition each, the decision points a workflow sequences | [Design › Stages](design/component-model/stages.md) |
-| **ActivityGroups & Activities** | The reusable I/O units: clearing calls, AR posting, DB writes, notifications | [Design › ActivityGroups & Activities](design/component-model/activities.md) |
-| **Event Handlers** | Async consumers of money-movement, AR-posted, and Open-To-Buy events | [API Spec › One-Data](build/api-spec/one-data.md) |
-| **Schedules** | Temporal Schedules that drive the periodic executors | [Build › Schedules](build/schedules.md) |
+| **One-Data Functions** | The versioned contracts that channels and partners call, such as `CreatePayment.v3` | [API Spec › One-Data](build/api-spec/one-data.md) |
+| **Billpay Core APIs** | The REST endpoints behind the gateway, such as `POST /payments` | [API Spec › Billpay Core](build/api-spec/billpay-core.md) |
+| **Billpay Router** | A library inside the core APIs and the dispatchers. It admits the request (422 when the market isn't live, 429 when its traffic is over budget), picks the journey, pins a plan key and places the work on a cluster | [Design › Routing](design/routing.md) |
+| **Temporal Workflows** | One durable workflow per journey: on the Online cluster when a caller is waiting, on the Offline cluster when nobody is | [Design › Workflows](design/component-model/workflows/index.md) |
+| **Stages** | One business step each, such as Verify or Execute. The only layer that changes with a market's behaviors | [Design › Stages](design/component-model/stages.md) |
+| **Activities** | The calls to one system, grouped as `{System}Activities`. Oracle is reached only through `PaymentStore` | [Design › Activities](design/component-model/activities.md) |
+| **Clients** | The adapter for one external system's contract | [Build › Clients](build/principles/core-build/clients.md) |
+| **Event Handlers** | Events from other platforms. A return starts its own workflow; settlement and AR-posted events land in the inbox | [API Spec › One-Data](build/api-spec/one-data.md) |
+| **Schedules** | Start the dispatchers, which release work that has fallen due at the rate the governor sets, and the periodic jobs | [Build › Schedules](build/schedules.md) |
 
 ## How to read these docs
 
@@ -30,14 +31,17 @@ After that, the path depends on what you need.
 
 - If you work on the product, read the [Payment Journeys](design/journeys/index.md). They follow a payment from the channel a customer starts in to the money settling. Then read the [Architecture Overview](architecture/overview.md) for the shape of the system around it.
 - If you write the code, start with the same [Payment Journeys](design/journeys/index.md), then go into the [Workflows](design/component-model/workflows/core.md) and the [Build section](build/index.md).
+- If you run Billpay, read [Observability](observability/index.md) for what to watch, then [Operations](operations/index.md) for the tools and procedures.
 
 ## Conventions
 
 - States are written in `UPPER_SNAKE_CASE`, for example `PENDING`, `ACCEPTED`, `PROCESSED`.
-- Workflow names end in `WF`: `CreateImmediatePaymentWF`.
-- Stages are named `{From}To{To}Stage`; activity groups end in `ActivityGroup`; activities end in `Activity`. The `{From}` half is usually a state, but in `InitiatedToPendingStage` it is the incoming request, which has no state yet.
-- The state and sequence diagrams are [Mermaid](https://mermaid.js.org/), so you can copy one straight into Confluence or another Mermaid host. The system maps, journey maps, and the legacy estate map are React components, and those only render here.
+- Workflows are named `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow`.
+- Stages are named for the step they perform: a `VerifyStage` interface, with implementations named for the behavior they handle, such as `MandateVerifyStage`.
+- Activities are grouped per system as `{System}Activities`, such as `ClearingActivities`. Clients are `{System}Client`.
+- A workflow ID is the payment ID plus a suffix, such as `{paymentId}-execute`, so any payment can be found from its ID alone.
+- The state and sequence diagrams are [Mermaid](https://mermaid.js.org/), so you can copy one straight into Confluence or another Mermaid host. The system maps, journey maps and the legacy estate map are React components, and those only render here.
 
 :::tip
-Pages are markdown. Adding a page, a Mermaid diagram, or a table takes no React. Only the shared visual components do.
+Pages are markdown. Adding a page, a Mermaid diagram or a table takes no React. Only the shared visual components do.
 :::

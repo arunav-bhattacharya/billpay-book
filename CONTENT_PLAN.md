@@ -415,7 +415,7 @@ Every page moves to the target design in the *Billpay Temporal Scaling Design* d
 
 1. Spec and repo files: `Wiki_Spec.md`, this file, `CLAUDE.md`, the `--amex-cat-onboarding` token.
 2. Intro, Vision and Architecture. Stop for review before Design.
-3. Design and Market Onboarding, together with the new section's navigation: `sidebars.js`, `sections.js` (`onboarding` after `design`; later sections renumber), the sidebar badge numbers in `custom.css`, and a ninth tile on the homepage board. The navigation waits for phase 3 because the build fails on links to pages that don't exist yet.
+3. Design and Market Onboarding, together with the new section's navigation: `sidebars.js`, `sections.js` (`onboarding` after `design`; later sections renumber), the sidebar badge numbers in `custom.css`, and a ninth tile on the homepage board. `intro.md` gets its Market Onboarding link at the same time. The navigation waits for phase 3 because the build fails on links to pages that don't exist yet.
 4. Build.
 5. Deployment, Observability, Operations, Testing and Contributing.
 
@@ -442,19 +442,19 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `intro.md` | Update | Router row: a library in the core APIs and dispatchers that admits (422 or 429), picks the journey, pins a plan key and places the work. Workflows row drops "long-running". Schedules row: dispatchers paced by the governor, plus periodic jobs. Naming: `{Verb}{Object}Workflow`, stages named for their step, `{System}Activities`, `{System}Client` | ☐ |
-| `vision/index.md` | Style pass | | ☐ |
-| `vision/payments-overview.md` | Style pass | Sources stay as recorded in Phases F and G | ☐ |
-| `vision/product.md` | Update | Onboarding adds the Operations step and versioned releases, which each environment tests and signs off (RFC in production). Behaviors are Y, N or BOTH. A corporate parent is PAID once it settles and every leg has posted | ☐ |
-| `vision/engineering.md` | Update | Stages picked at runtime from the plan key. Event handlers write settlement and AR-posted events to the inbox; no workflow waits on them. BOTH in the behavior answers. CompositionMap shows releases, provisioning and the plan key | ☐ |
+| `intro.md` | Update | Router row: a library in the core APIs and dispatchers that admits (422 or 429), picks the journey, pins a plan key and places the work. Workflows row drops "long-running". Schedules row: dispatchers paced by the governor, plus periodic jobs. Naming: `{Verb}{Object}Workflow`, stages named for their step, `{System}Activities`, `{System}Client` | ◐ |
+| `vision/index.md` | Style pass | | ◐ |
+| `vision/payments-overview.md` | Style pass | Sources stay as recorded in Phases F and G. Read in phase 2; it already reads well, so it is unchanged | ◐ |
+| `vision/product.md` | Update | Onboarding adds the Operations step and versioned releases, which each environment tests and signs off (RFC in production). Behaviors are Y, N or BOTH. A corporate parent is PAID once it settles and every leg has posted | ◐ |
+| `vision/engineering.md` | Update | Stages picked at runtime from the plan key. Event handlers write settlement and AR-posted events to the inbox; no workflow waits on them. BOTH in the behavior answers. CompositionMap shows releases, provisioning and the plan key | ◐ |
 
 #### Architecture
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `architecture/index.md` | Update | "The two worker pools" becomes "the two Temporal clusters and what each runs" | ☐ |
-| `architecture/overview.md` | Update | LayerStack: admission and placement in the Router; the two clusters and the dispatchers replace Workers; drop "Composed per market behaviors". Router steps: admit, pick the journey, resolve behaviors, pin the plan key, place, start. Periodic work: one dispatcher per kind of work, each with its own Schedule and budget, at rates the governor resets every 15 s. New two-cluster diagram (`ClusterMap`: coordinate SVG on the panel recipe, tokens, aria-label) | ☐ |
-| `architecture/high-availability.md` | Update | Aurora and OpenSearch 2 per cluster; Offline has 4K shards. Online app (core APIs, Router, Online workers, a client per cluster) and Offline app (dispatchers, relays, governor, Offline workflows, a worker deployment per downstream queue). Failure rows per cluster: Online down stops caller-facing journeys; Offline down pauses paced work while dated work waits in Oracle. Oracle row: `PaymentStore` rides out patching. HADiagram redrawn with a us-west-1 standby per cluster. Apps active in IPC2, standby in IPC1 | ☐ |
+| `architecture/index.md` | Update | "The two worker pools" becomes "the two Temporal clusters and what each runs" | ◐ |
+| `architecture/overview.md` | Update | LayerStack: admission and placement in the Router; the two clusters and the dispatchers replace Workers; drop "Composed per market behaviors". Router steps: admit, pick the journey, resolve behaviors, pin the plan key, place, start. Periodic work: one dispatcher per kind of work, each with its own Schedule and budget, at rates the governor resets every 15 s. New two-cluster diagram (`ClusterMap`: coordinate SVG on the panel recipe, tokens, aria-label) | ◐ |
+| `architecture/high-availability.md` | Update | Aurora and OpenSearch 2 per cluster; Offline has 4K shards. Online app (core APIs, Router, Online workers, a client per cluster) and Offline app (dispatchers, relays, governor, Offline workflows, a worker deployment per downstream queue). Failure rows per cluster: Online down stops caller-facing journeys; Offline down pauses paced work while dated work waits in Oracle. Oracle row: `PaymentStore` rides out patching. HADiagram redrawn with a us-west-1 standby per cluster. Apps active in IPC2, standby in IPC1 | ◐ |
 
 #### Design
 
@@ -587,7 +587,7 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 
 ### Components
 
-- New: `ClusterMap` (the two-cluster architecture), a corporate flow diagram, an onboarding diagram.
-- `HADiagram` redrawn with a standby per cluster, its colours moved onto tokens.
+- New: `ClusterMap` (the two-cluster architecture), a corporate flow diagram, an onboarding diagram. `ClusterMap` is built as a CSS box diagram rather than coordinate SVG: it is boxes in groups with short connectors, and as HTML it reflows to one column on a phone instead of shrinking its type (phase 2).
+- `HADiagram` redrawn with a standby per cluster, its colours moved onto tokens (phase 2). `CompositionMap` now takes `steps` and `settings`, so it can show the release, the plan key and the workflow (phase 2).
 - `ActivityTable` gains a queue column. `WorkflowMeta` shows the cluster and workflow ID. `WorkerChip`, `WorkerSplit` and `RouteMap` say cluster instead of worker.
 - `docs/domainModel/*.kt.md` stay as supplied; the domain-model pages list the gaps instead.

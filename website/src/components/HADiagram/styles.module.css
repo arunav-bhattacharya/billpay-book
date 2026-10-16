@@ -1,126 +1,106 @@
-/* HADiagram — layered HA topology. Structure colour comes from the design
-   tokens; the product marks (Oracle, Redis, Postgres, Kubernetes, AWS) keep
-   their own brand hues so the diagram reads at a glance. */
+/* HADiagram: the physical topology, in Blue Box colour. Tinted estates, filled
+   bands and boxes, no outlines. Every colour is a token: the cluster tones are
+   the worker tokens shared with ClusterMap and WorkerChip, and the solid
+   blocks take palette blues that keep white type legible in both themes. */
 
 .wrap {
   composes: panel from '../../css/recipes.module.css';
 
-  /* product marks */
-  --ha-oracle-a: #e2695a;
-  --ha-oracle-b: #a8351f;
-  --ha-oracle-dim-a: #b9968f;
-  --ha-oracle-dim-b: #8a6a63;
-  --ha-redis-a: #f0655a;
-  --ha-redis-b: #a41e11;
-  --ha-pg-a: #6d9fca;
-  --ha-pg-b: #2f5d84;
-  --ha-k8s: #326ce5;
-  --ha-aws: #ec7211;
-  --ha-temporal: #7b5cf0;
-  --ha-temporal-brand: #444ce7;
-  /* Chips must be opaque to mask the connectors they sit on, so this tracks
-     the card face rather than the old recessed tray. */
-  --ha-chip: #ffffff;
+  --ha-req: var(--amex-blue);
+  --ha-buf: var(--amex-sky);
+  --ha-rep: var(--amex-mut);
+  --ha-band: var(--amex-panel);
+  /* the estates sit on the rail's cool grey, a step below the white bands,
+     so each band reads as a card laid on its estate */
+  --ha-prem: color-mix(in srgb, var(--amex-blue) 6%, var(--amex-rail));
+  --ha-aws: color-mix(in srgb, var(--amex-platinum) 6%, var(--amex-rail));
+  --ha-group: color-mix(in srgb, var(--amex-blue) 6%, var(--amex-panel));
+  --ha-oracle: var(--amex-midnight);
+  --ha-offline-block: var(--amex-temporal);
 
   margin: 1.5rem 0 2rem;
+  padding: 10px 8px 6px;
   overflow-x: auto;
-  /* The house card, from the recipe in css/recipes.module.css, so the
-     diagram sits on the same paper as every other card on the site. */
-  padding: 10px 6px 4px;
 }
 
 :global([data-theme='dark']) .wrap {
-  --ha-oracle-a: #ef7f6d;
-  --ha-oracle-b: #a13322;
-  --ha-oracle-dim-a: #8d6f6a;
-  --ha-oracle-dim-b: #5a4340;
-  --ha-redis-a: #ff7a6b;
-  --ha-redis-b: #9c1c10;
-  --ha-pg-a: #7fb2dd;
-  --ha-pg-b: #2b567e;
-  --ha-k8s: #5b93f0;
-  --ha-aws: #ff9d3d;
-  --ha-temporal: #a48bff;
-  --ha-temporal-brand: #8f97ff;
-  --ha-chip: #123061;
+  --ha-req: var(--amex-blue-bright);
+  --ha-band: var(--amex-card);
+  --ha-prem: color-mix(in srgb, var(--amex-blue-bright) 6%, var(--amex-rail));
+  --ha-aws: color-mix(in srgb, var(--amex-platinum) 8%, var(--amex-rail));
+  --ha-group: color-mix(in srgb, var(--amex-blue-bright) 9%, var(--amex-card));
+  --ha-oracle: var(--amex-worker-offline);
+  --ha-offline-block: var(--amex-banner-block);
 }
 
 .svg {
   display: block;
   width: 100%;
-  min-width: 660px;
+  min-width: 720px;
   height: auto;
   font-family: var(--amex-font-sans);
 }
 
-/* --------------------------------------------------------------- groups */
-/* The two owned estates. Brand colour as a wash rather than a flat fill: the
-   regions and service cards sit inside these, so a saturated background would
-   take the contrast the content needs. The border carries the brand at full
-   strength, which is what makes the ownership read. */
-.groupAmex {
-  fill: color-mix(in srgb, var(--amex-blue) 11%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-blue) 62%, transparent);
-  stroke-width: 2;
+/* ------------------------------------------------------ estates, bands */
+.estatePrem {
+  fill: var(--ha-prem);
 }
-:global([data-theme='dark']) .groupAmex {
-  fill: color-mix(in srgb, var(--amex-blue-bright) 13%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-blue-bright) 52%, transparent);
+.estateAws {
+  fill: var(--ha-aws);
 }
-
-.groupAws {
-  fill: color-mix(in srgb, var(--ha-aws) 11%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-aws) 62%, transparent);
-  stroke-width: 2;
+.band {
+  fill: var(--ha-band);
 }
-:global([data-theme='dark']) .groupAws {
-  fill: color-mix(in srgb, var(--ha-aws) 15%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-aws) 55%, transparent);
+.group {
+  fill: var(--ha-group);
 }
 
-/* The cluster is where everything Temporal lives, so it carries the violet
-   and the Temporal mark. The Kubernetes heptagon inside keeps its own blue. */
-.groupEks {
-  fill: color-mix(in srgb, var(--ha-temporal) 13%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-temporal) 60%, transparent);
-  stroke-width: 1.6;
-  stroke-dasharray: 7 4;
-}
-:global([data-theme='dark']) .groupEks {
-  fill: color-mix(in srgb, var(--ha-temporal) 22%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-temporal) 56%, transparent);
-}
-
-.groupLabel {
-  font-size: 16.0px;
-  font-weight: 800;
+.estateLabel {
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   fill: var(--amex-txt-strong);
 }
-.groupNote {
-  font-size: 13.7px;
+.estateNote {
+  font-size: 13px;
   fill: var(--amex-mut);
 }
-
-/* -------------------------------------------------------------- regions */
-.regionPrem {
-  fill: color-mix(in srgb, var(--amex-platinum) 7%, var(--amex-panel));
-  stroke: var(--amex-line-strong);
-  stroke-width: 1.2;
-}
-.regionAws {
-  fill: color-mix(in srgb, var(--ha-aws) 7%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--ha-aws) 46%, transparent);
-  stroke-width: 1.3;
-  stroke-dasharray: 8 5;
-}
-.regionLabel {
-  font-size: 15.4px;
-  font-weight: 750;
+.bandLabel {
+  font-size: 13.5px;
+  font-weight: 700;
   letter-spacing: 0.1em;
   fill: var(--amex-txt-strong);
 }
-/* ---------------------------------------------------------------- icons */
+.groupLabel {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  fill: var(--amex-txt-strong);
+}
+.markLabel {
+  font-size: 16px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.markSub {
+  font-size: 13.5px;
+  fill: var(--amex-mut);
+}
+.small {
+  font-size: 12.5px;
+  fill: var(--amex-mut);
+}
+.bufLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: var(--amex-mut);
+}
+.gapLabel {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--amex-mut);
+}
+
 .icon {
   fill: none;
   stroke: currentColor;
@@ -128,399 +108,171 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.userIcon {
+.caller {
   color: var(--amex-mut);
 }
-.userLabel {
-  font-size: 12.5px;
-  fill: var(--amex-mut);
+
+/* ---------------------------------------------------------------- boxes */
+.tGate {
+  --tone: var(--amex-mut);
+  --block: var(--amex-platinum);
 }
-.siteIcon {
-  color: var(--amex-platinum);
+.tOnline {
+  --tone: var(--amex-worker-online);
+  --block: var(--amex-blue);
 }
-.svcIcon {
-  color: var(--svc-tint);
-  stroke-width: 1.6;
+.tOffline {
+  --tone: var(--amex-worker-offline);
+  --block: var(--ha-offline-block);
 }
-/* Brand glyphs come as filled paths, not stroked outlines. */
-.iconFilled {
-  fill: currentColor;
-  stroke: none;
+.tOracle {
+  --tone: var(--ha-oracle);
 }
 
-/* ------------------------------------------------------------- services */
-.svc {
-  --svc-tint: var(--amex-blue);
+.boxBody {
+  fill: color-mix(in srgb, var(--tone) 11%, var(--ha-band));
 }
-.tGw {
-  --svc-tint: var(--amex-blue);
+.boxBlock {
+  fill: var(--block);
 }
-.tCore {
-  --svc-tint: var(--amex-indigo);
-}
-.tTemporal {
-  --svc-tint: var(--amex-temporal);
-}
-:global([data-theme='dark']) .tGw {
-  --svc-tint: var(--amex-blue-bright);
-}
-:global([data-theme='dark']) .tCore {
-  --svc-tint: #7b93de;
-}
-:global([data-theme='dark']) .tTemporal {
-  --svc-tint: #a48bff;
-}
-
-.svcBody {
-  fill: color-mix(in srgb, var(--svc-tint) 12%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--svc-tint) 68%, transparent);
-  stroke-width: 1.4;
-  filter: drop-shadow(0 3px 6px rgba(0, 38, 99, 0.16));
-}
-:global([data-theme='dark']) .svcBody {
-  fill: color-mix(in srgb, var(--svc-tint) 20%, var(--amex-panel));
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55));
-}
-.svcGhost {
-  fill: color-mix(in srgb, var(--svc-tint) 9%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--svc-tint) 32%, transparent);
-  stroke-width: 1.1;
-}
-.svcGhost2 {
-  fill: color-mix(in srgb, var(--svc-tint) 11%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--svc-tint) 46%, transparent);
-  stroke-width: 1.2;
-}
-.svcGloss {
-  fill: rgba(255, 255, 255, 0.4);
-  pointer-events: none;
-}
-:global([data-theme='dark']) .svcGloss {
-  fill: rgba(255, 255, 255, 0.05);
-}
-.svcTitle {
-  font-size: 17.1px;
+.boxTitle {
+  font-size: 18px;
   font-weight: 650;
   fill: var(--amex-txt-strong);
 }
-.svcSub {
-  font-size: 12.5px;
+.boxSub {
+  font-size: 13.5px;
   fill: var(--amex-mut);
 }
+.temporalMark {
+  fill: var(--tone);
+}
+
 .dim {
-  opacity: 0.72;
+  opacity: 0.5;
 }
 
 /* ---------------------------------------------------------------- drums */
-.oraA {
-  stop-color: var(--ha-oracle-a);
+.drumBody {
+  fill: var(--tone);
 }
-.oraB {
-  stop-color: var(--ha-oracle-b);
+.drumLid {
+  fill: color-mix(in srgb, var(--tone) 62%, var(--amex-panel));
 }
-.oraDimA {
-  stop-color: var(--ha-oracle-dim-a);
+:global([data-theme='dark']) .drumLid {
+  fill: color-mix(in srgb, var(--tone) 70%, var(--amex-txt-strong));
 }
-.oraDimB {
-  stop-color: var(--ha-oracle-dim-b);
-}
-.pgA {
-  stop-color: var(--ha-pg-a);
-}
-.pgB {
-  stop-color: var(--ha-pg-b);
-}
-.redA {
-  stop-color: var(--ha-redis-a);
-}
-.redB {
-  stop-color: var(--ha-redis-b);
-}
-
-.drum {
-  filter: drop-shadow(0 4px 7px rgba(0, 38, 99, 0.22));
-}
-:global([data-theme='dark']) .drum {
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
-}
-.drumTop {
-  fill: color-mix(in srgb, var(--ha-oracle-a) 72%, #ffffff);
-  stroke: rgba(255, 255, 255, 0.5);
-  stroke-width: 0.8;
-}
-.drumTopDim {
-  fill: color-mix(in srgb, var(--ha-oracle-dim-a) 72%, #ffffff);
-}
-.drumBand {
+.drumCut {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.24);
-  stroke-width: 0.9;
-}
-.drumEdge {
-  fill: none;
-  stroke: rgba(0, 0, 0, 0.22);
-  stroke-width: 0.9;
+  stroke: var(--ha-band);
+  stroke-width: 1;
+  opacity: 0.5;
 }
 
-.drumTopPg {
-  fill: color-mix(in srgb, var(--ha-pg-a) 74%, #ffffff);
-}
-
-.markLabel {
-  font-size: 16.0px;
-  font-weight: 650;
-  fill: var(--amex-txt-strong);
-}
-.markSub {
-  font-size: 13.7px;
-  fill: var(--amex-mut);
-}
-.groupLabel {
-  font-size: 12.5px;
-  font-weight: 750;
-  letter-spacing: 0.12em;
-  fill: var(--amex-mut);
-}
-
-.discEdge {
-  fill: none;
-  stroke: rgba(0, 0, 0, 0.24);
-  stroke-width: 0.9;
-}
-.discGloss {
-  fill: rgba(255, 255, 255, 0.42);
-}
-
-/* ------------------------------------------------------------ Amex mark */
-.amexMark {
-  border-radius: 6px;
-}
-
-/* ------------------------------------------------------------ AWS mark */
-/* The wordmark ships navy (#252F3E), which vanishes on the dark panel, so it
-   takes the text token instead. The smile keeps Amazon orange in both themes. */
-.awsWord {
-  fill: #252f3e;
-}
-:global([data-theme='dark']) .awsWord {
-  fill: var(--amex-txt-strong);
-}
-.awsSmile {
-  fill: #ff9900;
-}
-
-/* ------------------------------------------------------- Temporal mark */
-.temporalMark {
-  fill: var(--ha-temporal-brand);
-}
-:global([data-theme='dark']) .temporalMark {
-  fill: #8f9bff;
-}
-
-
-/* ----------------------------------------------------------- Kubernetes */
-.k8sBody {
-  fill: var(--ha-k8s);
-  stroke: color-mix(in srgb, var(--ha-k8s) 74%, #000000);
-  stroke-width: 0.7;
-  filter: drop-shadow(0 3px 6px rgba(0, 38, 99, 0.22));
-}
-/* The helm: ring, spokes, pegs and hub, all white on the blue. */
-.k8sRing {
-  fill: none;
-  stroke: #ffffff;
-  stroke-width: 1.15;
-}
-.k8sHub {
-  fill: #ffffff;
-}
-.k8sSpoke {
-  stroke: #ffffff;
-  stroke-width: 1.25;
-  stroke-linecap: round;
-}
-.k8sPeg {
-  stroke: #ffffff;
-  stroke-width: 1.55;
-  stroke-linecap: round;
+.redis ellipse {
+  fill: var(--amex-sky);
+  stroke: var(--ha-band);
+  stroke-width: 1.4;
 }
 
 /* ---------------------------------------------------------------- pills */
-.pill rect {
-  stroke-width: 1;
-}
 .pill text {
   font-size: 11.4px;
-  font-weight: 750;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
-.pOk rect {
-  fill: color-mix(in srgb, var(--amex-state-success) 16%, var(--amex-panel));
-  stroke: var(--amex-state-success);
+.pActive rect {
+  fill: var(--amex-blue);
 }
-.pOk text {
-  fill: var(--amex-state-success);
+.pActive text {
+  fill: #ffffff;
 }
 .pPrimary rect {
-  fill: color-mix(in srgb, var(--amex-blue) 13%, var(--amex-panel));
-  stroke: var(--amex-blue);
+  fill: var(--amex-midnight);
 }
 .pPrimary text {
-  fill: var(--amex-blue);
-}
-:global([data-theme='dark']) .pPrimary text {
-  fill: var(--amex-blue-bright);
+  fill: #ffffff;
 }
 :global([data-theme='dark']) .pPrimary rect {
-  stroke: var(--amex-blue-bright);
+  fill: var(--amex-banner-block);
 }
 .pStandby rect {
-  fill: color-mix(in srgb, var(--amex-state-choice) 16%, var(--amex-panel));
-  stroke: var(--amex-state-choice);
+  fill: var(--amex-badge-quiet);
 }
 .pStandby text {
-  fill: var(--amex-state-choice);
+  fill: var(--amex-badge-quiet-ink);
 }
+
 /* ---------------------------------------------------------------- chips */
+/* Opaque, on the band's own colour, so a chip masks the line it sits on. */
 .chip rect {
-  fill: var(--ha-chip);
-  stroke-width: 1;
+  fill: var(--ha-band);
 }
 .chip text {
-  font-size: 13.7px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 650;
 }
-.chipReq rect {
-  stroke: color-mix(in srgb, var(--amex-blue) 45%, transparent);
+.cReq text {
+  fill: var(--ha-req);
 }
-.chipReq text {
-  fill: var(--amex-blue);
+.cBuf text {
+  fill: var(--amex-mut);
 }
-:global([data-theme='dark']) .chipReq text {
-  fill: var(--amex-blue-bright);
-}
-.chipBuf rect {
-  stroke: color-mix(in srgb, var(--amex-state-choice) 55%, transparent);
-}
-.chipBuf text {
-  fill: var(--amex-state-choice);
-}
-.chipRep rect {
-  stroke: var(--amex-line-strong);
-}
-.chipRep text {
+.cRep text {
   fill: var(--amex-mut);
 }
 
-/* ---------------------------------------------------------------- flows */
+/* ---------------------------------------------------------------- lines */
+.req,
+.buf,
+.rep,
+.idle {
+  fill: none;
+  stroke-linejoin: round;
+}
 .req {
-  stroke: var(--amex-blue);
+  stroke: var(--ha-req);
   stroke-width: 2;
-  fill: none;
-  stroke-linejoin: round;
 }
-:global([data-theme='dark']) .req {
-  stroke: var(--amex-blue-bright);
-}
-/* Wired, but carrying nothing until someone promotes the standby behind it. */
-.reqIdle {
-  stroke: var(--amex-blue);
-  stroke-width: 1.8;
-  stroke-dasharray: 5 5;
-  opacity: 0.42;
-  fill: none;
-  stroke-linejoin: round;
-}
-:global([data-theme='dark']) .reqIdle {
-  stroke: var(--amex-blue-bright);
-}
-.mIdle {
-  fill: var(--amex-blue);
-  opacity: 0.42;
-}
-:global([data-theme='dark']) .mIdle {
-  fill: var(--amex-blue-bright);
-}
-
 .buf {
-  stroke: var(--amex-state-choice);
+  stroke: var(--ha-buf);
   stroke-width: 2;
   stroke-dasharray: 6 4;
-  fill: none;
-  stroke-linejoin: round;
 }
 .rep {
-  stroke: var(--amex-mut);
+  stroke: var(--ha-rep);
   stroke-width: 1.6;
   stroke-dasharray: 7 5;
-  fill: none;
-  stroke-linejoin: round;
 }
-.mReq {
-  fill: var(--amex-blue);
+/* wired, but carrying nothing until the standby behind it is promoted */
+.idle {
+  stroke: var(--ha-req);
+  stroke-width: 1.8;
+  stroke-dasharray: 5 5;
+  opacity: 0.45;
 }
-:global([data-theme='dark']) .mReq {
-  fill: var(--amex-blue-bright);
+.head_req {
+  fill: var(--ha-req);
 }
-.mBuf {
-  fill: var(--amex-state-choice);
+.head_buf {
+  fill: var(--ha-buf);
 }
-.mRep {
-  fill: var(--amex-mut);
+.head_rep {
+  fill: var(--ha-rep);
 }
-
-/* Pod-to-pod: the Temporal services calling each other inside the cluster. */
-.pod {
-  stroke: var(--amex-temporal);
-  stroke-width: 1.7;
-  fill: none;
-}
-:global([data-theme='dark']) .pod {
-  stroke: #a48bff;
-}
-.mPod {
-  fill: var(--amex-temporal);
-}
-:global([data-theme='dark']) .mPod {
-  fill: #a48bff;
-}
-/* The bus itself, drawn as a pill so it reads as one shared medium the
-   services tap rather than as a bracket grouping them. */
-.podBus rect {
-  fill: color-mix(in srgb, var(--amex-temporal) 22%, var(--amex-panel));
-  stroke: color-mix(in srgb, var(--amex-temporal) 70%, transparent);
-  stroke-width: 1.4;
-}
-.podBus text {
-  font-size: 12.5px;
-  font-weight: 650;
-  letter-spacing: 0.05em;
-  fill: var(--amex-temporal);
-}
-:global([data-theme='dark']) .podBus rect {
-  fill: color-mix(in srgb, #a48bff 20%, var(--amex-panel));
-  stroke: color-mix(in srgb, #a48bff 55%, transparent);
-}
-:global([data-theme='dark']) .podBus text {
-  fill: #a48bff;
+.head_idle {
+  fill: var(--ha-req);
+  opacity: 0.45;
 }
 .junction {
-  fill: var(--amex-blue);
-}
-:global([data-theme='dark']) .junction {
-  fill: var(--amex-blue-bright);
-}
-.bufLabel {
-  font-size: 13.1px;
-  font-weight: 600;
-  fill: var(--amex-state-choice);
+  fill: var(--ha-req);
 }
 
 /* --------------------------------------------------------------- legend */
 .legend text {
-  font-size: 14.8px;
+  font-size: 14px;
   fill: var(--amex-txt);
 }
-.legendMut {
-  fill: var(--amex-mut) !important;
+.legend .legendMut {
+  fill: var(--amex-mut);
 }
