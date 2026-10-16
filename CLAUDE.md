@@ -1,9 +1,9 @@
 # CLAUDE.md — Billpay Wiki Project
 
 ## What this is
-A Docusaurus site documenting Billpay's credit card payment processing platform at American Express, for company leaders, product owners, and technology leaders. Structure is modeled on the existing site at https://arunav-bhattacharya.github.io/billpay-wiki/, but content is refined against `docs/Wiki_Spec.md`, which reflects updated APIs and workflows.
+A Docusaurus site documenting Billpay's credit card payment processing platform at American Express, for company leaders, product owners, and technology leaders. Structure is modeled on the existing site at https://arunav-bhattacharya.github.io/billpay-wiki/, but content follows `docs/Wiki_Spec.md`, which holds the target design: two Temporal clusters, the Router, dispatchers paced by a governor, and market onboarding through versioned releases.
 
-The site is built and the eight sections are written. `CONTENT_PLAN.md` holds the treatment for each page and is still the place to check before writing or restructuring one.
+The site has nine sections: Vision, Architecture, Design, Market Onboarding, Build, Testing, Deployment, Observability and Operations, plus the intro and Contributing. `CONTENT_PLAN.md` holds the treatment for each page and is the place to check before writing or restructuring one.
 
 ## Source of truth hierarchy
 1. **`docs/Wiki_Spec.md`** — authoritative for every technical fact (APIs, workflows, lifecycle states, dimensions, activities). If the reference site and the spec disagree, the spec wins.
@@ -13,7 +13,7 @@ The site is built and the eight sections are written. `CONTENT_PLAN.md` holds th
 ## Hard rules — do not violate silently
 - **Design** section must not include a "Payment Services" subsection, in any form.
 - **Build** section must not include a "Services" subsection, in any form.
-- **Testing, Deploy, Observability** should closely mirror the reference site's content. Adapt formatting/theme only — don't materially rewrite these.
+- **Testing, Deploy, Observability** follow the spec like every other section. Extend them or rewrite them in full where the spec calls for it; the reference site is no longer their source.
 - Audience includes non-engineering leadership. Vision and Architecture prose should stay accessible. Design and Build can go technical (the audience includes tech leaders) but should still explain jargon on first use, not just dump it.
 
 ## Design system
@@ -21,7 +21,7 @@ The site is built and the eight sections are written. `CONTENT_PLAN.md` holds th
 - Light mode default, dark mode supported, gradients via CSS custom properties (not hardcoded per-component)
 - Palette: the Amex design language (DLS) colours only. Bright Blue `#006FCF` for actions, links and badges, Deep Blue `#00175A` for headings, the brand bar, banners and table heads, Light Blue `#66A9E2` as a small accent, and the DLS greys. No gold, violet or cyan. All are `--amex-*` tokens in `website/src/css/custom.css`. Theme-independent brand values sit in the palette block at the top; anything that changes between light and dark belongs in the two theme blocks, as a pair. Components never hardcode a colour.
 - The "Blue Box" look: the square from the Amex logo is the one shape. Numbers are badges (white digits in a blue box, corner `--amex-badge-radius`), each h2 opens on a small blue box, and a section break is three of them. Structure comes from fills, tints and soft shadows, not from ruled lines: no rule under headings, no outline on cards, no edge on the sidebar or contents rail.
-- Every doc page opens on the page banner: a solid Deep Blue block with the section number and name, beside the H1 and Lead on a pale field (the dark card surface in dark mode). It is CSS in `custom.css` (section 12) over MDX's own `<header><h1>` and the Lead's global `doc-lead` class, fed two custom properties from `src/theme/DocItem/Layout`. The homepage hero holds the eight sections as a board.
+- Every doc page opens on the page banner: a solid Deep Blue block with the section number and name, beside the H1 and Lead on a pale field (the dark card surface in dark mode). It is CSS in `custom.css` (section 12) over MDX's own `<header><h1>` and the Lead's global `doc-lead` class, fed two custom properties from `src/theme/DocItem/Layout`. The homepage hero holds the nine sections as a board.
 
 ## Diagrams
 Four kinds, in the order to reach for them. Authoring guide: `DIAGRAMS.md`.
@@ -49,7 +49,7 @@ Reuse before building. Take colour from the `--amex-*` tokens so both themes wor
 
 **Shared behaviour lives in `website/src/lib/`** as flat files: `useOverlay` (Escape, scroll lock, focus return), `inlineMarkup` (`**bold**` and `` `code` `` in row data), `ordinal`, `sections`. It is deliberately not under `src/components/`, where every folder is a public MDX import surface.
 
-**Colour comes from tokens, always.** Worker tone is `--amex-worker-online` / `--amex-worker-offline`, applied through `WorkerChip`. The eight `--amex-cat-*` section accents are one set, read by literal name in components; deployment and operations have no reader today but stay so the set is complete. Section numbering itself is the Bright Blue badge, not a per-section hue.
+**Colour comes from tokens, always.** Worker tone is `--amex-worker-online` / `--amex-worker-offline`, applied through `WorkerChip`. The nine `--amex-cat-*` section accents are one set, read by literal name in components; deployment, operations and onboarding have no reader today but stay so the set is complete. Section numbering itself is the Bright Blue badge, not a per-section hue.
 
 **Prop names.** `term` and `desc` for a heading and the line under it, in every component that renders that pair. `rows` for a table's data. Keep a domain name where the concept really is different: a worker split has `workers`, a journey has `steps`.
 
@@ -61,10 +61,11 @@ Every doc page under `website/docs/`:
 - `desc` strings use backticks, unless the value needs JSX for inline markup.
 
 ## Writing style — applies to every page
-- **Run the `tone-of-voice` skill before writing page prose.** It lives at `.claude/skills/tone-of-voice/SKILL.md` and defines the house voice: approachable, sophisticated, professional, aspirational, authentic, supportive, trustworthy. Never overly casual, trendy, formal, out of reach, humorous, or pretentious.
-- **Run the `humanizer` skill alongside it.** Load both at the start of any content task, not as a cleanup pass at the end. The humanizer strips the machine tells; `tone-of-voice` sets what goes in their place.
+- **Write like a blog post from a senior engineer or product owner** who is explaining the system to a colleague. Open on the problem or the thing the reader will learn, say why before how, use a concrete number or example where one exists, and keep the reader moving from one idea to the next. The reader should finish a page knowing something they didn't.
+- **Run the `human-writing` skill for every page.** Load it at the start of any content task, together with `tone-of-voice` and `humanizer`, not as a cleanup pass at the end.
+- **`tone-of-voice`** lives at `.claude/skills/tone-of-voice/SKILL.md` and defines the house voice: approachable, sophisticated, professional, aspirational, authentic, supportive, trustworthy. Never overly casual, trendy, formal, out of reach, humorous, or pretentious. The humanizer strips the machine tells; `tone-of-voice` sets what goes in their place.
 - **No em dashes or en dashes.** Use a period, comma, colon, or parentheses. This is the most reliable AI tell and it is a hard rule.
-- **Prefer short bulleted points to paragraphs.** Verbosity is the problem, not page length.
+- **Short paragraphs that explain, with bullets and tables where the reader scans or compares.** Verbosity is the problem, not page length.
 - **Avoid `**Bold header:** explanation` bullet lists.** Write the point directly.
 - **Plain words over inflated ones.** Simple and easy to understand beats impressive.
 - Applies to page copy and to user-visible strings inside React components.
@@ -73,17 +74,17 @@ Every doc page under `website/docs/`:
 - No page gets written ad hoc — every page starts from an entry in `CONTENT_PLAN.md`.
 - One phase per session/commit. Don't jump ahead to Design before Vision/Architecture are reviewed and approved.
 - Commit after every phase, not just at the end.
-- Sub-agents are appropriate for: Mermaid diagram generation from spec tables, and mechanical copy/re-theme of Testing/Deploy/Observability. Keep Vision/Architecture/Design/Build authoring on the main thread — these need consistent voice and judgment calls that sub-agents can't coordinate on independently.
+- Sub-agents are appropriate for Mermaid diagram generation from spec tables and for checking finished pages against the spec. Keep page authoring on the main thread: every section now follows the spec, and the voice and judgment calls need one author.
 
 ## Repo layout
 ```
-/docs/Wiki_Spec.md            # source spec, do not edit
+/docs/Wiki_Spec.md            # source spec, the source of truth for every fact
 /reference/                   # snapshot of the existing site, read-only reference
 /CONTENT_PLAN.md
 /DIAGRAMS.md                  # diagram authoring guide
 /CLAUDE.md
 /website/                     # Docusaurus project root
-  docs/                       # the 85 pages
+  docs/                       # the pages, one folder per section
   src/
     components/               # one folder per component, each importable from MDX
     css/custom.css            # tokens and the site's own styling

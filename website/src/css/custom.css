@@ -315,11 +315,12 @@ h3 {
      family plus one green and one grey. Each clears 4.5:1 on white, so the
      labels they colour stay legible. Components read them by literal name
      (Principles, Highlights, JourneyIndex, the diagram maps). The numbering
-     itself is the Bright Blue badge, so deployment and operations have no
-     reader today; they stay so the set is complete. */
+     itself is the Bright Blue badge, so deployment, operations and
+     onboarding have no reader today; they stay so the set is complete. */
   --amex-cat-vision: #006fcf;        /* Bright Blue 600 */
   --amex-cat-architecture: #00175a;  /* Deep Blue 700 */
   --amex-cat-design: #00559e;        /* Bright Blue 700 */
+  --amex-cat-onboarding: #112a73;    /* Deep Blue 600 */
   --amex-cat-build: #003a6e;         /* Bright Blue 800 */
   --amex-cat-testing: #00804a;       /* Green 700 */
   --amex-cat-deployment: #595959;    /* Grey 700 */
@@ -470,6 +471,7 @@ h3 {
   --amex-cat-vision: #56a1e3;        /* Bright Blue 400 */
   --amex-cat-architecture: #e0e4f1;  /* Deep Blue 100 */
   --amex-cat-design: #83baeb;        /* Bright Blue 300 */
+  --amex-cat-onboarding: #66a9e2;    /* Light Blue */
   --amex-cat-build: #b5d7f4;         /* Bright Blue 200 */
   --amex-cat-testing: #5cbf96;       /* Green 400 */
   --amex-cat-deployment: #bdbdbd;    /* Grey 400 */

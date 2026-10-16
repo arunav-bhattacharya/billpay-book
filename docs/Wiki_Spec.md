@@ -1,48 +1,81 @@
 # Billpay Wiki Spec
 
-> This wiki covers billpay core APIs, event-handlers & workflows, generic activities, periodic processes for payments and refunds, along with defined lifecycle states
+> The source of truth for the Billpay wiki. It covers the One-Data functions, the Billpay core APIs, the Router, the workflows on the Online and Offline Temporal clusters, the stages, activities and clients they are built from, the dispatchers and governor that pace offline work, market onboarding, and the lifecycle states of payments and refunds. Every page takes its facts from here.
 
 ## Table of Contents
 
-The core components in this Billpay Wiki Spec are -
+1. [Rules every part follows](#rules-every-part-follows)
+2. [Billpay API Gateway - One Data Functions](#billpay-api-gateway---one-data-functions)
+3. [Billpay APIs](#billpay-apis)
+4. [Billpay Workflows (Temporal)](#billpay-workflows-temporal)
+5. [Payment Lifecycle States](#payment-lifecycle-states)
+6. [Market Onboarding & Payment Dimensions](#market-onboarding--payment-dimensions)
+7. [Core Components in Workflows](#core-components-in-workflows)
+8. [Workflow Logic](#workflow-logic)
+9. [Periodic Workflows](#periodic-workflows)
+10. [Activities](#activities)
+11. [Overall Payments View](#overall-payments-view)
+12. [Routing and Start Modes](#routing-and-start-modes)
+13. [Work Tracker, Outbox and Inbox](#work-tracker-outbox-and-inbox)
+14. [Dispatchers and the Governor](#dispatchers-and-the-governor)
+15. [Throttling, Priority and Fairness](#throttling-priority-and-fairness)
+16. [Corporate Allocations](#corporate-allocations)
+17. [Market Onboarding](#market-onboarding)
+18. [Platform](#platform)
+19. [Sequence and State Diagrams](#sequence-and-state-diagrams)
+20. [Open Items](#open-items)
 
-1. [Billpay API Gateway - One Data Functions](#billpay-api-gateway---one-data-functions)
-2. [Billpay APIs](#billpay-apis)
-3. [Billpay Workflows (Temporal)](#billpay-workflows-temporal)
-4. [Payment Lifecycle States](#payment-lifecycle-states)
-5. [Market Onboarding & Payment Dimensions](#market-onboarding--payment-dimensions)
-6. [Core Components in Workflows](#core-components-in-workflows)
-7. [Workflow Logic](#workflow-logic)
-8. [Activities & ActivityGroups](#activities--activitygroups)
-9. [A Bird's Eye View](#overall-payments-view)
-10. [Sequence Diagrams](#sequence-diagrams)
-11. [State Diagrams](#state-diagrams)
+Payments and credit balance refunds are both in scope.
+
+---
+
+## Rules every part follows
+
+When a choice is unclear, these rules decide it.
+
+1. **Oracle is the source of truth.** Every status change is a conditional update that applies only if the status is still what the writer expects. Whoever loses backs off.
+2. **Work that waits for a date waits in Oracle,** never in a sleeping workflow or on a Temporal timer.
+3. **Nothing calls across clusters.** Oracle is the only hand-off between the Online and Offline clusters.
+4. **Every payment workflow starts through the Router.** No API or dispatcher starts one on its own. Control workflows (dispatchers, the governor, provisioning) start from Schedules or their own APIs.
+5. **Pace at the door.** Admit only what a cluster and its downstreams can carry. Big bursts wait in Oracle, not in Temporal.
+6. **One workflow per journey.** Stages are the only thing that varies by market behavior. There are no market-specific workflows.
+7. **One Oracle commit per stage.** A stage runs its calls in parallel first; then the state change, the lifecycle timeline entry and the outbox rows commit together.
+8. **Pin the plan and the build at start.** A running workflow never has its code or config changed under it.
+
+[^ Top](#table-of-contents)
 
 ---
 
 ## Billpay API Gateway - One Data Functions
 
-### Core:
+One-Data functions are the versioned contracts that channels and partner systems call. Each one fronts a Billpay core API.
 
-1. [CreatePayment.v3](<[[https://explorer.aexp.com/functions/CreatePayment.v3?method=post](https://explorer.aexp.com/functions/CreatePayment.v3?method=post)](https://explorer.aexp.com/functions/CreatePayment.v3?method=post](https://explorer.aexp.com/functions/CreatePayment.v3?method=post))>) - Create a immediate payment or schedule a payment in future
-2. [UpdatePayment.v1](<[[https://explorer.aexp.com/functions/UpdatePayment.v1?method=post](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post)](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post))>) - Update an existing payment
-3. [DeletePayment.v1](<[[https://explorer.aexp.com/functions/DeletePayment.v1?method=post](https://explorer.aexp.com/functions/DeletePayment.v1?method=post)](https://explorer.aexp.com/functions/DeletePayment.v1?method=post](https://explorer.aexp.com/functions/DeletePayment.v1?method=post))>) - Delete an existing payment
-4. [ReadPayments.v1](<[[https://explorer.aexp.com/functions/ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1)](https://explorer.aexp.com/functions/ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1))>) - List payments for a given card account number
-5. [ReadPaymentEventsById.v1](<[[https://explorer.aexp.com/functions/ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1)](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1))>) - List different lifecycle states of a payment for a given payment id
-6. [CreateCreditBalanceRefund.v1](<[[https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post)](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post))>) - Initiate a refund on the credit balance amount on a credit card account
-7. `CreateInboundPayment.v1` - Process a push payment that is initiated by a Third Party
-8. `CreatePaymentIntent.v1` - Initiate an intent to create a payment
+### Core
 
-### Composite:
+1. [CreatePayment.v3](https://explorer.aexp.com/functions/CreatePayment.v3?method=post): create a payment for today or schedule one for a future date.
+2. [UpdatePayment.v1](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post): update a `SCHEDULED` payment. Works only inside the market's cancellation window; after it closes the answer is 409.
+3. [DeletePayment.v1](https://explorer.aexp.com/functions/DeletePayment.v1?method=post): cancel a `SCHEDULED` payment. Works only inside the cancellation window; after it closes the answer is 409.
+4. [ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1): list the payments on a card account.
+5. [ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1): list the lifecycle states one payment has been through.
+6. [CreateCreditBalanceRefund.v1](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post): refund a credit balance on a card account.
+7. `CreateInboundPayment.v1`: take a payment pushed by a third party. Asynchronous: 202 once the workflow has started, or 429 with Retry-After over budget.
+8. `CreatePaymentIntent.v1`: record an intent to pay, processed only when the customer's financial institution confirms it.
+9. `CreatePaymentAllocations.v1`: the allocations callback for corporate payments. **Placeholder name** until the real function name is known. Asynchronous: 202 once the batch is stored and its workflow has started.
 
-1. [CreatePaymentInstallment.v1](<[[https://explorer.aexp.com/functions/CreatePaymentInstallment.v1](https://explorer.aexp.com/functions/CreatePaymentInstallment.v1)](https://explorer.aexp.com/functions/CreatePaymentInstallment.v1](https://explorer.aexp.com/functions/CreatePaymentInstallment.v1))>) - Create payment and future installments of payment
-2. `CreateBillpayTransactionFromAccountsReceivable.v1` - Processes payment and refund requests that are initiated from Accounts Receivable Platform
+### Composite
 
-### Event Handlers:
+1. [CreatePaymentInstallment.v1](https://explorer.aexp.com/functions/CreatePaymentInstallment.v1): create a payment and a plan of future installments (Pay & Plan).
+2. `CreateBillpayTransactionFromAccountsReceivable.v1`: payments and refunds raised by the Accounts Receivable platform. Asynchronous: 202 once the workflow has started, or 429 with Retry-After over budget.
 
-1. `MoneyMovementEventHandler.v1` - Accepts money movement events (MR/M3) and if returned payment then triggers Returned Payment Workflow, if Settled Event insert into External State Transition Events table
-2. `AccountsReceivableTransactionEventHandler.v1` - Accepts Accounts Receivable (GAR) posted events, and other types of transaction events. When a posted payment event is sent it looks up for the corresponding payment, and makes an entry into an External State Transition Events table
-3. `OpentoBuyUpdatePaymentEventHandler.v1` - Accepts AMP events, make an entry into External State Transition Events table - TBD
+### Event Handlers
+
+Event handlers take events from other platforms. None of them makes a workflow wait.
+
+1. `MoneyMovementEventHandler.v1`: money movement events from MR/M3. A return starts `ProcessReturnedPaymentWorkflow` through `POST /payments/returns`. A settlement event lands in the external transaction events tracker, the **inbox**.
+2. `AccountsReceivableTransactionEventHandler.v1`: Accounts Receivable (GAR) events. When a payment posts, the handler finds the payment and writes the AR-posted event to the inbox.
+3. `OpentoBuyUpdatePaymentEventHandler.v1`: Authorizations (AMP) events, written to the inbox. Details still to be defined.
+
+`ProcessPaidEventsWorkflow` reads the inbox and sets `PAID` once both the settlement and the AR-posted events have arrived.
 
 [^ Top](#table-of-contents)
 
@@ -50,21 +83,48 @@ The core components in this Billpay Wiki Spec are -
 
 ## Billpay APIs
 
-### Core:
+Every write API admits the request first, through the Router (see [Routing and Start Modes](#routing-and-start-modes)):
 
-1. `POST /payments` - Initiates a payment immediately or schedules in future
-2. `PUT /payments/{payment-id}` - Updates a `SCHEDULED` payment
-3. `DELETE /payment/{payment-id}` - Cancels a `SCHEDULED` or `ACCEPTED` payment from being processed.
-4. `POST /payments/returns` - Processes a `RETURNED` payment
-5. `POST /payments/inbound` - Processes a payment that is initiated or confirmed by a Third-Party
-6. `POST /payments/intent` - Initiates an intent to make a payment which is only processed when customer's financial institution confirms it
-7. `POST /refunds` - Initiates a refund process to send money back to the customer
-8. `GET /payments/account/{account-id}` - List all payments for the given account
-9. `GET /payments/{payment-id}` - Provides detail of a single payment
+- **422** when the market, account type or API is not live in this environment. Senders do not retry a 422.
+- **429** with `Retry-After` when an asynchronous traffic class is over its budget. Every asynchronous sender retries on 429.
+- **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED`, or after the cancellation window has closed.
+- **503** with `Retry-After` for an asynchronous start while the Offline cluster is down.
 
-### Composite:
+### Core
 
-1. `POST /payment-installments` - Initiates a payment immediately and also creates a plan for future installments
+| API | What it does | Start mode | Reply |
+| --- | --- | --- | --- |
+| `POST /payments` | Pays today or schedules for a future date | From channels: Update-With-Start. From AR: async start | Channels: ACCEPTED, SCHEDULED or DECLINED. AR: 202 with the payment ID |
+| `PUT /payments/{payment-id}` | Updates a `SCHEDULED` payment inside the cancellation window | Update-With-Start | The new payment's result; 409 outside the window |
+| `DELETE /payments/{payment-id}` | Cancels a `SCHEDULED` payment inside the cancellation window | Update-With-Start | CANCELLED; a repeated cancel gets CANCELLED again; 409 otherwise |
+| `POST /payments/returns` | Processes a returned payment | Async start | 202 |
+| `POST /payments/inbound` | Processes a payment initiated or confirmed by a third party | Async start | 202 |
+| `POST /payments/intent` | Records an intent to pay, processed when the customer's FI confirms it | Update-With-Start | The intent's result |
+| `POST /payments/{payment-id}/allocations` | Takes one batch of allocations for a corporate payment | Stores the batch, then async start | 202 |
+| `POST /refunds` | Refunds a credit balance | From channels: Update-With-Start. Async events, such as from AR: async start | Channels: the refund's result. Events: 202 |
+| `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
+| `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment |
+
+AR learns the outcome of an asynchronous create from the SCHEDULED and DECLINED notifications and lifecycle events, or from `GET /payments/{payment-id}`.
+
+### Composite
+
+| API | What it does | Start mode |
+| --- | --- | --- |
+| `POST /payment-installments` | Pays today and creates a plan of future installments | Update-With-Start; its children run on the Online cluster |
+
+### Provisioning API
+
+Each environment's core app exposes a provisioning API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity.
+
+| Path | What it does |
+| --- | --- |
+| `/provisioning/releases` | Takes a frozen market release, reports its provisioning progress, records a sign-off and rolls a release back |
+| `/provisioning/markets/{market}/{account-type}/pause` | Pauses a live market's dispatchers |
+| `/provisioning/markets/{market}/{account-type}/resume` | Resumes them |
+| `GET /provisioning/capabilities` | Returns the deployed build's capability manifest: every behavior combination the build can run |
+
+Sending a release is idempotent: one provisioning workflow per market, account type, version and environment.
 
 [^ Top](#table-of-contents)
 
@@ -72,70 +132,81 @@ The core components in this Billpay Wiki Spec are -
 
 ## Billpay Workflows (Temporal)
 
-Even before we dive into the functionality of the Workflows we need to know how these workflows will get executed. Primarily there are only 2 different Temporal Workers in which these workflows can be executed -
+### Two clusters
 
-- **Online Worker** - Workflows that are triggered by an end-user (customer, representative, etc) and awaits a response back from the workflow.
-- **Offline Worker** - Workflows that are asynchronously triggered by events or other async systems like RTF, and there is no end-user directly awaiting on the execution of the workflow.
+Billpay runs on two self-hosted Temporal clusters. Each has its own Aurora PostgreSQL database and its own OpenSearch 2 visibility store.
 
-There are primarily 3 types of workflows based on functionality or how they are triggered -
+- **Online cluster:** journeys where a caller waits for an answer. Peak 100 TPS.
+- **Offline cluster:** work we can pace: scheduled execution, AR intake, corporate allocations, returns, inbound payments, representments, periodic jobs and the control workflows.
 
-- [[#Core Workflows]] - These are core Billpay business process workflows which are triggered as per incoming request, and can execute in either of _Online_ or _Offline_ worker depending upon which part of the customer journey the workflow is invoked (Real customer, batch process, etc).
-- [[#Composite Workflows]] - These workflows encompasses one or more core workflows, and may have additional custom logic outside of the core workflows depending upon the business requirement and can span the orchestration across domains (eg - _Pay & Plan_ which is orchestrated across Billpay & GAR, _Pay With MR Points_ - Billpay & Loyalty, etc). Currently all the known composite workflows are executed on _Online_ worker.
-- [[#Periodic Workflows]] - These workflows also manages core Billpay business processes, but they are triggered by a Scheduler (Temporal Schedules) on a _Offline_ worker.
+Separate databases mean offline load can never slow realtime traffic at the Temporal layer. Only Oracle and the downstream services are shared, and the governor watches both, so pressure there slows offline work, never online traffic.
 
-### Core Workflows
+**Nothing calls across clusters.** A payment accepted or scheduled on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as its state change. Self-hosted Nexus cannot bridge the two: it works only inside one cluster or across multi-cluster replication.
 
-> Can execute in either _Online_ or _Offline_ Worker
+**Standby.** Each cluster runs active-passive, like the single cluster it replaces: active in us-east-1, with a passive standby in us-west-1 whose database replicates from the east. An operator promotes each standby on its own, and the apps reconnect to it.
 
-#### Online Worker:
+### Two worker apps
 
-1. Create Immediate Payment #CreateImmediatePaymentWF
-2. Create Schedule Payment\* #CreateSchedulePaymentWF
-3. Execute Split Payment\* #ExecuteSplitPaymentWF
-4. Update Payment #UpdatePaymentWF
-5. Cancel Payment #CancelPaymentWF
-6. Create Payment Intent #CreatePaymentIntentWF
-7. Create Balance Refund\* #CreateBalanceRefundWF
+- **Online app:** the core APIs, the Router and the Online workers. The core APIs hold a Temporal client for each cluster.
+- **Offline app:** the dispatchers, the outbox relays, the governor, the Offline workflows, and one worker deployment per downstream task queue.
 
-#### Offline Worker:
+### Traffic classes
 
-1. Create Schedule Payment\* #CreateSchedulePaymentWF
-2. Execute Scheduled Payment #ExecuteScheduledPaymentWF
-3. Execute Split Payment\* #ExecuteSplitPaymentWF
-4. Process Inbound Payment #ProcessInboundPaymentWF
-5. Process Returned Payment #ProcessReturnedPaymentWF
-6. Process Representing Payment #ProcessRepresentmentWF
-7. Get Corporate Payment Allocations #GetCorporatePaymentAllocationsWF
-8. Create Balance Refund\* #CreateBalanceRefundWF
+| Traffic | Volume and rate | Caller waits | Deadline | Cluster |
+| --- | --- | --- | --- | --- |
+| Pay today, from channels | Peak 100 TPS | Yes, until ACCEPTED | Never impacted | Online |
+| Schedule, update, cancel, from channels | Part of realtime traffic; cancel under 2 TPS | Yes | Cancel only inside the cancellation window | Online |
+| Credit balance refunds | From channels, or as async events such as AR | Channels: yes. Events: no | None | Online from channels; Offline for events |
+| Scheduled intake, AR batch | 100 TPS sustained (1M in 2.8 h) | No: started, then 202; 429 over budget | None | Offline |
+| Scheduled execution, US | Up to 1M at midnight ET | No | No cutoff; 50 TPS floor, faster when healthy | Offline |
+| Scheduled execution, SEPA | Up to 250K per market (DE, IT) at midnight CET | No | 3 to 4 hour cutoff | Offline |
+| Corporate | Up to 50K payments and 500K allocations a day; up to 100K allocations in one payment | Only for pay today | The parent clears on its due date | Offline; pay today starts on Online |
+| Returns | Bursts of 100 TPS, up to 100K a day | No: started, then 202 | None | Offline |
+| Inbound, pushed by a third party | Assumed like returns | No: started, then 202 | None | Offline |
+| Representments | A share of returns | No | The date market rules set | Offline |
 
-> `*` - _Workflows can execute in both Online and Offline Workers_
+### Kinds of workflow
 
-### Composite Workflows
+- **Core workflows:** one business journey each, such as paying today, executing a scheduled payment or processing a return.
+- **Composite workflows:** a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), multiple instructions. They run on the Online cluster, with their children on the same cluster.
+- **Periodic workflows:** jobs started by Temporal Schedules on the Offline cluster.
+- **Control workflows:** the dispatchers, the governor and market provisioning. They pace and configure payment work; they are not payment journeys.
 
-#### Online Worker:
+### Online cluster
 
-1. Create Payment & Installments
-2. Create Payment with multiple instructions
+| Workflow | Workflow ID | Notes |
+| --- | --- | --- |
+| `CreateImmediatePaymentWorkflow` | `{paymentId}-init` | Pay today |
+| `CreateScheduledPaymentWorkflow` | `{paymentId}-init` | Scheduled from channels |
+| `UpdatePaymentWorkflow` | `{paymentId}-update` | |
+| `CancelPaymentWorkflow` | `{paymentId}-cancel` | |
+| `CreatePaymentIntentWorkflow` | `{paymentId}-init` | |
+| `CreateBalanceRefundWorkflow` | `{paymentId}-init` | Refunds from channels |
+| `CreatePaymentWithMultipleInstructionsWorkflow` and Pay & Plan | `{paymentId}-init` | Composites; children on the Online cluster |
+| `ExecuteSplitPaymentWorkflow` | `{paymentId}_{seq}-execute` | Consumer split legs of an Online parent run as its children |
 
-### Periodic Workflows
+### Offline cluster
 
-#### Offline Worker:
+| Workflow | Workflow ID | Started by |
+| --- | --- | --- |
+| `CreateScheduledPaymentWorkflow` | `{paymentId}-init` | The Router, for AR batch intake |
+| `ExecuteScheduledPaymentWorkflow` | `{paymentId}-execute` | The scheduled-payments dispatcher |
+| `ExecuteSplitPaymentWorkflow` | `{paymentId}_{seq}-execute` | The leg dispatcher (corporate legs), or the parent (consumer splits) |
+| `RequestAllocationsWorkflow` | `{paymentId}-allocations` | The allocation-request dispatcher |
+| `ReceiveAllocationsWorkflow` | `{paymentId}-allocations-{batch}` | The allocations callback API |
+| `ProcessReturnedPaymentWorkflow` | `{paymentId}-return-{seq}` | The Router, from `POST /payments/returns` |
+| `ProcessRepresentmentWorkflow` | `{paymentId}-represent-{seq}` | The representment dispatcher |
+| `ProcessInboundPaymentWorkflow` | `{paymentId}-init` | The Router, from `POST /payments/inbound` |
+| `CreateBalanceRefundWorkflow` | `{paymentId}-init` | The Router, for refunds that arrive as async events |
+| `ProcessPaidEventsWorkflow`, `ProcessMissingPaidEventsWorkflow`, `PurgeTransactionDataWorkflow` | Their Schedule's ID plus the trigger time | Temporal Schedules |
+| Dispatchers (scheduled payments, allocation requests, allocation legs, representments) | Their Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time | Temporal Schedules |
+| Outbox relays, one per target | Not payment workflows | They send directly |
+| `GovernorWorkflow` | `governor`, plus its Schedule's trigger time | A Schedule that keeps it running |
+| `MarketProvisioningWorkflow` | `provision-{market}-{accountType}-v{N}` | The provisioning API |
 
-1. Scheduled Payments Executor
-2. Corporate Allocations Processor
-3. Scheduled Representment Executor
-4. Paid Events Processing
-5. Missing Paid Events Processing
-6. Data Purger
+On returns and representments `{seq}` is the presentment sequence, so a payment returned again after its representment gets a new workflow ID.
 
-#### A Peek into Periodic Workflows (Temporal Schedules)
-
-1. Scheduled Payments Executor (Triggers **\*Execute Scheduled Payment** Workflow\* in batches (eg: Schedule 2500 payments over next 1 min, pick-up next 2500 payments after 1 min))
-2. Corporate Allocations Processor (Triggers **\*Execute Split Payment** Workflow\* in batches (eg: Schedule 2500 allocations over next 1 min, pick-up next 2500 allocations after 1 min))
-3. Scheduled Representments Executor (Triggers **\*Execute Representable Payment** Workflow\* in batches (eg: Schedule 2500 representments over next 1 min, pick-up next 2500 representments after 1 min))
-4. Paid Events Processor (Checks if both Settled and GAR Posted event have arrived then update the payment status to `PAID`)
-5. Missing Paid Events Processor (Checks if there are missing GAR or Settled events for payments, if so then makes enquiries into respective systems to query the current state, if they are settled or posted, then update status to `PAID`. If still missing raise alert)
-6. Data purger (Purges older data from Transactional tables)
+There are no 2,500-a-minute batches and no executors on timers: dated work waits as Work Tracker rows and dispatchers release it at the rate the governor sets.
 
 [^ Top](#table-of-contents)
 
@@ -143,29 +214,62 @@ There are primarily 3 types of workflows based on functionality or how they are 
 
 ## Payment Lifecycle States
 
-Consumer and Corporate Payments have almost a similar set of lifecycle states, except that Corporates have couple of additional Allocations processing states.
+Consumer and corporate payments share one set of states. A corporate parent also carries an **allocation status** on a separate track, which never blocks its clearing.
 
-| State          | Meaning                                                                                                                                                                                                                    | Terminal? |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `PENDING`      | The payment has been received in Billpay and is awaiting initial validation before processing it.                                                                                                                          | No        |
-| `SCHEDULED`    | The payment is set to execute at a future date, after it has been validated prior to scheduling.                                                                                                                           | No        |
-| `ACCEPTED`     | The payment is successfully validated by AmEx systems, and is ready to process.                                                                                                                                            | No        |
-| `PROCESSING`   | The payment is currently being executed by notifying the respective systems to debit the funding account (Banks, Financial Institutions) and credit the receiving accounts (in AmEx - Accounts Receivable, Authorization). | No        |
-| `PROCESSED`    | The payment has been executed and fulfilled by Billpay by notifying all the required stakeholders (Accounting, Audit, Risk, Communications, etc).                                                                          | No        |
-| `REPRESENTING` | A returned payment is scheduled to be re-attempted for settlement.                                                                                                                                                         | No        |
-| `PAID`         | The payment is settled and posted in accounts receivables.                                                                                                                                                                 | **Yes**   |
-| `RETURNED`     | The payment did not settle; funds were returned from the customer's bank.                                                                                                                                                  | **Yes**   |
-| `REPRESENTED`  | A returned payment was re-attempted and successfully settled.                                                                                                                                                              | **Yes**   |
-| `DECLINED`     | The payment failed validation and hence cannot be processed further.                                                                                                                                                       | **Yes**   |
-| `CANCELLED`    | The payment was withdrawn by system or customer before it can be processed.                                                                                                                                                | **Yes**   |
-| `DISALLOWED`   | The third-party initiated payment was not accepted in American Express.                                                                                                                                                    | **Yes**   |
+| State | Meaning | Terminal? |
+| --- | --- | --- |
+| `PENDING` | Captured in Billpay, idempotency checked, awaiting validation. | No |
+| `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
+| `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. | No |
+| `PROCESSING` | Being executed: clearing with the bank, the AR balance reduced, open-to-buy raised. | No |
+| `PROCESSED` | Clearing, AR, OTB, accounting, eBNC and risk have all succeeded. Comms and lifecycle events follow through the outbox after the commit. | No |
+| `REPRESENTING` | A returned payment queued for another presentment on the date market rules set. | No |
+| `PAID` | Settled and posted to Accounts Receivable. | Yes, unless a return arrives |
+| `RETURNED` | The payment did not settle; the customer's bank returned the funds. | Yes, unless it is represented |
+| `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
+| `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window. | Yes |
+| `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
 
-#### Additional Corporate Payment States
+### Transitions
 
-| State        | Meaning                                                                                                                              | Terminal ? |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
-| `ALLOCATING` | Billpay has requested allocations from the Allocation Processing system and currently awaiting it or in the process of receiving it. | No         |
-| `ALLOCATED`  | Billpay has received all the allocations corresponding to the Payment                                                                | No         |
+| From | To | By |
+| --- | --- | --- |
+| Input | `PENDING` | Capture |
+| `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
+| `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
+| `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date |
+| `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
+| `ACCEPTED` | `PROCESSING` | Execute |
+| `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
+| `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow` |
+| `PROCESSING`, `PROCESSED` or `PAID` | `RETURNED` | Return |
+| `RETURNED` | `REPRESENTING` | QueueRepresentment |
+| `REPRESENTING` | `REPRESENTED` or `DECLINED` | Represent |
+| `REPRESENTED` | `RETURNED` | Return, when it is returned again |
+
+There is no path from `ACCEPTED` to `CANCELLED`. A payment that has left `SCHEDULED` can no longer be cancelled.
+
+### Guarded updates
+
+Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`.
+
+### Allocation status (corporate parents)
+
+| `allocation_status` | Meaning |
+| --- | --- |
+| `NONE` | No allocations requested yet |
+| `ALLOCATING` | Requested from the allocations manager; batches may be arriving |
+| `ALLOCATED` | The legs received add up to the payment amount |
+
+Corporate rules:
+
+- The parent clears once, at payment level, on its due date. It does not wait for allocations.
+- The parent turns `PROCESSED`, by a guarded update, once it has cleared **and** every leg is `PROCESSED`.
+- The parent turns `PAID` once it has settled **and** every leg has posted to AR.
+- If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
+- A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
+- A declined or cancelled parent cancels its legs.
 
 [^ Top](#table-of-contents)
 
@@ -173,13 +277,20 @@ Consumer and Corporate Payments have almost a similar set of lifecycle states, e
 
 ## Market Onboarding & Payment Dimensions
 
-- Billpay will provide an onboarding UI for bringing in more markets into the platform. As a part of the onboarding journey the user can select which Billpay APIs will be onboarded for the market in concern.
-- Apart from this the user will be asked questions about the dimensions, which are essentially the processing variants, for the said market.
-- The possible dimensions for a Payment in billpay payment processing journey are -
-  - `accountType` - Possible values are `CONSUMER`, `CORPORATE` and `BUSINESS_TRAVEL`
-  - `requiresArPosting` - A boolean flag that indicates if the processed payment needs to be notified to AR
-  - `requiresRealtimeClearing` - Again this is a boolean flag, that determines if clearing is Realtime or Non-Realtime.
-  - `requiresMandateAuthorization` - This is again a boolean flag, that checks if mandate verification needs to be done while processing a payment.
+Markets are onboarded through billpay-ui, the market-onboarding control plane. The process, releases and provisioning are in [Market Onboarding](#market-onboarding).
+
+A market profile is one market and one account type. Onboarding picks the Billpay APIs the profile takes and answers four behavior questions, the payment dimensions:
+
+| Behavior | Values |
+| --- | --- |
+| `accountType` | `CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL` |
+| `requiresArPosting` | Y, N or BOTH: the processed payment is posted to AR |
+| `requiresRealtimeClearing` | Y, N or BOTH: clearing is realtime or batch |
+| `requiresMandateAuthorization` | Y, N or BOTH: a mandate is verified before processing |
+
+**BOTH** means required for some journeys and not others. Onboarding stores which journeys get Y, and the Router resolves BOTH to Y or N per journey. For realtime clearing only pay-today payments from channels get Y: every future-dated payment clears in batch, whether it came from a channel or from AR. Future-dated payments never clear in real time.
+
+A combination that is not onboarded for a market is rejected with 422 before any workflow starts.
 
 [^ Top](#table-of-contents)
 
@@ -187,60 +298,71 @@ Consumer and Corporate Payments have almost a similar set of lifecycle states, e
 
 ## Core Components in Workflows
 
-The component model exists to separate business decision-making from transport and infrastructure concerns. Each layer should be described first by the payment-lifecycle responsibility it owns, then by the Temporal or integration constraints that shape its implementation.
+Four layers handle every journey: **Workflow → Stage → Activity → Client**. Business sequencing belongs in workflows, business steps and every behavior variation in stages, calls to one system in activities, and contract mapping in clients.
 
-### 1.Workflow
+| Layer | What it does | May call | Must not call | Location | Naming |
+| --- | --- | --- | --- | --- | --- |
+| **Workflow** | Runs one journey. No market logic | Stages; child workflows on its own cluster | Activities, clients, external systems, anything on the other cluster | `core/lib/workflows/impl/` | `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow` |
+| **Stage** | One business step: parallel calls, then one Oracle commit. Returns its outcome. The only layer that varies by behavior | Activities; plain helper functions | Workflows, other stages, clients, external systems | `core/lib/stages/impl/`; a market override in `market/{m}/stages/` | A `{Step}Stage` interface; implementations named for the behavior, such as `MandateVerifyStage` |
+| **Activity** | The calls to one system, on that system's task queue | Clients | Workflows, stages, other activities, external systems | `core/lib/activities/` and `impl/` | `{System}Activities`, such as `ClearingActivities`; Oracle reads and writes in `PaymentStore` |
+| **Client** | Talks to one external system and maps its contract | That one system | Other clients, workflows, stages, activities | `core/lib/clients/` | `{System}Client` |
 
-- Orchestrates a complete business journey for a cardmember payment or refund, such as initiating a payment, scheduling a payment, or processing a return
-- Sequences business decision points without owning external-system mapping
+Nothing calls up or sideways: a stage never calls another stage, an activity never calls another activity, and a client never calls another client.
 
-### 2. Stage
+### Stages
 
-- Represents a business decision point in the payment lifecycle, such as initiated to pending, pending to accepted, or returned to representing
-- Implemented as a Kotlin class with a single function that performs the validations, persistence, and publications required for that decision
-- Consumes one well-defined payment state and emits the next auditable payment state
-- Exclusively called by workflows
+A stage is one business step, named after the journey step it performs. It returns its outcome, so the workflow never chooses between from-to stages. Each stage commits the new state, a timeline entry (with the cluster) and its outbox and Work Tracker rows in one guarded `PaymentStore` commit.
 
-### 3. Activity Group
+| Stage | Moves | Varies by |
+| --- | --- | --- |
+| Capture | Input → `PENDING`, with the idempotency check | Nothing |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; inbound → `DISALLOWED` | All four behaviors |
+| Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED` | All four |
+| Execute | `ACCEPTED` → `PROCESSING` | Account type, AR posting, realtime clearing |
+| Fulfil | `PROCESSING` → `PROCESSED` | Account type |
+| RequestAllocations | Allocation status → `ALLOCATING` | Nothing |
+| ReceiveAllocations | Legs written; allocation status → `ALLOCATED` | Nothing |
+| Cancel | `SCHEDULED` → `CANCELLED` | Account type, AR posting |
+| Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
+| QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
+| Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
+| Settle | `PROCESSED` → `PAID` | Nothing |
 
-- Coordinates a small set of related business actions that belong to one responsibility, such as payment validation, lifecycle-event publication, or statement-balance updates
-- Can be called directly by workflows or stages
-- Should be named after the business concern it coordinates, not the technical mechanism it uses
+"All four" means account type, AR posting, realtime clearing and mandate authorization.
 
-### 4. Activity
+### Plan keys and stage lookup
 
-- Executes one retryable business action, such as publishing a lifecycle event, persisting an audit record, reading a payment option, or updating a downstream balance
-- Launched exclusively by workflows, stages, or activity groups
-- Should remain thin and delegate protocol-specific mapping to clients
+- The Router pins a **plan key** at start: the journey, the resolved behaviors and the market's config version.
+- A KSP-built index maps each behavior combination to its stage implementations, and the most specific match wins. A market override is a more specific match for that market. The workflow reads its plan key and looks up its stages at runtime; stage objects are never passed into a workflow.
+- The same index produces the build's **capability manifest**: every combination the build can run. Provisioning checks each market profile against it.
+- Every combination has a default implementation. A combination with no implementation cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes code under a running payment.
 
-### 5. Client
+### Rules
 
-- Encapsulates communication with an external system or a reusable internal capability
-- Translates between BillPay's payment-lifecycle language and the contract of a downstream system
-- Called exclusively by activities
+- Workflows and stages are never `abstract`: composition over inheritance.
+- There is one implementation of each workflow. Workflows are composed from different stage implementations, never copied per market.
+- Activities are shared across markets. Pass IDs, not payment objects; activities load what they need.
+- Set search attributes once, at start. No signals or queries on the hot path.
+- Every HTTP call carries an idempotency key such as `{paymentId}-{step}`. Every Oracle write is insert-if-absent or a conditional update on the current state, because local activities run again if a worker dies mid-task and any activity can be retried after a timeout even when its call went through.
 
-### Component Rules
+### Retries and timeouts
 
-Use the following rules to preserve a clear payment-lifecycle model: business sequencing belongs in Workflows, state transitions belong in Stages, cohesive business concerns belong in ActivityGroups, retryable actions belong in Activities, and external contract mapping belongs in Clients.
+- **Business failures** found by Verify or Reverify (closed account, insufficient funds) are non-retryable. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
+- **429 with Retry-After:** throw `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
+- **Other errors:** retry from 1 s, doubling, capped at 60 s, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED` and the payment goes onto the exception list in its last state.
+- **Start-to-close** is about 2 to 3 times the call's p99, so a hung call frees its slot fast.
+- **No HTTP-client retries** inside activities (for example MicroProfile `@Retry`). One task is one call, so a queue's limit stays the real call rate.
 
-| Component         | May Call                                      | Must NOT Call                                                         | Location                                                                   | Naming                                             |
-| ----------------- | --------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- |
-| **Workflow**      | Workflows, Stages, ActivityGroups, Activities | Clients, external systems                                             | `core/lib/workflows/impl/` (default), `market/{m}/workflows/` (market)     | `{Market}InitiatePaymentWorkflow`                  |
-| **Stage**         | ActivityGroups, Activities                    | Workflows, other Stages, Clients, external systems                    | `core/lib/stages/impl/` (default), `market/{m}/stages/` (market)           | `{From}To{To}Stage` e.g. `InitiatedToPendingStage` |
-| **ActivityGroup** | Activities                                    | Workflows, Stages, other ActivityGroups, Clients, external systems    | `core/lib/activityGroups/` (shared), `market/{m}/activityGroups/` (market) | `{Responsibility}ActivityGroup`                    |
-| **Activity**      | Clients                                       | Workflows, Stages, ActivityGroups, other Activities, external systems | `core/lib/activities/` + `impl/`                                           | `{Action}Activity` / `{Action}ActivityImpl`        |
-| **Client**        | Other Clients, external systems               | Workflows, Stages, ActivityGroups, Activities                         | `core/lib/clients/`                                                        | `{System}Client`                                   |
+### PaymentStore and Oracle outages
 
-**Additional rules:**
+`PaymentStore` is the only code that reaches Oracle, and it runs as a local activity.
 
-- Workflows and Stages must **not** be `abstract` — use composition over inheritance
-- There should not be any different implementations of any workflow. Workflows will be composed by different implementations of Stages and ActivityGroups.
-- Activities are shared across markets; pass only required fields, not the full `Payment` object
-- All Dimensions must be present in the Payment context before starting a workflow.
-- Every Stage and ActivityGroup will have a default implementation for given combination of dimensions. If there is no functionality for a particular combination of dimension, for example a CorporateAccount that doesn't need AR Posting might not be possible, so we won't have any implementation for that combination.
-- When a market is onboarded the profiles maps to the dimensions automatically, so that in runtime when a workflow is called, using the profile information appropriate Stage / ActivityGroup inside a workflow can be invoked. This essentially means when a profile is created with a specific set of dimensions, it automatically maps to the corresponding implementations of the Stages & ActivityGroups.
-- As part of market onboarding, a market with specific set(s) of dimensions will be captured under that market profile. If a particular combination of dimension is not onboarded for a market, then a workflow cannot be started for that combination. For example, we might onboard a Consumer account -type for processing in a market, but if a request lands for a Corporate account type then the processing will be rejected even before starting the corresponding Workflow.
-- Define implementations of Stages and ActivityGroups which are driven by behavior and is not market-specific. Define a proper process in place for naming implementations of Stages and ActivityGroups which is behavior driven and not market specific.
+- Short blips retry inside the same workflow task.
+- Once the wait between retries passes the local retry threshold (3 times the workflow task timeout, 30 s by default in the Java SDK), the SDK schedules a workflow timer and retries in a later task. The payment pauses and resumes when Oracle is back, even across a worker restart.
+- `PaymentStore` gets a schedule-to-close timeout of a few hours and a maximum retry interval of about a minute. A Java local activity with neither schedule-to-close nor maximum attempts set is not retried at all.
+- On the Online cluster, Capture gets a short deadline so the caller gets a quick error; steps after the reply use the long one.
+- During an outage the governor sees Oracle errors and stops dispatching, so only in-flight payments wait.
 
 [^ Top](#table-of-contents)
 
@@ -248,377 +370,229 @@ Use the following rules to preserve a clear payment-lifecycle model: business se
 
 ## Workflow Logic
 
-### Core Workflows
+Each journey is one workflow built from stages. Pay today and scheduled execution share the same Execute and Fulfil stages.
 
-#### 1. Create Immediate Payment #CreateImmediatePaymentWF
+### The scheduled payment lifecycle
 
-> **_Dimensions:_** - _`accountType`_ - _`requiresArPosting`_ - _`requiresRealtimeClearing`_ - _`requiresMandateAuthorization`_
+A scheduled payment is a row in Oracle from intake to its due date. Temporal sees it only while it is checked and while it executes.
 
-##### A. Core Workflow Logic
+1. **Intake.** `CreateScheduledPaymentWorkflow` runs Capture and Verify, calling services in parallel where they don't depend on each other. One Oracle commit writes `SCHEDULED`, the `SCHED_EXEC` Work Tracker row (due at the market's execution time on the due date) and the outbox rows. A corporate payment also gets an `ALLOC_REQUEST` row, due at its fetch time. The caller gets its answer and the workflow closes.
+2. **Wait.** Nothing runs in Temporal, for up to 30 days. Cancel and update work until the cancellation window closes.
+3. **Release.** At the market's execution time its dispatcher claims the row, calls the Router with today's config, and starts `ExecuteScheduledPaymentWorkflow` `{paymentId}-execute`.
+4. **Execute.** Reverify (`SCHEDULED` → `ACCEPTED`), Execute (→ `PROCESSING`), Fulfil (→ `PROCESSED`). `PAID` follows once the settlement and AR-posted events have both arrived in the inbox.
+5. **Close.** The last commit marks the Work Tracker row `DONE`, which frees an in-flight slot.
 
-- **InitiatedToPendingStage**: Domain progresses from InputPayment -> PendingPayment
-- If (!idempotentPayment) -> `return` existingPayment
-- `PaymentValidationActivityGroup` validate PendingPayment
-- If (!validPayment)
-  - **PendingToDeclinedStage**: PendingPayment -> DeclinedPayment
-  - `return` DeclinedPayment
-- **PendingToAcceptedStage**: PendingPayment -> AcceptedPayment
-- `return` early to the caller
-- If (`CorporateAccount`)
-  - **AcceptedToProcessingStage**: AcceptedPayment -> ProcessingPayment
-  - Trigger #GetCorporatePaymentAllocationsWF
-  - Await on _AllocationsReceived_ Signal
-  - For each split, trigger #ExecuteSplitPaymentWF
-- Else If (`fullPayment`)
-  - **AcceptedToProcessingStage**: AcceptedPayment -> ProcessingPayment
-  - **ProcessingToProcessedStage**: ProcessingPayment -> ProcessedPayment
-- Else
-  - `CreatePaymentSplitActivity` creates split payments in DB in Accepted State
-  - For each split payment, trigger #ExecuteSplitPaymentWF
+### Core workflows
 
-##### B. Stages (Generic)
+#### 1. CreateImmediatePaymentWorkflow
 
-- **InitiatedToPendingStage**:
-  - Persist the payment in transaction detail, transaction lifecycle events and idempotency tables. If insert fails, because of duplicate index, that means it is not an idempotent request.
-  - If succeeds it is persisted as a `PENDING` payment and generates a `PENDING` payment event for Lumi (Analytics Platform) via RTF (Reliable Transaction Framework).
-- **PendingToAcceptedStage**:
-  - The domain transitions from `PENDING` to `ACCEPTED`. The attributes for an AcceptedPayment are enriched appropriately.
-  - The status of the transaction is updated in DB as `ACCEPTED`. Transaction Detail is updated and new lifecycle entry is done in Transaction Lifecycle Event table.
-  - `ACCEPTED` payment event with the enriched data is created and notified to LUMI via RTF.
-- **AcceptedToProcessingStage**: - Payment is sent for clearing to Bank (via MR/M3). - Sent to AccountsReceivable (AR) for reducing statement balance. - Sent to Authorizations (AMP) to increase open-to-buy. - In a generic process, all the above 3 processes will be triggered in parallel, but there can be variations to this depending upon the `accountType` and `requiresRealtimeClearing` - The status of the transaction is updated in DB as `PROCESSING`. While updating the data it takes care of enriching it as well. - `PROCESSING` payment event is generated and notified to LUMI via RTF.
-  >     NOTE:
-  >         - Logic may vary depending upon RTP vs non-RTP payments
-  >         - For Corporate payments, notification to AR and AMP will not happen in this workflow.
-- **ProcessingToProcessedStage**: - Payment is sent to other downstream systems (like Accounting, Audit, Risk, Communications, etc) to fulfill the transaction. - The Comms notification will be the last item in this stage. Notifications to other systems can happen in parallel. Once all are completed, the communication notification to the customer will be triggered. - Payment is sent to Audit System / Balance & Control System (eBNC) to ensure every payment is processed and not missed. - Payment is sent to Accounting System to ensure the payment is matched between different payment processing platforms across the company. - Payment is sent to Risk system to ensure the Risk rules are kept updated for the customer with every payment activity.
-  Payment is sent to Communication system (Raven) to notify the customer about the processing of the payment. - The status of the transaction is updated in DB as `PROCESSED`. While updating the data it takes care of enriching it as well. - `PROCESSED` payment event is generated and notified to LUMI via RTF.
-  >     NOTE:
-  >         - Account-type specific implementations may have different logic to notify different systems.
-- **PendingToDeclinedStage**: - The status of the transaction is updated in DB as `DECLINED`. While updating the data it takes care of enriching it as well. - `DECLINED` payment event is generated and notified to LUMI via RTF.
-  >     NOTE:
-  >         - Account-type specific implementations may have additional notification step to AR or other systems.
+> `{paymentId}-init` · Online · Update-With-Start from channels
 
-##### C. Sample Code
+- **Capture:** `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`).
+- **Verify:** `ACCEPTED` or `DECLINED`, in one guarded commit. The caller's update returns here.
+- If `DECLINED`, the workflow ends; notifications go through the outbox.
+- **Execute:** `PROCESSING`. Clearing, AR and OTB run in parallel, varied by account type, AR posting and realtime clearing.
+- **Fulfil:** `PROCESSED`. Accounting, eBNC and risk run in parallel; comms and lifecycle events leave through the outbox after the commit.
+- **Consumer split:** the parent's commit writes its split legs, and each runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
+- **Corporate:** Verify's commit also writes the `ALLOC_REQUEST` row and releases the legs; Execute clears at payment level; there is no Fulfil. The parent completes through the leg dispatcher (see [Corporate Allocations](#corporate-allocations)).
+
+#### 2. CreateScheduledPaymentWorkflow
+
+> `{paymentId}-init` · Online from channels (Update-With-Start), Offline from AR (async start, 202)
+
+- **Capture**, then **Verify**: `SCHEDULED` or `DECLINED`.
+- The `SCHEDULED` commit writes the `SCHED_EXEC` row, plus an `ALLOC_REQUEST` row for a corporate payment, and the outbox rows.
+- Reply, then close. Nothing waits in Temporal until the due date.
+
+#### 3. ExecuteScheduledPaymentWorkflow
+
+> `{paymentId}-execute` · Offline · started by the scheduled-payments dispatcher through the Router, with today's config
+
+- **Reverify:** `ACCEPTED` or `DECLINED`. Its guard (`SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`) means a cancel and the execution can never both win.
+- **Execute**, then **Fulfil**, as for pay today.
+- **Corporate:** Reverify's commit releases the held legs; Execute clears at payment level; there is no Fulfil.
+- The last commit marks the `SCHED_EXEC` row `DONE` (or `FAILED` when retries run out).
+
+#### 4. ExecuteSplitPaymentWorkflow
+
+> `{paymentId}_{seq}-execute` · Offline for corporate legs; the parent's cluster for consumer splits
+
+- **Execute:** AR balance and OTB in parallel. Consumer legs also clear; corporate legs never clear per allocation.
+- **Fulfil:** accounting, eBNC and risk; comms through the outbox.
+- Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment cannot starve the others.
+
+#### 5. RequestAllocationsWorkflow
+
+> `{paymentId}-allocations` · Offline · started by the allocation-request dispatcher at the fetch time
+
+- **RequestAllocations:** asks the allocations manager for the breakdown and sets allocation status `ALLOCATING`, then ends. No workflow waits for the answer.
+
+#### 6. ReceiveAllocationsWorkflow
+
+> `{paymentId}-allocations-{batch}` · Offline · started by the allocations callback API with only the payment ID and batch number
+
+- **ReceiveAllocations:** checks the stored batch, then writes each allocation as a leg `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` Work Tracker row. Rows are `HELD` while the parent is not yet `ACCEPTED`, and `SCHEDULED` once it has been released.
+- Allocation status turns `ALLOCATED` once the legs add up to the payment amount.
+
+#### 7. UpdatePaymentWorkflow
+
+> `{paymentId}-update` · Online · Update-With-Start
+
+- Checks the cancellation window and eligibility with read-only calls.
+- Cancels the old payment with the guarded update; 409 if it is no longer `SCHEDULED`.
+- Starts the new payment as child `CreateScheduledPaymentWorkflow` `{newId}-init`, with the same confirmation number.
+- Maps the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
+
+#### 8. CancelPaymentWorkflow
+
+> `{paymentId}-cancel` · Online · Update-With-Start
+
+- Checks the window and eligibility with read-only calls.
+- **Cancel:** one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. Notifications go out through the outbox after the reply.
+- Zero rows updated: if the payment is already `CANCELLED`, the API returns that result again; otherwise 409.
+
+#### 9. ProcessReturnedPaymentWorkflow
+
+> `{paymentId}-return-{seq}` · Offline · async start, 202
+
+- Checks the payment (full or split) and its current status. Eligible statuses: `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
+- **Return:** `RETURNED`.
+- Judges whether the return can be represented, and sets the representment date from market rules: today or later.
+- **QueueRepresentment:** commits `REPRESENTING` with a `REPRESENT` Work Tracker row due on that date. Returns never hand off to a representment workflow directly.
+
+#### 10. ProcessRepresentmentWorkflow
+
+> `{paymentId}-represent-{seq}` · Offline · started by the representment dispatcher on the representment date
+
+- **Represent:** rechecks eligibility before anything goes to clearing, then `REPRESENTED`, or `DECLINED` if the recheck fails.
+
+#### 11. ProcessInboundPaymentWorkflow
+
+> `{paymentId}-init` · Offline · async start, 202
+
+- **Capture**, **Verify** (`ACCEPTED` or `DISALLOWED`), **Execute**, **Fulfil**.
+
+#### 12. CreatePaymentIntentWorkflow
+
+> `{paymentId}-init` · Online · Update-With-Start
+
+- Records the intent; the payment is processed only when the customer's financial institution confirms it. Detailed steps are still to be defined.
+
+#### 13. CreateBalanceRefundWorkflow
+
+> `{paymentId}-init` · Online from channels (Update-With-Start), Offline for async events such as AR (async start, 202)
+
+- Follows the payment path: Capture, Verify, Execute, Fulfil. Detailed steps are still to be defined.
+
+### Composite workflows
+
+> `{paymentId}-init` · Online · Update-With-Start; their children run on the same cluster
+
+1. **Pay & Plan (Create Payment & Installments):** `CreateImmediatePaymentWorkflow` as a child, then the Installments API, then an optional Autopay update.
+2. **Multiple instructions** (`CreatePaymentWithMultipleInstructionsWorkflow`): validates the composite payment, then runs one `CreateImmediatePaymentWorkflow` per instruction.
+
+### Sketch
+
+How a payment workflow reads, with the caller's update answered at the decision and no early return, signals or child for allocations. Names other than the stages and `PaymentStore` are illustrative.
 
 ```kotlin
-    // Check if the incoming payment is idempotent
-    val pendingPayment = InitiatedToPendingStage.execute(inputPayment)
-    if (!pendingPayment.isIdempotent) {
-        return newActivityStub<PaymentRepository>()
-		  .getExistingPayment(idempotencyKey)
+@WorkflowInterface
+interface CreateImmediatePaymentWorkflow {
+    @WorkflowMethod
+    fun run(paymentId: String, plan: PlanKey)
+
+    // The caller's Update-With-Start lands here and returns once Verify has decided.
+    @UpdateMethod
+    fun decision(): PaymentDecision
+}
+
+class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
+    private var decided: PaymentDecision? = null
+
+    override fun run(paymentId: String, plan: PlanKey) {
+        // Stage implementations come from the plan key, looked up at runtime.
+        val stages = StageIndex.lookup(plan)
+
+        stages.capture.run(paymentId)                  // PENDING, idempotent
+        decided = stages.verify.run(paymentId)         // ACCEPTED or DECLINED, one guarded commit
+        if (decided != PaymentDecision.ACCEPTED) return
+
+        stages.execute.run(paymentId)                  // PROCESSING: clearing, AR and OTB in parallel
+        stages.fulfil.run(paymentId)                   // PROCESSED: comms and events leave through the outbox
     }
 
-    // Validate the payment
-    val isValidPayment = paymentValidationActivityGroup.validate(pendingPayment)
-
-    // If payment is not valid then decline it
-    if (!isValidPayment) {
-        val declinedPayment = pendingToDeclinedStage(pendingPayment)
-        return paymentResponse(declinedPayment)
+    override fun decision(): PaymentDecision {
+        Workflow.await { decided != null }
+        return decided!!
     }
-
-    val acceptedPayment = pendingToAcceptedStage.execute(pendingPayment)
-    // This is temporal early return, workflow method will actually not return
-    early_return paymentResponse(acceptedPayment)
-
-    // Process based on Account-type and Split/Non-Split
-    return when {
-        // Corporate Account and the payment is split into allocations
-        acceptedPayment.account.type == CORPORATE && acceptedPayment.isSplit -> {
-            val processingPaymentPromise = asyncFunction {
-                acceptedToProcessingStage(acceptedPayment)
-            }
-            val childWorkflowPromise = asyncProcedure {
-                newChildWorkflowStub<CorporatePaymentAllocationsWorkflow>()
-                    .fetchAllocations(acceptedPayment)
-            }
-            Promise.allOf(processingPaymentPromise, childWorkflowPromise).get()
-            Workflow.await(duration) { allocationsReceivedPromise.isCompleted }
-            allocations.forEach {
-                newChildWorkflowStub<ExecuteSplitPaymentWorkflow>
-                    .execute(it)
-            }
-            paymentResponse(processingPaymentPromise.get())
-        }
-
-        // Consumer Non-split
-        acceptedPayment.isFull -> {
-            val processingPayment = acceptedToProcessingStage(acceptedPayment)
-            val processedPayment = processingToProcessedStage(processingPayment)
-            paymentResponse(processedPayment)
-        }
-
-        // Consumer Split
-        acceptedPayment.isSplit -> {
-            val acceptedPaymentSplits =
-                newActivityStub<CreatePaymentSplitsActivity>(acceptedPayment)
-            acceptedPaymentSplits.forEach {
-                newChildWorkflowStub<ExecuteSplitPaymentWorkflow>
-                    .execute(it)
-            }
-            paymentResponse(acceptedPayment)
-        }
-    }
+}
 ```
-
-#### 2. Create Schedule Payment #CreateSchedulePaymentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`requiresArPosting`_
-> - _`requiresMandateAuthorization`_
-
-##### A. Core Workflow Logic
-
-- **InitiatedToPendingStage**: Domain progresses from InputPayment -> PendingPayment
-- If (!idempotentPayment) -> return existingPayment
-- `PaymentValidationActivityGroup` validate PendingPayment
-- If (validPayment)
-  - **PendingToScheduledStage**: PendingPayment -> ScheduledPayment
-  - Return early to the caller
-  - If (`CorporateAccount`)
-    - Trigger #GetCorporatePaymentAllocationsWF
-- Else
-  - **PendingToDeclinedStage**: PendingPayment -> DeclinedPayment
-
-#### 3. Execute Scheduled Payment #ExecuteScheduledPaymentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`requiresArPosting`_
-> - _`requiresRealtimeClearing`_
-> - _`requiresMandateAuthorization`_
-
-##### A. Core Workflow Logic
-
-- `PaymentValidationOnExecutionActivityGroup` validate ScheduledPayment
-- If (validPayment)
-  - **ScheduledToAcceptedStage**: ScheduledPayment -> AcceptedPayment
-  - If (fullPayment)
-    - **AcceptedToProcessingStage**: AcceptedPayment -> ProcessingPayment
-    - **ProcessingToProcessedStage**: ProcessingPayment -> ProcessedPayment
-  - Else
-    - If (`CorporateAccount`)
-      - **AcceptedToProcessingStage**: AcceptedPayment -> ProcessingPayment
-      - Trigger #GetCorporatePaymentAllocationsWF
-      - Await on _AllocationsReceived_ Signal
-      - For each split, trigger #ExecuteSplitPaymentWF
-    - Else
-      - `CreatePaymentSplitActivity` creates split payments in DB in Accepted State
-      - For each split payment, trigger #ExecuteSplitPaymentWF
-- Else
-  - **PendingToDeclinedStage**: PendingPayment -> DeclinedPayment
-
-#### 4. Execute Split Payment #ExecuteSplitPaymentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`requiresArPosting`_
-> - _`requiresRealtimeClearing`_
-
-##### A. Core Workflow Logic
-
-- Below stages will be triggered - **AcceptedToProcessingStage**: AcceptedPayment -> ProcessingPayment - **ProcessingToProcessedStage**: ProcessingPayment -> ProcessedPayment
-  >     NOTE:
-  >         - AcceptedToProcessingStage may vary on the accountType, hence we can have different implementations at runtime depending upon the accountType.
-  >         - For Corporate Account, AcceptedToProcessingStage  at Split level means only updating balances and open-to-buy.
-  >         - But for Consumer Account, AcceptedToProcessingStage at Split level means clearing, as well as updating balances and open-to-buy.
-
-#### 5. Cancel Payment #CancelPaymentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`requiresArPosting`_
-
-##### A. Core Workflow Logic
-
-- `IdempotencyCheckActivity` checks if the request is unique
-- If !Idempotent -> return previous response
-- `ValidateCancelPaymentRequestActivityGroup` validates if the cancellation request is valid & also fetches current state of the payment
-- If eligible
-  - If currentPaymentStatus = `SCHEDULED`
-    - **ScheduledToCancelledStage**: ScheduledPayment to CancelledPayment
-  - Else If currentPaymentStatus = `ACCEPTED`
-    - **AcceptedToCancelledStage**: AcceptedPayment to CancelledPayment
-
-#### 6. Update Payment #UpdatePaymentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`requiresArPosting`_
-> - _`requiresRealtimeClearing`_
-> - _`requiresMandateAuthorization`_
-
-##### A. Core Workflow Logic
-
-- `IdempotencyCheckActivity` checks if the request is unique
-- If !Idempotent -> return previous response
-- **ScheduledToCancelledStage**: Original payment moves from ScheduledPayment -> CancelledPayment. We can consider invoking #CancelPaymentWF here.
-- Build a new payment request as PendingPayment with new paymentId but same confirmationNumber and the updated details
-- Can invoke #CreateSchedulePaymentWF which will essentially do the following -
-  - `ValidatePaymentActivityGroup` validates the new PendingPayment
-  - If validPayment
-    - **PendingToScheduledStage**: New payment moves from PendingPayment to ScheduledPayment
-  - Else
-    - **PendingToDeclinedStage:** New payment moves from PendingPayment to DeclinedPayment
-- Finally, invoke `MapNewPaymentToOriginalPaymentActivityGroup` to map the new payment to the original payment in the DB for Audit purpose.
-
-#### 7. Process Returned Payment #ProcessReturnedPaymentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-
-##### A. Core Workflow Logic
-
-- `IdempotencyCheckActivity` checks if the request is unique
-- If !Idempotent -> return previous response
-- `ReturnedPaymentValidationActivityGroup` validates the input ReturnedPayment request by looking up the payment (full or split) in DB along with its current status. Eligible statuses are `PAID`, `PROCESSING`, `PROCESSED`
-- If validReturnedPayment
-  - **ToReturnedStage**: (PaidToReturnedStage / ProcessingToReturnedStage / ProcessedToReturnedStage) `PAID`/ `PROCESSING`/ `PROCESSED` to ReturnedPayment
-  - `RepresentmentEligibileActivityGroup` checks if the return is representable
-  - If Representable
-    - **ToRepresentingStage**:
-      - Enrich the different attributes related to this representing payment, like next representable date, etc via `EnrichRepresentmentDetailsActivityGroup`.
-      - `CreateRepresentmentActivity` will create a new presentment transaction as `REPRESENTING`
-
-#### 8. Process Representing Payment #ProcessRepresentmentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`requiresArPosting`_
-> - _`requiresRealtimeClearing`_
-> - _`requiresMandateAuthorization`_
-
-##### A. Core Workflow Logic
-
-- `RepresentingPaymentValidationActivityGroup` validate ScheduledPayment
-- If (validPayment)
-  - **RepresentingToRepresentedStage**: RepresentingPayment -> RepresentedPayment
-- Else
-  - **RepresentingToDeclinedStage**: RepresentingPayment -> DeclinedPayment
-
-#### 9. Get Corporate Payment Allocations #GetCorporatePaymentAllocationsWF
-
-> **Generic**
-
-##### A. Core Workflow Logic
-
-- **ToAllocatingStage**:
-  - Invoke appropriate Allocations Manager Service to fetch required allocations
-  - Update ScheduledPayment / AcceptedPayment to AllocationsRequested
-- Await on _AllocationsReady_ Signal
-- **ToAllocatedStage**:
-  - Update the status for the parent payment to `ALLOCATED`
-  - `CreatePaymentSplitActivity` creates split payments in DB in Accepted State
-  - For each split payment, trigger #ExecuteSplitPaymentWF
-
-#### 10. Process Inbound Payment #ProcessInboundPaymentWF
-
-> **_Dimensions:_**
->
-> - `TBD`
-
-##### A. Core Workflow Logic
-
-- **InitiatedToPendingStage**: Domain progresses from InputPayment -> PendingPayment
-- If (!idempotentPayment) -> return existingPayment
-- `PaymentValidationActivityGroup` validate PendingPayment
-- If (validPayment)
-  - **PendingToAcceptedStage**: PendingPayment -> AcceptedPayment
-  - Return early to the caller
-  - If (`fullPayment`)
-    - **AcceptedToProcessingStage**: AcceptedPayment -> ProcessingPayment
-    - **ProcessingToProcessedStage**: ProcessingPayment -> ProcessedPayment
-  - Else
-    - If (`ConsumerAccount`)
-      - `CreatePaymentSplitActivity` creates split payments in DB in Accepted State
-      - For each split payment, trigger #ExecuteSplitPaymentWF
-- Else
-  - **PendingToDisallowedStage**: PendingPayment -> DisallowedPayment
-
-#### 11. Create Payment Intent #CreatePaymentIntentWF
-
-> **_Dimensions:_**
->
-> - _`accountType`_
-> - _`instrumentType`_
-> - _`requiresMandateAuthorization`_ (? - Do we need it for Debit cards / non-PWBT)
-
-##### A. Core Workflow Logic
-
-- TBD
-
-### Composite Workflows
-
-#### 1. Create Payment & Installments
-
-- Create Immediate Payment Workflow
-- Call Installments API
-- Update Autopay (optional)
-
-#### 2. Create Payments with multiple instructions
-
-- Validation of composite payment
-- Execute separate Create Immediate Payment Workflows for each instruction
-
-### Periodic Workflows
-
-#### 1. Paid Events Processor #PaidEventsProcessingWF
-
-- Fetch all payments from External Transaction Events Tracker for which both AR Posted and Clearing Settlement event have arrived.
-- Update the status in the External Transaction Events Tracker table for all these transactions as "Picked-up-for-processing"
-- Insert into Transaction Lifecycle Event table as `PAID`
-- Update the status in Transaction Detail Table as `PAID`
-- Publish `PAID` lifecycle event
-
-#### 2. Missing Paid Events Processor #MissingPaidEventsProcessingWF
-
-- Fetch all payments from External Transaction Events Tracker for which either AR Posted or Clearing Settlement or both events are missing for last 48 hours
-- Invoke the respective system to fetch the latest status
-  - If found, then insert the corresponding events into External Transaction Events Tracker table
-  - If still missing, then raise alert
-
-#### 3. Data purger #DataPurgingWF
-
-- Fetch all older records from DB
-- Delete those records from DB
 
 [^ Top](#table-of-contents)
 
 ---
 
-## Activities / ActivityGroups
+## Periodic Workflows
 
-| Sl No | Activity / ActivityGroups                      | Generic / Variations                                                                                                | State Transitions                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| :---: | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   1   | `PersistPendingPaymentActivity`                | Generic                                                                                                             | Input -> `PENDING`                                                   | 1. Tries inserting into idempotency_checker, trans_dtl & trans_lfcyc_event tables<br>2. If already present then duplicate, else idempotent<br>3. If idempotent then publish`PENDING` lifecycle event<br><br>Will be invoked from **InitiatedToPendingStage**.                                                                                                                                                                                                          |
-|   2   | `IdempotencyCheckActivity`                     | Generic                                                                                                             | No state transition                                                  | 1. Tries inserting into idempotency_checker table for the corresponding API<br>2. If already present then duplicate, else idempotent<br><br>Will be invoked from **Workflows** wherever there is an idempotency check.                                                                                                                                                                                                                                                 |
-|   3   | `PaymentValidationActivityGroup`               | Dimensions:<br>`accountType`<br>`requiresArPosting`<br>`requiresRealtimeClearing`<br>`requiresMandateAuthorization` | `PENDING` -> `ACCEPTED` or `SCHEDULED` / `DECLINED`<br><br>          | This activity group will be responsible to make external calls (if necessary) and do an evaluation on the data fetched to check if the payment is valid or not.<br><br>Will be invoked from **CreateImmediatePayment** and **CreateScheduledPayment** Workflows.                                                                                                                                                                                                       |
-|   4   | `PaymentValidationOnExecutionActivityGroup`    | Dimensions:<br>`accountType`<br>`requiresArPosting`<br>`requiresRealtimeClearing`<br>`requiresMandateAuthorization` | `SCHEDULED` / `ALLOCATED` -> `ACCEPTED` / `DECLINED`                 | This is invoked during Execute Scheduled Payment Workflow<br>1. Invokes different systems to fetch related information that might vary<br>2. Sometimes call to one system can only be done after certain information is fetched from another system<br>3. Validate **if the scheduled payment is still valid**, once all necessary information is fetched. <br>4. If valid return true else false.<br><br>Will be invoked inside **ExecuteScheduledPayment Workflow**. |
-| <br>5 | `PaymentStateTransitionActivity`               | Generic                                                                                                             | Different state transitions                                          | 1. Update trans_dtl table with new status, receives current and previous states as input for a given payment-id<br>2. Add a new row in trans_lfcyc_event table for the new state.<br>3. Publish lifecycle event for corresponding state transition.<br><br>Will be invoked inside all **Stages** whenever there is a state transition at the payment level.                                                                                                            |
-|   6   | `PaymentSplitStateTransitionActivity`          | Generic                                                                                                             | Different state transitions at split level                           | 1. Update split_trans_dtl table with new status, receives current and previous states as input for a given split-payment-id<br>2. Add a new row in split_trans_lfcyc_event table for the new state.<br>3. Publish lifecycle event for corresponding split state transition.<br><br>Will be invoked inside all **Stages** that involves split payments.                                                                                                                 |
-|   7   | `PaymentScheduledNotificationActivityGroup`    | Dimensions:<br>`accountType`<br>`requiresArPosting`                                                                 | No state transition                                                  | Notify systems when a payment is `SCHEDULED`. <br><br>Will be invoked from **PendingToScheduledStage**.                                                                                                                                                                                                                                                                                                                                                                |
-|   8   | `PaymentDeclinedNotificationActivityGroup`     | Dimensions:<br>`accountType`<br>`requiresArPosting`                                                                 | No state transition                                                  | Notify systems when a payment is `DECLINED` during immediate payment or when a payment is being `SCHEDULED`. <br><br>Will be invoked from **PendingToDeclinedStage**.                                                                                                                                                                                                                                                                                                  |
-|   9   | `PaymentAllocatingActivityGroup`               | Generic                                                                                                             | `PENDING` / `SCHEDULED` -> `ALLOCATING`                              | For Corporate Immediate Payments, a payment moves to `ACCEPTED` (after `ALLOCATING` & `ALLOCATED` states) only after the allocations are fetched. If Allocations couldn't be fetched it is `DECLINED`.<br>For Corporate Scheduled Payments, a payment after it has been `SCHEDULED`, it moves to `ALLOCATING` on the day or -X days before the scheduled date.<br><br>Will be invoked from **ToAllocatingStage**.                                                      |
-|  10   | `PaymentAllocatedActivityGroup`                | Generic                                                                                                             | `ALLOCATING` -> `ALLOCATED`                                          | Receive allocations from GPA<br>TBD - What kind of validation needs to happen in Billpay when allocations are received<br><br>Will be invoked from **ToAllocatedStage**.                                                                                                                                                                                                                                                                                               |
-|  11   | `PaymentExecutionActivityGroup`                | Dimensions:<br>`accountType`<br>`requiresArPosting`<br>`requiresRealtimeClearing`                                   | `ACCEPTED` -> `PROCESSING`                                           | Do the following in parallel -<br> 1. Send payment to clearing system & insert in notification tracker table<br> 2. Decrease balance in Accounts Receivable & insert in notification tracker table<br> 3. Increase open-to-buy in Authorization & insert in notification tracker table<br><br>_There can be variations to these steps depending upon the variance._<br><br>Will be invoked from **AcceptedToProcessingStage**                                          |
-|  12   | `PaymentFulfillmentActivityGroup`              | Dimensions:<br>`accountType`                                                                                        | `PROCESSING` -> `PROCESSED`                                          | 1. Do the following in parallel -<br> - Notify accounting & insert in notification tracker table<br> - Notify Balance & Control & insert in notification tracker table<br>2. Notify Communications & insert in notification tracker table<br><br>Will be invoked from **ProcessingToProcessedStage**.                                                                                                                                                                  |
-|  13   | `PaymentSplitsCreationActivity`                | Generic                                                                                                             | `ACCEPTED` (Full) -> `ACCEPTED` (Split)                              | 1. For each split make an entry in Split trans detail and split_lfcyc_event table as `ACCEPTED`<br>2. Publish lifecycle event for corresponding state transition at split level.<br><br>Will be invoked from **CreateImmediatePayment** and **ExecuteScheduledPayment** Workflows.                                                                                                                                                                                     |
-|  14   | `PaymentCancelValidationActivityGroup`         | Dimensions:<br>`accountType`                                                                                        | No state transition                                                  | 1. Check current state of payment in DB, if valid continue<br>2. Do necessary calls to external systems to validate the eligibility of cancellation request. If valid cancellation request, then return true.<br><br>Will be invoked from **CancelPaymentWorkflow**.                                                                                                                                                                                                   |
-|  15   | `PaymentCancellationActivityGroup`             | Dimensions:<br>`accountType`<br>`requiresArPosting`                                                                 | `SCHEDULED` / `ACCEPTED` -> `CANCELLED`                              | 1. Notify different systems once a payment is cancelled<br><br>Will be invoked from **CancelPaymentWorkflow**.                                                                                                                                                                                                                                                                                                                                                         |
-|  16   | `PaymentReturnValidationActivity`              | Generic                                                                                                             | No state transition                                                  | 1. Check current state of payment in DB, if valid continue<br><br>Will be invoked from **ReturnedPaymentWorkflow**.                                                                                                                                                                                                                                                                                                                                                    |
-|  17   | `PaymentReturnExecutionActivityGroup`          | Dimensions:<br>`accountType`<br>                                                                                    | `PROCESSING` / `PROCESSED` / `PAID` -> `RETURNED`                    | 1. Notify different systems once a payment is `RETURNED` in DB<br><br>Will be invoked from **ToReturnedStage**.                                                                                                                                                                                                                                                                                                                                                        |
-|  18   | `PaymentRepresentmentEligibilityActivityGroup` | Dimensions:<br>`accountType`<br>`requiresArPosting`<br>`requiresRealtimeClearing`<br>`requiresMandateAuthorization` | No state transition                                                  | 1. Do necessary calls to external systems to validate the eligibility of representment. If valid representment, then return true, else false.<br><br>Will be invoked from **ReturnedPaymentWorkflow**.                                                                                                                                                                                                                                                                 |
-|  19   | `PaymentRepresentmentCreationActivityGroup`    | Generic                                                                                                             | `RETURNED` (Presentment Seq 1) -> `REPRESENTING` (Presentment Seq 2) | 1. Make a new entry in trans_dtl and trans_lfcyc_event for `REPRESENTING` status<br>2. Publish a lifecycle event<br><br>Will be invoked from **ToRepresentingStage**.                                                                                                                                                                                                                                                                                                  |
-|  20   | `PaymentRepresentmentValidationActivityGroup`  | Dimensions:<br>`accountType`<br>`requiresArPosting`<br>`requiresRealtimeClearing`<br>`requiresMandateAuthorization` | No state transition                                                  | 1. Do necessary calls to external systems to validate if representment is still valid to execute on the day of processing the representment. If valid representment, then return true, else false.<br><br>Will be invoked from **ProcessingRepresentablePayment Workflow**.                                                                                                                                                                                            |
-|  21   | `PaymentRepresentmentExecutionActivityGroup`   | Dimensions:<br>`accountType`<br>`requiresArPosting`<br>`requiresRealtimeClearing`<br>`requiresMandateAuthorization` | `REPRESENTING` -> `REPRESENTED`                                      | 1. Send to clearing system. <br>2. Notify different systems in parallel, once a payment is `REPRESENTED`<br><br>Will be invoked from **RepresentingToRepresentedStage**.                                                                                                                                                                                                                                                                                               |
-|  22   | `MapNewPaymentIdToPreviousIdActivity`          | Generic                                                                                                             | No state transition                                                  | 1. Make an entry into `ORIG_TRANS_REFER_MAP` table with old and new payment-id<br><br>Will be invoked from **UpdatePaymentWorkflow**                                                                                                                                                                                                                                                                                                                                   |
+All run on the Offline cluster, started by Temporal Schedules.
+
+#### 1. ProcessPaidEventsWorkflow
+
+- Reads the inbox for payments whose settlement and AR-posted events have both arrived, and flags those rows as picked up, so a run never reads them twice.
+- **Settle:** `PROCESSED` → `PAID`, with its timeline entry; the `PAID` lifecycle event goes through the outbox and the RTF relay.
+- A corporate parent is `PAID` only once it has settled and every leg has posted to AR.
+
+#### 2. ProcessMissingPaidEventsWorkflow
+
+- Finds payments whose AR-posted or settlement event (or both) has been missing for 48 hours.
+- Asks the respective system for the current state. If the event is found, it is written to the inbox; if it is still missing, an alert is raised.
+
+#### 3. PurgeTransactionDataWorkflow
+
+- Purges old transactional data. Work Tracker and notification tracker data is removed by dropping daily partitions 15 days after they fall due, so there are no mass `DELETE`s.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Activities
+
+One activity interface per system, each on that system's task queue. Comms (Raven) and RTF lifecycle events are not activities: the stage's commit writes them to the outbox and a relay sends them.
+
+| Interface | System | Task queue | Called by |
+| --- | --- | --- | --- |
+| `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes in ReceiveAllocations; the guarded cancel; the ID map in Update |
+| `InstrumentActivities` | Payment Instruments | Its own queue if it has an agreed limit; otherwise the workflow's queue | Verify, Reverify, Represent |
+| `OptionsActivities` | Payment Options | Its own queue if it has an agreed limit; otherwise the workflow's queue | Verify, Reverify, Represent |
+| `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent |
+| `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, and every leg |
+| `AuthorizationActivities` | Authorizations (AMP), open-to-buy | `ds-authorization` | Execute, and every leg |
+| `AccountingActivities` | Accounting | `ds-accounting` | Fulfil, and every leg |
+| `BalanceControlActivities` | eBNC (Balance & Control) | `ds-ebnc` | Fulfil, and every leg |
+| `RiskActivities` | Risk | `ds-risk` | Fulfil, and every leg |
+| `AllocationActivities` | Allocations manager | `ds-allocations` | RequestAllocations |
+
+### PaymentStore operations
+
+`PaymentStore` is the only code that reads or writes Oracle. Each operation is one transaction:
+
+- **Capture:** insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before.
+- **A stage commit:** the guarded status update, the timeline entry with the cluster, the outbox rows, and any Work Tracker rows the step creates, releases or closes.
+- **Writing legs:** split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row.
+- **Cancel:** the guarded update to `CANCELLED` and the cancellation of the payment's Work Tracker rows.
+- **Mapping a replacement:** the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
+- **Reads:** loading the fields an activity or stage needs, by ID.
+
+### Where each call runs
+
+| Call | Runs as | Why |
+| --- | --- | --- |
+| Oracle reads and writes | Local activity (`PaymentStore`) | No task round trip; one marker when the workflow task completes |
+| Calls a downstream may throttle | Regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle; priority and fairness apply there |
+| Slow calls nobody throttles | Regular activity on the workflow's queue, eager dispatch on | Eager dispatch skips matching and saves writes |
+| Comms and lifecycle events | Outbox row in the stage's commit | A relay sends them |
+
+Throttled calls stay off eager dispatch: it hands the task straight back to the worker, which skips the queue's limit.
 
 [^ Top](#table-of-contents)
 
@@ -626,46 +600,662 @@ Use the following rules to preserve a clear payment-lifecycle model: business se
 
 ## Overall Payments View
 
-### APIs & Workflows
+> One-Data function → Billpay core API → Billpay Router → workflow → stages → activities → clients
 
-> One data functions -> Billpay core APIs -> Billpay Router -> Billpay Workflows -> Different Stages, ActivityGroups, Activities -> Different Activities (in a Stage / ActivityGroup)
+Between the core APIs and the workflows sits the Billpay Router. For every row below it does the same six steps: **admit, pick the journey, resolve behaviors, pin the plan key, place, start.**
 
-Between Billpay Core APIs and Billpay Core Workflows, sits a Billpay Router which based on the input instructions, date, and other parameters can route to appropriate workflows.
+| One-Data function | Core API | Router: journey and start | Workflows | Children and follow-ups |
+| --- | --- | --- | --- | --- |
+| `CreatePayment.v3` | `POST /payments` | Today, one instruction; Update-With-Start | `CreateImmediatePaymentWorkflow` (Online) | Consumer: `ExecuteSplitPaymentWorkflow` children (Online). Corporate: `RequestAllocationsWorkflow`, `ReceiveAllocationsWorkflow` and one `ExecuteSplitPaymentWorkflow` per leg (Offline) |
+| | | Today, several instructions; Update-With-Start | `CreatePaymentWithMultipleInstructionsWorkflow` (Online) | One `CreateImmediatePaymentWorkflow` per instruction |
+| | | Future-dated; Update-With-Start | `CreateScheduledPaymentWorkflow` (Online), then `ExecuteScheduledPaymentWorkflow` on the due date (Offline) | As for pay today, on the Offline cluster |
+| `UpdatePayment.v1` | `PUT /payments/{payment-id}` | `SCHEDULED`, inside the window; Update-With-Start | `UpdatePaymentWorkflow` (Online) | Child `CreateScheduledPaymentWorkflow` `{newId}-init` |
+| `DeletePayment.v1` | `DELETE /payments/{payment-id}` | `SCHEDULED`, inside the window; Update-With-Start | `CancelPaymentWorkflow` (Online) | |
+| `CreatePaymentIntent.v1` | `POST /payments/intent` | Awaiting FI confirmation; Update-With-Start | `CreatePaymentIntentWorkflow` (Online) | |
+| `CreatePaymentInstallment.v1` | `POST /payment-installments` | Pay & Plan; Update-With-Start | Pay & Plan composite (Online) | `CreateImmediatePaymentWorkflow` |
+| `CreateCreditBalanceRefund.v1` | `POST /refunds` | From a channel; Update-With-Start | `CreateBalanceRefundWorkflow` (Online) | |
+| `CreateBillpayTransactionFromAccountsReceivable.v1` (payment) | `POST /payments` | Future-dated from AR; async start, 202 | `CreateScheduledPaymentWorkflow` (Offline), then `ExecuteScheduledPaymentWorkflow` on the due date | As for any scheduled payment |
+| `CreateBillpayTransactionFromAccountsReceivable.v1` (refund) | `POST /refunds` | Async event; async start, 202 | `CreateBalanceRefundWorkflow` (Offline) | |
+| `MoneyMovementEventHandler.v1` | `POST /payments/returns` | A return; async start, 202 | `ProcessReturnedPaymentWorkflow` (Offline) | A `REPRESENT` row; `ProcessRepresentmentWorkflow` on its date (Offline) |
+| `CreateInboundPayment.v1` | `POST /payments/inbound` | Third-party push; async start, 202 | `ProcessInboundPaymentWorkflow` (Offline) | |
+| `CreatePaymentAllocations.v1` (placeholder) | `POST /payments/{payment-id}/allocations` | A corporate batch; stored, then async start, 202 | `ReceiveAllocationsWorkflow` (Offline) | One `ExecuteSplitPaymentWorkflow` per leg, from the leg dispatcher |
+| Representment dispatcher | None | A `REPRESENT` row falls due; the dispatcher calls the Router | `ProcessRepresentmentWorkflow` (Offline) | |
 
-| One-Data Function                                                                      | Billpay Core API              | Billpay Router                                                                                                                                                         | Parent Workflows                                                                                | Child Workflows                                                                                                                                                          |
-| -------------------------------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CreatePayment.v3                                                                       | POST /payments                | 1. payment-date=current-date<br>2. Fetch respective stages based on Dimensions<br>3. Invoke workflow by passing the respective stages<br>4. Single instruction         | 1. #CreateImmediatePaymentWF (Online)<br>                                                       | When Consumer - <br>1. #ExecuteSplitPaymentWF (Online)<br><br>When Corporate -<br>1. #GetCorporatePaymentAllocationsWF (Offline)<br>2. #ExecuteSplitPaymentWF (Offline)  |
-|                                                                                        |                               | 1. If payment-date = current-date<br>2. Fetch respective stages based on Dimensions<br>3. Invoke workflow by passing the respective stages<br>4. Multiple instructions | 1. #CreatePaymentWithMultipleInstructionsWF (Online)                                            |                                                                                                                                                                          |
-|                                                                                        |                               | 1. payment-date > current-date<br>2. Fetch respective stages based on Dimensions<br>3. Invoke workflow by passing the respective stages<br>4. Single instruction       | 1. #CreateSchedulePaymentWF (Online)<br>2. #ExecuteScheduledPaymentWF (future dated) (Offline)  | When Consumer - <br>1. #ExecuteSplitPaymentWF (Offline)<br><br>When Corporate -<br>1. #GetCorporatePaymentAllocationsWF (Offline)<br>2. #ExecuteSplitPaymentWF (Offline) |
-| UpdatePayment.v1                                                                       | PUT /payments/{payment-id}    | 1. Fetch respective stages based on Dimensions<br>2. Invoke workflow by passing the respective stages                                                                  | 1. #UpdatePaymentWF (Online)                                                                    |                                                                                                                                                                          |
-| DeletePayment.v1                                                                       | DELETE /payments/{payment-id} | 1. Fetch respective stages based on Dimensions<br>2. Invoke workflow by passing the respective stages                                                                  | 1. #CancelPaymentWF (Online)                                                                    |                                                                                                                                                                          |
-| MoneyMovementEventListener.v1                                                          | POST /payments/returns        | 1. Fetch respective stages based on Dimensions<br>2. Invoke workflow by passing the respective stages                                                                  | 1. #ProcessReturnedPaymentWF (Offline)                                                          | 1. #ProcessRepresentmentWF (Offline)                                                                                                                                     |
-| CreateInboundPayment.v1                                                                | POST /payments/inbound        | 1. Fetch respective stages based on Dimensions<br>2. Invoke workflow by passing the respective stages                                                                  | 1. #ProcessInboundPaymentWF                                                                     |                                                                                                                                                                          |
-| CreatePaymentIntent.v1                                                                 | POST /payments/intent         | 1. Fetch respective stages based on Dimensions<br>2. Invoke workflow by passing the respective stages                                                                  | #CreatePaymentIntentWF (Online)                                                                 |                                                                                                                                                                          |
-| CreateBillpayTransactionFromAccountsReceivable.v1 <br>(when transactionType = PAYMENT) | POST /payments                | 1. payment-date > current-date<br>2. Fetch respective stages based on Dimensions<br>3. Invoke workflow by passing the respective stages<br>4. Single instruction       | 1. #CreateSchedulePaymentWF (Offline)<br>2. #ExecuteScheduledPaymentWF (future dated) (Offline) | When Consumer - <br>1. #ExecuteSplitPaymentWF (Offline)<br><br>When Corporate -<br>1. #GetCorporatePaymentAllocationsWF (Offline)<br>2. #ExecuteSplitPaymentWF (Offline) |
+### Periodic and control workflows
 
-### Periodic Workflows
+All on the Offline cluster.
 
-> All Workflows will be executed in _Offline_ Worker
-
-| Schedule                                 | Temporal Workflows             |
-| ---------------------------------------- | ------------------------------ |
-| Schedule Payment Executor Schedule       | #ExecuteScheduledPaymentWF     |
-| Corporate Allocations Processor Schedule | #ExecuteSplitPaymentWF         |
-| Paid Events Processor Schedule           | #PaidEventsProcessingWF        |
-| Missing Paid Events Processor Schedule   | #MissingPaidEventsProcessingWF |
-| Data Purge Schedule                      | #DataPurgingWF                 |
+| Schedule | Workflow | Runs |
+| --- | --- | --- |
+| Scheduled payments, one per market | The scheduled-payments dispatcher | At the market's execution time, in its time zone; drains, sweeps stragglers, then ends |
+| Allocation requests | The allocation-request dispatcher | Every minute |
+| Allocation legs | The leg dispatcher | Every minute |
+| Representments, one per market | The representment dispatcher | Every few minutes |
+| Outbox relays, one per target | The comms relay and the RTF relay | Every few seconds |
+| Governor | `GovernorWorkflow` | Kept running; a check every 15 s |
+| Paid events | `ProcessPaidEventsWorkflow` | Periodically |
+| Missing paid events | `ProcessMissingPaidEventsWorkflow` | Periodically |
+| Purge | `PurgeTransactionDataWorkflow` | Periodically |
 
 [^ Top](#table-of-contents)
 
 ---
 
-## Sequence Diagrams
+## Routing and Start Modes
 
-- Create Sequence Diagrams using Mermaid for complete billpay flows including APIs, workflows and Schedules
+The Billpay Router is a library inside the core APIs and the dispatchers. It decides the journey, the stages and where the work runs, so no channel or market branches that choice by hand.
 
-## State Diagrams
+### The Router's six steps
 
-- Create State Diagrams using Mermaid based on different payment state transitions under State Transition in Workflows
+1. **Admit.** The market, account type and API must be live in this environment; if not, 422, which senders don't retry. The traffic class must be inside its budget; if not, 429 with `Retry-After`.
+2. **Pick the journey** from the routing table.
+3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
+4. **Pin the plan key:** the journey, the resolved behaviors and the config version.
+5. **Place:** cluster, task queue, priority, fairness key and workflow ID.
+6. **Start** with the journey's start mode.
+
+### Start modes
+
+| When | Start | Reply | Used by |
+| --- | --- | --- | --- |
+| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | The update's result: ACCEPTED, SCHEDULED, DECLINED or CANCELLED | Pay today, schedule, composites, intent, update, cancel, refunds from channels |
+| Nobody waits | Async start; the workflow exists before we reply | 202 with the payment ID; 429 with `Retry-After` over budget | AR batch, returns, inbound, refund events, allocation callbacks |
+| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit; a dispatcher starts it through the Router | None | Scheduled execution, allocation requests, corporate legs, representments |
+
+- Eager workflow start is not used: the server refuses it with Update-With-Start, and online latency comes from Update-With-Start and local activities.
+- For an async start the payment ID comes from the idempotency key. Conflict policy `USE_EXISTING` joins a retry to the running workflow; reuse policy `REJECT_DUPLICATE` stops a second run after it closes, and the API then answers from Oracle. The reply needs only a durable start, so it fits the 500 ms p99 that `POST /payments` promises.
+- Every workflow ID is the payment ID plus a suffix (see [Platform](#platform)).
+
+### Routing table
+
+| Trigger | Condition | Workflow | Cluster | Start |
+| --- | --- | --- | --- | --- |
+| Create payment | Today, one instruction | `CreateImmediatePaymentWorkflow` | Online | Update-With-Start |
+| Create payment | Today, several instructions | `CreatePaymentWithMultipleInstructionsWorkflow` | Online | Update-With-Start |
+| Create payment | Future-dated | `CreateScheduledPaymentWorkflow`; `ExecuteScheduledPaymentWorkflow` on the due date | Online, then Offline | Update-With-Start; then dispatcher |
+| From Accounts Receivable | Future-dated | `CreateScheduledPaymentWorkflow`; `ExecuteScheduledPaymentWorkflow` on the due date | Offline | Async start; then dispatcher |
+| Update payment | `SCHEDULED`, inside the cancellation window | `UpdatePaymentWorkflow` | Online | Update-With-Start |
+| Cancel payment | `SCHEDULED`, inside the cancellation window | `CancelPaymentWorkflow` | Online | Update-With-Start |
+| Payment intent | Awaiting FI confirmation | `CreatePaymentIntentWorkflow` | Online | Update-With-Start |
+| Credit balance refund | From a channel | `CreateBalanceRefundWorkflow` | Online | Update-With-Start |
+| Credit balance refund | An async event, such as AR | `CreateBalanceRefundWorkflow` | Offline | Async start |
+| Money movement event | A return | `ProcessReturnedPaymentWorkflow` | Offline | Async start |
+| Representment falls due | A `REPRESENT` row | `ProcessRepresentmentWorkflow` | Offline | Dispatcher |
+| Inbound payment | Initiated by a third party | `ProcessInboundPaymentWorkflow` | Offline | Async start |
+| Allocations callback | A corporate payment | `ReceiveAllocationsWorkflow` | Offline | Async start |
+
+Consumer split legs run as child workflows on the parent's cluster. Corporate legs start from Work Tracker rows instead, because one payment can have 100K of them. No child workflow ever crosses clusters.
+
+### Re-routing on the due date
+
+On the due date the dispatcher calls the Router again, so a scheduled payment runs with today's config. The version used at scheduling stays in its timeline for audit. Two guardrails keep replay safe: the plan key carries the resolved behaviors and the config version, and the workflow is pinned to its build.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Work Tracker, Outbox and Inbox
+
+One narrow Work Tracker table drives all paced work. The notification tracker doubles as the **outbox**, and the external transaction events tracker is the **inbox**. Payment data stays in the domain tables, with a few additions.
+
+### `work_tracker`
+
+| Column | Holds |
+| --- | --- |
+| `item_id` | Primary key: a deterministic business key such as `exec:{paymentId}`, so a retried insert can't create duplicate work |
+| `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_LEG`, `REPRESENT` |
+| `ref_id` | Payment or leg ID in the domain tables |
+| `group_key` | Market, or the parent payment ID for legs |
+| `due_at` | Earliest start: execution time, fetch time, release time or representment date |
+| `priority` | Claim order inside a type |
+| `status` | See below |
+| `run_id`, `claimed_at` | Which dispatcher run claimed it, and when |
+| `attempts`, `last_error` | Dispatch retries, and the last failure |
+| `trace_parent` | OpenTelemetry context from the producer, for span links |
+
+Workflow IDs are not stored: each is the payment ID plus its suffix.
+
+| Type | One row per | Due at | Started by |
+| --- | --- | --- | --- |
+| `SCHED_EXEC` | Scheduled payment, corporate parents included | The market's execution time on the due date | Scheduled-payments dispatcher |
+| `ALLOC_REQUEST` | Corporate payment | Its fetch time | Allocation-request dispatcher |
+| `ALLOC_LEG` | Allocation leg | The parent's due date, reset when the leg is released | Leg dispatcher |
+| `REPRESENT` | Representment | The date market rules set | Representment dispatcher |
+
+### Status
+
+`SCHEDULED → DISPATCHING → DISPATCHED → DONE` or `FAILED`, plus `HELD → SCHEDULED` for legs waiting on their parent, and `CANCELLED` from `SCHEDULED` or `HELD`. `HELD` rows stay out of the claim index, so no dispatcher sees them until they are released.
+
+| Status | Set by |
+| --- | --- |
+| `HELD` | `ReceiveAllocationsWorkflow`, for legs whose parent is not yet `ACCEPTED` |
+| `SCHEDULED` | The producer, in the same commit as the domain row; or the leg dispatcher, when it releases legs |
+| `DISPATCHING` | The dispatcher's claim |
+| `DISPATCHED` | The dispatcher, after a successful start |
+| `DONE` or `FAILED` | The workflow's last commit |
+| `CANCELLED` | `CancelPaymentWorkflow`; or a declined or cancelled parent, for its legs |
+
+### Outbox: the notification tracker
+
+- A stage's commit writes one row per notification or lifecycle event, in the same transaction as the state change: target, payload, `due_at`, status and attempts. An event can't exist without its state, or the other way round.
+- A relay claims due rows for its target, sends them and marks them `SENT`. A failed send moves `due_at` out by the backoff and holds that payment's later rows for the same target; after N attempts the row goes to `FAILED`.
+- Online-cluster notifications use the same relays, so each target's limit is enforced in one place. Online payments never wait on them.
+
+### Inbox: the external transaction events tracker
+
+- Event handlers write settlement and AR-posted events here. No workflow waits on them.
+- `ProcessPaidEventsWorkflow` reads payments whose two events have both arrived, flags the rows as picked up, and settles them to `PAID`.
+
+### Indexes and partitions
+
+- **Claim index:** function-based, on `CASE WHEN status = 'SCHEDULED' THEN … END` for `item_type`, `group_key`, `priority` and `due_at`. Oracle stores no entry when every key is NULL, so the index holds only claimable rows and stays small beside millions of finished ones.
+- **In-flight index:** the same trick for `DISPATCHING` and `DISPATCHED` rows, so the in-flight count is a small index scan.
+- **Partitions:** daily interval partitions on `due_at`, with row movement on. Purge drops partitions 15 days after they fall due. The notification tracker gets the same index and partitions.
+
+### Claiming rows
+
+- Open a cursor with `FOR UPDATE SKIP LOCKED`, fetch up to N rows (`BULK COLLECT … LIMIT N`), mark those IDs `DISPATCHING`, and commit.
+- Don't use `ROWNUM <= N` with SKIP LOCKED: ROWNUM counts locked rows too, so you can get fewer rows than asked, or none.
+- Don't use `FETCH FIRST`: Oracle doesn't allow it together with `FOR UPDATE`.
+
+### Changes to domain tables
+
+| Table | Change | Why |
+| --- | --- | --- |
+| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at` | Allocations never block clearing; legs know when they may run |
+| `trans_lfcyc_event` | The cluster in each entry of the existing timeline BLOB | Says which cluster's UI holds each step |
+| `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts | Keeps big batches out of workflow inputs |
+| `market_config_version`, `market_config_active` (new) | Published market config: immutable versions, and the active one per market and account type | The Router reads it; only `MarketProvisioningWorkflow` writes it |
+
+Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update on the current status.
+
+### Control tables
+
+| Table | One row per | Used for |
+| --- | --- | --- |
+| `dispatch_run` | Dispatcher run | Ops view: counts, current rate, paused or not |
+| `rate_allocation` | Traffic class, market or corporate payment | The governor writes it; dispatchers read it every few seconds; manual overrides live here |
+| `downstream_limit` | Downstream endpoint | Agreed TPS, online margin, current offline share, last 429 |
+| `governor_decision` | Governor check, every 15 s | Inputs and outputs, to explain any rate later |
+
+[^ Top](#table-of-contents)
+
+---
+
+## Dispatchers and the Governor
+
+### Dispatchers
+
+One dispatcher per kind of work releases due rows into Temporal at the governor's rate, spread evenly, with a cap on in-flight work. Each has its own Schedule, control queue and budget, so one kind can't hold up another. Every start goes through the Router.
+
+| Dispatcher | Claims | Runs | Starts |
+| --- | --- | --- | --- |
+| Scheduled payments, one per market per day | `SCHED_EXEC` due in that market | Schedule at the market's execution time; drains, sweeps stragglers, then ends | `ExecuteScheduledPaymentWorkflow` |
+| Allocation requests | `ALLOC_REQUEST` at its fetch time | Schedule every minute | `RequestAllocationsWorkflow` |
+| Allocation legs | Released `ALLOC_LEG` rows, fair across parents | Schedule every minute | `ExecuteSplitPaymentWorkflow` |
+| Representments, one per market | `REPRESENT` rows due | Schedule every few minutes | `ProcessRepresentmentWorkflow` |
+| Outbox relays, one per target | Notification tracker rows due for that target | Every few seconds | Nothing: they send to RTF or the target directly |
+
+**Schedules.** A market's Schedules take its time zone, so the execution time holds across daylight saving; test the DST weekends. Overlap policy SKIP and a 6-hour catch-up window, so a trigger missed in an outage still fires. Each run's workflow ID is its Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time Temporal appends. A minute Schedule starts a short run that drains what is due, continues-as-new while work remains, and ends when a claim comes back empty.
+
+**One tick**
+
+1. Tick size = allowed rate × 20 s; 50 TPS gives 1,000 items.
+2. Activity `claimAndStart`, on its dispatcher's control queue: claims up to that many rows as `DISPATCHING` stamped with the run ID; starts one workflow per row through the Router and a token bucket (50 TPS is one start every 20 ms); re-reads the allowed rate and checks in-flight every 50 or so starts; heartbeats its position every 2 to 3 s, also while it waits on the cap or the bucket; marks the rows `DISPATCHED` and returns counts.
+3. The workflow adds the counts and loops. An empty claim triggers a sweep of this run's `DISPATCHING` rows, then the run ends.
+4. Continue-as-new when the SDK suggests it.
+
+Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, the task queue, priority and fairness keys, and the search attributes.
+
+**Backpressure.** In-flight = rate × time per payment. At 50 TPS and 6 s per payment, about 300 are open. If a downstream slows to 30 s, that becomes 1,500 and keeps climbing. A cap makes the activity wait instead, and the real rate settles at cap ÷ time per payment: 1,000 ÷ 30 s ≈ 33 TPS. The execution cap starts at 1,000 and is tuned in the load test.
+
+**Changing the rate.** The activity reads `rate_allocation` every few seconds, so a new rate lands within seconds, with no signals and no extra history. Overrides (pause, resume, a maximum rate) are rows in `rate_allocation`, written through an ops API, and win over the governor. Pausing a Schedule stops new runs too.
+
+**Crash safety.** A worker that dies mid-tick trips the heartbeat timeout (10 s), and the retried activity resumes from its last heartbeat. A repeated start fails as already started and counts as done; `REJECT_DUPLICATE` stops a second execution. Rows claimed but never started are caught by the sweep or by the next run.
+
+**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position. Completion: every 60 s it counts legs by status for parents in `PROCESSING`, and moves a parent to `PROCESSED` once all its legs are.
+
+**Cost and scale.** About 5 Temporal writes per tick: 1M payments at 50 TPS is about 1,000 ticks, so about 5K writes. One activity can issue a few hundred starts a second. Past that, split into lanes, each owning a hash bucket of `ref_id` at rate ÷ lanes.
+
+### Execution windows
+
+| Window | Starts (UTC, winter) | Starts (local) | Volume | Cutoff | Rate needed |
+| --- | --- | --- | --- | --- | --- |
+| SEPA (DE, IT) | 23:00 | Midnight CET, 6 PM ET | Up to 500K | 3 to 4 h | 46 TPS for 3 h; the governor aims at about 56 |
+| US | 05:00 | Midnight ET | Up to 1M | None | 50 TPS floor (5.6 h); 100 TPS takes 2.8 h |
+
+In summer both windows start an hour earlier in UTC. They never overlap, so one Offline cluster serves them in turn and the US window sets its size. SEPA runs during the US evening, so it is the window most likely to be slowed for online traffic.
+
+### The governor
+
+`GovernorWorkflow` sets every offline rate every 15 s. It raises rates slowly while all signals are healthy, cuts fast when any degrades, and hands out the budget by priority.
+
+**Signals: the worst one wins**
+
+| Signal | Raise if | Hold if | Cut if |
+| --- | --- | --- | --- |
+| Offline Aurora CPU (Enhanced Monitoring, 1 to 5 s) | Under 50% | 50 to 60% | Over 60% |
+| Offline persistence p99 | Under 1.5× baseline | 1.5 to 2× | Over 2× |
+| Offline schedule-to-start | Flat | Rising | Rising for a minute |
+| Online p99 (`POST /payments`, SLO 500 ms) | Under 70% of SLO | 70 to 90% | Over 90% |
+| Oracle commit latency and errors | Near baseline | Rising | Over 2× baseline, or errors |
+
+CPU over 70%, or online p99 over its SLO, halves the budget instead. Persistence p99 is the fastest honest signal; standard per-minute CloudWatch CPU is too slow. The load test sets the final bands: hold sits just below the knee where persistence p99 starts to climb.
+
+**The budget**
+
+- Raise by 5%, but only after two calm checks, because metrics lag about 30 s. Cut ×0.8.
+- The budget is in Temporal writes per second, not starts, because the DB is the constraint. Each class is charged its measured cost per workflow: about 30 for execution, 20 for a leg, 10 for a return.
+- The ceiling is the writes/s the load test measured at 60% CPU.
+
+**Handing it out, in order**
+
+1. **Online first.** If online p99 or shared Oracle degrade, every offline class is cut, execution included.
+2. **SEPA cutoff floor:** remaining ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
+3. **US execution floor:** 50 TPS.
+4. **AR intake:** its demand; above the budget it gets 429.
+5. **The rest by priority, up to demand:** SEPA and US execution above their floors, then corporate (split evenly across active corporate payments), then inbound, then representments, then returns last.
+
+Every class is also capped by its downstreams (see [Throttling, Priority and Fairness](#throttling-priority-and-fairness)).
+
+**Cutoff alert.** Projected finish = now + remaining ÷ current rate. The governor alerts when that passes the cutoff minus 15 minutes, or when the floor no longer fits the budget.
+
+**Guardrails**
+
+- Missing metrics: hold. Still missing after 5 minutes: drop to the floors.
+- If the governor itself stops, dispatchers fall back to the floors once `rate_allocation` is 5 minutes stale.
+- Manual overrides always win.
+- Every decision goes to `governor_decision` with its inputs.
+
+It runs as `governor` on the Offline cluster, and a Schedule with overlap policy SKIP starts it again if it isn't running. One activity per check reads Prometheus and Oracle, then writes `rate_allocation`, downstream queue limits (only when they change) and the decision row. It continues-as-new hourly and costs about 20 writes a minute.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Throttling, Priority and Fairness
+
+Each downstream sees at most its agreed TPS. Offline traffic gets what online traffic isn't using, enforced at one place per downstream.
+
+### Must-succeed calls: clearing, AR, OTB, accounting, eBNC, risk
+
+- **One choke point.** One activity task queue per downstream endpoint: `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk` and `ds-allocations`. Its server-side rate limit is the overall limit for the queue, across all pods. The governor changes it at runtime through the task queue config API.
+- **Offline share** = agreed TPS − online traffic's measured use (peak of the last minute) − a 10% margin. Online traffic is never throttled.
+- **Admission.** Across all classes, the sum of start rate × calls per workflow to a downstream stays within its offline share, handed out in priority order. Admitting more only parks tasks in the queue backlog, and that backlog is DB rows.
+- **Reaction.** One call waits out `Retry-After`. If the 429 rate passes 1% or p99 doubles, the queue limit drops ×0.7, then probes back up 5% at a time. In an outage the queue trickles at 1 RPS to probe, and admissions for classes that need it pause; only capped in-flight work waits.
+- **Worker slots** ≈ queue limit × call latency: 100 RPS at 1 s needs about 100 slots across pods. More slots won't add throughput.
+
+### Comms and events: outbox relays
+
+- The comms relay sends to Raven through a token bucket at its agreed share, and pauses for `Retry-After`.
+- The RTF relay has no limit to respect: RTF guarantees delivery once it has an event. It sends as fast as Oracle reads, one lane per payment-ID hash, and a failed send holds that payment's later events, so each payment's events stay in order.
+
+### Priority and fairness
+
+Priority decides who goes first on a shared downstream queue; fairness splits one priority level between markets and corporate payments. Both are set once at workflow start, and activities inherit them.
+
+| Class | Priority key | Fairness key | Per-key limit |
+| --- | --- | --- | --- |
+| AR batch intake | 1 | `intake` | None in effect: weight 100 |
+| SEPA execution | 1 | Market | None in effect: weight 100 |
+| US execution | 1 | Market | None in effect: weight 100 |
+| Corporate: parent execution, allocation requests, legs | 2 | Parent payment ID | The queue's default per-key RPS, so one payment can't take the whole queue |
+| Inbound | 3 | `inbound` | None in effect: weight 100 |
+| Representments | 4 | Market | None in effect: weight 100 |
+| Returns | 5, the lowest | `returns` | None in effect: weight 100 |
+
+- Priority keys run from 1 (first) to 5.
+- Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is acceptable for async work; their backlog age is alerted on so a long wait is visible.
+- Fairness is switched on in the server's dynamic config (`matching.enableFairness`). The default per-key limit applies to every key on a queue, scaled by the key's weight, so every key except a corporate parent's carries weight 100 and never meets it. Weights only compare keys within one priority level.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Corporate Allocations
+
+The parent and its allocations run on separate tracks. The parent clears at payment level on its due date; legs post as their allocations arrive, in parallel with clearing.
+
+- **Fetch timing** is a market setting: at scheduling, a set lead time before the due date, or on the due date. Pay today requests at once. The intake commit (`SCHEDULED`, or `ACCEPTED` for pay today) adds an `ALLOC_REQUEST` row due at that time.
+- **Request.** The allocation-request dispatcher starts `RequestAllocationsWorkflow`. It asks the allocations manager, sets allocation status `ALLOCATING`, and ends; no workflow waits for the answer.
+- **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`, a placeholder name), once or several times, with batches numbered per payment. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch and writes each allocation as a leg `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` row. Allocation status turns `ALLOCATED` once the legs add up to the payment amount.
+- **Release.** `ALLOC_LEG` rows wait as `HELD` until the parent is `ACCEPTED` on its due date. The commit that makes the parent `ACCEPTED` (Reverify, or Verify for pay today) sets its `legs_released_at`, and the leg dispatcher moves its rows from `HELD` to `SCHEDULED` in 5,000-row chunks. Rows for legs that arrive later are written as `SCHEDULED`. A declined parent cancels its legs.
+- **Legs.** Each runs `ExecuteSplitPaymentWorkflow`: AR balance and OTB in parallel, then accounting, eBNC and risk, with comms through the outbox. Clearing never runs per allocation.
+- **Fairness.** Legs run at priority 2 with the parent's ID as fairness key and a per-key limit. At 100 legs a second, a 100K payment takes about 17 minutes without starving other payments.
+- **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared and every leg is `PROCESSED`. It turns `PAID` when it settles and every leg has posted to AR. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
+- **Late allocations.** The parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
+- **Volume.** Up to 50K parents and 500K allocations a day, and 100K in one payment. One workflow per leg handles that, so there is no chunk mode.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Market Onboarding
+
+Onboarding has its own frontend, backend and tables, kept apart from payments. Environments take only frozen releases, through one API, and a workflow in each environment checks, tests and activates them.
+
+- The control plane never reads or writes an environment's Oracle or Temporal, and an environment never reads the authoring tables.
+- A release moves through three environments: E1, E2 and E3. E3 is production, where an RFC is required.
+
+### What runs where
+
+| Part | What it is | Lives in |
+| --- | --- | --- |
+| billpay-ui frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
+| billpay-ui backend | The control plane itself: SSO, maker-checker, audit, versioned releases | The control plane, one for all environments |
+| Authoring tables | Drafts, revisions, releases, approvals, deployments, audit | The control plane's own schema, outside billpay-core |
+| Provisioning API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's core app (see [Billpay APIs](#provisioning-api)) |
+| `MarketProvisioningWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
+| Published config | `market_config_version` and `market_config_active` | Each environment's billpay-core database |
+
+### From draft to live
+
+1. **Freeze.** When a release is approved, the backend saves the draft as release vN: the profile's full config as JSON, a checksum, the author and the approver. A release is one profile (a market and account type). It never changes; later edits become vN+1.
+2. **Send.** The backend calls E1's provisioning API with vN, using its own service identity. The call is idempotent: one workflow per market, account type, version and environment.
+3. **Track.** A deployment row per release and environment follows the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
+4. **Sign off.** When someone signs off in the UI, the backend sends the sign-off through the same API. In E3 the RFC must pass the ServiceNow check first.
+5. **Promote.** Once vN is active and signed off in E1, the same vN goes to E2, then E3.
+
+There are two human checks: approval once, on the content (maker-checker), and sign-off in each environment after its test payments pass.
+
+### MarketProvisioningWorkflow
+
+> `provision-{market}-{accountType}-v{N}` · Offline · started by the provisioning API · control queue `ctl-provision`
+
+1. **Check** vN against the deployed build's capability manifest. A combination the build can't run stops here, marked as needing a build.
+2. **Save** vN as an inactive version, with the Schedules, dispatcher settings, rate rows and fairness settings it needs, also inactive.
+3. **Test** with payments against vN. The Router accepts a pinned version for test accounts only.
+4. **Wait** for sign-off, and for the RFC in E3.
+5. **Activate:** switch `market_config_active` to vN and apply its Schedules and settings. New payments use vN at once; running workflows keep the version in their plan key.
+
+Rollback switches the pointer, and the Schedules and settings, back to the previous version. Pause and resume stop and restart a live market's dispatchers.
+
+### Operations settings
+
+A step in billpay-ui. Each setting drives something at runtime.
+
+| Setting | Used by |
+| --- | --- |
+| Time zone and execution time | The scheduled-payments dispatcher's Schedule |
+| Cancellation window | Cancel and update. It closes before execution starts |
+| Cutoff, if any | The governor's cutoff floor and alert |
+| Allocation fetch timing and alert point | The `ALLOC_REQUEST` due time, and the late-allocation alert |
+| Representment rules | The representment date |
+| Expected volumes | The governor's floors and budgets |
+| BOTH rules, per behavior | The Router: which journeys get Y |
+
+### Capability manifest
+
+Every build ships a manifest of the behavior combinations it can run, returned by `GET /provisioning/capabilities`. A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and provisioning stops at step 1 until that build is deployed.
+
+### What changes in today's billpay-ui code
+
+- `promote()` only moves a status in H2 today; it will send vN to the next environment.
+- `verifyProfile()`, the sign-off, will send the sign-off to that environment's workflow.
+- `recordRfc()` stays, and becomes required before the E3 sign-off.
+- `Readiness.kt` is simulated today; the deployment rows replace it.
+- Authoring checks each new combination against the manifest.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Platform
+
+### Temporal server
+
+Both clusters run the latest server, at least 1.30.1, so visibility can use OpenSearch 2.
+
+| Setting | Online | Offline | Why |
+| --- | --- | --- | --- |
+| History shards | 2K | 4K | Fixed when the cluster is created; room for more markets |
+| Persistence | Own Aurora PostgreSQL | Own Aurora PostgreSQL | Isolation |
+| Visibility | OpenSearch 2 | OpenSearch 2, its own index | Off the main DB; Temporal recommends it at scale |
+| Standby | Passive, in us-west-1 | Passive, in us-west-1 | Active-passive; an operator promotes each standby on its own |
+| `system.enableActivityEagerExecution` | true | true | Eager activities save writes |
+| Eager workflow start | Not used | Not used | The server refuses it with Update-With-Start |
+| `matching.enableFairness` | Not needed | true | Fairness keys and per-key limits |
+| Namespace retention | 30 days | 30 days | The retention requirement |
+| Namespace RPS limits | Well above peak | About 2× the API requests per second at the governor's ceiling | A hard backstop if the governor misbehaves |
+
+All Schedules live on the Offline cluster.
+
+### Offline namespace and task queues
+
+One Offline namespace serves all markets, with market as a fairness key, so each downstream has one queue and one limit.
+
+| Task queue | Carries | Workers |
+| --- | --- | --- |
+| `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
+| `ctl-sched`, `ctl-alloc`, `ctl-leg`, `ctl-repr`, `ctl-relay`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the relays, the governor and provisioning | A small control deployment |
+| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-allocations` | One downstream each, rate-limited | One worker deployment per downstream |
+
+Queue limits are set through the task queue config API, for example:
+
+```bash
+temporal task-queue config set --task-queue ds-clearing --task-queue-type activity \
+  --queue-rps-limit 120 --queue-rps-limit-reason governor
+```
+
+Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so the default limits only corporate parents.
+
+### Java SDK settings
+
+- Caller waits: Update-With-Start, conflict policy `USE_EXISTING`.
+- Nobody waits: async start, conflict policy `USE_EXISTING`, reuse policy `REJECT_DUPLICATE`; reply only after the start returns.
+- Dispatcher starts: reuse policy `REJECT_DUPLICATE`, priority and fairness keys, search attributes.
+- `PaymentStore` local activities: schedule-to-close of a few hours, maximum retry interval about a minute. Capture on the Online cluster gets a short deadline.
+- Activities per downstream: its task queue, start-to-close about 2 to 3× p99, business errors non-retryable.
+- A 429 becomes `ApplicationFailure.newFailureWithCauseAndDelay(...)` with the `Retry-After` value.
+- Worker Versioning: payment workflows are PINNED; dispatchers and the governor upgrade when they continue-as-new.
+- OpenTelemetry interceptors on clients and workers. HTTP clients inside activities have their own retries off.
+
+### Sizing
+
+| Item | Online cluster | Offline cluster |
+| --- | --- | --- |
+| Aurora | 64 vCPU; under 40% at the 100 TPS peak | 64 vCPU to start, up to 192; under 60% |
+| History shards | 2K | 4K |
+| Visibility | OpenSearch 2 | OpenSearch 2, its own index |
+| Retention | 30 days | 30 days |
+| Workflow workers | Sticky cache at least the in-flight count | Sticky cache at least the in-flight count (2,000+) |
+| Activity workers | Sized for the 100 TPS peak | Per downstream: slots ≈ queue limit × call latency |
+
+### Capacity
+
+Every number here is an estimate from the write model; load-test run 1 measures the real costs and the governor takes them.
+
+**Write model**
+
+- A regular activity costs about 4 writes: scheduled, started, completed, and the next workflow task.
+- A group of local activities inside one workflow task costs about 2 writes in total.
+- A stage of k parallel regular activities costs about 2k + 3.
+- Start and close cost about 4. Visibility writes go to OpenSearch, not Aurora.
+
+| Workflow | Writes per workflow |
+| --- | --- |
+| Scheduled execution | ≈30 |
+| Return | ≈10 |
+| Leg | ≈20 |
+| AR batch intake | ≈12 |
+
+| Window | Work | Rate | Offline writes/s |
+| --- | --- | --- | --- |
+| SEPA, 23:00 to 02:00 UTC | DE and IT execution | 56 TPS | ≈1,700 |
+| US, from 05:00 UTC | US execution | 50 to 100 TPS | 1,500 to 3,000 |
+| Business hours | AR batch intake | 100 TPS | ≈1,200 |
+| Any time | Returns, at the full burst | 100 TPS | ≈1,000 |
+| Any time | Corporate legs, paced | 100 a second | ≈2,000 |
+
+- The worst overlap (US at 100 TPS, a returns burst and corporate legs at once) needs about 6,000 writes/s.
+- Dispatchers, relays and the governor add under 10 writes/s.
+- 500K legs a day average about 115 writes/s. A 100K payment at 100 legs a second adds about 2,000 writes/s for about 17 minutes.
+- **Offline DB size.** Load-test run 2 measures writes/s at 60% CPU on 64 and on 192 vCPU. If 64 vCPU covers the worst overlap, Offline starts there and keeps 192 as headroom.
+- **Downstream demand.** Calls per second to a downstream = the sum over classes of rate × calls per workflow to it. US execution at 100 TPS calling clearing once needs 100 RPS of clearing's offline share. Each agreed TPS must cover online traffic's peak plus each window's need; SEPA needs at least about 56 RPS of offline share during the US evening.
+
+### Workflow IDs and tracing
+
+Any payment can be traced from its ID alone. Workflow IDs are the payment ID plus a suffix, the timeline in `trans_lfcyc_event` names each step's cluster, and OpenTelemetry links tie the traces together.
+
+| Thing | Workflow ID |
+| --- | --- |
+| Create or schedule | `{paymentId}-init` |
+| Scheduled execution | `{paymentId}-execute` |
+| Update and cancel | `{paymentId}-update`, `{paymentId}-cancel` |
+| Allocation request and received batch | `{paymentId}-allocations`, `{paymentId}-allocations-{batch}` |
+| Leg | `{paymentId}_{seq}-execute` |
+| Return and representment | `{paymentId}-return-{seq}`, `{paymentId}-represent-{seq}` |
+| Dispatcher run | Its Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time |
+| Governor | `governor`, plus its Schedule's trigger time |
+| Market provisioning | `provision-{market}-{accountType}-v{N}` |
+
+- **Search attributes,** set once at start: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for legs.
+- **Traces.** One trace per workflow, through the SDK's OpenTelemetry interceptors. Execution, leg and relay spans carry a span link to the producer's trace, read from `trace_parent`; a single 30-day trace isn't practical.
+- **Finding payment X:** read `trans_lfcyc_event` by payment ID for every step and its cluster; open `{paymentId}-{suffix}` in that cluster's Temporal UI (within 30 days); open the trace for call-level detail.
+
+### Alerts
+
+| Alert | Fires when | People do |
+| --- | --- | --- |
+| SEPA cutoff at risk | The projected finish passes the cutoff minus 15 minutes, or the cutoff floor no longer fits the budget | Raise downstream limits or the rate override, or accept the delay |
+| Late allocations | A corporate parent is still `ALLOCATING` at the market's alert point | Chase the allocation source |
+| Returns backlog age | The oldest waiting return passes its age threshold | Check whether higher priorities are holding the queue |
+| Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list |
+| Downstream outage | A `ds-*` queue drops to its 1 RPS probe | Contact the downstream's owner if it lasts |
+| Offline DB hot | Offline Aurora CPU stays above the governor's cut band for 15 minutes | Look at what is running and whether the bands need tuning |
+| Governor down | `rate_allocation` is 5 minutes stale; dispatchers have fallen back to their floors | Find why the governor stopped, if the Schedule's restart doesn't hold |
+| Offline cluster down | The Offline cluster stops answering | Restore the cluster, or promote its standby |
+| Release failed provisioning | `MarketProvisioningWorkflow` stops before activation | Fix the profile, or ship the build it needs |
+
+### Failure modes
+
+Most failures need no one: the system slows down, waits, or resumes on its own.
+
+| Failure | What the system does | People do |
+| --- | --- | --- |
+| Downstream sends 429 | Calls wait out `Retry-After`; the queue limit drops ×0.7; admissions follow | Nothing |
+| Downstream outage | The queue trickles at 1 RPS; dependent admissions pause; in-flight stays capped | Contact the owner if it lasts |
+| Oracle outage or patching | `PaymentStore` retries, then waits on durable timers; dispatchers stop claiming; work resumes when Oracle is back | Nothing, unless it outlasts the schedule-to-close |
+| Offline DB runs hot | The governor cuts; a hard breach halves the budget | Look if it lasts over 15 minutes |
+| Online p99 near its SLO | Every offline class is cut, execution included | Nothing, unless a cutoff alert follows |
+| SEPA cutoff at risk | Alert with the projected finish | Raise downstream limits, or accept the delay |
+| Governor down or metrics missing | Dispatchers hold their rates, then fall back to the floors after 5 minutes; a Schedule restarts the governor | Look if it keeps failing |
+| Worker dies mid-dispatch | Heartbeat timeout; the activity resumes; starts are idempotent | Nothing |
+| Online cluster down | Journeys where a caller waits can't start. The Offline cluster carries on, since nothing calls across | Restore the cluster, or promote its standby |
+| Offline cluster down | Dated work waits in Oracle; async starts get 503 with `Retry-After` and senders retry; relays pause, so notifications and events wait in the outbox; the Online cluster keeps serving | Restore the cluster, or promote its standby |
+| Cancel at the window's edge | The guarded update lets one side win; a late cancel gets 409 | Nothing |
+| Validation fails | `DECLINED`, with notifications | Nothing |
+| Retries run out | Work Tracker row `FAILED`; the payment goes on the exception list in its last state | Review the list |
+| Allocations late | The parent still clears on time; its legs wait; an alert fires at the market's alert point | Chase the allocation source |
+| A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
+| AR intake over budget | 429 with `Retry-After` | Nothing |
+
+### Load tests
+
+Seven runs show whether the design holds. Runs 1 and 2 measure costs and the DB ceiling, runs 3 to 6 replay each window (with failures injected in run 5), and run 7 proves a market release. Every run uses downstream stubs at the agreed TPS with real latency.
+
+| Run | What | Pass if |
+| --- | --- | --- |
+| 1. Cost per workflow | Each workflow type alone at 10 TPS | Measured writes within 20% of the model; otherwise the governor's costs are updated |
+| 2. DB ceiling | Execution at 25, 50, 100 and 150 TPS, then upward until 60% CPU, on 64, then 192 vCPU | Writes/s at 60% CPU and the persistence-p99 knee are recorded; they become the governor's ceiling and bands |
+| 3. US window | 1M executions, governor on | At least 50 TPS throughout; ramps up when healthy; Offline CPU under 60% |
+| 4. SEPA window | 500K executions with a 3-hour cutoff, plus 100 TPS synthetic realtime traffic on the Online cluster against the same stubs | Done with 15% of the cutoff to spare; online p99 unchanged |
+| 5. Failures | During run 3: a 429 storm, a downstream outage, worker kills, a governor kill, an Offline Aurora failover, an Oracle restart | No duplicates, no lost items, recovery with no manual step |
+| 6. Corporate and intake | One 100K and twenty 10K corporate payments, with allocations arriving by callback in parts before and after the due date, plus 100 TPS AR intake | Parents clear on time; legs progress fairly; intake p99 under 500 ms; 429 only above budget |
+| 7. Market release | Publish, test, activate and roll back a release in E1 while payments run | New payments use the new version; running ones keep theirs; rollback restores the old one |
+
+After every run, reconcile: Work Tracker rows by status match the completed workflows, and the stubs' ledger matches `PAID` payments with no duplicates.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Sequence and State Diagrams
+
+Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin the plan key, place), the start mode, stages as participants, and the outbox after each commit.
+
+### Sequence diagrams
+
+| # | Flow | Must show |
+| --- | --- | --- |
+| 1 | Pay today, one instruction | Update-With-Start on Online; the reply at Verify; Execute and Fulfil; comms and events through the outbox |
+| 2 | Scheduled payment, created today and executed later | Intake on Online writes `SCHEDULED` and a `SCHED_EXEC` row; on the due date the dispatcher re-routes and starts `ExecuteScheduledPaymentWorkflow` on Offline |
+| 3 | Corporate payment, pay today | The parent clears on its own track; `RequestAllocationsWorkflow`; the callback; legs released at once and started by the leg dispatcher; the completion check |
+| 4 | Corporate payment, scheduled | Allocations fetched at the market's fetch time; legs `HELD` until Reverify makes the parent `ACCEPTED`, then released |
+| 5 | Update a scheduled payment | The guarded cancel, then child `CreateScheduledPaymentWorkflow` `{newId}-init`; 409 when late |
+| 6 | Cancel a payment | The guarded update; the payment's Work Tracker rows cancelled in the same commit; 409 outside the window |
+| 7 | Return | Async start with 202; Return; QueueRepresentment writes a `REPRESENT` row |
+| 8 | Representment | The representment dispatcher on the date; Represent rechecks, then `REPRESENTED` or `DECLINED` |
+| 9 | Inbound payment | Async start with 202; Verify to `ACCEPTED` or `DISALLOWED` |
+| 10 | Paid events | Settlement and AR-posted events in the inbox; `ProcessPaidEventsWorkflow` settles to `PAID`; the PAID event through the RTF relay |
+| 11 | Missing paid events | `ProcessMissingPaidEventsWorkflow` finds payments still waiting after 48 hours |
+| 12 | Pay & Plan | The composite on Online with its children on the same cluster |
+| 13 | Allocations callback | One-Data, `POST /payments/{payment-id}/allocations`, the batch stored in `allocation_batch`, async start, 202; `ReceiveAllocationsWorkflow` writes legs and `ALLOC_LEG` rows |
+
+### Payment states
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Capture
+    PENDING --> ACCEPTED: Verify, pay today or inbound
+    PENDING --> SCHEDULED: Verify, future date
+    PENDING --> DECLINED: Verify fails
+    PENDING --> DISALLOWED: Verify, inbound not accepted
+    SCHEDULED --> ACCEPTED: Reverify, on the due date
+    SCHEDULED --> DECLINED: Reverify fails
+    SCHEDULED --> CANCELLED: Cancel, inside the window
+    ACCEPTED --> PROCESSING: Execute
+    PROCESSING --> PROCESSED: Fulfil
+    PROCESSED --> PAID: Settle
+    PROCESSING --> RETURNED: Return
+    PROCESSED --> RETURNED: Return
+    PAID --> RETURNED: Return
+    RETURNED --> REPRESENTING: QueueRepresentment
+    REPRESENTING --> REPRESENTED: Represent
+    REPRESENTING --> DECLINED: Recheck fails
+    REPRESENTED --> RETURNED: Returned again
+    PAID --> [*]
+    DECLINED --> [*]
+    CANCELLED --> [*]
+    DISALLOWED --> [*]
+```
+
+Corporate parents use the same states. A corporate parent reaches `PROCESSED` through the completion check instead of Fulfil.
+
+### Allocation status, beside the payment states
+
+```mermaid
+stateDiagram-v2
+    [*] --> NONE: Corporate payment captured
+    NONE --> ALLOCATING: RequestAllocations
+    ALLOCATING --> ALLOCATED: ReceiveAllocations, legs add up to the amount
+    ALLOCATED --> [*]
+```
+
+[^ Top](#table-of-contents)
+
+---
+
+## Open Items
+
+These inputs are assumed for now. The first changes the numbers most.
+
+| Item | Assumed for now | Why it matters |
+| --- | --- | --- |
+| Agreed TPS per downstream | Parameters in `downstream_limit` | Caps every window; SEPA needs about 56 RPS of offline share during the US evening |
+| Inbound volume | Like returns: bursts of 100 TPS, up to 100K a day | Sizes the inbound budget |
+| AR intake time of day | Business hours, outside the midnight windows | Overlap with execution changes the budget split |
+| US execution time zone | Midnight ET for all 1M | Per-customer time zones would spread the load |
+| AT and other SEPA volumes | Below DE and IT, same window | Adds to the 3-hour cutoff |
+| Allocation callback contract | `POST /payments/{payment-id}/allocations`, batches numbered per payment; complete when the legs add up to the payment amount | Idempotency and the completeness check |
+| Allocation callback function name | `CreatePaymentAllocations.v1`, a placeholder | The One-Data contract |
+| Allocations changing after they arrive | They don't | If they can, legs need replacing before release |
+| Cancellation window per market | A market setting that closes before the execution time | The dispatcher must never start inside it |
+| Representable Return behavior | Set in billpay-ui; not yet a behavior in this spec | Decides whether QueueRepresentment varies by it |
+| Holiday calendars | Execution runs every day | A market that skips holidays needs a calendar in its dispatcher |
+| Validation services' limits | Payment Instruments and Options take full rate | With agreed TPS they get their own queues |
+| Per-market namespaces on Offline | One namespace, market as fairness key | Separate namespaces would make the governor split each downstream's share across them by demand |
+| Open-to-buy event handler | Events written to the inbox | Its details are still to be defined |
+| Payment intent and balance refund steps | They follow the payment path | Detailed stages are still to be defined |
 
 [^ Top](#table-of-contents)

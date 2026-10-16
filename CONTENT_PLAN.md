@@ -20,12 +20,14 @@ The reference site is a client-rendered Docusaurus SPA, so a plain HTTP fetch on
 | # | Section | Proposed subsections | Treatment | Primary source | Notes |
 |---|---------|----------------------|-----------|-----------------|-------|
 | 1 | Vision | — | **Rewrite** | Reference site (narrative/tone) + Spec (scope, intro) | Understand how the reference site frames the vision, restate it grounded in what the spec actually covers |
-| 2 | Architecture | — | **Rewrite** | Reference site (structure) + Spec (APIs, workflows, routing) | Must reflect the updated API/workflow changes in the spec — especially the "Overall Payments View" routing table |
-| 3 | Design | Payment Lifecycle States · Market Onboarding & Dimensions · Core Components (Workflow / Stage / ActivityGroup / Activity / Client) · Workflow Logic · Sequence Diagrams · State Diagrams | **Redesign** | Spec (primary) | **No "Payment Services" subsection** |
-| 4 | Build | API Gateway (One Data Functions) · Billpay REST APIs · Temporal Workflows (Core / Composite / Periodic) · Activities & ActivityGroups · Overall Payments View | **Redo** | Spec (primary) | **No "Services" subsection** |
-| 5 | Testing | mirror reference site | **Copy** | Reference site | Re-theme only, no content rewrite |
-| 6 | Deploy | mirror reference site | **Copy** | Reference site | Re-theme only, no content rewrite |
-| 7 | Observability | mirror reference site | **Copy** | Reference site | Re-theme only, no content rewrite |
+| 2 | Architecture | — | **Rewrite** | Reference site (structure) + Spec (APIs, workflows, routing) | Must reflect the spec's two Temporal clusters, the Router and the "Overall Payments View" |
+| 3 | Design | Payment Lifecycle States · Journeys · Routing and start modes · Core Components (Workflow / Stage / Activity / Client) · Pacing · Throttling · Corporate allocations · Sequence Diagrams | **Redesign** | Spec (primary) | **No "Payment Services" subsection** |
+| 4 | Market Onboarding | Overview · Market profile · Operations settings · Releases and environments · Provisioning | **New** (2026-10-15) | Spec §Market Onboarding | Between Design and Build. The billpay-ui deployable and screen pages link here |
+| 5 | Build | API Gateway (One Data Functions) · Billpay REST APIs · Router · Workflows, stages, activities and clients · Dispatchers and the governor · Database · Schedules | **Redo** | Spec (primary) | **No "Services" subsection** |
+| 6 | Testing | Functional · Non-functional, with the seven load-test runs | **Redo** (was Copy) | Spec (primary) | Follows the spec; extend or rewrite in full (decision 3, 2026-10-15) |
+| 7 | Deploy | Deployables · Pipeline · Temporal Server | **Redo** (was Copy) | Spec (primary) | Follows the spec; extend or rewrite in full |
+| 8 | Observability | Monitoring · SLA/SLI/SLO · Alerts | **Redo** (was Copy) | Spec (primary) | Follows the spec; extend or rewrite in full |
+| 9 | Operations | Familiarity · Dispatch controls · SOPs | **Redo** (was Copy) | Spec (primary) | Follows the spec like every other section |
 
 ---
 
@@ -298,12 +300,12 @@ live in Design; contract tables (function, endpoint, type, schema) live in Build
 |---|---|
 | Component model, call rules, naming | `design/principles.md` |
 | Payment lifecycle states | `design/payment-state-model.md` |
-| Router: trigger to workflow | `design/routing.md` |
+| Router: trigger to workflow, start modes, workflow IDs | `design/routing.md` |
 | Schedule to workflow | `design/component-model/workflows/periodic.md` |
-| Online / Offline worker split | `design/component-model/workflows/index.md` |
+| Online / Offline cluster split | `design/component-model/workflows/index.md` |
 | Per-workflow behaviour | `design/component-model/workflows/*.md` |
 | Per-stage behaviour | `design/component-model/stages.md` |
-| Activities and ActivityGroups | `design/component-model/activities.md` |
+| Activities | `design/component-model/activities.md` |
 | Flow diagrams | `design/sequence-diagrams.md` |
 | One-Data functions, core endpoints | `build/api-spec/one-data.md`, `billpay-core.md` |
 | Tables and schema | `build/database.md` |
@@ -311,6 +313,20 @@ live in Design; contract tables (function, endpoint, type, schema) live in Build
 | Code rules and enforcement | `build/principles/core-build/*.md` |
 | Why Temporal, durable execution | `architecture/overview.md#why-temporal` |
 | Physical topology, failover | `architecture/high-availability.md` |
+| Work Tracker lifecycle, dispatchers, relays, governor | `design/pacing.md` |
+| Task queues, throttling, priority, fairness | `design/throttling.md` |
+| Corporate allocations flow | `design/corporate-allocations.md` |
+| Market profile and behaviors | `onboarding/market-profile.md` |
+| Operations settings | `onboarding/operations-settings.md` |
+| Releases and environments | `onboarding/releases.md` |
+| Provisioning API and workflow | `onboarding/provisioning.md` |
+| Building the Router | `build/principles/core-build/router.md` |
+| Building dispatchers and the governor | `build/dispatchers.md` |
+| Cluster settings, shards, standby | `deployment/temporal-server.md` |
+| Alert catalogue | `observability/alerts/kibana.md` |
+| Pacing dashboards | `observability/monitoring/pacing.md` |
+| Dispatch controls for operators | `operations/familiarity/dispatch-controls.md` |
+| Load-test runs | `testing/non-functional/performance.md` |
 
 ### Page changes
 
@@ -377,3 +393,201 @@ What changed on the HA page:
   label. It routes down x=1088 because the "Histories…" line above reaches x=1071, which is the
   only clear lane to the region edge.
 - `architecture/index.md` still does not assert a region count, which stays correct either way.
+
+## Phase H — Target design (2026-10-15)
+
+Every page moves to the target design in the *Billpay Temporal Scaling Design* doc. The plan below comes from that doc's **Wiki changes** tab (rev 38); the facts come from the rewritten `docs/Wiki_Spec.md`. 61 of the 85 pages change and 12 pages are new, 5 of them in a new Market Onboarding section.
+
+**Decisions behind it** (Wiki changes tab, settled by the user):
+
+1. Every page shows the target design now, not the rollout steps.
+2. `Wiki_Spec.md` is rewritten with the new design, keeping nothing of the old, and stays the source of truth.
+3. Testing, Deployment and Observability may be extended or rewritten in full.
+4. Credit balance refunds run on Online (Update-With-Start) from channels, and on Offline (async start) for async events such as AR.
+5. Periodic workflows: `ProcessPaidEventsWorkflow`, `ProcessMissingPaidEventsWorkflow`, `PurgeTransactionDataWorkflow`.
+6. Each cluster is active-passive, with a passive standby in us-west-1 promoted on its own.
+7. The allocations callback function is `CreatePaymentAllocations.v1`, a placeholder name.
+8. Provisioning API paths as in the spec: `/provisioning/releases`, `/provisioning/markets/{market}/{account-type}/pause` and `/resume`, `GET /provisioning/capabilities`.
+
+**Voice** (user direction, 2026-10-15). Blog-post style: a senior engineer or product owner explaining the system, so the reader learns something and stays with it. Run `human-writing` with `tone-of-voice` and `humanizer`. A page marked **Style pass** keeps its facts; its prose is reworked only where it lists without explaining.
+
+**Commits, one phase each:**
+
+1. Spec and repo files: `Wiki_Spec.md`, this file, `CLAUDE.md`, the `--amex-cat-onboarding` token.
+2. Intro, Vision and Architecture. Stop for review before Design.
+3. Design and Market Onboarding, together with the new section's navigation: `sidebars.js`, `sections.js` (`onboarding` after `design`; later sections renumber), the sidebar badge numbers in `custom.css`, and a ninth tile on the homepage board. The navigation waits for phase 3 because the build fails on links to pages that don't exist yet.
+4. Build.
+5. Deployment, Observability, Operations, Testing and Contributing.
+
+Each new page gets its `sidebars.js` line and its parent's SectionIndex entry in the phase that writes it.
+
+### Global changes, on every page
+
+| Topic | Change to |
+|---|---|
+| Where workflows run | Online and Offline Temporal clusters, each with its own Aurora DB and app, each active-passive. Nothing calls across them; an Oracle Work Tracker row is the only hand-off |
+| Layers | Workflow → Stage → Activity → Client. A stage is one business step and the only layer that varies by behavior. `{System}Activities` per system, throttled systems on their own `ds-*` queue, Oracle through the `PaymentStore` local activity |
+| Names | `...Workflow`. `CreateScheduledPaymentWorkflow`; `RequestAllocationsWorkflow` plus `ReceiveAllocationsWorkflow`; the three periodic jobs above |
+| Dated work | A Work Tracker row until it is due; a dispatcher starts the workflow on the day at the governor's rate |
+| Corporate payments | The parent clears once, at payment level, on its due date. Allocations arrive by callback and post as legs in parallel. `allocation_status` replaces the ALLOCATING and ALLOCATED states; no signals |
+| Cancel and update | `SCHEDULED` only, inside the market's cancellation window, by a guarded update; a late request gets 409 |
+| Before PROCESSED | Clearing, AR, OTB, accounting, eBNC and risk must succeed. Comms (Raven) and lifecycle events (RTF) go through the outbox after the commit |
+| Realtime clearing | Only pay-today payments from channels. BOTH is resolved per journey |
+
+### Pages
+
+Treatments: **Update** (facts change, rewritten in the house voice), **Style pass** (facts stay), **New**. Status uses the legend at the top of this file.
+
+#### Intro and Vision
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `intro.md` | Update | Router row: a library in the core APIs and dispatchers that admits (422 or 429), picks the journey, pins a plan key and places the work. Workflows row drops "long-running". Schedules row: dispatchers paced by the governor, plus periodic jobs. Naming: `{Verb}{Object}Workflow`, stages named for their step, `{System}Activities`, `{System}Client` | ☐ |
+| `vision/index.md` | Style pass | | ☐ |
+| `vision/payments-overview.md` | Style pass | Sources stay as recorded in Phases F and G | ☐ |
+| `vision/product.md` | Update | Onboarding adds the Operations step and versioned releases, which each environment tests and signs off (RFC in production). Behaviors are Y, N or BOTH. A corporate parent is PAID once it settles and every leg has posted | ☐ |
+| `vision/engineering.md` | Update | Stages picked at runtime from the plan key. Event handlers write settlement and AR-posted events to the inbox; no workflow waits on them. BOTH in the behavior answers. CompositionMap shows releases, provisioning and the plan key | ☐ |
+
+#### Architecture
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `architecture/index.md` | Update | "The two worker pools" becomes "the two Temporal clusters and what each runs" | ☐ |
+| `architecture/overview.md` | Update | LayerStack: admission and placement in the Router; the two clusters and the dispatchers replace Workers; drop "Composed per market behaviors". Router steps: admit, pick the journey, resolve behaviors, pin the plan key, place, start. Periodic work: one dispatcher per kind of work, each with its own Schedule and budget, at rates the governor resets every 15 s. New two-cluster diagram (`ClusterMap`: coordinate SVG on the panel recipe, tokens, aria-label) | ☐ |
+| `architecture/high-availability.md` | Update | Aurora and OpenSearch 2 per cluster; Offline has 4K shards. Online app (core APIs, Router, Online workers, a client per cluster) and Offline app (dispatchers, relays, governor, Offline workflows, a worker deployment per downstream queue). Failure rows per cluster: Online down stops caller-facing journeys; Offline down pauses paced work while dated work waits in Oracle. Oracle row: `PaymentStore` rides out patching. HADiagram redrawn with a us-west-1 standby per cluster. Apps active in IPC2, standby in IPC1 | ☐ |
+
+#### Design
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `design/index.md` | Update | Four layers. The Router entry adds admission, plan keys, placement and start modes. SectionIndex lists the new pages | ☐ |
+| `design/principles.md` | Update | A stage is one business step that returns its outcome; no ActivityGroup. Call rules: a workflow calls stages and starts children on its own cluster, a stage calls activities and helpers, an activity calls clients, a client calls only its own system. Naming table from the spec. Stages looked up from the plan key (most specific match); combinations not onboarded get 422 | ☐ |
+| `design/payment-state-model.md` | Update | Corporate diagram matches consumer, with `allocation_status` as a separate track. No ACCEPTED → CANCELLED. Corporate PROCESSED and PAID rules. A short section on guarded updates. Late allocations leave the parent PROCESSING, with an alert at the market's alert point | ☐ |
+| `design/journeys/index.md` | Update | Future-dated journeys never clear in real time. Wait steps become Work Tracker rows that a dispatcher releases. Raven and Lumi move to the outbox. Update: a guarded cancel, then child `{newId}-init`. Corporate: the callback and held legs; Request and Receive Allocations. AR-initiated payments: async start on Offline, 202 or 429. Refunds: Online from channels, Offline when AR raises them | ☐ |
+| `design/routing.md` | Update | RouteMap tags mean clusters; a start-mode column; rows for the allocations callback, representments that fall due and both refund routes. Corporate: Request and Receive Allocations and one leg workflow per allocation, on Offline. The dispatcher re-routes on the due date. Stages come from the plan key; Worker Versioning pins the build. A section on start modes and workflow IDs | ☐ |
+| `design/component-model/index.md` | Update | Twelve business steps. "ActivityGroups & Activities" becomes Activities, and none vary by behavior | ☐ |
+| `design/component-model/workflows/index.md` | Update | WorkerSplit by cluster. Isolation is physical. The "Either worker" box goes: create scheduled runs on Online from channels and on Offline from AR, corporate legs only on Offline, no child crosses clusters. Control workflows as a kind. Balance refund on both clusters | ☐ |
+| `design/component-model/workflows/core.md` | Update | WorkflowMeta shows cluster and workflow ID. New stage names. Create Scheduled writes its Work Tracker rows and ends. Execute Scheduled is started by the dispatcher and releases held legs at ACCEPTED. Corporate legs: AR and OTB, then accounting, eBNC and risk, at priority 2 with the parent's ID as fairness key. Update starts child `{newId}-init`. QueueRepresentment writes a `REPRESENT` row. No signals. Balance refund on both clusters | ☐ |
+| `design/component-model/workflows/composite.md` | Update | Started with Update-With-Start; children on the same cluster | ☐ |
+| `design/component-model/workflows/periodic.md` | Update | Dispatchers (scheduled payments and representments per market, allocation requests and legs every minute), the outbox relays and GovernorWorkflow, with no fixed batch. Paid events: the corporate PAID rule, and the PAID event through the RTF relay | ☐ |
+| `design/component-model/stages.md` | Update | Twelve stages: Verify absorbs the four Pending stages; RequestAllocations, ReceiveAllocations and Settle added; one Cancel stage. Each stage commits state, timeline entry (with cluster) and outbox rows in one guarded `PaymentStore` commit | ☐ |
+| `design/component-model/activities.md` | Update | Retitled Activities: one row per `{System}Activities` with its queue, plus `PaymentStore`. ActivityTable gets a queue column in place of the behavior filter. No decline when allocations can't be fetched | ☐ |
+| `design/sequence-diagrams.md` | Update | Participants become stages. Router hops and start modes. #2: a `SCHED_EXEC` row and the dispatcher. #3 and #4: the new corporate flow. #5 and #6: guarded cancel and 409. #7 and #8: QueueRepresentment and the representment dispatcher. #10: PAID through the outbox. New #13: the allocations callback | ☐ |
+| `design/pacing.md` | New | Dispatchers and the governor: the Work Tracker lifecycle, each dispatcher, the outbox relays, the governor's loop, floors and costs | ☐ |
+| `design/throttling.md` | New | Queues, throttling and priority: `ds-*` queues and their limits, 429 and Retry-After, must-succeed calls, priorities 1 to 5, fairness keys | ☐ |
+| `design/corporate-allocations.md` | New | The two tracks, with a corporate flow diagram; fetch timing, callback batches, held legs and their release, completion rules, the late alert, volumes | ☐ |
+
+#### Market Onboarding (new section, between Design and Build)
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `onboarding/index.md` | New | What onboarding covers, who does what, and the path from draft to live, with an onboarding diagram | ☐ |
+| `onboarding/market-profile.md` | New | One market and account type, the APIs it takes, the four behaviors with Y, N or BOTH per journey, and what the capability manifest allows | ☐ |
+| `onboarding/operations-settings.md` | New | Each operations setting and what it drives. The settings table lives here and nowhere else | ☐ |
+| `onboarding/releases.md` | New | Maker-checker approval, frozen vN, promotion E1 → E2 → E3, test payments, sign-off, RFC in E3, rollback, pause and resume | ☐ |
+| `onboarding/provisioning.md` | New | The provisioning API, MarketProvisioningWorkflow's five steps, `market_config_version` and `market_config_active`, and how new payments pick up a version | ☐ |
+
+#### Build
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `build/index.md` | Update | Schedules and Database blurbs match their pages. "The worker app" becomes the Online and Offline apps. SectionIndex lists the new pages | ☐ |
+| `build/api-spec/index.md` | Style pass | | ☐ |
+| `build/api-spec/billpay-core.md` | Update | Start-mode column. The allocations callback and the provisioning API. Admission: 422 when not live, 429 over budget. No account-type fan-out and no direct hand-off from returns to representment. `PaymentStore` replaces the persist and idempotency activities | ☐ |
+| `build/api-spec/one-data.md` | Update | Update and Delete only inside the window, 409 after. Inbound and the AR composite are async: 202, or 429 over budget. The corporate PAID rule. `CreatePaymentAllocations.v1` (placeholder) | ☐ |
+| `build/database.md` | Update | New tables: `work_tracker`, `allocation_batch`, `market_config_version`, `market_config_active`, and the control tables `dispatch_run`, `rate_allocation`, `downstream_limit`, `governor_decision`. `trans_dtl` gains `allocation_status` and `legs_released_at`; timeline entries name the cluster. The notification tracker is the outbox, the events tracker the inbox. "Written by" becomes `PaymentStore`. Habits: guarded updates; Work Tracker and outbox rows in the same commit as the state change | ☐ |
+| `build/domain-model/index.md` | Update | The corporate ALLOCATING/ALLOCATED gap becomes three: no `allocation_status` on the parent, no edge for legs under a scheduled parent, no cancelled leg type. Behaviors resolved per journey and pinned in the plan key | ☐ |
+| `build/domain-model/payment.md` | Update | Corporate legs are written as ACCEPTED while the parent is SCHEDULED, ACCEPTED or PROCESSING, and a cancelled or declined parent cancels them; both edges are gaps, and the 26 stay. ReceiveAllocationsWorkflow writes the legs. A stage is one business step, with `PaymentStore` and the outbox | ☐ |
+| `build/domain-model/instruments.md` | Style pass | | ☐ |
+| `build/domain-model/payment-options.md` | Style pass | | ☐ |
+| `build/principles/index.md` | Update | No activity groups in the layer list; the Router among what we build | ☐ |
+| `build/principles/core-build/index.md` | Update | Call chain without ActivityGroup; stages may call helpers; children start only on the workflow's own cluster. Activities card: `{System}Activities` plus `PaymentStore`. SectionIndex adds the Router page | ☐ |
+| `build/principles/core-build/activities.md` | Update | Retitled "Building Activities", named `{System}Activities`. `PaymentStore` example: guarded update, timeline entry, outbox and Work Tracker rows in one commit, as a local activity with a long schedule-to-close. ActivityGroup material moves into stages | ☐ |
+| `build/principles/core-build/clients.md` | Update | A client calls only its own system, never another client | ☐ |
+| `build/principles/core-build/code-layout.md` | Update | No ActivityGroup row and no `market/{m}/activityGroups/`; no market-specific workflows. Market timing and BOTH rules come from billpay-ui releases, not code. The Online and Offline apps | ☐ |
+| `build/principles/core-build/stages.md` | Update | A stage is one journey step that returns its outcome. A `{Step}Stage` interface with implementations named for the behavior, such as `MandateVerifyStage`. Example: an Execute stage. `PaymentStore` guarded updates; events become outbox rows. Selection by plan key through the KSP index, and how market overrides enter the match | ☐ |
+| `build/principles/core-build/workflows.md` | Update | No signals and no timers for dated work. The plan key picks stages at runtime. Worker Versioning (pinned) replaces version branches. Start modes replace "early return"; no eager start. Placement by the Router. A new sketch | ☐ |
+| `build/principles/core-build/router.md` | New | Building the Router: admission, journey pick, behavior resolution, plan key and KSP index, placement, start calls, re-routing on the due date | ☐ |
+| `build/principles/tech-stack/index.md` | Update | Temporal: two self-hosted clusters on Aurora with OpenSearch 2; Update-With-Start, Schedules, Worker Versioning, priority and fairness. KSP adopted | ☐ |
+| `build/principles/tech-stack/database.md` | Update | Only `PaymentStore` reaches Oracle; the habit count changes | ☐ |
+| `build/principles/tech-stack/datasource.md` | Update | The Online and Offline apps replace the worker app | ☐ |
+| `build/principles/tech-stack/orm.md` | Update | Only `PaymentStore` opens Oracle transactions | ☐ |
+| `build/principles/tech-stack/http-client.md` | Style pass | | ☐ |
+| `build/principles/tech-stack/serialization.md` | Style pass | | ☐ |
+| `build/schedules.md` | Update | Schedules start dispatchers, relays, the governor and periodic jobs, each with its own control queue and budget. No batching section: the governor sets rates every 15 s. Market Schedules arrive in a release and apply when it goes live; rollback switches back | ☐ |
+| `build/dispatchers.md` | New | Building dispatchers and the governor: claiming rows with SKIP LOCKED, run IDs, heartbeats, budgets, `rate_allocation`, overrides, sizing | ☐ |
+
+#### Testing
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `testing/index.md` | Style pass | | ☐ |
+| `testing/functional/index.md` | Update | The Unit line adds stages | ☐ |
+| `testing/functional/unit.md` | Update | Each stage implementation per behavior, and the plan-key lookup | ☐ |
+| `testing/functional/integration.md` | Style pass | | ☐ |
+| `testing/functional/replay.md` | Style pass | | ☐ |
+| `testing/functional/e2e.md` | Style pass | | ☐ |
+| `testing/non-functional/index.md` | Style pass | | ☐ |
+| `testing/non-functional/performance.md` | Update | The seven load-test runs and their pass criteria, against stubs at agreed TPS with real latency; reconcile Work Tracker rows and PAID payments after every run | ☐ |
+
+#### Deployment
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `deployment/index.md` | Update | Temporal Server in the SectionIndex. Market releases reach E1, E2 and E3 through each environment's provisioning API, not the pipeline | ☐ |
+| `deployment/deployables/index.md` | Update | Six deployables: the Online and Offline apps replace the Worker App. billpay-ui is the onboarding control plane. The two clusters are not deployables | ☐ |
+| `deployment/deployables/ui-app.md` | Update | One control plane for all environments: SSO, maker-checker, audit, versioned releases. Authoring tables in their own schema, outside billpay-core | ☐ |
+| `deployment/deployables/worker-app.md` | Update | Path kept, retitled "Online and Offline apps". Each deploys and scales on its own; what each contains; one worker deployment per `ds-*` queue (slots ≈ queue limit × call latency). Payment workflows pinned with Worker Versioning | ☐ |
+| `deployment/pipeline.md` | Update | The two apps deploy separately. Old builds keep running until their pinned workflows finish. Each build ships a capability manifest that provisioning checks | ☐ |
+| `deployment/temporal-server.md` | Update | Two clusters on server 1.30.1 or later: 2K and 4K shards, OpenSearch 2, 30-day retention. Schedules on Offline. A passive standby per cluster in us-west-1, promoted on its own. With Offline down, Online keeps serving, dated work waits and async starts get 503. Offline: fairness on, priorities 1 to 5, no eager start | ☐ |
+| `deployment/ci-checks.md` | Style pass | | ☐ |
+| `deployment/code-merge-strategy.md` | Style pass | | ☐ |
+| `deployment/deployables/codec-server-app.md` | Style pass | | ☐ |
+| `deployment/deployables/mocks-app.md` | Style pass | | ☐ |
+| `deployment/deployables/one-data-functions.md` | Style pass | | ☐ |
+
+#### Observability
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `observability/index.md` | Style pass | | ☐ |
+| `observability/alerts/index.md` | Style pass | | ☐ |
+| `observability/alerts/kibana.md` | Update | The alert catalogue from the spec's Platform section | ☐ |
+| `observability/monitoring/index.md` | Update | Both clusters, and a fourth view for the governor and dispatchers | ☐ |
+| `observability/monitoring/app-health.md` | Style pass | | ☐ |
+| `observability/monitoring/pacing.md` | New | Governor and dispatchers: rates per class, backlog and in-flight against the cap, cutoff projection, downstream limits and 429s, outbox backlog | ☐ |
+| `observability/monitoring/sla-sli-slo/index.md` | Update | Async entries measure time to the 202, which goes out only after the workflow starts; 429 with Retry-After over budget, and whether 429s spend error budget | ☐ |
+| `observability/monitoring/sla-sli-slo/billpay-apis.md` | Update | Channels reply through Update-With-Start, AR gets 202 or 429, both within the 500 ms p99. Update and Cancel: 409 outside the window. Return and Inbound: time to the 202. Refunds on both routes. The allocations callback | ☐ |
+| `observability/monitoring/sla-sli-slo/one-data-functions.md` | Update | Cancel: the round trip to CANCELLED, or 409 outside the window | ☐ |
+| `observability/monitoring/temporal-health.md` | Update | Both clusters. Panels for the governor's inputs and for backlog and rate limit on each `ds-*` and `ctl-*` queue | ☐ |
+
+#### Operations
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `operations/index.md` | Style pass | | ☐ |
+| `operations/familiarity/index.md` | Update | One Temporal UI per cluster, billpay-ui as the control plane, two Aurora DBs. SectionIndex adds dispatch controls | ☐ |
+| `operations/familiarity/billpay-ui.md` | Update | The Operations step and releases in brief, linking to Market Onboarding for the process. Readiness shows real provisioning progress. Pause and resume stop and restart a live market's dispatchers | ☐ |
+| `operations/familiarity/oracle-db.md` | Update | Oracle is the only hand-off between the clusters; a scheduled payment is a Work Tracker row until it is due. During patching payments pause and resume; escalate only past the `PaymentStore` schedule-to-close | ☐ |
+| `operations/familiarity/temporal-db-aws.md` | Update | Two Aurora DBs and their sizing; OpenSearch 2; Offline CPU and persistence p99 feed the governor | ☐ |
+| `operations/familiarity/temporal-server-aws.md` | Update | Offline queues, priorities 1 to 5 by class, Schedules on Offline | ☐ |
+| `operations/familiarity/temporal-web-ui.md` | Update | Search by `{paymentId}-{suffix}` and by the search attributes. A scheduled payment has no workflow until its due date. No signals | ☐ |
+| `operations/familiarity/tracing-ui.md` | Update | One trace per workflow; span links through `trace_parent`; the lookup path | ☐ |
+| `operations/familiarity/opensearch-logs.md` | Style pass | | ☐ |
+| `operations/familiarity/dispatch-controls.md` | New | Work Tracker statuses, `dispatch_run`, rate overrides, pausing Schedules, `governor_decision`, the exception list | ☐ |
+| `operations/sops.md` | Update | Runbooks for Oracle patching, late allocations, a failed release, SEPA cutoff at risk (overrides in `rate_allocation`), retries exhausted, Offline cluster down, promoting a cluster's standby | ☐ |
+
+#### Contributing
+
+| Page | Treatment | What changes | Status |
+|---|---|---|---|
+| `contributing/index.md` | Style pass | | ☐ |
+| `contributing/publish.md` | Style pass | | ☐ |
+| `contributing/run-locally.md` | Update | The onboarding folder in the project layout tree | ☐ |
+
+### Components
+
+- New: `ClusterMap` (the two-cluster architecture), a corporate flow diagram, an onboarding diagram.
+- `HADiagram` redrawn with a standby per cluster, its colours moved onto tokens.
+- `ActivityTable` gains a queue column. `WorkflowMeta` shows the cluster and workflow ID. `WorkerChip`, `WorkerSplit` and `RouteMap` say cluster instead of worker.
+- `docs/domainModel/*.kt.md` stay as supplied; the domain-model pages list the gaps instead.
