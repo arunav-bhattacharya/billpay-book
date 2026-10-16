@@ -85,7 +85,26 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
 | **Oracle primary** | `PaymentStore` waits out a short outage or a patch on its own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
 | **The Online cluster** | Journeys where a caller waits can't start until the cluster returns or an operator promotes its us-west-1 standby. The Offline cluster carries on, since nothing calls across. |
 | **The Offline cluster** | Dated work waits in Oracle, async starts get 503 with `Retry-After` and their senders retry, and relays pause, so notifications and events wait in the outbox. The Online cluster keeps serving. The fix is to restore the cluster or promote its standby. |
+| **All of us-east-1** | Both clusters stop at once. Moving Temporal to us-west-1 is covered [below](#when-us-east-1-goes-down). |
 
-Either way, a Temporal outage loses nothing: every history is in the cluster's database rather than in a worker, so workflows resume exactly where they stopped. That is the durability Temporal was [chosen for](./overview.md#why-temporal).
+When one cluster goes down and comes back, nothing is lost: every history is in the cluster's database rather than in a worker, so workflows resume exactly where they stopped. That is the durability Temporal was [chosen for](./overview.md#why-temporal).
+
+## When us-east-1 goes down
+
+Both Temporal clusters run in us-east-1, so a regional outage takes them out together. Nothing moves to us-west-1 on its own. One write site at a time is the rule for Temporal, just as it is for Oracle, so switching regions is a decision an operator makes.
+
+While the region is down:
+
+- Journeys where a caller waits can't start, because there is no cluster to start them on.
+- Async starts from Accounts Receivable, returns and inbound get 503 with `Retry-After`, and their senders try again later.
+- Scheduled payments, notifications and lifecycle events wait in Oracle. Nothing that falls due is lost; it is only late.
+
+To bring Temporal back in us-west-1:
+
+1. An operator promotes the us-west-1 standby of each cluster to primary. The Online and Offline clusters are promoted separately, each with its own database.
+2. The apps are pointed at the west. The Online app's two Temporal clients, one per cluster, and the Offline app's client switch to the us-west-1 frontends.
+3. Work picks up again. Workflows carry on from the histories the standby received, dispatchers start claiming due rows, and the relays drain the outbox.
+
+A step that ran just before the outage may run a second time after the switch. That is safe by design: every downstream call carries an idempotency key and every Oracle write is a guarded update, so the retry finds the work already done and money never moves twice. The step-by-step runbook sits with the other [SOPs](../operations/sops.md).
 
 The front door stays open in both sites, and everything behind it runs in one place at a time. Moving that place is a call someone makes, and each cluster's standby is promoted on its own.

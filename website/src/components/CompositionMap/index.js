@@ -17,8 +17,8 @@ import styles from './styles.module.css';
  * steps:     [{via, title, note}]
  */
 const ONBOARD = {
-  title: 'Onboard the market in billpay-ui',
-  note: 'Once per market and account type. A second person approves it.',
+  title: 'Onboard the market',
+  note: 'In the Market Onboarding UI, once per market and account type. A second person approves it.',
 };
 
 export default function CompositionMap({apis = [], behaviors = [], settings = [], onboard = ONBOARD, steps = []}) {

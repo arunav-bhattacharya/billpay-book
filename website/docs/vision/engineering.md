@@ -155,7 +155,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
 
 ## From onboarding to a running workflow
 
-A market reaches the platform as configuration. In billpay-ui the team picks the One-Data APIs the market takes, answers the behavior questions and fills in the operations settings, once per account type, because consumer and corporate rules differ. A second person approves it, and it becomes a frozen release.
+A market reaches the platform as configuration. In the Market Onboarding UI the team picks the One-Data APIs the market takes, answers the behavior questions and fills in the operations settings, once per account type, because consumer and corporate rules differ. A second person approves it, and it becomes a frozen release.
 
 Each environment then provisions that release on its own. It checks every combination against what the deployed build can run, saves it inactive, sends test payments through it and waits for sign-off. Once the release is active, the Router uses it for every new payment: it resolves the behaviors for the journey, so a BOTH becomes Y or N, and pins them with the config version in the plan key. The workflow picks its stages from that key. What each behavior means is on the [Product Vision](./product.md).
 
@@ -174,7 +174,7 @@ A new way of processing a payment is a new stage implementation behind one combi
 
 ## Optimize for
 
-<Highlights
+<Principles
   items={[
     {
       term: 'Correctness',

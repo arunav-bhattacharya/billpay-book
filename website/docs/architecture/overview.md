@@ -110,7 +110,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 3. Resolve the behaviors from the market's active release. A behavior set to BOTH becomes Y or N for this journey.
 4. Pin the plan key: the journey, the resolved behaviors and the config version.
 5. Place the work: cluster, task queue, priority and workflow ID.
-6. Start it. When a caller is waiting that means Update-With-Start, so the answer comes back the moment the payment is decided. When nobody is, it means an async start, and the API replies 202 once the workflow exists.
+6. Start it. When a caller is waiting that means Update-With-Start: the caller gets the payment's state back, the decision once Verify has made it or `PENDING` until then, while the workflow carries on. When nobody is waiting, it means an async start, and the API replies 202 once the workflow exists.
 
 [Design → Routing](../design/routing.md) has the full map of trigger to workflow. Below the Router:
 

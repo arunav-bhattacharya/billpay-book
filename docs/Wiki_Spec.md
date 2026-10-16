@@ -94,7 +94,7 @@ Every write API admits the request first, through the Router (see [Routing and S
 
 | API | What it does | Start mode | Reply |
 | --- | --- | --- | --- |
-| `POST /payments` | Pays today or schedules for a future date | From channels: Update-With-Start. From AR: async start | Channels: ACCEPTED, SCHEDULED or DECLINED. AR: 202 with the payment ID |
+| `POST /payments` | Pays today or schedules for a future date | From channels: Update-With-Start. From AR: async start | Channels: PENDING, ACCEPTED, SCHEDULED or DECLINED. AR: 202 with the payment ID |
 | `PUT /payments/{payment-id}` | Updates a `SCHEDULED` payment inside the cancellation window | Update-With-Start | The new payment's result; 409 outside the window |
 | `DELETE /payments/{payment-id}` | Cancels a `SCHEDULED` payment inside the cancellation window | Update-With-Start | CANCELLED; a repeated cancel gets CANCELLED again; 409 otherwise |
 | `POST /payments/returns` | Processes a returned payment | Async start | 202 |
@@ -658,10 +658,11 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 
 | When | Start | Reply | Used by |
 | --- | --- | --- | --- |
-| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | The update's result: ACCEPTED, SCHEDULED, DECLINED or CANCELLED | Pay today, schedule, composites, intent, update, cancel, refunds from channels |
+| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | The update's result: PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED | Pay today, schedule, composites, intent, update, cancel, refunds from channels |
 | Nobody waits | Async start; the workflow exists before we reply | 202 with the payment ID; 429 with `Retry-After` over budget | AR batch, returns, inbound, refund events, allocation callbacks |
 | Due on a date, or a big fan-out | A Work Tracker row in the producer's commit; a dispatcher starts it through the Router | None | Scheduled execution, allocation requests, corporate legs, representments |
 
+- PENDING in a reply means the payment is captured but not yet decided; the caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`.
 - Eager workflow start is not used: the server refuses it with Update-With-Start, and online latency comes from Update-With-Start and local activities.
 - For an async start the payment ID comes from the idempotency key. Conflict policy `USE_EXISTING` joins a retry to the running workflow; reuse policy `REJECT_DUPLICATE` stops a second run after it closes, and the API then answers from Oracle. The reply needs only a durable start, so it fits the 500 ms p99 that `POST /payments` promises.
 - Every workflow ID is the payment ID plus a suffix (see [Platform](#platform)).
@@ -941,7 +942,7 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 
 | Part | What it is | Lives in |
 | --- | --- | --- |
-| billpay-ui frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
+| billpay-ui frontend, the Market Onboarding UI | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
 | billpay-ui backend | The control plane itself: SSO, maker-checker, audit, versioned releases | The control plane, one for all environments |
 | Authoring tables | Drafts, revisions, releases, approvals, deployments, audit | The control plane's own schema, outside billpay-core |
 | Provisioning API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's core app (see [Billpay APIs](#provisioning-api)) |
@@ -1142,6 +1143,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Governor down or metrics missing | Dispatchers hold their rates, then fall back to the floors after 5 minutes; a Schedule restarts the governor | Look if it keeps failing |
 | Worker dies mid-dispatch | Heartbeat timeout; the activity resumes; starts are idempotent | Nothing |
 | Online cluster down | Journeys where a caller waits can't start. The Offline cluster carries on, since nothing calls across | Restore the cluster, or promote its standby |
+| us-east-1 down, both clusters | Nothing new starts in Temporal: caller journeys fail, async starts get 503, dated work and outbox rows wait in Oracle | Promote both us-west-1 standbys, each on its own, and point the apps' Temporal clients at the us-west-1 frontends |
 | Offline cluster down | Dated work waits in Oracle; async starts get 503 with `Retry-After` and senders retry; relays pause, so notifications and events wait in the outbox; the Online cluster keeps serving | Restore the cluster, or promote its standby |
 | Cancel at the window's edge | The guarded update lets one side win; a late cancel gets 409 | Nothing |
 | Validation fails | `DECLINED`, with notifications | Nothing |
@@ -1257,5 +1259,6 @@ These inputs are assumed for now. The first changes the numbers most.
 | Per-market namespaces on Offline | One namespace, market as fairness key | Separate namespaces would make the governor split each downstream's share across them by demand |
 | Open-to-buy event handler | Events written to the inbox | Its details are still to be defined |
 | Payment intent and balance refund steps | They follow the payment path | Detailed stages are still to be defined |
+| When a channel gets PENDING | The payment is captured but not yet decided | Decides how long the API waits for the decision before replying |
 
 [^ Top](#table-of-contents)
