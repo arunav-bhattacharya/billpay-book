@@ -83,42 +83,12 @@ A market comes onto Billpay through **onboarding** in the Market Onboarding UI, 
 
 The first kind sets the **behaviors**, the choices that change how a payment is handled. The account type is one; the other three are answered **Y**, **N** or **BOTH**. BOTH means the behavior applies to some journeys and not others, and onboarding records which ones. Realtime clearing is the clearest example: only a payment made today in a channel can clear in real time, so a market that clears today's payments in real time answers BOTH, and every future-dated payment clears in batch.
 
-<Highlights
-  items={[
-    {
-      term: 'Account type',
-      desc: (
-        <>
-          Consumer, corporate or business travel (<code>accountType</code>). Each is onboarded as a profile of its own, because each is processed differently, and a request for an account type the market hasn't onboarded is turned away.
-        </>
-      ),
-    },
-    {
-      term: 'Good faith credit',
-      desc: (
-        <>
-          Whether the cardmember gets credit for the payment before the money settles. Billpay tells <strong>Accounts Receivable</strong>, the system that tracks what they owe, to post the payment while it is still processing (<code>requiresArPosting</code>).
-        </>
-      ),
-    },
-    {
-      term: 'Realtime clearing',
-      desc: (
-        <>
-          Whether the payment goes to the customer's bank straight away or waits for a periodic <strong>batch</strong> (<code>requiresRealtimeClearing</code>).
-        </>
-      ),
-    },
-    {
-      term: 'Mandate authorization',
-      desc: (
-        <>
-          Whether Billpay has to verify a <strong>mandate</strong>, the standing authorization to collect the money, while the payment is processed (<code>requiresMandateAuthorization</code>).
-        </>
-      ),
-    },
-  ]}
-/>
+| Behavior | What it decides | Answers |
+| --- | --- | --- |
+| **Account type** | Which kind of card account the payment is for (`accountType`). Each is onboarded as a profile of its own, because each is processed differently, and a request for an account type the market hasn't onboarded is turned away. | Consumer, corporate or business travel |
+| **Good faith credit** | Whether the cardmember gets credit for the payment before the money settles. Billpay tells Accounts Receivable, the system that tracks what they owe, to post the payment while it is still processing (`requiresArPosting`). | Y, N or BOTH |
+| **Realtime clearing** | Whether the payment goes to the customer's bank straight away or waits for a periodic batch (`requiresRealtimeClearing`). | Y, N or BOTH |
+| **Mandate authorization** | Whether Billpay has to verify a mandate, the standing authorization to collect the money, while the payment is processed (`requiresMandateAuthorization`). | Y, N or BOTH |
 
 ### Operations settings
 
