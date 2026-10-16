@@ -823,23 +823,40 @@ details.alert > summary {
   --ifm-alert-background-color: color-mix(in srgb, var(--amex-blue) 14%, transparent);
 }
 
-/* Sidebar weight tiers. Docusaurus ships every .menu__link at semibold,
-   which flattens the tree into one texture. A foldable section header keeps
-   Medium, and the page links inside drop to Regular, so the two read as
-   different kinds of thing. The active item below is the deliberate
-   exception: it stays Medium so the current page still stands out from its
-   siblings. */
-.theme-doc-sidebar-menu .menu__link {
+/* The sidebar is a quiet index. Pages and groups rest at Regular, the small
+   section capitals take Medium only so they don't thin out, and the page you
+   are on is the one Semibold line (below). Size, tone, tracking and spacing
+   carry the rest of the hierarchy. Docusaurus ships every .menu__link at
+   semibold, which turned the whole tree into one heavy texture. */
+.theme-doc-sidebar-menu .menu__link,
+.theme-doc-sidebar-menu .menu__link--sublist {
   font-weight: 400;
 }
-.theme-doc-sidebar-menu .menu__link--sublist {
-  font-weight: 600;
+
+/* Ink comes through Infima's own menu token, so a resting link, its hover and
+   the ancestor rule below all read one value: body ink for every page and
+   sub-group, and navy for the section names, which reset the token on their
+   own row further down. */
+.theme-doc-sidebar-menu {
+  --ifm-menu-color: var(--amex-txt);
+}
+
+/* The chevrons step back until the pointer reaches their row, so they stop
+   competing with the words. */
+.theme-doc-sidebar-menu .menu__caret,
+.theme-doc-sidebar-menu .menu__link--sublist-caret::after {
+  opacity: 0.5;
+  transition: opacity 0.16s ease;
+}
+.theme-doc-sidebar-menu .menu__list-item-collapsible:hover .menu__caret,
+.theme-doc-sidebar-menu .menu__link--sublist-caret:hover::after {
+  opacity: 0.9;
 }
 
 /* Blue in the sidebar means one thing only: this is the page you are on.
    Docusaurus also flags every ancestor of the current page as active, which
    paints whole branches blue and drains the signal, so ancestors are pulled
-   back to the ordinary menu colour. */
+   back to the ordinary menu colour, whatever their row sets it to. */
 .theme-doc-sidebar-menu .menu__link--sublist.menu__link--active {
   color: var(--ifm-menu-color);
 }
@@ -850,6 +867,12 @@ details.alert > summary {
 .theme-doc-sidebar-menu .menu__list-item-collapsible--active > .menu__link.menu__link--active {
   color: var(--ifm-menu-color-active);
   font-weight: 600;
+}
+
+/* Infima tints the row of a current section or group with the grey hover
+   colour; give it the same pill as every other current page instead. */
+.theme-doc-sidebar-menu .menu__list-item-collapsible--active {
+  background: var(--ifm-menu-color-background-active);
 }
 
 /* The sidebar sits on a cool tint instead of behind a ruled edge. */
@@ -958,15 +981,24 @@ details.alert > summary {
   background: var(--amex-mut);
 }
 
-/* Numbered top-level sidebar sections, mirroring the homepage card indices
-   (zero-padded). Each number is a section badge: digits in a box, like the
-   logo. At rest the box is a quiet Deep Blue tint, so eight of them stacked in
-   a narrow rail do not shout; the section you are in takes the full Bright
-   Blue. Size carries the rest of the hierarchy: sections run a step above
-   their pages. */
+/* Top-level sections read like the heads of an index: small, widely tracked
+   capitals in navy, each led by its number. At rest the number is a plain
+   grey numeral in its own narrow column; the section you are in fills its
+   number with the Bright Blue box, so the only blue in the rail is where you
+   are. The pages of a section hang under its name, not under its number. */
+.sidebar-sec {
+  margin-top: 0.45rem;
+}
+
+.sidebar-sec > .menu__list-item-collapsible {
+  --ifm-menu-color: var(--amex-txt-strong);
+}
+
 .sidebar-sec > .menu__list-item-collapsible > .menu__link {
-  color: var(--ifm-menu-color);
-  font-size: 1.1em;
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .sidebar-sec > .menu__list-item-collapsible > .menu__link::before {
@@ -974,15 +1006,15 @@ details.alert > summary {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 24px;
-  height: 24px;
-  margin-right: 0.7rem;
+  width: 22px;
+  height: 22px;
+  margin-right: 0.6rem;
   border-radius: var(--amex-badge-radius);
-  background: var(--amex-badge-quiet);
-  color: var(--amex-badge-quiet-ink);
+  background: transparent;
+  color: var(--amex-mut);
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 400;
+  letter-spacing: 0.03em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -992,6 +1024,11 @@ details.alert > summary {
 .sidebar-sec > .menu__list-item-collapsible > .menu__link.menu__link--active::before {
   background: var(--amex-blue);
   color: #ffffff;
+  font-weight: 600;
+}
+
+.sidebar-sec > .menu__list {
+  padding-left: calc(22px + 0.6rem);
 }
 
 .sidebar-sec--vision > .menu__list-item-collapsible > .menu__link::before { content: '01'; }

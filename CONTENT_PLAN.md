@@ -415,7 +415,7 @@ Every page moves to the target design in the *Billpay Temporal Scaling Design* d
 
 1. Spec and repo files: `Wiki_Spec.md`, this file, `CLAUDE.md`, the `--amex-cat-onboarding` token.
 2. Intro, Vision and Architecture. Stop for review before Design.
-3. Design and Market Onboarding, together with the new section's navigation: `sidebars.js`, `sections.js` (`onboarding` after `design`; later sections renumber), the sidebar badge numbers in `custom.css`, and a ninth tile on the homepage board. `intro.md` gets its Market Onboarding link at the same time. The navigation waits for phase 3 because the build fails on links to pages that don't exist yet.
+3. Design and Market Onboarding, together with the new section's navigation: `sidebars.js`, `sections.js` (`onboarding` after `design`; later sections renumber), the sidebar section numbers in `custom.css`, and a ninth tile on the homepage board. `intro.md` gets its Market Onboarding link at the same time. The navigation waits for phase 3 because the build fails on links to pages that don't exist yet.
 4. Build.
 5. Deployment, Observability, Operations, Testing and Contributing.
 
