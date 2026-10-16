@@ -8,12 +8,12 @@ import styles from './styles.module.css';
  *
  * Straight after the page's H1 it is the lower half of the page banner:
  * custom.css (section 12) finds it there through the global `doc-lead` class
- * and sets it on the same Deep Blue field as the title and the section badge.
- * Anywhere else it sits on a soft Bright Blue panel, from this module.
+ * and sets it on the same field as the title, beside the blue block that
+ * carries the section number. Anywhere else it sits on a soft Bright Blue
+ * panel, from this module.
  *
- * It used to take its colour from the section in the URL, as a rule down its
- * left edge. The banner carries the section now, as a numbered badge, so the
- * colour has nothing left to say and the prop is gone.
+ * The banner carries the section, so the Lead takes no colour or props of
+ * its own.
  */
 export default function Lead({children}) {
   return <p className={clsx('doc-lead', styles.lead)}>{children}</p>;

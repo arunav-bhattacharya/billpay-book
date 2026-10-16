@@ -6,7 +6,7 @@
  * (the surrounding `.container` still supplies the page margins). A small
  * floating tab on the right edge re-opens it. State persists in localStorage.
  *
- * Also hands the page banner its section badge: the article carries the
+ * Also hands the page banner its section number: the article carries the
  * section number and name as custom properties, read by custom.css.
  */
 import React, {useState, useEffect, useCallback} from 'react';
@@ -34,9 +34,10 @@ function useDocSection() {
 }
 
 /**
- * The page banner (custom.css, section 12) prints the section badge and name
- * from two custom properties, so the title can stay MDX's own <h1>. Their
- * values are CSS strings, quotes included, because they feed `content`.
+ * The page banner (custom.css, section 12) prints the section number and name
+ * in its blue block from two custom properties, so the title can stay MDX's
+ * own <h1>. Their values are CSS strings, quotes included, because they feed
+ * `content`.
  */
 function bannerVars(section) {
   if (!section) {

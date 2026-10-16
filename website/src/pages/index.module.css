@@ -33,7 +33,7 @@
   font-weight: 700;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--amex-banner-label);
+  color: var(--amex-hero-label);
 }
 .eyebrow::before {
   content: '';
@@ -153,7 +153,7 @@
 .tileBlurb {
   font-size: 0.8rem;
   line-height: 1.35;
-  color: var(--amex-banner-label);
+  color: var(--amex-hero-label);
 }
 
 /* ---- Start here ----

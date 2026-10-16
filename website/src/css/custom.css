@@ -18,8 +18,9 @@
  *
  *   Frame     a Deep Blue brand bar at the top and a Deep Blue footer at the
  *             bottom, in both themes.
- *   Banners   every doc page opens on a Deep Blue banner carrying the section
- *             badge, the title and the lead. Table heads are the same band.
+ *   Banners   every doc page opens on a banner: a solid Bright Blue block
+ *             with the section number, beside the title and the lead on a
+ *             pale field. Table heads are a Deep Blue band.
  *   Ink       headings in Deep Blue, body in DLS grey 900.
  *   Accent    Bright Blue on links, badges, heading marks and the active page.
  *
@@ -236,14 +237,19 @@ h3 {
   --amex-tint: #edf7ff;
   --amex-tint-ink: #22336b;
 
-  /* The page banner: Deep Blue, lit from the top-right corner. */
-  --amex-banner-bg: #00175a;
-  --amex-banner-glow: rgba(0, 111, 207, 0.5);
-  --amex-banner-ink: #d5dcf0;
-  --amex-banner-label: #a7b3d9;
+  /* The page banner: a solid Bright Blue block carrying the section number,
+     and a pale field for the title and the lead. */
+  --amex-banner-block: var(--amex-blue);
+  --amex-banner-block-ink: #ffffff;
+  --amex-banner-block-label: rgba(255, 255, 255, 0.82);
+  --amex-banner-bg: #f4f6fb;
+  --amex-banner-title: var(--amex-midnight);
+  --amex-banner-ink: #3d3d3d;      /* grey 800 */
+  --amex-banner-strong: var(--amex-midnight);
 
   /* The homepage banner: the brand bar's Deep Blue carried on down, lit from
      behind the section board. */
+  --amex-hero-label: #a7b3d9;
   --amex-hero-field: var(--amex-midnight);
   --amex-hero-glow: rgba(0, 111, 207, 0.5);
   --amex-hero-glow-soft: rgba(0, 111, 207, 0.2);
@@ -413,11 +419,16 @@ h3 {
   --amex-tint: rgba(86, 161, 227, 0.09);
   --amex-tint-ink: #d2dbf2;
 
-  --amex-banner-bg: #0d2257;
-  --amex-banner-glow: rgba(0, 111, 207, 0.4);
-  --amex-banner-ink: #d5dcf0;
-  --amex-banner-label: #a7b3d9;
+  /* Same block; the field is the DLS dark surface the cards use. */
+  --amex-banner-block: var(--amex-blue);
+  --amex-banner-block-ink: #ffffff;
+  --amex-banner-block-label: rgba(255, 255, 255, 0.82);
+  --amex-banner-bg: #101b3d;
+  --amex-banner-title: #ffffff;
+  --amex-banner-ink: #c9d3ee;
+  --amex-banner-strong: #ffffff;
 
+  --amex-hero-label: #a7b3d9;
   --amex-hero-field: var(--amex-navy);
   --amex-hero-glow: rgba(0, 111, 207, 0.38);
   --amex-hero-glow-soft: rgba(0, 111, 207, 0.16);
@@ -1025,33 +1036,32 @@ details.alert > summary {
 /* ==================================================================== *
  * 12. Page banner
  * ==================================================================== */
-/* Every doc page opens on one Deep Blue banner: the section badge and its
-   name, the title, then the lead.
+/* Every doc page opens on one banner. A solid Bright Blue block down the left
+   carries the section number and name, the Blue Box at full size; the title
+   and the lead sit beside it on a pale field (the dark surface in dark mode).
 
      - The title is MDX's own <header><h1>.
-     - The badge and the name are that header's ::before and ::after. Their
-       text comes from --doc-sec-num and --doc-sec-label, which
-       DocItem/Layout sets on the article from the URL. Off a section (the
-       introduction), the properties are unset, `content` falls back to none,
-       and the banner simply has no eyebrow.
-     - Flex `order` puts the two pseudo-elements on one line above the title.
      - The lead is the <Lead> straight after the header (global class
        `doc-lead`). The header squares off its bottom corners and the lead
        continues the same field below it.
+     - The block is a thick left border on both, so it runs unbroken from the
+       top of the title to the bottom of the lead whatever their heights.
+     - The number and the name are the header's ::before and ::after, placed
+       over that border. Their text comes from --doc-sec-num and
+       --doc-sec-label, which DocItem/Layout sets on the article from the URL.
+       Off a section (the introduction) the article has no doc-has-section
+       class, so there is no block, and the unset properties leave `content`
+       at none. */
+.theme-doc-markdown {
+  --banner-block-w: 112px;
+}
 
-   The glow sits only in the header and is spent before the header's bottom
-   edge, so the seam with the lead is invisible. */
 .theme-doc-markdown > header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 0.7rem;
+  position: relative;
   margin: 0.4rem 0 2.4rem;
-  padding: 1.8rem 2.25rem 2rem;
+  padding: 1.9rem 2.25rem 2rem 2rem;
   border-radius: 16px;
-  background:
-    radial-gradient(45% 120% at 100% 0%, var(--amex-banner-glow) 0%, transparent 70%),
-    var(--amex-banner-bg);
+  background: var(--amex-banner-bg);
 }
 .theme-doc-markdown > header:has(+ .doc-lead) {
   margin-bottom: 0;
@@ -1059,53 +1069,60 @@ details.alert > summary {
   border-radius: 16px 16px 0 0;
 }
 
+.doc-has-section .theme-doc-markdown > header,
+.doc-has-section .theme-doc-markdown > header + .doc-lead {
+  border-left: var(--banner-block-w) solid var(--amex-banner-block);
+}
+
 .theme-doc-markdown > header::before {
   content: var(--doc-sec-num);
-  order: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--amex-badge-radius);
-  background: var(--amex-blue);
-  color: #ffffff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  position: absolute;
+  top: 1.55rem;
+  left: calc(-1 * var(--banner-block-w));
+  width: var(--banner-block-w);
+  text-align: center;
+  font-size: 2.1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  color: var(--amex-banner-block-ink);
 }
 .theme-doc-markdown > header::after {
   content: var(--doc-sec-label);
-  order: 1;
-  font-size: 0.74rem;
+  position: absolute;
+  top: 4.75rem;
+  left: calc(-1 * var(--banner-block-w));
+  width: var(--banner-block-w);
+  text-align: center;
+  font-size: 0.58rem;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--amex-banner-label);
+  color: var(--amex-banner-block-label);
 }
 .theme-doc-markdown > header > h1 {
-  order: 2;
-  flex-basis: 100%;
   margin: 0;
-  color: #ffffff;
-}
-.doc-has-section .theme-doc-markdown > header > h1 {
-  margin-top: 0.95rem;
+  color: var(--amex-banner-title);
 }
 
 .theme-doc-markdown > header + .doc-lead {
   margin: 0 0 2.4rem;
-  padding: 0.85rem 2.25rem 2rem;
+  padding: 0.85rem 2.25rem 2rem 2rem;
   border-radius: 0 0 16px 16px;
   background: var(--amex-banner-bg);
   color: var(--amex-banner-ink);
 }
 .theme-doc-markdown > header + .doc-lead strong {
-  color: #ffffff;
+  color: var(--amex-banner-strong);
 }
 
+/* On a phone the block narrows to the number alone; the name would not fit
+   across it, and the sidebar and breadcrumbs already say where you are. */
 @media (max-width: 700px) {
+  .theme-doc-markdown {
+    --banner-block-w: 64px;
+  }
   .theme-doc-markdown > header {
     padding: 1.35rem 1.25rem 1.5rem;
     border-radius: 12px;
@@ -1113,6 +1130,13 @@ details.alert > summary {
   .theme-doc-markdown > header:has(+ .doc-lead) {
     padding-bottom: 0.2rem;
     border-radius: 12px 12px 0 0;
+  }
+  .theme-doc-markdown > header::before {
+    top: 1.25rem;
+    font-size: 1.45rem;
+  }
+  .theme-doc-markdown > header::after {
+    content: none;
   }
   .theme-doc-markdown > header + .doc-lead {
     padding: 0.7rem 1.25rem 1.5rem;
