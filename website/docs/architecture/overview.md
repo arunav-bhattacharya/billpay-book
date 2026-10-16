@@ -21,7 +21,7 @@ export const GROUPS = [
       },
       {
         title: 'One-Data Functions',
-        role: 'Versioned API gateway',
+        role: 'Versioned API gateway, and the inbox where settlement and posting wait',
         icon: 'gateway',
         items: [
           'CreatePayment.v3',
@@ -58,7 +58,7 @@ export const GROUPS = [
         title: 'Oracle',
         role: 'The source of truth, and the only hand-off between the clusters',
         icon: 'database',
-        items: ['Payments', 'Work Tracker', 'Inbox'],
+        items: ['Payments', 'Work Tracker'],
       },
     ],
   },
@@ -78,7 +78,7 @@ export const GROUPS = [
 
 export const ASIDE = {
   title: 'Event Handlers & Schedules',
-  role: 'Late outcomes land in the inbox; Schedules start the dispatchers and jobs',
+  role: 'Late outcomes come back in; Schedules start the dispatchers and jobs',
   accent: 'var(--amex-cat-architecture)',
   icon: 'async',
   items: ['Returns', 'Settlement', 'AR posting', 'Dispatchers', 'Periodic jobs'],
@@ -99,7 +99,7 @@ export const ASIDE = {
 
 - Requests start at the customer and servicing channels, the Accounts Receivable platform, third parties pushing money in, and the allocations manager sending a corporate payment's breakdown. Events from other platforms arrive here too.
 - One-Data Functions are the contracts upstream integrates with. They are versioned, so `CreatePayment.v3` keeps working while what sits behind it changes.
-- The functions do none of the work themselves. Each one delegates to a Billpay core API. Every function and the endpoint it calls is listed in [Build → API Spec](../build/api-spec/one-data.md).
+- Most functions do no work of their own: each delegates to a Billpay core API. The event handlers for settlement and Accounts Receivable posting are the exception. They keep those events in One-Data's inbox, a Postgres database, and mark a payment ready once both are in. Every function and the endpoint it calls is listed in [Build → API Spec](../build/api-spec/one-data.md).
 
 ### Billpay Core layer
 
@@ -127,7 +127,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 
 ### Event handlers and schedules
 
-- Event handlers take late outcomes back in. A return starts `ProcessReturnedPaymentWorkflow`. Settlement and Accounts Receivable posting events land in the inbox, and `ProcessPaidEventsWorkflow` marks the payment `PAID` once both have arrived. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
+- Event handlers take late outcomes back in. A return starts `ProcessReturnedPaymentWorkflow`. Settlement and Accounts Receivable posting can arrive at a thousand a second, so they never reach Billpay as events: they wait in One-Data's inbox until a payment has both. `ProcessPaidEventsWorkflow` starts every 30 seconds and pulls ready payments 500 at a time, marking each batch `PAID` in one transaction and sending their lifecycle events. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
 - Work that falls due on a date waits in Oracle as a Work Tracker row. One dispatcher per kind of work releases it, each with its own Schedule and budget, at rates the governor resets every 15 seconds. Three periodic jobs, for paid events, missing paid events and the purge, run on Schedules too. [Design → Periodic Workflows](../design/component-model/workflows/periodic.md) has the list.
 
 ## Two clusters, one hand-off

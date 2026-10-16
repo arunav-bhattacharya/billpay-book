@@ -118,6 +118,6 @@ Validation comes first. A payment that fails it is declined, and nothing else ru
 
 All of these have to succeed before a payment counts as `PROCESSED`. The customer hears last, so a confirmation never goes out while an earlier step is still unfinished.
 
-A payment reaches `PAID` only once Billpay has seen **both** confirmations come back: that the bank settled the funds, and that AR posted the payment. Until both arrive, the payment is not paid.
+A payment reaches `PAID` only once **both** confirmations have come back: that the bank settled the funds, and that AR posted the payment. They arrive separately, in either order and often in bursts, so One-Data collects them and marks the payment ready when the second one lands. Billpay picks up ready payments in batches, at a pace it sets, and marks them `PAID`.
 
 Which of these steps run in parallel, and on which part of the platform, is on the [Architecture Overview](../architecture/overview.md).

@@ -37,7 +37,7 @@ When a choice is unclear, these rules decide it.
 2. **Work that waits for a date waits in Oracle,** never in a sleeping workflow or on a Temporal timer.
 3. **Nothing calls across clusters.** Oracle is the only hand-off between the Online and Offline clusters.
 4. **Every payment workflow starts through the Router.** No API or dispatcher starts one on its own. Control workflows (dispatchers, the governor, provisioning) start from Schedules or their own APIs.
-5. **Pace at the door.** Admit only what a cluster and its downstreams can carry. Big bursts wait in Oracle, not in Temporal.
+5. **Pace at the door.** Admit only what a cluster and its downstreams can carry. Big bursts wait in Oracle or in One-Data's inbox, not in Temporal.
 6. **One workflow per journey.** Stages are the only thing that varies by market behavior. There are no market-specific workflows.
 7. **One Oracle commit per stage.** A stage makes its calls first, in parallel where they don't depend on each other; then the state change and the lifecycle timeline entry commit together. Its RTF lifecycle event, and a Raven message where the customer is told, go out right after the commit. Fulfil is the exception: `PROCESSED` waits for both.
 8. **Pin the plan and the build at start.** A running workflow never has its code or config changed under it.
@@ -69,13 +69,24 @@ One-Data functions are the versioned contracts that channels and partner systems
 
 ### Event Handlers
 
-Event handlers take events from other platforms. None of them makes a workflow wait.
+Event handlers take events from other platforms. None of them makes a workflow wait, and none of them calls Billpay for a settlement or an AR posting.
 
-1. `MoneyMovementEventHandler.v1`: money movement events from MR/M3. A return starts `ProcessReturnedPaymentWorkflow` through `POST /payments/returns`. A settlement event lands in the external transaction events tracker, the **inbox**.
-2. `AccountsReceivableTransactionEventHandler.v1`: Accounts Receivable (GAR) events. When a payment posts, the handler finds the payment and writes the AR-posted event to the inbox.
-3. `OpentoBuyUpdatePaymentEventHandler.v1`: Authorizations (AMP) events, written to the inbox. Details still to be defined.
+1. `MoneyMovementEventHandler.v1`: money movement events from MR/M3. A return starts `ProcessReturnedPaymentWorkflow` through `POST /payments/returns`. A settlement is recorded in One-Data's **inbox** against its payment and presentment.
+2. `AccountsReceivableTransactionEventHandler.v1`: Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment and presentment, or against its leg for a corporate allocation.
+3. `OpentoBuyUpdatePaymentEventHandler.v1`: Authorizations (AMP) events, stored by One-Data. Details still to be defined.
 
-`ProcessPaidEventsWorkflow` reads the inbox and sets `PAID` once both the settlement and the AR-posted events have arrived.
+The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. One-Data works out when a payment has every event it needs and marks its row `READY`; `ProcessPaidEventsWorkflow` reads only `READY` rows and sets `PAID` (see [Work Tracker and Inbox](#work-tracker-and-inbox)).
+
+- Each handler writes the raw event and upserts the payment's inbox row in one transaction, and acknowledges the sender only after the commit. If the database is down, the sender gets an error and retries.
+- For a payment, whichever of the two events arrives second sets the row `READY` in the same statement, so two events that arrive together can't miss each other, and a repeated event can't set it twice.
+- Handlers never call Billpay for these events, pace anything, or run on a schedule.
+
+### Inbox functions
+
+Billpay reaches the inbox through two One-Data functions, never through the database. `ProcessPaidEventsWorkflow` is their only caller. Both names are **placeholders**.
+
+1. `ReadPaidReadyPayments.v1`: puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, then returns up to 500 of the oldest `READY` rows. It changes nothing else, so a repeat before the status update returns the same rows.
+2. `UpdatePaidReadyPayments.v1`: sets the listed rows `DONE` or `UNMATCHED` in one transaction and returns the counts. Setting a status twice does no harm, so a retry is safe.
 
 [^ Top](#table-of-contents)
 
@@ -164,6 +175,7 @@ Separate databases mean offline load can never slow realtime traffic at the Temp
 | Returns | Bursts of 100 TPS, up to 100K a day | No: started, then 202 | None | Offline |
 | Inbound, pushed by a third party | Assumed like returns | No: started, then 202 | None | Offline |
 | Representments | A share of returns | No | The date market rules set | Offline |
+| Settlement and AR posting | One event of each per payment, in bursts of up to 1,000 a second. They wait in One-Data's inbox, and Billpay reads one `READY` row per payment | No | None; paced last of all | Offline |
 
 ### Kinds of workflow
 
@@ -241,7 +253,7 @@ Consumer and corporate payments share one set of states. A corporate parent also
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
 | `ACCEPTED` | `PROCESSING` | Execute |
 | `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
-| `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow` |
+| `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a corporate parent, the leg dispatcher's completion check |
 | `PROCESSING`, `PROCESSED` or `PAID` | `RETURNED` | Return |
 | `RETURNED` | `REPRESENTING` | QueueRepresentment |
 | `REPRESENTING` | `REPRESENTED` or `DECLINED` | Represent |
@@ -330,7 +342,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
 | QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
-| Settle | `PROCESSED` → `PAID` | Nothing |
+| Settle | `PROCESSED` → `PAID`, for a batch of up to 500 `READY` inbox rows at once | Nothing |
 
 "All four" means account type, AR posting, realtime clearing and mandate authorization.
 
@@ -384,7 +396,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 1. **Intake.** `CreateScheduledPaymentWorkflow` runs Capture and Verify, calling services in parallel where they don't depend on each other. One Oracle commit writes `SCHEDULED` and the `SCHED_EXEC` Work Tracker row (due at the market's execution time on the due date). A corporate payment also gets an `ALLOC_REQUEST` row, due at its fetch time. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
 2. **Wait.** Nothing runs in Temporal, for up to 30 days. Cancel and update work until the cancellation window closes.
 3. **Release.** At the market's execution time its dispatcher claims the row, calls the Router with today's config, and starts `ExecuteScheduledPaymentWorkflow` `{paymentId}-execute`.
-4. **Execute.** Reverify (`SCHEDULED` → `ACCEPTED`), Execute (→ `PROCESSING`), Fulfil (→ `PROCESSED`). `PAID` follows once the settlement and AR-posted events have both arrived in the inbox.
+4. **Execute.** Reverify (`SCHEDULED` → `ACCEPTED`), Execute (→ `PROCESSING`), Fulfil (→ `PROCESSED`). `PAID` follows once One-Data's inbox has both the settlement and the AR posting, and `ProcessPaidEventsWorkflow` picks the payment up.
 5. **Close.** The last commit marks the Work Tracker row `DONE`, which frees an in-flight slot.
 
 ### Core workflows
@@ -547,14 +559,26 @@ All run on the Offline cluster, started by Temporal Schedules.
 
 #### 1. ProcessPaidEventsWorkflow
 
-- Reads the inbox for payments whose settlement and AR-posted events have both arrived, and flags those rows as picked up, so a run never reads them twice.
-- **Settle:** `PROCESSED` → `PAID`, with its timeline entry. Once a batch has committed, the run sends each payment's `PAID` event to RTF.
-- A corporate parent is `PAID` only once it has settled and every leg has posted to AR.
+Billpay pulls PAID work at its own pace. A Temporal Schedule starts this workflow every 30 seconds with overlap policy SKIP, so only one run is ever active. A run takes batches until the inbox is empty, then ends. Each batch:
+
+1. **Fetch** up to 500 `READY` rows through `ReadPaidReadyPayments.v1`. Fewer than 500 means this is the run's last batch; none ends the run.
+2. **Settle** the batch in one `PaymentStore` transaction (see [PaymentStore operations](#paymentstore-operations)). The workflow generates the batch ID with `Workflow.randomUUID()`, so a retried Settle uses the same one.
+3. **Announce:** a `PAID` event to RTF for each payment whose timeline row carries the batch ID.
+4. **Mark** the rows through `UpdatePaidReadyPayments.v1`: `DONE` for rows that found their payment, parent or leg; `UNMATCHED` for the rest.
+5. **Pace:** wait as long as the governor's rate for class `PAID` in `rate_allocation` asks, then fetch again. The run continues-as-new every 20 batches.
+
+- Every step is safe to repeat. Settle changes only rows that still need it, and a retried Settle that committed the first time still finds the payments it moved by their batch ID, so their events go out.
+- Mark runs last, so a row is `DONE` only once its payment's event has gone out. RTF consumers already accept a repeated event, because any activity can run twice.
+- If RTF is down, the run waits on its batch. Later triggers are skipped, and new rows wait in the inbox.
+- A run terminated by hand between Settle and the announcement leaves its payments `PAID` without their event. The batch ID, in the run's history and on their timeline rows, says which payments to re-send.
+- An `UNMATCHED` row (no payment, or one not yet `PROCESSED`) comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED` and raises an alert.
+- One run settles an estimated 1,000 payments a second, at about half a second a batch; load-test run 1 measures it. More would need lanes: the fetch would take a lane number and count and filter on a hash of the payment ID.
+- A corporate parent turns `PAID` in the leg dispatcher's completion check, not here. This workflow only records the parent's settlement and each leg's posting (see [Corporate Allocations](#corporate-allocations)).
 
 #### 2. ProcessMissingPaidEventsWorkflow
 
-- Finds payments whose AR-posted or settlement event (or both) has been missing for 48 hours.
-- Asks the respective system for the current state. If the event is found, it is written to the inbox; if it is still missing, an alert is raised.
+- Finds payments that have been `PROCESSED` for more than 48 hours without turning `PAID`.
+- Asks MR/M3 and GAR for the payment's current state. An event it finds goes into the inbox through the same One-Data handler, so the inbox keeps one writer; one still missing raises an alert. The payment's inbox row shows which event is missing.
 
 #### 3. PurgeTransactionDataWorkflow
 
@@ -580,7 +604,8 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 | `BalanceControlActivities` | eBNC (Balance & Control) | `ds-ebnc` | Fulfil, and every leg |
 | `RiskActivities` | Risk | `ds-risk` | Fulfil, and every leg |
 | `AllocationActivities` | Allocations manager | `ds-allocations` | RequestAllocations |
-| `LifecycleEventActivities` | RTF, the lifecycle events other systems consume | The workflow's own queue: RTF has no rate limit | Every stage's announcement; Fulfil and the corporate completion check, before their commit; Settle |
+| `InboxActivities` | One-Data's inbox functions | The workflow's own queue: nobody throttles them | `ProcessPaidEventsWorkflow`, to fetch and to mark |
+| `LifecycleEventActivities` | RTF, the lifecycle events other systems consume | The workflow's own queue: RTF has no rate limit | Every stage's announcement; Fulfil and the corporate completion check, before their commit; the `PAID` events after Settle, and after a corporate parent turns `PAID` |
 | `CommunicationActivities` | Raven, customer messages | `ds-comms` | Announcements the customer is told about; Fulfil and the corporate completion check, before their commit |
 
 ### PaymentStore operations
@@ -592,6 +617,7 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 - **Writing legs:** split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row.
 - **Cancel:** the guarded update to `CANCELLED` and the cancellation of the payment's Work Tracker rows.
 - **Mapping a replacement:** the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
+- **Settle:** a batch of inbox rows, sent as JDBC batches in one transaction. A payment's row is a guarded update, `PROCESSED` → `PAID` with `stlmt_ts` and `ar_pstd_ts`, plus a `PAID` timeline row tagged with the batch ID wherever the update count is 1. A corporate parent's row sets its `stlmt_ts`, and a leg's row its `ar_pstd_ts`, where still empty. Then it reads back the payments whose timeline row carries the batch ID, and which rows found their payment, parent or leg. A payment's row is `UNMATCHED` if the payment isn't `PAID` afterwards.
 - **Reads:** loading the fields an activity or stage needs, by ID.
 
 ### Where each call runs
@@ -627,6 +653,7 @@ Between the core APIs and the workflows sits the Billpay Router. For every row b
 | `CreateBillpayTransactionFromAccountsReceivable.v1` (payment) | `POST /payments` | Future-dated from AR; async start, 202 | `CreateScheduledPaymentWorkflow` (Offline), then `ExecuteScheduledPaymentWorkflow` on the due date | As for any scheduled payment |
 | `CreateBillpayTransactionFromAccountsReceivable.v1` (refund) | `POST /refunds` | Async event; async start, 202 | `CreateBalanceRefundWorkflow` (Offline) | |
 | `MoneyMovementEventHandler.v1` | `POST /payments/returns` | A return; async start, 202 | `ProcessReturnedPaymentWorkflow` (Offline) | A `REPRESENT` row; `ProcessRepresentmentWorkflow` on its date (Offline) |
+| `MoneyMovementEventHandler.v1` (settlement), `AccountsReceivableTransactionEventHandler.v1` | None: the events stay in One-Data's inbox | Not routed: One-Data marks the payment's row `READY` | `ProcessPaidEventsWorkflow` (Offline) reads `READY` rows every 30 s | The `PAID` events to RTF |
 | `CreateInboundPayment.v1` | `POST /payments/inbound` | Third-party push; async start, 202 | `ProcessInboundPaymentWorkflow` (Offline) | |
 | `CreatePaymentAllocations.v1` (placeholder) | `POST /payments/{payment-id}/allocations` | A corporate batch; stored, then async start, 202 | `ReceiveAllocationsWorkflow` (Offline) | One `ExecuteSplitPaymentWorkflow` per leg, from the leg dispatcher |
 | Representment dispatcher | None | A `REPRESENT` row falls due; the dispatcher calls the Router | `ProcessRepresentmentWorkflow` (Offline) | |
@@ -642,7 +669,7 @@ All on the Offline cluster.
 | Allocation legs | The leg dispatcher | Every minute |
 | Representments, one per market | The representment dispatcher | Every few minutes |
 | Governor | `GovernorWorkflow` | Kept running; a check every 15 s |
-| Paid events | `ProcessPaidEventsWorkflow` | Periodically |
+| Paid events | `ProcessPaidEventsWorkflow` | Every 30 s, overlap SKIP; a run drains the inbox's `READY` rows, then ends |
 | Missing paid events | `ProcessMissingPaidEventsWorkflow` | Periodically |
 | Purge | `PurgeTransactionDataWorkflow` | Periodically |
 
@@ -706,7 +733,7 @@ On the due date the dispatcher calls the Router again, so a scheduled payment ru
 
 ## Work Tracker and Inbox
 
-One narrow Work Tracker table drives all paced work, and the external transaction events tracker is the **inbox**. Payment data stays in the domain tables, with a few additions. There is no outbox: lifecycle events and customer messages are activities (see [Activities](#activities)).
+One narrow Work Tracker table drives all paced work. The **inbox**, where settlements and AR postings land, is One-Data's, in its Postgres database. Payment data stays in the domain tables, with a few additions. There is no outbox: lifecycle events and customer messages are activities (see [Activities](#activities)).
 
 ### `work_tracker`
 
@@ -745,16 +772,57 @@ Workflow IDs are not stored: each is the payment ID plus its suffix.
 | `DONE` or `FAILED` | The workflow's last commit |
 | `CANCELLED` | `CancelPaymentWorkflow`; or a declined or cancelled parent, for its legs |
 
-### Inbox: the external transaction events tracker
+### Inbox: One-Data's Postgres tables
 
-- Event handlers write settlement and AR-posted events here. No workflow waits on them.
-- `ProcessPaidEventsWorkflow` reads payments whose two events have both arrived, flags the rows as picked up, and settles them to `PAID`.
+Oracle holds no inbox. The handlers write two tables in One-Data's Postgres, and Billpay sees only rows that are ready.
+
+| Table | One row per | Holds |
+| --- | --- | --- |
+| `billpay_extnl_event` | Event, as received | The raw event, its source, type and idempotency ID: the log to audit or replay from |
+| `billpay_paid_ready` | Payment and presentment: `pymt_id`, `prsnt_seq_no` | `acct_id`, `row_kind`, `stlmt_ts`, `ar_pstd_ts`, `sta_cd`, `creat_ts`, `lst_updt_ts` |
+
+| `row_kind` | `READY` when |
+| --- | --- |
+| `PAYMENT` | Both the settlement and the AR posting are in |
+| `PARENT` | A corporate parent's settlement is in. Its AR posts leg by leg |
+| `LEG` | A corporate leg's AR posting is in. Legs never clear on their own |
+
+| `sta_cd` | Meaning |
+| --- | --- |
+| `WAITING` | A payment with one of its two events in |
+| `READY` | Every event the row needs is in; waiting for Billpay |
+| `DONE` | Billpay has applied it |
+| `UNMATCHED` | Billpay found nothing ready for it: no payment, or one not yet `PROCESSED`. Tried again an hour later, for up to 48 hours |
+
+Each event is one upsert. Its timestamp is set only where it is still empty, and a payment's row moves from `WAITING` to `READY` in the same statement once both are in:
+
+```sql
+insert into bpyevnts.billpay_paid_ready as p
+  (pymt_id, prsnt_seq_no, acct_id, row_kind, stlmt_ts, ar_pstd_ts, sta_cd)
+values
+  (:pymt_id, :prsnt_seq_no, :acct_id, :row_kind, :stlmt_ts, :ar_pstd_ts,   -- one of the two is null
+   case when :row_kind = 'PAYMENT' then 'WAITING' else 'READY' end)
+on conflict (pymt_id, prsnt_seq_no) do update set
+  stlmt_ts    = coalesce(p.stlmt_ts, excluded.stlmt_ts),
+  ar_pstd_ts  = coalesce(p.ar_pstd_ts, excluded.ar_pstd_ts),
+  sta_cd      = case when p.sta_cd = 'WAITING'
+                      and coalesce(p.stlmt_ts, excluded.stlmt_ts) is not null
+                      and coalesce(p.ar_pstd_ts, excluded.ar_pstd_ts) is not null
+                     then 'READY' else p.sta_cd end,
+  lst_updt_ts = now();
+```
+
+- When both events arrive at once, Postgres makes the second upsert wait for the first one's row, so it sees both and sets `READY`.
+- Only `WAITING` moves to `READY`, so a repeated event can't set it twice. Duplicates need no unique index: a repeat changes nothing, and Settle skips a payment that is already `PAID`.
+- Partial indexes keep each read small: `READY` rows by `lst_updt_ts` for the fetch, `UNMATCHED` rows by `lst_updt_ts` for the hourly retry, `WAITING` rows by `creat_ts` for the 48-hour view.
+- One-Data deletes `DONE` rows after 30 days, and drops `billpay_extnl_event` partitions on the same schedule.
 
 ### Indexes and partitions
 
 - **Claim index:** function-based, on `CASE WHEN status = 'SCHEDULED' THEN … END` for `item_type`, `group_key`, `priority` and `due_at`. Oracle stores no entry when every key is NULL, so the index holds only claimable rows and stays small beside millions of finished ones.
 - **In-flight index:** the same trick for `DISPATCHING` and `DISPATCHED` rows, so the in-flight count is a small index scan.
 - **Partitions:** daily interval partitions on `due_at`, with row movement on. Purge drops partitions 15 days after they fall due.
+- **Settle's indexes:** `trans_lfcyc_event (batch_id)` holds only the `PAID` rows Settle tags, since Oracle stores no entry when every key is NULL. `split_trans_dtl (trans_id, ar_pstd_ts)` lets the completion check stop at a parent's first unposted leg.
 
 ### Claiming rows
 
@@ -766,8 +834,9 @@ Workflow IDs are not stored: each is the payment ID plus its suffix.
 
 | Table | Change | Why |
 | --- | --- | --- |
-| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at` | Allocations never block clearing; legs know when they may run |
-| `trans_lfcyc_event` | The cluster in each entry of the existing timeline BLOB | Says which cluster's UI holds each step |
+| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at`. On every payment: `stlmt_ts` and `ar_pstd_ts`, set by Settle; a corporate parent gets its `stlmt_ts` as soon as its settlement is in | Allocations never block clearing; legs know when they may run. The two timestamps say when the money settled and when AR posted |
+| `split_trans_dtl` | `ar_pstd_ts`, set by Settle when the leg's AR posting is in | The completion check needs every leg posted |
+| `trans_lfcyc_event` | One row per status per presentment. Two new columns: the cluster that ran the step, and `batch_id` on the `PAID` rows Settle writes | Says which cluster's UI holds each step; lets a retried Settle find the payments it moved |
 | `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts | Keeps big batches out of workflow inputs |
 | `market_config_version`, `market_config_active` (new) | Published market config: immutable versions, and the active one per market and account type | The Router reads it; only `MarketProvisioningWorkflow` writes it |
 
@@ -816,7 +885,7 @@ Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, 
 
 **Crash safety.** A worker that dies mid-tick trips the heartbeat timeout (10 s), and the retried activity resumes from its last heartbeat. A repeated start fails as already started and counts as done; `REJECT_DUPLICATE` stops a second execution. Rows claimed but never started are caught by the sweep or by the next run.
 
-**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position. Completion: every 60 s it counts legs by status for parents in `PROCESSING`. Once all of a parent's legs are `PROCESSED`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`.
+**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position. Completion: every 60 s it counts legs by status for parents in `PROCESSING`. Once all of a parent's legs are `PROCESSED`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`. A `PROCESSED` parent whose `stlmt_ts` is set, and whose legs all have `ar_pstd_ts`, moves to `PAID` by a guarded update, and its `PAID` event goes to RTF after the commit.
 
 **Cost and scale.** About 5 Temporal writes per tick: 1M payments at 50 TPS is about 1,000 ticks, so about 5K writes. One activity can issue a few hundred starts a second. Past that, split into lanes, each owning a hash bucket of `ref_id` at rate ÷ lanes.
 
@@ -848,7 +917,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget instead. Persistence
 **The budget**
 
 - Raise by 5%, but only after two calm checks, because metrics lag about 30 s. Cut ×0.8.
-- The budget is in Temporal writes per second, not starts, because the DB is the constraint. Each class is charged its measured cost per workflow: about 45 for execution, 30 for a leg, 20 for a return.
+- The budget is in Temporal writes per second, not starts, because the DB is the constraint. Each class is charged its measured cost per workflow: about 45 for execution, 30 for a leg, 20 for a return. The PAID drain costs about 20 per batch of 500; its weight falls on Oracle instead, so its rate is in payments a second and the Oracle signals cut it first.
 - The ceiling is the writes/s the load test measured at 60% CPU.
 
 **Handing it out, in order**
@@ -857,7 +926,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget instead. Persistence
 2. **SEPA cutoff floor:** remaining ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
 3. **US execution floor:** 50 TPS.
 4. **AR intake:** its demand; above the budget it gets 429.
-5. **The rest by priority, up to demand:** SEPA and US execution above their floors, then corporate (split evenly across active corporate payments), then inbound, then representments, then returns last.
+5. **The rest by priority, up to demand:** SEPA and US execution above their floors, then corporate (split evenly across active corporate payments), then inbound, then representments, then returns, then the PAID drain last.
 
 Every class is also capped by its downstreams (see [Throttling, Priority and Fairness](#throttling-priority-and-fairness)).
 
@@ -911,6 +980,7 @@ Priority decides who goes first on a shared downstream queue; fairness splits on
 - Priority keys run from 1 (first) to 5.
 - Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is acceptable for async work; their backlog age is alerted on so a long wait is visible.
 - Fairness is switched on in the server's dynamic config (`matching.enableFairness`). The default per-key limit applies to every key on a queue, scaled by the key's weight, so every key except a corporate parent's carries weight 100 and never meets it. Weights only compare keys within one priority level.
+- `ProcessPaidEventsWorkflow` uses no shared queue, so it has no priority key. Its calls go to One-Data, Oracle and RTF from its own queue, and the governor paces it directly.
 
 [^ Top](#table-of-contents)
 
@@ -926,7 +996,7 @@ The parent and its allocations run on separate tracks. The parent clears at paym
 - **Release.** `ALLOC_LEG` rows wait as `HELD` until the parent is `ACCEPTED` on its due date. The commit that makes the parent `ACCEPTED` (Reverify, or Verify for pay today) sets its `legs_released_at`, and the leg dispatcher moves its rows from `HELD` to `SCHEDULED` in 5,000-row chunks. Rows for legs that arrive later are written as `SCHEDULED`. A declined parent cancels its legs.
 - **Legs.** Each runs `ExecuteSplitPaymentWorkflow`: AR balance and OTB in parallel, then accounting, eBNC and risk, then RTF and Raven. Clearing never runs per allocation.
 - **Fairness.** Legs run at priority 2 with the parent's ID as fairness key and a per-key limit. At 100 legs a second, a 100K payment takes about 17 minutes without starving other payments.
-- **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared and every leg is `PROCESSED`; the check sends the parent's RTF event and Raven message first. It turns `PAID` when it settles and every leg has posted to AR. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
+- **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared and every leg is `PROCESSED`; the check sends the parent's RTF event and Raven message first. It turns `PAID` once its settlement is in and every leg has posted to AR, which Settle records as `stlmt_ts` on the parent and `ar_pstd_ts` on each leg. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
 - **Late allocations.** The parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
 - **Volume.** Up to 50K parents and 500K allocations a day, and 100K in one payment. One workflow per leg handles that, so there is no chunk mode.
 
@@ -1051,6 +1121,7 @@ Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other 
 - `PaymentStore` local activities: schedule-to-close of a few hours, maximum retry interval about a minute. Capture on the Online cluster gets a short deadline.
 - Activities per downstream: its task queue, start-to-close about 2 to 3× p99, business errors non-retryable.
 - RTF and Raven activities: idempotency keys, and a long schedule-to-close.
+- Inbox function activities: idempotent, unlimited retries with backoff, and a start-to-close a little above the function's own time limit.
 - A 429 becomes `ApplicationFailure.newFailureWithCauseAndDelay(...)` with the `Retry-After` value.
 - Worker Versioning: payment workflows are PINNED; dispatchers and the governor upgrade when they continue-as-new.
 - OpenTelemetry interceptors on clients and workers. HTTP clients inside activities have their own retries off.
@@ -1083,6 +1154,7 @@ Every number here is an estimate from the write model; load-test run 1 measures 
 | Return | ≈20 |
 | Leg | ≈30 |
 | AR batch intake | ≈24 |
+| PAID drain | ≈20 per batch of 500 payments |
 
 An announcement costs about 4 writes, or about 7 when RTF and Raven go together, so announcements are about 15 of an execution's 45.
 
@@ -1093,9 +1165,11 @@ An announcement costs about 4 writes, or about 7 when RTF and Raven go together,
 | Business hours | AR batch intake | 100 TPS | ≈2,400 |
 | Any time | Returns, at the full burst | 100 TPS | ≈2,000 |
 | Any time | Corporate legs, paced | 100 a second | ≈3,000 |
+| Any time, last priority | The PAID drain | Up to about 1,000 payments a second | ≈40 |
 
 - The worst overlap (US at 100 TPS, a returns burst and corporate legs at once) needs about 9,500 writes/s.
 - Dispatchers and the governor add under 10 writes/s.
+- The PAID drain is light on Temporal and heavy on Oracle: at full speed it adds about 2,000 Oracle writes/s, an update and a timeline insert per payment. That is why the governor gives it budget last and the Oracle signals cut it first.
 - 500K legs a day average about 180 writes/s. A 100K payment at 100 legs a second adds about 3,000 writes/s for about 17 minutes.
 - **Offline DB size.** Load-test run 2 measures writes/s at 60% CPU on 64 and on 192 vCPU. If 64 vCPU covers the worst overlap, Offline starts there and keeps 192 as headroom.
 - **Downstream demand.** Calls per second to a downstream = the sum over classes of rate × calls per workflow to it. US execution at 100 TPS calling clearing once needs 100 RPS of clearing's offline share. Each agreed TPS must cover online traffic's peak plus each window's need; SEPA needs at least about 56 RPS of offline share during the US evening.
@@ -1119,6 +1193,7 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 - **Search attributes,** set once at start: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for legs.
 - **Traces.** One trace per workflow, through the SDK's OpenTelemetry interceptors. Execution and leg spans carry a span link to the producer's trace, read from `trace_parent`; a single 30-day trace isn't practical.
 - **Finding payment X:** read `trans_lfcyc_event` by payment ID for every step and its cluster; open `{paymentId}-{suffix}` in that cluster's Temporal UI (within 30 days); open the trace for call-level detail.
+- **A payment stuck in `PROCESSED`:** its row in One-Data's inbox says which event is missing, or that it is `UNMATCHED`.
 
 ### Alerts
 
@@ -1127,6 +1202,8 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | SEPA cutoff at risk | The projected finish passes the cutoff minus 15 minutes, or the cutoff floor no longer fits the budget | Raise downstream limits or the rate override, or accept the delay |
 | Late allocations | A corporate parent is still `ALLOCATING` at the market's alert point | Chase the allocation source |
 | Returns backlog age | The oldest waiting return passes its age threshold | Check whether higher priorities are holding the queue |
+| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold | Check whether the governor is holding the drain, or RTF is down |
+| Payment not PAID | A payment is still `PROCESSED` after 48 hours, or an inbox row has stayed `UNMATCHED` for 48 hours | Read the inbox row for the missing event, or check the event's IDs against Oracle |
 | Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list |
 | Downstream outage | A `ds-*` queue drops to its 1 RPS probe | Contact the downstream's owner if it lasts |
 | RTF or Raven down | Their calls have failed for 5 minutes, so payments are waiting in Fulfil | Contact the owner; payments resume when they are back |
@@ -1143,7 +1220,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | --- | --- | --- |
 | Downstream sends 429 | Calls wait out `Retry-After`; the queue limit drops ×0.7; admissions follow | Nothing |
 | Downstream outage | The queue trickles at 1 RPS; dependent admissions pause; in-flight stays capped | Contact the owner if it lasts |
-| Raven or RTF outage | Payments wait in Fulfil, short of `PROCESSED`, and other announcements wait in their workflows. Once the in-flight cap fills, dispatching stops, so a SEPA cutoff can be missed | Contact the owner; the cutoff alert fires if the run falls behind |
+| Raven or RTF outage | Payments wait in Fulfil, short of `PROCESSED`, and other announcements wait in their workflows, the PAID drain's included. Once the in-flight cap fills, dispatching stops, so a SEPA cutoff can be missed | Contact the owner; the cutoff alert fires if the run falls behind |
 | Oracle outage or patching | `PaymentStore` retries, then waits on durable timers; dispatchers stop claiming; work resumes when Oracle is back | Nothing, unless it outlasts the schedule-to-close |
 | Offline DB runs hot | The governor cuts; a hard breach halves the budget | Look if it lasts over 15 minutes |
 | Online p99 near its SLO | Every offline class is cut, execution included | Nothing, unless a cutoff alert follows |
@@ -1159,6 +1236,9 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Allocations late | The parent still clears on time; its legs wait; an alert fires at the market's alert point | Chase the allocation source |
 | A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
 | AR intake over budget | 429 with `Retry-After` | Nothing |
+| One-Data's inbox database down | Handlers can't store events, so senders retry; the drain's fetch retries; nothing turns `PAID` until it is back | Restore it; PAID catches up on its own |
+| A burst of settlements and postings | Events wait in the inbox; the drain takes them at the governor's rate | Nothing |
+| An inbox row matches no payment | `UNMATCHED`, tried again hourly; after 48 hours an alert fires | Check the event's IDs |
 
 ### Load tests
 
@@ -1171,7 +1251,7 @@ Seven runs show whether the design holds. Runs 1 and 2 measure costs and the DB 
 | 3. US window | 1M executions, governor on | At least 50 TPS throughout; ramps up when healthy; Offline CPU under 60% |
 | 4. SEPA window | 500K executions with a 3-hour cutoff, plus 100 TPS synthetic realtime traffic on the Online cluster against the same stubs | Done with 15% of the cutoff to spare; online p99 unchanged |
 | 5. Failures | During run 3: a 429 storm, a downstream outage, worker kills, a governor kill, an Offline Aurora failover, an Oracle restart | No duplicates, no lost items, recovery with no manual step |
-| 6. Corporate and intake | One 100K and twenty 10K corporate payments, with allocations arriving by callback in parts before and after the due date, plus 100 TPS AR intake | Parents clear on time; legs progress fairly; intake p99 under 500 ms; 429 only above budget |
+| 6. Corporate and intake | One 100K and twenty 10K corporate payments, with allocations arriving by callback in parts before and after the due date, plus 100 TPS AR intake and a 10-minute burst of 1,000 settlement and posting events a second into the inbox | Parents clear on time; legs progress fairly; intake p99 under 500 ms; 429 only above budget; the PAID drain clears the burst at the governor's pace, with online p99 unchanged |
 | 7. Market release | Publish, test, activate and roll back a release in E1 while payments run | New payments use the new version; running ones keep theirs; rollback restores the old one |
 
 After every run, reconcile: Work Tracker rows by status match the completed workflows, and the stubs' ledger matches `PAID` payments with no duplicates.
@@ -1197,8 +1277,8 @@ Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin 
 | 7 | Return | Async start with 202; Return; QueueRepresentment writes a `REPRESENT` row |
 | 8 | Representment | The representment dispatcher on the date; Represent rechecks, then `REPRESENTED` or `DECLINED` |
 | 9 | Inbound payment | Async start with 202; Verify to `ACCEPTED` or `DISALLOWED` |
-| 10 | Paid events | Settlement and AR-posted events in the inbox; `ProcessPaidEventsWorkflow` settles to `PAID`, then sends the `PAID` events to RTF |
-| 11 | Missing paid events | `ProcessMissingPaidEventsWorkflow` finds payments still waiting after 48 hours |
+| 10 | Paid events | MR/M3 and GAR events recorded in One-Data's inbox, the second one setting the row `READY`; the Schedule starts `ProcessPaidEventsWorkflow`; fetch up to 500 `READY` rows; Settle in one transaction; the `PAID` events to RTF; the rows marked `DONE` or `UNMATCHED` |
+| 11 | Missing paid events | `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and sends any event it finds through One-Data's handler |
 | 12 | Pay & Plan | The composite on Online with its children on the same cluster |
 | 13 | Allocations callback | One-Data, `POST /payments/{payment-id}/allocations`, the batch stored in `allocation_batch`, async start, 202; `ReceiveAllocationsWorkflow` writes legs and `ALLOC_LEG` rows |
 
@@ -1265,9 +1345,14 @@ These inputs are assumed for now. The first changes the numbers most.
 | Holiday calendars | Execution runs every day | A market that skips holidays needs a calendar in its dispatcher |
 | Validation services' limits | Payment Instruments and Options take full rate | With agreed TPS they get their own queues |
 | Per-market namespaces on Offline | One namespace, market as fairness key | Separate namespaces would make the governor split each downstream's share across them by demand |
-| Open-to-buy event handler | Events written to the inbox | Its details are still to be defined |
+| Open-to-buy event handler | Events stored by One-Data; nothing in Billpay reads them yet | Its details are still to be defined |
 | Payment intent and balance refund steps | They follow the payment path | Detailed stages are still to be defined |
 | When a channel gets PENDING | The payment is captured but not yet decided | Decides how long the API waits for the decision before replying |
 | Which changes send a Raven message | `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED` | Each adds a call, and writes, to its workflow |
+| PAID where `requiresArPosting` is N | GAR still sends an AR posting once it posts the payment, so PAID waits for both events as everywhere else | If GAR sends nothing, those rows stay `WAITING`, and One-Data must know to expect settlement only |
+| IDs on settlement and AR events | Both carry the payment ID (the leg ID for a leg) and the presentment | One-Data keys the inbox on them; without the presentment, a re-presented payment could pair the wrong events |
+| Corporate events | One-Data can tell them apart: a leg's ID carries its `_{seq}` suffix, and the settlement event says the payment is corporate | Without it, a parent's row waits for a parent-level AR posting that never comes |
+| One-Data's inbox database | One Postgres primary serves both sites | With one per site, each site needs its own drain, fetching and marking only its own rows |
+| Returns and inbound payments that One-Data stores | One-Data calls the async APIs as today: 202, or 429 and it retries later | Billpay could pull them the way it pulls `READY` rows, which would end One-Data's retries |
 
 [^ Top](#table-of-contents)

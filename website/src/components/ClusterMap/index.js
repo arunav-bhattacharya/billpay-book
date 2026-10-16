@@ -45,7 +45,7 @@ const CLUSTERS = [
   },
 ];
 
-const ORACLE = ['Payments', 'Work Tracker', 'Inbox'];
+const ORACLE = ['Payments', 'Work Tracker'];
 
 const DOWNSTREAM = [
   'Clearing',
@@ -60,7 +60,7 @@ const DOWNSTREAM = [
 ];
 
 const LABEL =
-  'Two Temporal clusters joined only through Oracle. At the top, channels, where someone is waiting for the answer, and Accounts Receivable, returns, inbound payments and allocation callbacks, where nobody is. Both go through the Billpay core APIs and the Router, which admits each request, picks the journey, resolves the behaviors, pins the plan key, places the work and starts it. Journeys with a caller waiting start on the Online cluster with Update-With-Start: pay today, schedule, update, cancel, intent, refunds and composites, and the cluster responds back to the caller as PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. Work that can be paced starts on the Offline cluster with an async start and a 202: scheduled execution, allocations, corporate legs, AR intake, returns, inbound, representments, periodic jobs and provisioning, paced by the dispatchers and the governor. Each cluster has its own Aurora PostgreSQL database and OpenSearch 2 visibility store; Online has 2,000 history shards and Offline 4,000. Oracle runs under both clusters and holds payments, the Work Tracker and the inbox. The only hand-off runs through it: a commit on the Online cluster writes a Work Tracker row, and a dispatcher on the Offline cluster claims the row when it falls due. Below, both clusters call the same downstream systems: clearing, Accounts Receivable, authorization, accounting, eBNC, risk, Raven for customer messages, RTF for lifecycle events, and the allocations manager. The governor watches Oracle and the downstreams, so pressure there slows offline work, never online traffic.';
+  'Two Temporal clusters joined only through Oracle. At the top, channels, where someone is waiting for the answer, and Accounts Receivable, returns, inbound payments and allocation callbacks, where nobody is. Both go through the Billpay core APIs and the Router, which admits each request, picks the journey, resolves the behaviors, pins the plan key, places the work and starts it. Journeys with a caller waiting start on the Online cluster with Update-With-Start: pay today, schedule, update, cancel, intent, refunds and composites, and the cluster responds back to the caller as PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. Work that can be paced starts on the Offline cluster with an async start and a 202: scheduled execution, allocations, corporate legs, AR intake, returns, inbound, representments, periodic jobs and provisioning, paced by the dispatchers and the governor. Each cluster has its own Aurora PostgreSQL database and OpenSearch 2 visibility store; Online has 2,000 history shards and Offline 4,000. Oracle runs under both clusters and holds payments and the Work Tracker. The only hand-off runs through it: a commit on the Online cluster writes a Work Tracker row, and a dispatcher on the Offline cluster claims the row when it falls due. Below, both clusters call the same downstream systems: clearing, Accounts Receivable, authorization, accounting, eBNC, risk, Raven for customer messages, RTF for lifecycle events, and the allocations manager. The governor watches Oracle and the downstreams, so pressure there slows offline work, never online traffic.';
 
 function Chips({items, quiet}) {
   return (

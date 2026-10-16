@@ -80,9 +80,10 @@ Two problems shape almost every decision on this page. The first is variety. Eve
       term: 'The Event Handlers',
       desc: (
         <>
-          Settlement and Accounts Receivable posting come back later as events, written to an inbox
-          that no workflow waits on. A periodic job marks the payment <code>PAID</code> once both
-          have arrived. A return starts a workflow of its own.
+          Settlement and Accounts Receivable posting come back later as events, often in bursts. They
+          wait in One-Data's own inbox, which marks a payment ready once both are in, and a periodic
+          job pulls ready payments in batches and marks them <code>PAID</code>. A return starts a
+          workflow of its own.
         </>
       ),
     },
@@ -132,7 +133,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
     },
     {
       term: 'Pace at the door',
-      desc: `Billpay admits only what a cluster and the systems behind it can carry. Big bursts wait in Oracle, and a governor resets every offline rate every 15 seconds from database load, latency and downstream health, protecting online traffic first.`,
+      desc: `Billpay admits only what a cluster and the systems behind it can carry. Big bursts wait outside Temporal: dated work in Oracle, settlement and posting events in One-Data's inbox. A governor resets every offline rate every 15 seconds from database load, latency and downstream health, protecting online traffic first.`,
     },
     {
       term: 'One commit per stage',
