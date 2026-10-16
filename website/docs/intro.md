@@ -20,7 +20,7 @@ A payment passes through a handful of layers on its way in, and each one has a s
 | **Stages** | One business step each, such as Verify or Execute. The only layer that changes with a market's behaviors | [Design › Stages](design/component-model/stages.md) |
 | **Activities** | The calls to one system, grouped as `{System}Activities`. Oracle is reached only through `PaymentStore` | [Design › Activities](design/component-model/activities.md) |
 | **Clients** | The adapter for one external system's contract | [Build › Clients](build/principles/core-build/clients.md) |
-| **Event Handlers** | Events from other platforms. A return starts its own workflow. Settlement and AR-posted events wait in One-Data's inbox, which marks a payment ready once both are in | [API Spec › One-Data](build/api-spec/one-data.md) |
+| **Event Handlers** | Events from other platforms. A return starts its own workflow. Settlement and Accounts Receivable (AR) posting wait in One-Data's inbox until a payment has both, and Billpay then marks it `PAID` | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Schedules** | Start the dispatchers, which release work that has fallen due at the rate the governor sets, and the periodic jobs | [Build › Schedules](build/schedules.md) |
 
 ## How to read these docs

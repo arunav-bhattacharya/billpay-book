@@ -48,7 +48,7 @@ When a choice is unclear, these rules decide it.
 
 ## Billpay API Gateway - One Data Functions
 
-One-Data functions are the versioned contracts that channels and partner systems call. Each one fronts a Billpay core API.
+One-Data functions are the versioned contracts that channels and partner systems call. Most front a Billpay core API. The settlement and AR posting handlers keep their events in One-Data's inbox instead, and Billpay calls the two inbox functions.
 
 ### Core
 
@@ -75,7 +75,7 @@ Event handlers take events from other platforms. None of them makes a workflow w
 2. `AccountsReceivableTransactionEventHandler.v1`: Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment and presentment, or against its leg for a corporate allocation.
 3. `OpentoBuyUpdatePaymentEventHandler.v1`: Authorizations (AMP) events, stored by One-Data. Details still to be defined.
 
-The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. One-Data works out when a payment has every event it needs and marks its row `READY`; `ProcessPaidEventsWorkflow` reads only `READY` rows and sets `PAID` (see [Work Tracker and Inbox](#work-tracker-and-inbox)).
+The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. One-Data works out when a payment has every event it needs and marks its row `READY`; `ProcessPaidEventsWorkflow` reads only `READY` rows: it sets a payment `PAID`, and records a corporate parent's settlement or a corporate leg's posting (see [Work Tracker and Inbox](#work-tracker-and-inbox)).
 
 - Each handler writes the raw event and upserts the payment's inbox row in one transaction, and acknowledges the sender only after the commit. If the database is down, the sender gets an error and retries.
 - For a payment, whichever of the two events arrives second sets the row `READY` in the same statement, so two events that arrive together can't miss each other, and a repeated event can't set it twice.
@@ -83,7 +83,7 @@ The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. One-Da
 
 ### Inbox functions
 
-Billpay reaches the inbox through two One-Data functions, never through the database. `ProcessPaidEventsWorkflow` is their only caller. Both names are **placeholders**.
+Billpay reaches the inbox through two One-Data functions, never through the database. `ProcessPaidEventsWorkflow` is their only caller. `ProcessMissingPaidEventsWorkflow` hands a found event to its One-Data handler, the same way MR/M3 and GAR send events. Both names are **placeholders**.
 
 1. `ReadPaidReadyPayments.v1`: puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, then returns up to 500 of the oldest `READY` rows. It changes nothing else, so a repeat before the status update returns the same rows.
 2. `UpdatePaidReadyPayments.v1`: sets the listed rows `DONE` or `UNMATCHED` in one transaction and returns the counts. Setting a status twice does no harm, so a retry is safe.
@@ -175,7 +175,7 @@ Separate databases mean offline load can never slow realtime traffic at the Temp
 | Returns | Bursts of 100 TPS, up to 100K a day | No: started, then 202 | None | Offline |
 | Inbound, pushed by a third party | Assumed like returns | No: started, then 202 | None | Offline |
 | Representments | A share of returns | No | The date market rules set | Offline |
-| Settlement and AR posting | One event of each per payment, in bursts of up to 1,000 a second. They wait in One-Data's inbox, and Billpay reads one `READY` row per payment | No | None; paced last of all | Offline |
+| Settlement and AR posting | One event of each per payment, in bursts of up to 1,000 a second. They wait in One-Data's inbox, and Billpay reads one `READY` row per payment (for a corporate payment, one for the parent and one per leg) | No | None; paced last of all | Offline |
 
 ### Kinds of workflow
 
@@ -342,7 +342,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
 | QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
-| Settle | `PROCESSED` → `PAID`, for a batch of up to 500 `READY` inbox rows at once | Nothing |
+| Settle | `PROCESSED` → `PAID` for each payment in a batch of up to 500 `READY` inbox rows; a corporate parent's or leg's row only records its timestamp | Nothing |
 
 "All four" means account type, AR posting, realtime clearing and mandate authorization.
 
@@ -563,8 +563,8 @@ Billpay pulls PAID work at its own pace. A Temporal Schedule starts this workflo
 
 1. **Fetch** up to 500 `READY` rows through `ReadPaidReadyPayments.v1`. Fewer than 500 means this is the run's last batch; none ends the run.
 2. **Settle** the batch in one `PaymentStore` transaction (see [PaymentStore operations](#paymentstore-operations)). The workflow generates the batch ID with `Workflow.randomUUID()`, so a retried Settle uses the same one.
-3. **Announce:** a `PAID` event to RTF for each payment whose timeline row carries the batch ID.
-4. **Mark** the rows through `UpdatePaidReadyPayments.v1`: `DONE` for rows that found their payment, parent or leg; `UNMATCHED` for the rest.
+3. **Announce:** one `LifecycleEventActivities` call sends a `PAID` event to RTF for each payment whose timeline row carries the batch ID.
+4. **Mark** the rows through `UpdatePaidReadyPayments.v1`: `DONE` for a payment now `PAID`, or a parent or leg that was found; `UNMATCHED` for the rest.
 5. **Pace:** wait as long as the governor's rate for class `PAID` in `rate_allocation` asks, then fetch again. The run continues-as-new every 20 batches.
 
 - Every step is safe to repeat. Settle changes only rows that still need it, and a retried Settle that committed the first time still finds the payments it moved by their batch ID, so their events go out.
@@ -578,7 +578,8 @@ Billpay pulls PAID work at its own pace. A Temporal Schedule starts this workflo
 #### 2. ProcessMissingPaidEventsWorkflow
 
 - Finds payments that have been `PROCESSED` for more than 48 hours without turning `PAID`.
-- Asks MR/M3 and GAR for the payment's current state. An event it finds goes into the inbox through the same One-Data handler, so the inbox keeps one writer; one still missing raises an alert. The payment's inbox row shows which event is missing.
+- Asks MR/M3 and GAR for the payment's current state, and hands any event it finds to its One-Data handler, so events reach the inbox only one way. An event still missing raises an alert; the payment's inbox row shows which one.
+- A row already `UNMATCHED` for 48 hours is left for a person. Replaying an event can't bring it back, because the upsert only moves `WAITING` rows, so the alert names it.
 
 #### 3. PurgeTransactionDataWorkflow
 
@@ -597,14 +598,14 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 | `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes in ReceiveAllocations; the guarded cancel; the ID map in Update |
 | `InstrumentActivities` | Payment Instruments | Its own queue if it has an agreed limit; otherwise the workflow's queue | Verify, Reverify, Represent |
 | `OptionsActivities` | Payment Options | Its own queue if it has an agreed limit; otherwise the workflow's queue | Verify, Reverify, Represent |
-| `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent |
-| `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, and every leg |
+| `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
+| `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `AuthorizationActivities` | Authorizations (AMP), open-to-buy | `ds-authorization` | Execute, and every leg |
 | `AccountingActivities` | Accounting | `ds-accounting` | Fulfil, and every leg |
 | `BalanceControlActivities` | eBNC (Balance & Control) | `ds-ebnc` | Fulfil, and every leg |
 | `RiskActivities` | Risk | `ds-risk` | Fulfil, and every leg |
 | `AllocationActivities` | Allocations manager | `ds-allocations` | RequestAllocations |
-| `InboxActivities` | One-Data's inbox functions | The workflow's own queue: nobody throttles them | `ProcessPaidEventsWorkflow`, to fetch and to mark |
+| `InboxActivities` | One-Data's inbox functions and event handlers | The workflow's own queue: nobody throttles them | `ProcessPaidEventsWorkflow`, to fetch and to mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler |
 | `LifecycleEventActivities` | RTF, the lifecycle events other systems consume | The workflow's own queue: RTF has no rate limit | Every stage's announcement; Fulfil and the corporate completion check, before their commit; the `PAID` events after Settle, and after a corporate parent turns `PAID` |
 | `CommunicationActivities` | Raven, customer messages | `ds-comms` | Announcements the customer is told about; Fulfil and the corporate completion check, before their commit |
 
@@ -638,7 +639,7 @@ Throttled calls stay off eager dispatch: it hands the task straight back to the 
 
 > One-Data function → Billpay core API → Billpay Router → workflow → stages → activities → clients
 
-Between the core APIs and the workflows sits the Billpay Router. For every row below it does the same six steps: **admit, pick the journey, resolve behaviors, pin the plan key, place, start.**
+Between the core APIs and the workflows sits the Billpay Router. For every row below except settlement and AR posting, which are not routed, it does the same six steps: **admit, pick the journey, resolve behaviors, pin the plan key, place, start.**
 
 | One-Data function | Core API | Router: journey and start | Workflows | Children and follow-ups |
 | --- | --- | --- | --- | --- |
@@ -733,7 +734,7 @@ On the due date the dispatcher calls the Router again, so a scheduled payment ru
 
 ## Work Tracker and Inbox
 
-One narrow Work Tracker table drives all paced work. The **inbox**, where settlements and AR postings land, is One-Data's, in its Postgres database. Payment data stays in the domain tables, with a few additions. There is no outbox: lifecycle events and customer messages are activities (see [Activities](#activities)).
+One narrow Work Tracker table drives all dated and dispatched work. The **inbox**, where settlements and AR postings land, is One-Data's, in its Postgres database. Payment data stays in the domain tables, with a few additions. There is no outbox: lifecycle events and customer messages are activities (see [Activities](#activities)).
 
 ### `work_tracker`
 
@@ -785,7 +786,7 @@ Oracle holds no inbox. The handlers write two tables in One-Data's Postgres, and
 | --- | --- |
 | `PAYMENT` | Both the settlement and the AR posting are in |
 | `PARENT` | A corporate parent's settlement is in. Its AR posts leg by leg |
-| `LEG` | A corporate leg's AR posting is in. Legs never clear on their own |
+| `LEG` | A corporate leg's AR posting is in. Corporate legs never clear on their own |
 
 | `sta_cd` | Meaning |
 | --- | --- |
@@ -809,11 +810,14 @@ on conflict (pymt_id, prsnt_seq_no) do update set
                       and coalesce(p.stlmt_ts, excluded.stlmt_ts) is not null
                       and coalesce(p.ar_pstd_ts, excluded.ar_pstd_ts) is not null
                      then 'READY' else p.sta_cd end,
-  lst_updt_ts = now();
+  lst_updt_ts = now()
+where (p.stlmt_ts is null and excluded.stlmt_ts is not null)
+   or (p.ar_pstd_ts is null and excluded.ar_pstd_ts is not null);
 ```
 
 - When both events arrive at once, Postgres makes the second upsert wait for the first one's row, so it sees both and sets `READY`.
-- Only `WAITING` moves to `READY`, so a repeated event can't set it twice. Duplicates need no unique index: a repeat changes nothing, and Settle skips a payment that is already `PAID`.
+- Only `WAITING` moves to `READY`, and the `where` clause skips an event the row already has. A repeat changes nothing, not even `lst_updt_ts`, so a `READY` row keeps its place in the fetch order and an `UNMATCHED` row keeps its retry time.
+- `billpay_extnl_event` needs no unique index on the idempotency ID: a repeated event leaves the inbox row as it was, and Settle skips a payment that is already `PAID`.
 - Partial indexes keep each read small: `READY` rows by `lst_updt_ts` for the fetch, `UNMATCHED` rows by `lst_updt_ts` for the hourly retry, `WAITING` rows by `creat_ts` for the 48-hour view.
 - One-Data deletes `DONE` rows after 30 days, and drops `billpay_extnl_event` partitions on the same schedule.
 
@@ -834,7 +838,7 @@ on conflict (pymt_id, prsnt_seq_no) do update set
 
 | Table | Change | Why |
 | --- | --- | --- |
-| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at`. On every payment: `stlmt_ts` and `ar_pstd_ts`, set by Settle; a corporate parent gets its `stlmt_ts` as soon as its settlement is in | Allocations never block clearing; legs know when they may run. The two timestamps say when the money settled and when AR posted |
+| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at`. On every payment: `stlmt_ts` and `ar_pstd_ts`, set by Settle. Settle sets a corporate parent's `stlmt_ts` from its own inbox row, which can come before the parent is `PROCESSED` | Allocations never block clearing; legs know when they may run. The two timestamps say when the money settled and when AR posted |
 | `split_trans_dtl` | `ar_pstd_ts`, set by Settle when the leg's AR posting is in | The completion check needs every leg posted |
 | `trans_lfcyc_event` | One row per status per presentment. Two new columns: the cluster that ran the step, and `batch_id` on the `PAID` rows Settle writes | Says which cluster's UI holds each step; lets a retried Settle find the payments it moved |
 | `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts | Keeps big batches out of workflow inputs |
@@ -885,7 +889,7 @@ Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, 
 
 **Crash safety.** A worker that dies mid-tick trips the heartbeat timeout (10 s), and the retried activity resumes from its last heartbeat. A repeated start fails as already started and counts as done; `REJECT_DUPLICATE` stops a second execution. Rows claimed but never started are caught by the sweep or by the next run.
 
-**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position. Completion: every 60 s it counts legs by status for parents in `PROCESSING`. Once all of a parent's legs are `PROCESSED`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`. A `PROCESSED` parent whose `stlmt_ts` is set, and whose legs all have `ar_pstd_ts`, moves to `PAID` by a guarded update, and its `PAID` event goes to RTF after the commit.
+**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position. Completion: every 60 s it counts legs by status for parents in `PROCESSING` or `PROCESSED`. Once all of a parent's legs are `PROCESSED`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`. A `PROCESSED` parent whose `stlmt_ts` is set, and whose legs all have `ar_pstd_ts`, moves to `PAID` by a guarded update, and its `PAID` event goes to RTF after the commit.
 
 **Cost and scale.** About 5 Temporal writes per tick: 1M payments at 50 TPS is about 1,000 ticks, so about 5K writes. One activity can issue a few hundred starts a second. Past that, split into lanes, each owning a hash bucket of `ref_id` at rate ÷ lanes.
 
@@ -980,7 +984,7 @@ Priority decides who goes first on a shared downstream queue; fairness splits on
 - Priority keys run from 1 (first) to 5.
 - Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is acceptable for async work; their backlog age is alerted on so a long wait is visible.
 - Fairness is switched on in the server's dynamic config (`matching.enableFairness`). The default per-key limit applies to every key on a queue, scaled by the key's weight, so every key except a corporate parent's carries weight 100 and never meets it. Weights only compare keys within one priority level.
-- `ProcessPaidEventsWorkflow` uses no shared queue, so it has no priority key. Its calls go to One-Data, Oracle and RTF from its own queue, and the governor paces it directly.
+- `ProcessPaidEventsWorkflow` uses no shared queue, so it has no priority key. Its calls to One-Data and RTF run on its own queue, Oracle goes through `PaymentStore`, and the governor paces it directly.
 
 [^ Top](#table-of-contents)
 
@@ -1310,7 +1314,7 @@ stateDiagram-v2
     DISALLOWED --> [*]
 ```
 
-Corporate parents use the same states. A corporate parent reaches `PROCESSED` through the completion check instead of Fulfil.
+Corporate parents use the same states. A corporate parent reaches `PROCESSED` through the completion check instead of Fulfil, and `PAID` through the same check instead of Settle.
 
 ### Allocation status, beside the payment states
 
@@ -1351,7 +1355,8 @@ These inputs are assumed for now. The first changes the numbers most.
 | Which changes send a Raven message | `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED` | Each adds a call, and writes, to its workflow |
 | PAID where `requiresArPosting` is N | GAR still sends an AR posting once it posts the payment, so PAID waits for both events as everywhere else | If GAR sends nothing, those rows stay `WAITING`, and One-Data must know to expect settlement only |
 | IDs on settlement and AR events | Both carry the payment ID (the leg ID for a leg) and the presentment | One-Data keys the inbox on them; without the presentment, a re-presented payment could pair the wrong events |
-| Corporate events | One-Data can tell them apart: a leg's ID carries its `_{seq}` suffix, and the settlement event says the payment is corporate | Without it, a parent's row waits for a parent-level AR posting that never comes |
+| Corporate events | One-Data can tell them apart because the events say the payment is corporate. The `_{seq}` suffix alone isn't enough: consumer split legs carry it too | Without it, a parent's row waits for a parent-level AR posting that never comes |
+| Consumer split payments | Each leg clears and posts on its own, so its inbox row needs both events, keyed on the leg ID. How Settle moves the leg, and when the parent turns `PAID`, is still to be defined | Without it, a consumer split has no path to `PAID` |
 | One-Data's inbox database | One Postgres primary serves both sites | With one per site, each site needs its own drain, fetching and marking only its own rows |
 | Returns and inbound payments that One-Data stores | One-Data calls the async APIs as today: 202, or 429 and it retries later | Billpay could pull them the way it pulls `READY` rows, which would end One-Data's retries |
 

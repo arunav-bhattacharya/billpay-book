@@ -40,7 +40,7 @@ billpay-core is two apps, one for each Temporal cluster.
 - The payments schema is active-passive. The read/write primary is in IPC2, with two read-only replicas next to it carrying read and reporting traffic.
 - IPC1 holds the **Oracle Data Guard** standby plus one more read-only replica. Data Guard ships redo from the primary to it continuously, and the standby stays read-only until someone promotes it.
 - Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
-- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work. Settlement and posting events never land here. They wait in One-Data's inbox, a Postgres database, until Billpay pulls the payments that are ready.
+- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work. Settlement and Accounts Receivable posting events are held in One-Data's inbox, its own Postgres database, separate from Temporal's, until a payment has both. Billpay then pulls it.
 - Short outages and patching windows don't fail payments. `PaymentStore`, the only code that touches Oracle, keeps retrying and then waits on a durable timer, so a payment pauses and carries on when the database is back. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
 - This is the [same Oracle setup](../build/principles/tech-stack/database.md) the DBO team runs day to day.
 
@@ -83,7 +83,7 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
 | **The Offline app in IPC2** | Dispatchers stop and the offline workers go quiet, so dated work waits in Oracle and running payments pause where they are. Nothing is lost. Work resumes when the app returns or its IPC1 standby is promoted. |
 | **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and parking in Redis until an operator promotes the apps and the **Data Guard** standby there. |
 | **Oracle primary** | `PaymentStore` waits out a short outage or a patch on its own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
-| **One-Data's inbox** | Settlement and posting events can't be stored, so their senders retry, and payments wait in `PROCESSED` a little longer. Nothing is lost: `PAID` catches up once the inbox is back. |
+| **One-Data's inbox** | Settlement and Accounts Receivable posting events can't be stored, so their senders retry, and payments stay `PROCESSED` until the inbox is back. Nothing is lost: `PAID` catches up on its own. |
 | **The Online cluster** | Journeys where a caller waits can't start until the cluster returns or an operator promotes its us-west-1 standby. The Offline cluster carries on, since nothing calls across. |
 | **The Offline cluster** | Dated work waits in Oracle, async starts get 503 with `Retry-After` and their senders retry, and running offline payments pause, notifications included. The Online cluster keeps serving. The fix is to restore the cluster or promote its standby. |
 | **All of us-east-1** | Both clusters stop at once. Moving Temporal to us-west-1 is covered [below](#when-us-east-1-goes-down). |

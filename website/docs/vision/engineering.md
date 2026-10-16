@@ -80,8 +80,8 @@ Two problems shape almost every decision on this page. The first is variety. Eve
       term: 'The Event Handlers',
       desc: (
         <>
-          Settlement and Accounts Receivable posting come back later as events, often in bursts. They
-          wait in One-Data's own inbox, which marks a payment ready once both are in, and a periodic
+          Settlement and Accounts Receivable posting come back later as events, often in bursts.
+          One-Data holds them in its own inbox and marks a payment ready once both are in. A periodic
           job pulls ready payments in batches and marks them <code>PAID</code>. A return starts a
           workflow of its own.
         </>
@@ -203,7 +203,7 @@ A new way of processing a payment is a new stage implementation behind one combi
     },
     {
       term: 'Reliability',
-      desc: `Hosts restart, downstream systems go quiet and Oracle gets patched, and a payment survives all three. Temporal resumes the workflow where it stopped, PaymentStore waits out a database outage instead of failing, and a periodic sweep raises an alert for any payment whose settlement or posting event is still missing after 48 hours.`,
+      desc: `Hosts restart, downstream systems go quiet and Oracle gets patched, and a payment survives all three. Temporal resumes the workflow where it stopped, PaymentStore waits out a database outage instead of failing, and a periodic sweep chases any payment still short of PAID after 48 hours, asking the clearing and AR systems again before it raises an alert.`,
     },
     {
       term: 'Efficiency',

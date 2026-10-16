@@ -465,7 +465,7 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 | `design/index.md` | Update | Four layers. The Router entry adds admission, plan keys, placement and start modes. SectionIndex lists the new pages | ☐ |
 | `design/principles.md` | Update | A stage is one business step that returns its outcome; no ActivityGroup. Call rules: a workflow calls stages and starts children on its own cluster, a stage calls activities and helpers, an activity calls clients, a client calls only its own system. Naming table from the spec. Stages looked up from the plan key (most specific match); combinations not onboarded get 422 | ☐ |
 | `design/payment-state-model.md` | Update | Corporate diagram matches consumer, with `allocation_status` as a separate track. No ACCEPTED → CANCELLED. Corporate PROCESSED and PAID rules: a payment turns PAID in `ProcessPaidEventsWorkflow`'s Settle, a corporate parent in the completion check. A short section on guarded updates. Late allocations leave the parent PROCESSING, with an alert at the market's alert point | ☐ |
-| `design/journeys/index.md` | Update | Future-dated journeys never clear in real time. Wait steps become Work Tracker rows that a dispatcher releases. Fulfil lists accounting, eBNC and risk, then RTF and Raven, all before `PROCESSED` (Lumi becomes RTF). Update: a guarded cancel, then child `{newId}-init`. Corporate: the callback and held legs; Request and Receive Allocations. AR-initiated payments: async start on Offline, 202 or 429. Refunds: Online from channels, Offline when AR raises them | ☐ |
+| `design/journeys/index.md` | Update | Future-dated journeys never clear in real time. Wait steps become Work Tracker rows that a dispatcher releases. Fulfil lists accounting, eBNC and risk, then RTF and Raven, all before `PROCESSED` (Lumi becomes RTF). Update: a guarded cancel, then child `{newId}-init`. Corporate: the callback and held legs; Request and Receive Allocations. AR-initiated payments: async start on Offline, 202 or 429. Refunds: Online from channels, Offline when AR raises them. The External Transaction Events Tracker step becomes One-Data's inbox and the PAID pull | ☐ |
 | `design/routing.md` | Update | RouteMap tags mean clusters; a start-mode column; rows for the allocations callback, representments that fall due and both refund routes. Corporate: Request and Receive Allocations and one leg workflow per allocation, on Offline. The dispatcher re-routes on the due date. Stages come from the plan key; Worker Versioning pins the build. A section on start modes and workflow IDs | ☐ |
 | `design/component-model/index.md` | Update | Twelve business steps. "ActivityGroups & Activities" becomes Activities, and none vary by behavior | ☐ |
 | `design/component-model/workflows/index.md` | Update | WorkerSplit by cluster. Isolation is physical. The "Either worker" box goes: create scheduled runs on Online from channels and on Offline from AR, corporate legs only on Offline, no child crosses clusters. Control workflows as a kind. Balance refund on both clusters | ☐ |
@@ -475,7 +475,7 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 | `design/component-model/stages.md` | Update | Twelve stages: Verify absorbs the four Pending stages; RequestAllocations, ReceiveAllocations and Settle added (Settle takes a batch of up to 500 `READY` inbox rows); one Cancel stage. Each stage commits state and timeline entry (with cluster) in one guarded `PaymentStore` commit, then announces the change to RTF, and to Raven where the customer is told; Fulfil announces before its commit | ☐ |
 | `design/component-model/activities.md` | Update | Retitled Activities: one row per `{System}Activities` with its queue, plus `PaymentStore`. ActivityTable gets a queue column in place of the behavior filter. No decline when allocations can't be fetched | ☐ |
 | `design/sequence-diagrams.md` | Update | Participants become stages. Router hops and start modes. #1: RTF and Raven last in Fulfil, before `PROCESSED`. #2: a `SCHED_EXEC` row and the dispatcher. #3 and #4: the new corporate flow. #5 and #6: guarded cancel and 409. #7 and #8: QueueRepresentment and the representment dispatcher. #10: One-Data's inbox sets a payment `READY`, then the fetch, Settle, the PAID events to RTF and the status update. #11: payments still `PROCESSED` after 48 hours. New #13: the allocations callback | ☐ |
-| `design/pacing.md` | New | Dispatchers and the governor: the Work Tracker lifecycle, each dispatcher, the governor's loop, floors and costs | ☐ |
+| `design/pacing.md` | New | Dispatchers and the governor: the Work Tracker lifecycle, each dispatcher, the governor's loop, floors and costs. The PAID drain is the governor's last class: its rate is in payments a second, and the Oracle signals cut it first | ☐ |
 | `design/throttling.md` | New | Queues, throttling and priority: `ds-*` queues and their limits, 429 and Retry-After, must-succeed calls, priorities 1 to 5, fairness keys | ☐ |
 | `design/corporate-allocations.md` | New | The two tracks, with a corporate flow diagram; fetch timing, callback batches, held legs and their release, completion rules, the late alert, volumes | ☐ |
 
@@ -546,7 +546,7 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 | `deployment/code-merge-strategy.md` | Style pass | | ☐ |
 | `deployment/deployables/codec-server-app.md` | Style pass | | ☐ |
 | `deployment/deployables/mocks-app.md` | Style pass | | ☐ |
-| `deployment/deployables/one-data-functions.md` | Style pass | | ☐ |
+| `deployment/deployables/one-data-functions.md` | Update | One-Data also runs the inbox: its Postgres database, the handlers' upsert, the two inbox functions and the daily purge | ☐ |
 
 #### Observability
 
@@ -577,7 +577,7 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 | `operations/familiarity/tracing-ui.md` | Update | One trace per workflow; span links through `trace_parent`; the lookup path | ☐ |
 | `operations/familiarity/opensearch-logs.md` | Style pass | | ☐ |
 | `operations/familiarity/dispatch-controls.md` | New | Work Tracker statuses, `dispatch_run`, rate overrides, pausing Schedules, `governor_decision`, the exception list | ☐ |
-| `operations/sops.md` | Update | Runbooks for Oracle patching, late allocations, a failed release, SEPA cutoff at risk (overrides in `rate_allocation`), retries exhausted, Offline cluster down, promoting a cluster's standby | ☐ |
+| `operations/sops.md` | Update | Runbooks for Oracle patching, late allocations, a failed release, SEPA cutoff at risk (overrides in `rate_allocation`), retries exhausted, Offline cluster down, promoting a cluster's standby, PAID backlog age, a payment not PAID after 48 hours, One-Data's inbox down | ☐ |
 
 #### Contributing
 
