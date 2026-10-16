@@ -67,7 +67,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
 
 Every payment is either full or split. A **full payment** settles as one amount against one card account. A **split payment** is divided into **allocations**, and each allocation is processed and posted on its own before rolling back up to the original payment.
 
-The usual case is a **corporate payment**: one payment from a company, spread across the accounts it covers. A single one can carry up to 100,000 allocations. The company's payment clears with its bank once, as one amount, on its due date. The breakdown by account arrives separately, from the allocations manager. From the due date on, each allocation posts to its own account as it arrives, in parallel with the clearing. The company still sees one payment, and it counts as paid once it has settled and every allocation has posted.
+The usual case is a **corporate payment**: one payment from a company, spread across the accounts it covers. A single one can carry up to 100,000 allocations. The company's payment clears with its bank once, as one amount, on its due date. The breakdown by account arrives separately, from the allocations manager. From the due date on, each allocation posts to its own account as it arrives, in parallel with the clearing. The company still sees one payment, and it counts as paid once its settlement and the first allocation's posting have come back.
 
 ## Scheduled payments at midnight
 

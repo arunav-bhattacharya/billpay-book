@@ -40,7 +40,7 @@ billpay-core is two apps, one for each Temporal cluster.
 - The payments schema is active-passive. The read/write primary is in IPC2, with two read-only replicas next to it carrying read and reporting traffic.
 - IPC1 holds the **Oracle Data Guard** standby plus one more read-only replica. Data Guard ships redo from the primary to it continuously, and the standby stays read-only until someone promotes it.
 - Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
-- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work. Settlement and Accounts Receivable posting events are held in One-Data's inbox, its own Postgres database, separate from Temporal's, until a payment has both. Billpay then pulls it.
+- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work. Settlement and Accounts Receivable posting events are held in One-Data's inbox until a payment has both, and Billpay then pulls it. The inbox is a Postgres database of its own, separate from Temporal's, with one primary replicated across IPC1 and IPC2.
 - Short outages and patching windows don't fail payments. `PaymentStore`, the only code that touches Oracle, keeps retrying and then waits on a durable timer, so a payment pauses and carries on when the database is back. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
 - This is the [same Oracle setup](../build/principles/tech-stack/database.md) the DBO team runs day to day.
 
