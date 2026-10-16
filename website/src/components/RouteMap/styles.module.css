@@ -1,4 +1,4 @@
-/* RouteMap — the Billpay Router as a grouped, scannable table.
+/* RouteMap: the Billpay Router as a grouped, scannable table.
 
    Set in the body sans throughout, at one size in the body, with the header
    band a step above it. The trigger, condition, workflow name, sequence arrow
@@ -115,17 +115,18 @@
   text-transform: uppercase;
   vertical-align: 1px;
 }
+/* Tones come from the shared account-type tokens, which swap with the theme. */
 .consumer {
-  color: #0f766e;
-  background: color-mix(in srgb, #0f766e 13%, transparent);
+  color: var(--amex-acct-consumer);
+  background: color-mix(in srgb, var(--amex-acct-consumer) 11%, transparent);
 }
 .corporate {
-  color: #7c3aed;
-  background: color-mix(in srgb, #7c3aed 14%, transparent);
+  color: var(--amex-acct-corporate);
+  background: color-mix(in srgb, var(--amex-acct-corporate) 11%, transparent);
 }
 .travel {
-  color: #97600c;
-  background: color-mix(in srgb, #97600c 14%, transparent);
+  color: var(--amex-acct-travel);
+  background: color-mix(in srgb, var(--amex-acct-travel) 11%, transparent);
 }
 
 /* ---- dark theme ---- */
@@ -140,14 +141,11 @@
   background: color-mix(in srgb, var(--amex-cat-architecture) 12%, transparent);
 }
 :global([data-theme='dark']) .consumer {
-  color: #5eead4;
-  background: color-mix(in srgb, #2dd4bf 18%, transparent);
+  background: color-mix(in srgb, var(--amex-acct-consumer) 16%, transparent);
 }
 :global([data-theme='dark']) .corporate {
-  color: #c4b5fd;
-  background: color-mix(in srgb, #a78bfa 20%, transparent);
+  background: color-mix(in srgb, var(--amex-acct-corporate) 16%, transparent);
 }
 :global([data-theme='dark']) .travel {
-  color: #e6c060;
-  background: color-mix(in srgb, #e0b34e 18%, transparent);
+  background: color-mix(in srgb, var(--amex-acct-travel) 16%, transparent);
 }

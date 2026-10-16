@@ -13,16 +13,20 @@
   isolation: isolate;
 }
 
-/* Corner lighting, at low volume. Cyan is a light in the top right rather
-   than a third of the gradient, and gold answers it from the bottom left. */
+/* The field is ruled on a 40 px module, barely there, the way a ledger page
+   is ruled before anything is written on it. It fades out toward the bottom
+   so the title sits on the grid and the buttons on clear navy. */
 .heroGlow {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background:
-    radial-gradient(38% 48% at 92% 8%, rgba(0, 163, 224, 0.3), transparent 68%),
-    radial-gradient(40% 52% at 6% 96%, rgba(230, 191, 90, 0.12), transparent 66%),
-    radial-gradient(70% 90% at 34% 108%, rgba(0, 12, 40, 0.42), transparent 64%);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center top;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 45%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 45%, transparent 100%);
 }
 
 /* Shimmer rule along the bottom edge, the same one that opens the footer, so
@@ -54,7 +58,7 @@
 .heroTagline {
   font-size: 1.22rem;
   line-height: 1.55;
-  color: rgba(233, 242, 251, 0.9);
+  color: #e0e4f1;
   max-width: 680px;
   margin: 0 auto 2.2rem;
 }
@@ -78,10 +82,9 @@
   transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 .heroGhost:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
   border-color: #fff;
   color: #fff;
-  transform: translateY(-2px);
 }
 
 /* ---- Section grid ---- */
@@ -96,16 +99,15 @@
   margin: 0 0 0.4rem;
   color: var(--amex-txt-strong);
 }
-/* Same shimmer rule the content pages hang under every h2, so the homepage
-   and the docs read as one place. */
+/* The same short Bright Blue rule the content pages hang under every h2, so
+   the homepage and the docs read as one place. */
 .sectionHeadTitle::after {
   content: '';
   display: block;
-  width: 76px;
-  height: 3px;
-  margin: 0.75rem auto 0;
-  border-radius: 3px;
-  background: var(--amex-grad-rule);
+  width: 48px;
+  height: 2px;
+  margin: 0.8rem auto 0;
+  background: var(--ifm-color-primary);
 }
 .grid {
   display: grid;
@@ -150,7 +152,7 @@
 }
 
 .card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-2px);
   background:
     var(--card-face-hover) padding-box,
     var(--card-border-hover) border-box,

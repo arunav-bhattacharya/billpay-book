@@ -7,15 +7,15 @@
   display: flex;
   flex-direction: column;
 
-  --ly-surface: #f2f6fd;
+  --ly-surface: #ffffff;
   --ly-chip: #ffffff;
   --ly-chip-mix: 12%;
   --ly-lo: 5;
   --ly-hi: 11;
 }
 :global([data-theme='dark']) .map {
-  --ly-surface: #0a1c3b;
-  --ly-chip: #0b2246;
+  --ly-surface: #0c173a;
+  --ly-chip: #0d2854;
   --ly-chip-mix: 28%;
   --ly-lo: 12;
   --ly-hi: 27;

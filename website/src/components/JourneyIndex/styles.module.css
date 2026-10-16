@@ -1,15 +1,10 @@
-/* JourneyIndex — see index.js for what the two colours mean and why they are
+/* JourneyIndex: see index.js for what the two colours mean and why they are
    the ones the diagrams below already use. */
 
 .wrap {
-  --ji-cust: var(--amex-blue);
-  --ji-sys: #f4761f;
+  --ji-cust: var(--amex-journey-customer);
+  --ji-sys: var(--amex-journey-system);
   margin: 1.4rem 0 2.4rem;
-}
-
-:global([data-theme='dark']) .wrap {
-  --ji-cust: #4da3e6;
-  --ji-sys: #ff9a4d;
 }
 
 /* A filled dot is a person on the line. A ring is an empty seat. The shape

@@ -1,9 +1,9 @@
-/* DataTable — the house table shell, shared by the table components and by
+/* DataTable: the house table shell, shared by the table components and by
    every markdown pipe table (src/theme/MDXComponents.js).
 
-   Every table on the site agrees on the panel, the blue header band and the
-   row rhythm, and disagrees only on size, alignment and how rows are told
-   apart. Those are the tokens below: retune the token, not the rule, so a row
+   Every table on the site agrees on the panel, the head band with its navy
+   threshold rule, and the row rhythm, and disagrees only on size, alignment
+   and how rows are told apart. Those are the tokens below: retune the token, not the rule, so a row
    stays one tier.
 
    The base cell rule sits at one class plus one element, which is enough to
@@ -21,7 +21,9 @@
   /* Body and header type. The header sits one step above the body, which is
      enough to name the columns without reopening a three-tier row. */
   --dt-fs: 0.88rem;
-  --dt-th-fs: 0.94rem;
+  /* Column names are small tracked capitals, the way an engineering plate
+     labels its columns: present, exact, and quieter than the data. */
+  --dt-th-fs: 0.76rem;
   --dt-pad: 0.7rem 1rem;
   --dt-th-pad: 0.72rem 1rem;
   --dt-valign: top;
@@ -56,19 +58,22 @@
 }
 
 .shell thead tr {
-  background: var(--dt-head-bg, var(--amex-blue));
+  background: var(--dt-head-bg, var(--amex-table-head-bg));
   border: none;
 }
 
+/* The head closes on a heavier rule: the threshold between the column names
+   and the data, which is the one line in a table allowed to carry weight. */
 .shell thead th {
   padding: var(--dt-th-pad);
   font-size: calc(var(--dt-th-fs) * var(--dt-shrink, 1));
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--dt-head-fg, #ffffff);
+  letter-spacing: 0.09em;
+  color: var(--dt-head-fg, var(--amex-table-head-fg));
   text-align: left;
   border: none;
+  border-bottom: 2px solid var(--dt-head-rule, var(--amex-table-head-rule));
   white-space: var(--dt-th-wrap, nowrap);
 }
 

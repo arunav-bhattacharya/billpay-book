@@ -1,62 +1,63 @@
 /**
- * Billpay Wiki — American Express–inspired design system.
+ * Billpay Wiki: the "Ledger Blue" design system.
  *
- * Grounded in Amex's brand identity:
- *   - Signature "Blue Box" blue  #016FD0
- *   - Midnight Blue              #002663
- *   - Typeface: Benton Sans (the Amex corporate face) for text, falling back
- *     to SF Pro Rounded / the system stack. SF Mono for code.
+ * Every colour comes from the American Express design language (DLS):
+ *   - Bright Blue   #006FCF   action, links, the current page, one rule per field
+ *   - Deep Blue     #00175A   headings, the hero, the footer, table thresholds
+ *   - Light Blue    #66A9E2   accent only, never more than a fifth of a surface
+ *   - The DLS grey scale (100 to 900) for every line, surface and quiet label
+ *   - Typeface: Benton Sans (the Amex corporate face), SF Mono for code.
  *
- * Colour strategy. Blue is the brand, but a page made entirely of blue reads
- * as a screensaver rather than a document, and light mode is where that shows
- * first. So blue is rationed by role:
+ * Colour strategy. The page is white paper ruled with hairlines, and blue is
+ * rationed by role:
  *
- *   Surface   exactly one full-strength blue block per page (the homepage
- *             hero), plus the footer that closes it. Everything between them
- *             is paper in light and near-black in dark.
- *   Ink       headings and body sit in deep navy rather than grey, so the
- *             brand still runs through the text.
- *   Accent    Blue Box blue on rails, indices, links, table headers and
- *             arrows, against a neutral surface.
+ *   Surface   one full-strength field per page (the homepage hero) and the
+ *             footer that closes it. Everything between them is white in
+ *             light and DLS Deep Blue 900 in dark.
+ *   Ink       headings in Deep Blue, body in DLS grey 900, so the brand runs
+ *             through the hierarchy without tinting every line of prose.
+ *   Accent    Bright Blue on links, indices, the active page and the short
+ *             rule under each section heading.
  *
- * Gold is the secondary, used sparingly and warm: shimmer rules, the hero
- * eyebrow, the footer stripe, a whisper in the page wash. It is what keeps
- * the neutrals from turning cold and blue-grey.
+ * Structure is drawn in tone rather than colour: hairlines in grey 300, a
+ * heavier rule only at a threshold (under a heading, under a table head).
+ * There is no gold, violet or cyan, and no gradient that calls attention to
+ * itself.
  *
  * Both light and dark modes are first-class. All values are CSS custom
- * properties — components never hardcode color.
+ * properties, so components never hardcode a colour.
  */
 
 /* ==================================================================== *
  * 1. Brand palette (theme-independent raw values)
  * ==================================================================== */
 :root {
-  --amex-blue: #016fd0;          /* signature Blue Box */
-  --amex-blue-bright: #00a3e0;   /* electric / digital blue */
-  --amex-blue-deep: #01488f;
-  --amex-midnight: #002663;      /* Amex Midnight Blue */
-  --amex-navy: #00175a;
+  --amex-blue: #006fcf;          /* DLS Bright Blue 600 */
+  --amex-blue-bright: #56a1e3;   /* Bright Blue 400: the accent on dark surfaces */
+  --amex-blue-deep: #00559e;     /* Bright Blue 700: hover and pressed */
+  --amex-midnight: #00175a;      /* DLS Deep Blue, the brand navy */
+  --amex-navy: #000f3c;          /* Deep Blue 800 */
+  --amex-sky: #66a9e2;           /* DLS Light Blue, accent only */
 
-  --amex-platinum: #6f7c8f;      /* Platinum slate */
-  --amex-indigo: #34519e;
-  --amex-temporal: #7b5cf0;      /* Temporal violet, for the Billpay Core tier */
+  --amex-platinum: #737373;      /* Grey 600 */
+  --amex-indigo: #2b438c;        /* Deep Blue 500 */
+  --amex-temporal: #112a73;      /* Deep Blue 600, for the Billpay Core tier */
 }
 
 /* ==================================================================== *
  * 2. Signature gradients (shared; tuned per-theme where noted)
  * ==================================================================== */
 :root {
-  /* The hero / brand gradient. It stops at the Blue Box rather than running on
-     to cyan: the old version spent its last third in pale sky blue, which is
-     what made the light homepage look washed out. Every stop here is a colour
-     white type clears comfortably, so the field stays deep from corner to
-     corner and the cyan appears only as a small corner light in .heroGlow. */
-  --amex-grad-brand: linear-gradient(118deg, #00133d 0%, #002663 32%, #01488f 68%, #0166c2 100%);
-  /* Button gradient. */
-  --amex-grad-btn: linear-gradient(135deg, #0164c4 0%, #018ad6 55%, #00a3e0 100%);
-  --amex-grad-btn-hover: linear-gradient(135deg, #01579f 0%, #0176bd 55%, #0d94cf 100%);
-  /* Thin shimmer rule for dividers / underlines: blue → cyan → gold. */
-  --amex-grad-rule: linear-gradient(90deg, #016fd0 0%, #12a7dd 55%, #d7c690 100%);
+  /* The hero field. Almost flat Deep Blue, deepening a step at one corner and
+     lifting a step at the other, so it reads as a solid mass rather than as a
+     gradient. Every stop clears white type by a wide margin. */
+  --amex-grad-brand: linear-gradient(120deg, #000f3c 0%, #00175a 46%, #0b2a6e 100%);
+  /* Buttons are solid Bright Blue, as in the DLS. The gradient tokens stay so
+     callers need no change; each is a single colour expressed as an image. */
+  --amex-grad-btn: linear-gradient(#006fcf, #006fcf);
+  --amex-grad-btn-hover: linear-gradient(#00559e, #00559e);
+  /* The closing rule on the hero and the footer: Bright Blue into Light Blue. */
+  --amex-grad-rule: linear-gradient(90deg, #006fcf 0%, #66a9e2 100%);
 }
 
 /* ==================================================================== *
@@ -179,134 +180,141 @@ h3 {
  * 4. LIGHT theme
  * ==================================================================== */
 :root {
-  /* Primary ramp derived from Amex Blue. */
-  --ifm-color-primary: #016fd0;
-  --ifm-color-primary-dark: #0164bb;
-  --ifm-color-primary-darker: #015eb1;
-  --ifm-color-primary-darkest: #014e92;
-  --ifm-color-primary-light: #1a7dd6;
-  --ifm-color-primary-lighter: #2f89da;
-  --ifm-color-primary-lightest: #57a0e2;
+  /* Primary ramp derived from DLS Bright Blue 600. */
+  --ifm-color-primary: #006fcf;
+  --ifm-color-primary-dark: #0064ba;
+  --ifm-color-primary-darker: #005eb0;
+  --ifm-color-primary-darkest: #004e91;
+  --ifm-color-primary-light: #1a7dd4;
+  --ifm-color-primary-lighter: #2685d6;
+  --ifm-color-primary-lightest: #4c9add;
 
-  /* Surfaces — near-white with the faintest cream warmth, never flat white.
-     The wash is warm only. An earlier version carried a blue radial in the top
-     left, which tinted the whole canvas and left light mode with nowhere that
-     wasn't blue. Warmth here is what makes the blue accents read as accents. */
-  --amex-bg: #faf9f6;
-  --amex-bg-grad:
-    radial-gradient(118% 92% at 90% 100%, rgba(198, 146, 20, 0.05), transparent 62%),
-    radial-gradient(100% 80% at 6% 0%, rgba(198, 146, 20, 0.028), transparent 58%),
-    linear-gradient(158deg, #fdfcfa 0%, #f8f7f2 52%, #fbfaf5 100%);
-  --amex-card: linear-gradient(160deg, #ffffff 0%, #fbfbf8 52%, #f8f7f2 100%);
-  --amex-card-hover: linear-gradient(160deg, #ffffff 0%, #fafaf6 48%, #f6f5f0 100%);
-  --amex-panel: #fdfdfb;
+  /* Surfaces: white paper. No wash and no tint, so the blue accents are the
+     only colour on the page and read as accents. */
+  --amex-bg: #ffffff;
+  --amex-bg-grad: #ffffff;
+  --amex-card: #ffffff;
+  --amex-card-hover: #ffffff;
+  --amex-panel: #ffffff;
+  --amex-panel-subtle: #fbfbfb;  /* DLS grey 100 */
 
-  --amex-txt: #0b1b34;           /* deep navy ink */
-  --amex-txt-strong: #001a45;
-  --amex-mut: #566988;
-  --amex-line: #e8e6df;
-  --amex-line-strong: #d9d5cd;
+  /* Ink. Headings take the brand navy; body copy is DLS grey 900, which reads
+     crisper than a tinted ink over long pages. Muted text is grey 700, which
+     still clears 7:1 on white. */
+  --amex-txt: #262626;
+  --amex-txt-strong: #00175a;
+  --amex-mut: #595959;
+  --amex-line: #e0e0e0;          /* grey 300: every hairline */
+  --amex-line-strong: #bdbdbd;   /* grey 400 */
 
-  /* Table rows. Every table on the site alternates between the panel it sits
-     on and one step off it, and lifts to the hover tint under the cursor.
-     Shared here so a markdown table and a component table stripe alike. */
-  --amex-row-alt: color-mix(in srgb, var(--amex-line) 40%, transparent);
-  --amex-row-hover: color-mix(in srgb, var(--amex-blue) 7%, transparent);
+  /* Table rows. Every table alternates white and grey 100, and lifts to
+     Bright Blue 100 under the cursor. Shared so a markdown table and a
+     component table stripe alike. */
+  --amex-row-alt: #fbfbfb;
+  --amex-row-hover: #edf7ff;
 
-  /* Which Temporal worker a thing runs on. Online takes the platform blue,
-     Offline the gold the async band carries. Five stylesheets used to spell
-     these out as hexes, at four slightly different mix percentages, and each
-     one carried its own dark-mode block to swap them. */
-  --amex-worker-online: #0159ad;
-  --amex-worker-offline: #97600c;
+  /* The table head: a grey 200 band with Deep Blue labels, closed by a
+     heavier Deep Blue rule. The rule is the threshold between the column
+     names and the data, which is the one place a table needs weight. */
+  --amex-table-head-bg: #f4f4f4;
+  --amex-table-head-fg: #00175a;
+  --amex-table-head-rule: #00175a;
+
+  /* Which Temporal cluster a thing runs on: Online takes Bright Blue,
+     Offline the deeper navy. */
+  --amex-worker-online: #006fcf;
+  --amex-worker-offline: #112a73;
+
+  /* Account-type tags on routing rows. All three sit inside the DLS family. */
+  --amex-acct-consumer: #00559e;
+  --amex-acct-corporate: #112a73;
+  --amex-acct-travel: #595959;
+
+  /* The two kinds of journey trigger: a person, or a system. */
+  --amex-journey-customer: #006fcf;
+  --amex-journey-system: #4c63a6;
 
   /* How much of its own hue a tinted chip mixes into the panel. Read by the
      chipTinted recipe as a fallback, so a chip can still opt out of either. */
-  --chip-fill-base: 13%;
-  --chip-line-base: 30%;
+  --chip-fill-base: 10%;
+  --chip-line-base: 26%;
 
-  /* Navy-tinted layered shadow (subtle depth, not flat). */
-  --amex-sh-sm: 0 2px 6px rgba(0, 38, 99, 0.07);
-  --amex-sh: 0 10px 28px rgba(0, 38, 99, 0.1), 0 2px 6px rgba(0, 38, 99, 0.06);
-  /* The lift under the primary button. It is the only thing that reads it, so
-     it is tuned there rather than shared. */
-  --amex-glow: 0 4px 13px rgba(1, 111, 208, 0.17);
+  /* Shadows are rare and shallow, navy-tinted so they stay in the palette.
+     Lines do the structural work; a shadow only says "this lifts". */
+  --amex-sh-sm: 0 1px 2px rgba(0, 23, 90, 0.06);
+  --amex-sh: 0 8px 24px rgba(0, 23, 90, 0.08), 0 1px 3px rgba(0, 23, 90, 0.06);
+  --amex-glow: 0 1px 2px rgba(0, 23, 90, 0.16);
 
   /* ---- Card system ----
-     Every card on the site is one thing: a paper face, a quiet hairline edge,
-     and a shallow navy shadow. Section 9a has the recipe and how to apply it.
-
-     The homepage cards arrived here first. They used to be eight solid blue
-     faces, which put a second blue slab under the hero and a third above the
-     footer. A blue tinted face was tried and reverted (a wash across eight
-     cards puts the colour back where it was doing the damage), then a full
-     gradient border, then a blue corner ramp that faded out a third of the way
-     round. All of them drew the eye to the frame instead of the content, so
-     the edge is now a flat neutral line and the shadow is shallow enough to
-     separate the card from the page without announcing itself.
+     A card is white paper with a grey 300 hairline and almost no shadow. On
+     hover the edge takes a whisper of Bright Blue and the card lifts a little.
+     Section 9a has the recipe and how to apply it.
 
      --card-accent still exists and components still set it, because the hue
-     drives headings, icons and rules inside the card. It no longer paints the
-     edge.
-
-     The shadow is navy rather than neutral grey, which is what keeps it in the
-     palette rather than reading as a generic drop shadow. */
+     drives headings, icons and rules inside the card. It does not paint the
+     edge. */
   --card-accent: var(--amex-blue);
-  --card-face: linear-gradient(160deg, #ffffff 0%, #fdfcfa 55%, #faf9f4 100%);
-  --card-face-hover: linear-gradient(160deg, #ffffff 0%, #ffffff 55%, #fdfcf8 100%);
-  --card-radius: 16px;
-  /* Edge width. A hairline, where the corner ramp needed 2.5px to read. */
+  /* Faces are images for the same reason as the edge below: the recipe uses
+     them in more than one background layer, where a bare colour is invalid. */
+  --card-face: linear-gradient(#ffffff, #ffffff);
+  --card-face-hover: linear-gradient(#ffffff, #ffffff);
+  --card-radius: 12px;
   --card-bw: 1px;
   /* Painted as a background layer, not a border colour, because the recipe in
      section 9a stacks three layers and this is the middle one. It has to stay
      an <image>: CSS allows a background-color in the last layer only, so a
-     bare `var(--amex-line)` here makes the whole shorthand invalid and the
-     card loses its face as well as its edge. A one-stop gradient is the flat
-     colour expressed as an image, which is what keeps the recipe working. */
+     one-stop gradient is the flat colour expressed as an image. */
   --card-border: linear-gradient(var(--amex-line), var(--amex-line));
-  --card-border-hover: linear-gradient(
-    var(--amex-line-strong),
-    var(--amex-line-strong)
-  );
-  --card-sh:
-    0 11px 24px rgba(0, 38, 99, 0.085),
-    0 3px 8px rgba(0, 38, 99, 0.055),
-    0 1px 2px rgba(0, 38, 99, 0.04);
+  --card-border-hover: linear-gradient(#b5d7f4, #b5d7f4);
+  --card-sh: 0 1px 2px rgba(0, 23, 90, 0.04);
   --card-sh-hover:
-    0 18px 36px rgba(0, 38, 99, 0.135),
-    0 6px 13px rgba(0, 38, 99, 0.085),
-    0 1px 3px rgba(0, 38, 99, 0.05);
-  /* Corner lighting for cards that want it, banked on the same corner as the
-     accent so hover lights the card from where the brand already touches it.
-     Gold answers from the opposite corner. */
-  --card-glow:
-    radial-gradient(112% 82% at 100% 100%, rgba(1, 111, 208, 0.1), transparent 62%),
-    radial-gradient(78% 68% at 0% 0%, rgba(198, 146, 20, 0.06), transparent 60%);
+    0 12px 28px rgba(0, 23, 90, 0.09),
+    0 2px 6px rgba(0, 23, 90, 0.05);
+  --card-glow: none;
 
-  /* Per-section accent coding (Amex-family hues), one per top-level section.
-     Mostly read as var(--amex-cat-${slug}) from src/lib/sections.js, so a
-     search for the literal name will not find every use and two of these look
-     dead when they are not. Keep all eight: the set is the numbering. */
-  --amex-cat-vision: #016fd0;
-  --amex-cat-architecture: #1e4f8a;
-  --amex-cat-design: #0090cf;
-  --amex-cat-build: #b5810f;
-  --amex-cat-testing: #2f7d54;
-  --amex-cat-deployment: #5f6f86;
-  --amex-cat-observability: #34519e;
-  --amex-cat-operations: #0e7c86;
+  /* Per-section accents, one per top-level section, all inside the DLS blue
+     family plus one green and one grey. Each clears 4.5:1 on white, so the
+     indices and labels they colour stay legible. Mostly read as
+     var(--amex-cat-${slug}) from src/lib/sections.js, so a search for the
+     literal name will not find every use. Keep the full set: it is the
+     numbering. */
+  --amex-cat-vision: #006fcf;        /* Bright Blue 600 */
+  --amex-cat-architecture: #00175a;  /* Deep Blue 700 */
+  --amex-cat-design: #00559e;        /* Bright Blue 700 */
+  --amex-cat-build: #003a6e;         /* Bright Blue 800 */
+  --amex-cat-testing: #00804a;       /* Green 700 */
+  --amex-cat-deployment: #595959;    /* Grey 700 */
+  --amex-cat-observability: #2b438c; /* Deep Blue 500 */
+  --amex-cat-operations: #4c63a6;    /* Deep Blue 400 */
 
-  /* The channels family on the payments landscape. Every other family on that
-     board reads a token that changes with the theme; this one was pinned to
-     the raw brand navy, so on the dark skin it came out at 1.02 against the
-     panel behind it, which is to say invisible.
+  /* The channels family on the payments landscape: white type on navy. */
+  --amex-channels: var(--amex-midnight);
 
-     The dark cut stays in the navy family rather than going light. The pills
-     carry the colour with white type on top, so lifting them all the way to a
-     steel would have traded a pill you cannot see for a label you cannot
-     read. The value below sits at 7.96 against white and 2.13 against the
-     panel, which is the same separation the other four families have. */
-  --amex-channels: var(--amex-navy);
+  /* The footer closes the page in the brand navy. Set here rather than through
+     --ifm-footer-background-color, which Infima redefines on .footer--dark. */
+  --amex-footer-bg: var(--amex-midnight);
+
+  /* Status colours for admonitions, from the DLS status set. */
+  --ifm-color-info: #006fcf;
+  --ifm-color-info-dark: #006fcf;
+  --ifm-color-info-contrast-background: #edf7ff;
+  --ifm-color-info-contrast-foreground: #003a6e;
+  --ifm-color-success: #189662;
+  --ifm-color-success-dark: #189662;
+  --ifm-color-success-contrast-background: #f2fcf8;
+  --ifm-color-success-contrast-foreground: #005934;
+  --ifm-color-warning: #e3660d;
+  --ifm-color-warning-dark: #e3660d;
+  --ifm-color-warning-contrast-background: #fff6ed;
+  --ifm-color-warning-contrast-foreground: #8c410c;
+  --ifm-color-danger: #b41601;
+  --ifm-color-danger-dark: #b41601;
+  --ifm-color-danger-contrast-background: #ffede8;
+  --ifm-color-danger-contrast-foreground: #822001;
+  --ifm-color-secondary: #bdbdbd;
+  --ifm-color-secondary-dark: #8c8c8c;
+  --ifm-color-secondary-contrast-background: #fbfbfb;
+  --ifm-color-secondary-contrast-foreground: #262626;
 
   /* Map onto Infima surfaces. */
   --ifm-background-color: var(--amex-bg);
@@ -317,118 +325,136 @@ h3 {
   --ifm-link-hover-color: var(--amex-blue-deep);
   --ifm-toc-border-color: var(--amex-line);
   --ifm-hr-border-color: var(--amex-line);
-  --ifm-navbar-background-color: rgba(252, 252, 249, 0.85);
-  --ifm-navbar-shadow: 0 1px 0 var(--amex-line), 0 6px 22px rgba(0, 38, 99, 0.06);
-  --ifm-footer-background-color: #002663;
-  --ifm-menu-color-background-active: rgba(1, 111, 208, 0.09);
-  --ifm-menu-color-background-hover: rgba(1, 111, 208, 0.07);
+  --ifm-navbar-background-color: rgba(255, 255, 255, 0.94);
+  --ifm-navbar-shadow: 0 1px 0 var(--amex-line);
+  --ifm-footer-background-color: var(--amex-midnight);
+  --ifm-menu-color-background-active: #edf7ff;
+  --ifm-menu-color-background-hover: #f4f4f4;
   --ifm-blockquote-color: var(--amex-mut);
   --ifm-blockquote-border-color: var(--amex-blue);
-  --docusaurus-highlighted-code-line-bg: rgba(1, 111, 208, 0.12);
+  --docusaurus-highlighted-code-line-bg: rgba(0, 111, 207, 0.1);
 }
 
 /* ==================================================================== *
- * 5. DARK theme — premium "Platinum / Centurion" register
+ * 5. DARK theme: the DLS dark surfaces, built on Deep Blue 900
  * ==================================================================== */
 [data-theme='dark'] {
-  --ifm-color-primary: #4da3e6;
-  --ifm-color-primary-dark: #2f92e1;
-  --ifm-color-primary-darker: #1f8ade;
-  --ifm-color-primary-darkest: #1670bc;
-  --ifm-color-primary-light: #6bb4eb;
-  --ifm-color-primary-lighter: #7abced;
-  --ifm-color-primary-lightest: #a6d2f3;
+  --ifm-color-primary: #56a1e3;
+  --ifm-color-primary-dark: #4d91cc;
+  --ifm-color-primary-darker: #4989c1;
+  --ifm-color-primary-darkest: #3c719f;
+  --ifm-color-primary-light: #67aae6;
+  --ifm-color-primary-lighter: #6fafe7;
+  --ifm-color-primary-lightest: #89bdeb;
 
-  --amex-bg: #020304;
+  /* Base is DLS Deep Blue 900. One quiet lift at the top of the page keeps
+     the canvas from reading as flat black without turning into a gradient. */
+  --amex-bg: #00081f;
   --amex-bg-grad:
-    radial-gradient(85% 65% at 88% 108%, rgba(214, 162, 46, 0.06), transparent 55%),
-    radial-gradient(75% 60% at 2% -8%, rgba(0, 163, 224, 0.06), transparent 62%),
-    radial-gradient(140% 120% at 50% -12%, #06152f 0%, #03091a 40%, #02050e 72%, #010204 100%);
-  --amex-card: linear-gradient(158deg, #143365 0%, #0c1f42 55%, #0b1830 100%);
-  --amex-card-hover: linear-gradient(158deg, #1a3f73 0%, #10254c 55%, #0d1c37 100%);
-  --amex-panel: #0b1c3a;
+    radial-gradient(120% 70% at 50% -10%, #0a1a46 0%, rgba(10, 26, 70, 0) 60%),
+    #00081f;
+  --amex-card: #101b3d;          /* DLS dark surface */
+  --amex-card-hover: #13224a;
+  --amex-panel: #0c173a;
+  --amex-panel-subtle: #09173d;
 
-  --amex-txt: #e8f0fb;
-  --amex-txt-strong: #f4f8fe;
-  --amex-mut: #93a7c8;
-  --amex-line: #1c355f;
-  --amex-line-strong: #274372;
+  --amex-txt: #eceef4;
+  --amex-txt-strong: #ffffff;
+  --amex-mut: #a7b3d9;           /* Deep Blue 200 */
+  --amex-line: #1f336e;          /* DLS dark border, subtle */
+  --amex-line-strong: #3d4f82;   /* DLS dark border, regular */
 
-  --amex-row-alt: color-mix(in srgb, var(--amex-line) 50%, transparent);
-  --amex-row-hover: color-mix(in srgb, var(--amex-blue-bright) 10%, transparent);
+  --amex-row-alt: color-mix(in srgb, #101b3d 70%, transparent);
+  --amex-row-hover: rgba(86, 161, 227, 0.1);
 
-  --amex-worker-online: #6ba6e6;
-  --amex-worker-offline: #e0b34e;
+  --amex-table-head-bg: #0d2854; /* DLS dark secondary surface */
+  --amex-table-head-fg: #e0e4f1;
+  --amex-table-head-rule: #56a1e3;
+
+  --amex-worker-online: #56a1e3;
+  --amex-worker-offline: #a7b3d9;
+
+  --amex-acct-consumer: #83baeb;
+  --amex-acct-corporate: #a7b3d9;
+  --amex-acct-travel: #bdbdbd;
+
+  --amex-journey-customer: #56a1e3;
+  --amex-journey-system: #a7b3d9;
 
   --chip-fill-base: 15%;
   --chip-line-base: 34%;
 
-  --amex-sh-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
-  --amex-sh: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(90, 160, 230, 0.07);
-  --amex-glow: 0 5px 16px rgba(0, 130, 224, 0.26);
+  --amex-sh-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --amex-sh: 0 10px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --amex-glow: 0 1px 2px rgba(0, 0, 0, 0.4);
 
-  /* Same card, dark skin. The face is Amex navy rather than paper, so it reads
-     as lit against the near-black canvas, and the accent steps up to the
-     brighter blue to stay legible on it. Geometry is shared with light: only
-     the colours and the shadows change.
-
-     The ramp runs Midnight Blue at the lit corner, through --amex-navy in the
-     middle, to one step under it at the far corner. It is the corporate navy
-     rather than the desaturated slate that used to sit here, which is a
-     deeper, warmer blue and closer to the footer the page closes on. It stays
-     well under the hero: navy is the card, Blue Box blue is still rationed to
-     the one full-strength block per page. */
+  /* Same card, dark skin: the DLS surface with a hairline that lifts to the
+     regular border on hover. */
   --card-accent: var(--amex-blue-bright);
-  --card-face: linear-gradient(158deg, #002663 0%, #00175a 55%, #001243 100%);
-  --card-face-hover: linear-gradient(158deg, #013378 0%, #00216c 55%, #001a55 100%);
-  /* No edge in dark. The navy face already separates from the near-black
-     canvas on its own, and a hairline on top of that just outlines it. The
-     ring still has to be painted with an <image> for the reasons in the light
-     block, so it is a transparent one: the face underneath shows through and
-     the geometry stays identical across the two themes. */
-  --card-border: linear-gradient(transparent, transparent);
-  --card-border-hover: linear-gradient(transparent, transparent);
-  /* On the near-black canvas a cast shadow has almost nothing to fall on, so
-     the inset top highlight, not the cast, is what gives the panel its edge.
-     It survives the trim; the cast below it is what came down. */
-  --card-sh:
-    0 10px 24px rgba(0, 0, 0, 0.48),
-    0 3px 8px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(140, 195, 245, 0.11);
+  --card-face: linear-gradient(#101b3d, #101b3d);
+  --card-face-hover: linear-gradient(#13224a, #13224a);
+  --card-border: linear-gradient(#1f336e, #1f336e);
+  --card-border-hover: linear-gradient(#3d4f82, #3d4f82);
+  --card-sh: 0 1px 2px rgba(0, 0, 0, 0.35);
   --card-sh-hover:
-    0 18px 38px rgba(0, 0, 0, 0.56),
-    0 6px 14px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(140, 195, 245, 0.17);
-  --card-glow:
-    radial-gradient(112% 84% at 100% 100%, rgba(0, 163, 224, 0.2), transparent 64%),
-    radial-gradient(78% 68% at 0% 0%, rgba(230, 191, 90, 0.07), transparent 62%);
+    0 14px 32px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  --card-glow: none;
 
-  --amex-cat-vision: #4da3e6;
-  --amex-cat-architecture: #6f9fdc;
-  --amex-cat-design: #35b6e8;
-  --amex-cat-build: #e0b34e;
-  --amex-cat-testing: #57b483;
-  --amex-cat-deployment: #93a3bb;
-  --amex-cat-observability: #7b93de;
-  --amex-cat-operations: #3fb3bd;
+  --amex-cat-vision: #56a1e3;        /* Bright Blue 400 */
+  --amex-cat-architecture: #e0e4f1;  /* Deep Blue 100 */
+  --amex-cat-design: #83baeb;        /* Bright Blue 300 */
+  --amex-cat-build: #b5d7f4;         /* Bright Blue 200 */
+  --amex-cat-testing: #5cbf96;       /* Green 400 */
+  --amex-cat-deployment: #bdbdbd;    /* Grey 400 */
+  --amex-cat-observability: #a7b3d9; /* Deep Blue 200 */
+  --amex-cat-operations: #7789bf;    /* Deep Blue 300 */
 
-  --amex-channels: #215094;
+  --amex-channels: #2b438c;
+  --amex-footer-bg: var(--amex-navy);
+
+  /* The brand tones the diagrams use for tiers and services, lifted so they
+     hold their own on the dark surfaces. */
+  --amex-temporal: #4c63a6;
+  --amex-indigo: #7789bf;
+  --amex-platinum: #bdbdbd;
+
+  --ifm-color-info: #56a1e3;
+  --ifm-color-info-dark: #56a1e3;
+  --ifm-color-info-contrast-background: rgba(86, 161, 227, 0.1);
+  --ifm-color-info-contrast-foreground: #e0e4f1;
+  --ifm-color-success: #5cbf96;
+  --ifm-color-success-dark: #5cbf96;
+  --ifm-color-success-contrast-background: #16324b;
+  --ifm-color-success-contrast-foreground: #e0e4f1;
+  --ifm-color-warning: #eeaa67;
+  --ifm-color-warning-dark: #eeaa67;
+  --ifm-color-warning-contrast-background: #2e2f44;
+  --ifm-color-warning-contrast-foreground: #f4f4f4;
+  --ifm-color-danger: #d46e4e;
+  --ifm-color-danger-dark: #d46e4e;
+  --ifm-color-danger-contrast-background: #292540;
+  --ifm-color-danger-contrast-foreground: #f4f4f4;
+  --ifm-color-secondary: #3d4f82;
+  --ifm-color-secondary-dark: #4c63a6;
+  --ifm-color-secondary-contrast-background: #101b3d;
+  --ifm-color-secondary-contrast-foreground: #eceef4;
 
   --ifm-background-color: var(--amex-bg);
   --ifm-background-surface-color: var(--amex-panel);
   --ifm-font-color-base: var(--amex-txt);
   --ifm-heading-color: var(--amex-txt-strong);
   --ifm-link-color: var(--amex-blue-bright);
-  --ifm-link-hover-color: #6bb4eb;
+  --ifm-link-hover-color: #83baeb;
   --ifm-toc-border-color: var(--amex-line);
   --ifm-hr-border-color: var(--amex-line);
-  --ifm-navbar-background-color: rgba(6, 20, 44, 0.72);
-  --ifm-navbar-shadow: 0 1px 0 var(--amex-line), 0 8px 26px rgba(0, 0, 0, 0.5);
-  --ifm-footer-background-color: #010812;
-  --ifm-menu-color-background-active: rgba(77, 163, 230, 0.14);
-  --ifm-menu-color-background-hover: rgba(77, 163, 230, 0.1);
+  --ifm-navbar-background-color: rgba(0, 8, 31, 0.9);
+  --ifm-navbar-shadow: 0 1px 0 var(--amex-line);
+  --ifm-footer-background-color: var(--amex-navy);
+  --ifm-menu-color-background-active: rgba(86, 161, 227, 0.14);
+  --ifm-menu-color-background-hover: rgba(86, 161, 227, 0.08);
   --ifm-blockquote-border-color: var(--amex-blue-bright);
-  --docusaurus-highlighted-code-line-bg: rgba(77, 163, 230, 0.16);
+  --docusaurus-highlighted-code-line-bg: rgba(86, 161, 227, 0.16);
 }
 
 /* ==================================================================== *
@@ -449,9 +475,9 @@ strong {
 
 /* Only the page title carries Medium. Every heading below it drops to Regular,
    the same cut as body copy, so a long page reads as one voice instead of a
-   ladder of bold bars. The hierarchy is still there — it comes from size, the
-   gradient rule under h2, and the space above each heading, which is enough
-   once the weight stops shouting. */
+   ladder of bold bars. The hierarchy is still there: it comes from size, the
+   rule under h2, and the space above each heading, which is enough once the
+   weight stops shouting. */
 .markdown h2,
 .markdown h3,
 .markdown h4,
@@ -460,19 +486,29 @@ strong {
   font-weight: 400;
 }
 
-/* Gradient-underline accent for section headings on content pages. */
+/* Section headings sit on a grey hairline, with a short Bright Blue rule at
+   the left edge where the eye starts. One decisive mark, not a full-width
+   gradient. */
 .markdown > h2 {
-  padding-bottom: 0.3em;
-  border-bottom: 2px solid transparent;
-  border-image: var(--amex-grad-rule) 1;
+  position: relative;
+  padding-bottom: 0.4em;
+  border-bottom: 1px solid var(--amex-line);
+}
+.markdown > h2::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 48px;
+  height: 2px;
+  background: var(--ifm-color-primary);
 }
 
-/* Horizontal rules become a blue→cyan→gold shimmer. */
+/* Horizontal rules are plain hairlines. */
 hr {
   border: 0;
-  height: 2px;
-  background: var(--amex-grad-rule);
-  opacity: 0.6;
+  height: 1px;
+  background: var(--amex-line);
 }
 
 /* ==================================================================== *
@@ -509,21 +545,20 @@ hr {
   font-weight: 400;
 }
 
-/* In light mode the links take Blue Box blue rather than the ink, so the bar
-   reads as navigation at a glance and the brand runs along the top of every
-   page. It is --amex-blue exactly, the same value every table header band on
-   the site is filled with, so the blue a reader meets in the navbar is the
-   blue they meet in the content. Hover drops to the deep blue. Dark keeps its
-   default ink: the links already separate from that surface without help. */
+/* In light mode the links sit in the brand navy, the same ink as the headings,
+   so the bar reads as quiet, confident navigation. Bright Blue is kept for the
+   two signals that matter: the link under the pointer and the section you are
+   in. Dark keeps its default ink: the links already separate from that
+   surface without help. */
 html[data-theme='light'] .navbar__link {
-  color: var(--amex-blue);
+  color: var(--amex-txt-strong);
 }
 html[data-theme='light'] .navbar__link:hover {
-  color: var(--amex-blue-deep);
+  color: var(--amex-blue);
 }
 
 /* The current section steps up to Medium. 600 lands in the 501-and-up bucket of
-   the two Benton cuts, so it renders the Medium face. Colour and the underline
+   the two Benton cuts, so it renders the Medium face. Colour and the rule
    below still mark it too; the weight is what makes it findable without
    hunting for which link is a shade different from its neighbours. */
 .navbar__link--active {
@@ -533,43 +568,41 @@ html[data-theme='light'] .navbar__link:hover {
 html[data-theme='light'] .navbar__link--active {
   color: var(--amex-blue);
 }
-/* Gradient underline under the active/hover navbar item. */
+/* A solid Bright Blue rule under the current section only. */
 .navbar__link {
   position: relative;
 }
-.navbar__link:hover::after,
 .navbar__link--active::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -6px;
+  left: var(--ifm-navbar-item-padding-horizontal);
+  right: var(--ifm-navbar-item-padding-horizontal);
+  bottom: -11px;
   height: 2px;
-  border-radius: 2px;
-  background: var(--amex-grad-rule);
+  background: var(--ifm-color-primary);
 }
 
 /* ==================================================================== *
- * 8. Buttons — rich gradient with lift
+ * 8. Buttons: solid Bright Blue, as in the DLS
  * ==================================================================== */
 /* 450 rather than 600 on purpose. The two static Benton cuts bucket 400 to 500
    as Regular and 501 up as Medium (see the @font-face block), so this renders
-   Regular, and the button gets its emphasis from the gradient field and the
-   size rather than from a second step of weight. */
+   Regular, and the button gets its emphasis from the solid field and the size
+   rather than from a second step of weight. No lift on hover: the colour
+   steps down to Bright Blue 700, which is signal enough. */
 .button--primary {
   background: var(--amex-grad-btn);
   border: none;
+  border-radius: 6px;
   color: #fff;
   font-weight: 450;
   letter-spacing: 0.01em;
   box-shadow: var(--amex-glow);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  transition: background 0.16s ease;
 }
 .button--primary:hover {
   background: var(--amex-grad-btn-hover);
   color: #fff;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(1, 111, 208, 0.26);
 }
 .button--secondary {
   background: transparent;
@@ -633,16 +666,19 @@ a {
   text-underline-offset: 2px;
 }
 
+/* Inline code is set in navy on a grey 200 chip: it reads as a term of art
+   without competing with the Bright Blue of real links. */
 :not(pre) > code {
-  background: rgba(1, 111, 208, 0.08);
+  background: #f4f4f4;
   border: 1px solid var(--amex-line);
-  border-radius: 6px;
-  color: var(--amex-blue-deep);
-  font-size: 0.88em;
+  border-radius: 4px;
+  color: var(--amex-txt-strong);
+  font-size: 0.86em;
 }
 [data-theme='dark'] :not(pre) > code {
-  background: rgba(77, 163, 230, 0.12);
-  color: #add4f5;
+  background: rgba(86, 161, 227, 0.1);
+  border-color: var(--amex-line);
+  color: #b5d7f4;
 }
 
 .table-of-contents__link--active {
@@ -652,9 +688,12 @@ a {
 
 /* Markdown tables get their chrome from src/components/DataTable. */
 
+/* Admonitions take the DLS status colours (section 4) as a tinted field with
+   a coloured left rule. Flat: the rule carries the type, so no shadow. */
 .theme-admonition {
-  border-radius: 12px;
-  box-shadow: var(--amex-sh-sm);
+  border-radius: 8px;
+  box-shadow: none;
+  --ifm-alert-border-left-width: 4px;
 }
 
 /* Collapsible blocks. Docusaurus renders <details> as an info alert, which
@@ -856,12 +895,10 @@ details.alert > summary {
  * ==================================================================== */
 .footer {
   position: relative;
-  /* Deep navy in both themes, lifted with a subtle brand-blue gradient
-     and a faint cyan wash that echoes the hero. */
-  background-color: var(--amex-midnight);
-  background-image:
-    radial-gradient(80% 120% at 88% 0%, rgba(0, 163, 224, 0.1), transparent 60%),
-    linear-gradient(160deg, #01306f 0%, #002663 48%, #001a48 100%);
+  /* Deep Blue in light, a step deeper in dark, settling into Deep Blue 800
+     at the bottom edge. Flat enough to read as one mass, like the hero. */
+  background-color: var(--amex-footer-bg);
+  background-image: linear-gradient(180deg, var(--amex-footer-bg) 0%, #000f3c 100%);
   /* White, not the warm off-white this used to carry. The cream picked up the
      gold that runs through the rest of the palette, which on the navy field
      read as a tint rather than as a neutral. */

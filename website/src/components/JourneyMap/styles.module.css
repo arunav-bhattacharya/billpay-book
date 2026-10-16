@@ -19,39 +19,37 @@
   /* Fan brackets are hairlines. --amex-line-strong vanishes against the dark
      panel, so mix off the muted ink, which holds up in both themes. */
   --jm-soft: color-mix(in srgb, var(--amex-mut) 60%, transparent);
-  /* Step numbers are an index, not a status. They get a hue used nowhere else,
-     so they cannot be mistaken for a payment outcome. */
-  --jm-num: #6d4aca;
-  /* Worker pills name infrastructure, so they get their own neutral hues too. */
-  --jm-online: #4a5f8f;
-  --jm-offline: #6f7c8f;
-  /* The orchestrating workflow gets a hue of its own, away from the Amex blue
-     used everywhere else. It shares the step-number purple on purpose: the
+  /* Step numbers are an index, not a status, so they take the brand navy
+     rather than a status colour. */
+  --jm-num: var(--amex-midnight);
+  /* Worker pills name infrastructure, so they get neutral DLS hues. */
+  --jm-online: #4c63a6;
+  --jm-offline: #737373;
+  /* The orchestrating workflow shares the step-number navy on purpose: the
      workflow is the thing that owns those numbered steps. */
-  --jm-wf: #5b3fc4;
+  --jm-wf: #112a73;
   --jm-wf-ink: #ffffff;
   /* Both layer boxes are Amex blue. They stay apart by weight, not hue: the
      outer band is dashed on a light wash, the core is solid on a deep one. */
   --jm-outer: var(--amex-blue);
   /* Machine-driven things: schedules, event handlers, and the async region.
-     A vivid orange, off the blue axis entirely, so it never blurs into the
-     cards or the layer boxes the way a gold tint did. */
-  --jm-async: #f4761f;
+     The same system tone the journey index uses, so a system trigger reads
+     the same on both. */
+  --jm-async: var(--amex-journey-system);
   --jm-gap: 30px;
   --jm-vgap: 26px;
 }
 :global([data-theme='dark']) .wrap {
   background: var(--amex-panel);
-  /* Amex blue lifted enough to hold its own on the dark panel. */
-  --jm-accent: #3d97e0;
-  --jm-num: #a78bfa;
-  --jm-online: #8fa8d4;
-  --jm-offline: #a3b0c2;
-  /* The lifted purple needs dark ink rather than white. */
-  --jm-wf: #a78bfa;
-  --jm-wf-ink: #1a1040;
-  --jm-outer: #3d97e0;
-  --jm-async: #ff9a4d;
+  /* Bright Blue lifted enough to hold its own on the dark panel. */
+  --jm-accent: #56a1e3;
+  --jm-num: #a7b3d9;
+  --jm-online: #a7b3d9;
+  --jm-offline: #bdbdbd;
+  /* The lifted navy needs dark ink rather than white. */
+  --jm-wf: #a7b3d9;
+  --jm-wf-ink: #00081f;
+  --jm-outer: #56a1e3;
 }
 
 /* ==================================================================== *
