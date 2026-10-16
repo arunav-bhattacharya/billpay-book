@@ -58,7 +58,7 @@ export const GROUPS = [
         title: 'Oracle',
         role: 'The source of truth, and the only hand-off between the clusters',
         icon: 'database',
-        items: ['Payments', 'Work Tracker', 'Outbox', 'Inbox'],
+        items: ['Payments', 'Work Tracker', 'Inbox'],
       },
     ],
   },
@@ -116,13 +116,13 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 
 - Workflows run on one of two Temporal clusters. Online takes the journeys where someone is waiting for an answer, and Offline takes everything that can be paced. [The next section](#two-clusters-one-hand-off) shows what runs where.
 - A workflow never calls an external system itself. It is built from components in a strict order, **Workflow → Stage → Activity → Client → external system**, and stages are the only layer that changes with a market's behaviors. The rules are in [Design → Principles](../design/principles.md).
-- Oracle is the source of truth. Every status change is a guarded update that applies only if the status is still what the writer expected, and each stage commits its state, its timeline entry and its outgoing events in one transaction. Oracle is also the only hand-off between the two clusters.
+- Oracle is the source of truth. Every status change is a guarded update that applies only if the status is still what the writer expected, and each stage commits its state and its timeline entry in one transaction. Oracle is also the only hand-off between the two clusters.
 
 ### External systems
 
 - Clearing moves the money out to the customer's bank. Accounts Receivable reduces the statement balance, and Authorization raises open-to-buy. These three run in parallel in the Execute stage.
-- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage. All six must succeed before the payment is `PROCESSED`.
-- Customer communications (Raven) and the lifecycle events other systems consume (RTF) never hold a payment up. The stage's commit writes them to an outbox, and a relay sends them afterwards.
+- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, and last of all the customer's message (Raven) and the lifecycle event other systems consume (RTF). All eight must succeed before the payment is `PROCESSED`.
+- Every other state change sends its lifecycle event, and a customer message where one is due, straight after its commit. A workflow waits for them before its next step, so each payment's events arrive in order.
 - A corporate payment clears once, at payment level, on its due date. Its allocations arrive separately, by callback from the allocations manager, and each one posts as a leg of its own, in parallel with the clearing.
 
 ### Event handlers and schedules
@@ -140,7 +140,7 @@ The split comes from one question: is anyone waiting? A cardmember paying their 
 - The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, the periodic jobs, and the control workflows that do the pacing.
 - Each cluster has its own Aurora database, so no amount of midnight work on Offline can slow a payment on Online inside Temporal. What the two share is Oracle and the downstream systems, and the governor watches both. When either comes under pressure, offline work slows down and online traffic doesn't.
 - Nothing calls across. A payment scheduled on Online reaches Offline as a Work Tracker row, written in the same Oracle commit as its `SCHEDULED` state. On the due date a dispatcher on Offline claims the row and starts the execution there.
-- Two apps host the workers. The Online app runs the core APIs, the Router and the Online workers, and its core APIs hold a Temporal client for each cluster. The Offline app runs the dispatchers, the outbox relays, the governor, the Offline workflows and one worker deployment per downstream queue. Where each physically runs is on [High Availability](./high-availability.md).
+- Two apps host the workers. The Online app runs the core APIs, the Router and the Online workers, and its core APIs hold a Temporal client for each cluster. The Offline app runs the dispatchers, the governor, the Offline workflows and one worker deployment per downstream queue. Where each physically runs is on [High Availability](./high-availability.md).
 
 ## Why Temporal
 

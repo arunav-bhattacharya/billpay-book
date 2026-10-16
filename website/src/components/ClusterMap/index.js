@@ -41,17 +41,26 @@ const CLUSTERS = [
     start: 'Async start, then 202',
     startNote: 'Started async; the API replies 202',
     runs: ['Execution', 'Allocations', 'Corporate legs', 'AR intake', 'Returns', 'Inbound', 'Representments', 'Periodic jobs', 'Provisioning'],
-    control: ['Dispatchers', 'Governor', 'Outbox relays'],
+    control: ['Dispatchers', 'Governor'],
   },
 ];
 
-const ORACLE = ['Payments', 'Work Tracker', 'Outbox', 'Inbox'];
+const ORACLE = ['Payments', 'Work Tracker', 'Inbox'];
 
-const DOWNSTREAM = ['Clearing', 'Accounts Receivable', 'Authorization (OTB)', 'Accounting', 'eBNC', 'Risk', 'Allocations manager'];
-const OUTBOX = ['Raven (comms)', 'RTF (events)'];
+const DOWNSTREAM = [
+  'Clearing',
+  'Accounts Receivable',
+  'Authorization (OTB)',
+  'Accounting',
+  'eBNC',
+  'Risk',
+  'Raven (comms)',
+  'RTF (events)',
+  'Allocations manager',
+];
 
 const LABEL =
-  'Two Temporal clusters joined only through Oracle. At the top, channels, where someone is waiting for the answer, and Accounts Receivable, returns, inbound payments and allocation callbacks, where nobody is. Both go through the Billpay core APIs and the Router, which admits each request, picks the journey, resolves the behaviors, pins the plan key, places the work and starts it. Journeys with a caller waiting start on the Online cluster with Update-With-Start: pay today, schedule, update, cancel, intent, refunds and composites, and the cluster responds back to the caller as PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. Work that can be paced starts on the Offline cluster with an async start and a 202: scheduled execution, allocations, corporate legs, AR intake, returns, inbound, representments, periodic jobs and provisioning, paced by the dispatchers, the governor and the outbox relays. Each cluster has its own Aurora PostgreSQL database and OpenSearch 2 visibility store; Online has 2,000 history shards and Offline 4,000. Oracle runs under both clusters and holds payments, the Work Tracker, the outbox and the inbox. The only hand-off runs through it: a commit on the Online cluster writes a Work Tracker row, and a dispatcher on the Offline cluster claims the row when it falls due. Below, both clusters call the same downstream systems: clearing, Accounts Receivable, authorization, accounting, eBNC, risk and the allocations manager, with Raven and RTF reached through the outbox. The governor watches Oracle and the downstreams, so pressure there slows offline work, never online traffic.';
+  'Two Temporal clusters joined only through Oracle. At the top, channels, where someone is waiting for the answer, and Accounts Receivable, returns, inbound payments and allocation callbacks, where nobody is. Both go through the Billpay core APIs and the Router, which admits each request, picks the journey, resolves the behaviors, pins the plan key, places the work and starts it. Journeys with a caller waiting start on the Online cluster with Update-With-Start: pay today, schedule, update, cancel, intent, refunds and composites, and the cluster responds back to the caller as PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. Work that can be paced starts on the Offline cluster with an async start and a 202: scheduled execution, allocations, corporate legs, AR intake, returns, inbound, representments, periodic jobs and provisioning, paced by the dispatchers and the governor. Each cluster has its own Aurora PostgreSQL database and OpenSearch 2 visibility store; Online has 2,000 history shards and Offline 4,000. Oracle runs under both clusters and holds payments, the Work Tracker and the inbox. The only hand-off runs through it: a commit on the Online cluster writes a Work Tracker row, and a dispatcher on the Offline cluster claims the row when it falls due. Below, both clusters call the same downstream systems: clearing, Accounts Receivable, authorization, accounting, eBNC, risk, Raven for customer messages, RTF for lifecycle events, and the allocations manager. The governor watches Oracle and the downstreams, so pressure there slows offline work, never online traffic.';
 
 function Chips({items, quiet}) {
   return (
@@ -178,8 +187,6 @@ export default function ClusterMap() {
         <div className={styles.downstream}>
           <span className={styles.downTerm}>Downstream systems, shared by both clusters</span>
           <Chips items={DOWNSTREAM} />
-          <p className={styles.subLabel}>Through the outbox</p>
-          <Chips items={OUTBOX} quiet />
         </div>
       </div>
 

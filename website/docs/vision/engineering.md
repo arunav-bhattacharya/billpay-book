@@ -136,7 +136,15 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
     },
     {
       term: 'One commit per stage',
-      desc: `A stage writes its new state, the entry in the payment's timeline and the events it raises in one Oracle transaction. An event can't exist without its state, or a state without its event, and a relay sends the events on in order.`,
+      desc: (
+        <>
+          A stage makes its calls first, then writes its new state and the entry in the payment's
+          timeline in one Oracle transaction. Its lifecycle event and customer message go out straight
+          after, and Temporal retries them until they land. Fulfil sends them before its commit
+          instead: a payment counts as <code>PROCESSED</code> only once the customer has been told and
+          RTF has the event.
+        </>
+      ),
     },
     {
       term: 'Idempotent at every step',
@@ -198,7 +206,7 @@ A new way of processing a payment is a new stage implementation behind one combi
     },
     {
       term: 'Efficiency',
-      desc: `Every write to Temporal's database is capacity the midnight run needs. A stage makes its calls in parallel and commits once, and the database calls run as local activities, so an executed payment costs an estimated 30 writes, a figure the first load test is there to confirm.`,
+      desc: `Every write to Temporal's database is capacity the midnight run needs. A stage makes its calls in parallel and commits once, and the database calls run as local activities, so an executed payment costs an estimated 45 writes, a figure the first load test is there to confirm.`,
     },
   ]}
 />

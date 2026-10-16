@@ -30,7 +30,7 @@ import HADiagram from '@site/src/components/HADiagram';
 billpay-core is two apps, one for each Temporal cluster.
 
 - The **Online app** runs the REST APIs, the [Billpay Router](../design/routing.md) and the Online cluster's workers. Its core APIs hold a Temporal client for each cluster, because an async start from Accounts Receivable or a return goes straight to Offline.
-- The **Offline app** runs the dispatchers, the outbox relays, the governor, the Offline cluster's workflows, and one worker deployment per downstream task queue, so each downstream system's workers scale on their own.
+- The **Offline app** runs the dispatchers, the governor, the Offline cluster's workflows, and one worker deployment per downstream task queue, so each downstream system's workers scale on their own.
 - Each app is deployed in both sites, and only IPC2's take traffic. The IPC1 instances stay deployed and ready, and an operator promotes them if IPC2 goes.
 - Both apps read and write the Oracle primary next to them in IPC2, and they are the only components that talk to Temporal.
 - So each kind of work runs in exactly one place, which is also one place to look when a payment is stuck. Deployment detail is on the [apps' deployable page](../deployment/deployables/worker-app.md).
@@ -40,7 +40,7 @@ billpay-core is two apps, one for each Temporal cluster.
 - The payments schema is active-passive. The read/write primary is in IPC2, with two read-only replicas next to it carrying read and reporting traffic.
 - IPC1 holds the **Oracle Data Guard** standby plus one more read-only replica. Data Guard ships redo from the primary to it continuously, and the standby stays read-only until someone promotes it.
 - Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
-- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work, and the outbox and inbox.
+- Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work, and the inbox where settlement and posting events land.
 - Short outages and patching windows don't fail payments. `PaymentStore`, the only code that touches Oracle, keeps retrying and then waits on a durable timer, so a payment pauses and carries on when the database is back. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
 - This is the [same Oracle setup](../build/principles/tech-stack/database.md) the DBO team runs day to day.
 
@@ -80,11 +80,11 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
 | What fails | What happens |
 | --- | --- |
 | **The Online app in IPC2** | Both One-Data instances keep answering callers and park their requests in **Redis**. **RTF** replays them into the core APIs once they're back, or once an operator promotes the IPC1 app. Nothing is dropped, it just processes late. |
-| **The Offline app in IPC2** | Dispatchers and relays stop, so dated work, notifications and events wait in Oracle. Nothing is lost. Work resumes when the app returns or its IPC1 standby is promoted. |
+| **The Offline app in IPC2** | Dispatchers stop and the offline workers go quiet, so dated work waits in Oracle and running payments pause where they are. Nothing is lost. Work resumes when the app returns or its IPC1 standby is promoted. |
 | **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and parking in Redis until an operator promotes the apps and the **Data Guard** standby there. |
 | **Oracle primary** | `PaymentStore` waits out a short outage or a patch on its own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
 | **The Online cluster** | Journeys where a caller waits can't start until the cluster returns or an operator promotes its us-west-1 standby. The Offline cluster carries on, since nothing calls across. |
-| **The Offline cluster** | Dated work waits in Oracle, async starts get 503 with `Retry-After` and their senders retry, and relays pause, so notifications and events wait in the outbox. The Online cluster keeps serving. The fix is to restore the cluster or promote its standby. |
+| **The Offline cluster** | Dated work waits in Oracle, async starts get 503 with `Retry-After` and their senders retry, and running offline payments pause, notifications included. The Online cluster keeps serving. The fix is to restore the cluster or promote its standby. |
 | **All of us-east-1** | Both clusters stop at once. Moving Temporal to us-west-1 is covered [below](#when-us-east-1-goes-down). |
 
 When one cluster goes down and comes back, nothing is lost: every history is in the cluster's database rather than in a worker, so workflows resume exactly where they stopped. That is the durability Temporal was [chosen for](./overview.md#why-temporal).
@@ -97,13 +97,13 @@ While the region is down:
 
 - Journeys where a caller waits can't start, because there is no cluster to start them on.
 - Async starts from Accounts Receivable, returns and inbound get 503 with `Retry-After`, and their senders try again later.
-- Scheduled payments, notifications and lifecycle events wait in Oracle. Nothing that falls due is lost; it is only late.
+- Scheduled payments wait in Oracle, and payments that were running pause, notifications included. Nothing that falls due is lost; it is only late.
 
 To bring Temporal back in us-west-1:
 
 1. An operator promotes the us-west-1 standby of each cluster to primary. The Online and Offline clusters are promoted separately, each with its own database.
 2. The apps are pointed at the west. The Online app's two Temporal clients, one per cluster, and the Offline app's client switch to the us-west-1 frontends.
-3. Work picks up again. Workflows carry on from the histories the standby received, dispatchers start claiming due rows, and the relays drain the outbox.
+3. Work picks up again. Workflows carry on from the histories the standby received, including any notifications they still owed, and dispatchers start claiming due rows.
 
 A step that ran just before the outage may run a second time after the switch. That is safe by design: every downstream call carries an idempotency key and every Oracle write is a guarded update, so the retry finds the work already done and money never moves twice. The step-by-step runbook sits with the other [SOPs](../operations/sops.md).
 

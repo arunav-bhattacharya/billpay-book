@@ -114,8 +114,9 @@ Validation comes first. A payment that fails it is declined, and nothing else ru
 - Accounts Receivable (AR) posting reduces the cardmember's statement balance, the amount they owe on the card.
 - Authorization restores the customer's *Open-To-Buy*, the room left to spend on the card. Paying the bill frees it up again.
 - Accounting, balance and control (eBNC) and risk are told about the payment.
+- Last, the customer is told through Raven, the messaging platform, and the lifecycle event other Amex systems listen for goes out through RTF (the Reliable Transaction Framework).
 
-All of these have to succeed before a payment counts as `PROCESSED`. Customer communications and the lifecycle events other systems listen for go out after that, from an outbox, so a slow messaging system never holds up a payment.
+All of these have to succeed before a payment counts as `PROCESSED`. The customer hears last, so a confirmation never goes out while an earlier step is still unfinished.
 
 A payment reaches `PAID` only once Billpay has seen **both** confirmations come back: that the bank settled the funds, and that AR posted the payment. Until both arrive, the payment is not paid.
 
