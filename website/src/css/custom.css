@@ -18,7 +18,7 @@
  *
  *   Frame     a Deep Blue brand bar at the top and a Deep Blue footer at the
  *             bottom, in both themes.
- *   Banners   every doc page opens on a banner: a solid Bright Blue block
+ *   Banners   every doc page opens on a banner: a solid Deep Blue block
  *             with the section number, beside the title and the lead on a
  *             pale field. Table heads are a Deep Blue band.
  *   Ink       headings in Deep Blue, body in DLS grey 900.
@@ -237,11 +237,12 @@ h3 {
   --amex-tint: #edf7ff;
   --amex-tint-ink: #22336b;
 
-  /* The page banner: a solid Bright Blue block carrying the section number,
-     and a pale field for the title and the lead. */
-  --amex-banner-block: var(--amex-blue);
+  /* The page banner: a solid Deep Blue block carrying the section number,
+     with the section name in Light Blue, and a pale field for the title and
+     the lead. */
+  --amex-banner-block: var(--amex-midnight);
   --amex-banner-block-ink: #ffffff;
-  --amex-banner-block-label: rgba(255, 255, 255, 0.82);
+  --amex-banner-block-label: var(--amex-sky);
   --amex-banner-bg: #f4f6fb;
   --amex-banner-title: var(--amex-midnight);
   --amex-banner-ink: #3d3d3d;      /* grey 800 */
@@ -419,10 +420,11 @@ h3 {
   --amex-tint: rgba(86, 161, 227, 0.09);
   --amex-tint-ink: #d2dbf2;
 
-  /* Same block; the field is the DLS dark surface the cards use. */
-  --amex-banner-block: var(--amex-blue);
+  /* Deep Blue 500 for the block, a step lifted so it still reads as a block
+     against the dark surface the cards use. */
+  --amex-banner-block: #2b438c;   /* Deep Blue 500 */
   --amex-banner-block-ink: #ffffff;
-  --amex-banner-block-label: rgba(255, 255, 255, 0.82);
+  --amex-banner-block-label: #a7b3d9;
   --amex-banner-bg: #101b3d;
   --amex-banner-title: #ffffff;
   --amex-banner-ink: #c9d3ee;
@@ -1036,7 +1038,7 @@ details.alert > summary {
 /* ==================================================================== *
  * 12. Page banner
  * ==================================================================== */
-/* Every doc page opens on one banner. A solid Bright Blue block down the left
+/* Every doc page opens on one banner. A solid Deep Blue block down the left
    carries the section number and name, the Blue Box at full size; the title
    and the lead sit beside it on a pale field (the dark surface in dark mode).
 
