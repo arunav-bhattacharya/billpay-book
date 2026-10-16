@@ -3,9 +3,9 @@ import ordinal from './ordinal';
 /**
  * The eight top-level sections, in sidebar order.
  *
- * Each one owns a hue, defined as --amex-cat-<slug> in css/custom.css and used
- * by the sidebar numerals, the contents rail and the lead paragraph on every
- * page. The order here is the numbering: Vision is 01.
+ * The order here is the numbering: Vision is 01. The number becomes the
+ * section badge in the page banner (via DocItem/Layout) and matches the
+ * sidebar badges and the homepage board.
  */
 export const SECTION_ORDER = [
   'vision',
@@ -31,15 +31,4 @@ export function sectionFromPath(pathname) {
     number: ordinal(index + 1),
     label: slug.charAt(0).toUpperCase() + slug.slice(1),
   };
-}
-
-/**
- * The CSS colour a page should accent with, from its URL.
- *
- * Falls back to the Vision hue off a docs page, which is where the homepage
- * and the contributing pages sit.
- */
-export function accentFromPath(pathname) {
-  const section = sectionFromPath(pathname);
-  return `var(--amex-cat-${section ? section.slug : 'vision'})`;
 }

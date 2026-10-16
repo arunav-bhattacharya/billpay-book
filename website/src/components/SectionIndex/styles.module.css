@@ -1,24 +1,20 @@
 /* SectionIndex — see index.js for why a section's pages are a contents block
    rather than a grid of cards. */
 
-/* No rule along the top. The heading above the block already carries one, and
-   two hairlines a few pixels apart read as a mistake. The rows close the block
-   from underneath instead. */
+/* Rows are soft tiles with a little air between them: separated by fill and
+   space, not by ruled lines. */
 .index {
   /* One hue for every section index on the site. See index.js. */
   --sx-accent: var(--amex-cat-vision);
 
   display: grid;
+  gap: 0.5rem;
   margin: 1.15rem 0 2.2rem;
 }
 
 /* The row is the target, all of it. Two columns: the titles line up down the
    left so the section can be read as a list of names, and each description
-   sits on the same line as the name it belongs to.
-
-   The bottom hairline is drawn by ::after rather than by a border, because the
-   row corners are rounded for the hover wash and a real border would bend with
-   them. The line has to stay straight: it belongs to the block, not the row. */
+   sits on the same line as the name it belongs to. */
 .row {
   position: relative;
   display: grid;
@@ -28,8 +24,9 @@
      baseline. Three type sizes in a row will not line up any other way, and
      padding tuned by eye drifts the moment a size changes. */
   align-items: baseline;
-  padding: 0.95rem 0.9rem 1rem;
+  padding: 0.95rem 1rem 1rem;
   border-radius: 10px;
+  background-color: var(--amex-rail);
   color: inherit;
   text-decoration: none;
   transition: background-color 0.17s ease;
@@ -39,7 +36,7 @@
 .row:focus-visible {
   color: inherit;
   text-decoration: none;
-  background-color: color-mix(in srgb, var(--sx-accent) 6%, transparent);
+  background-color: var(--amex-pill);
 }
 
 .row:focus-visible {
@@ -47,57 +44,33 @@
   outline-offset: -2px;
 }
 
-.row::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: var(--amex-line);
-}
-
-/* The sidebar's active-page rail, borrowed. It grows from the middle of the
-   row under the cursor, which is the only movement in the block. */
-.rail {
-  position: absolute;
-  left: 0;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--sx-accent);
-  transform: scaleY(0);
-  opacity: 0;
-  transition: transform 0.19s ease, opacity 0.19s ease;
-}
-
-.row:hover .rail,
-.row:focus-visible .rail {
-  transform: scaleY(1);
-  opacity: 1;
-}
-
-/* Tabular figures so the column of numbers stays a column: 01 and 11 have to
-   occupy the same width or the titles beside them shift. Grey at rest, the
-   accent under the cursor. */
+/* The number is a badge: digits in a box, like the logo. Tabular figures so
+   01 and 11 hold the same width. A quiet tint at rest, Bright Blue under the
+   cursor. */
 .num {
   composes: ordinal from '../../css/recipes.module.css';
-  font-size: 0.79rem;
-  font-weight: 500;
-  letter-spacing: 0.07em;
-  color: var(--amex-mut);
-  transition: color 0.17s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-badge-quiet);
+  color: var(--amex-badge-quiet-ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: background-color 0.17s ease, color 0.17s ease;
 }
 
 .row:hover .num,
 .row:focus-visible .num {
-  color: var(--sx-accent);
+  background: var(--amex-blue);
+  color: #ffffff;
 }
 
 /* The title is the link, and it is coloured like every other link on the site
-   so it reads as one from across the page. The hue belongs to the number, the
-   rail and the wash; the link keeps the site's blue. */
+   so it reads as one from across the page. */
 .term {
   font-size: 1.06rem;
   font-weight: 400;
@@ -147,7 +120,7 @@
 }
 
 /* Under the two-column breakpoint the description drops beneath its title.
-   The row keeps its hairline, so the block still reads as a contents list. */
+   The rows keep their tint, so the block still reads as a contents list. */
 @media (max-width: 996px) {
   .row {
     grid-template-columns: 2.2rem minmax(0, 1fr);
@@ -169,19 +142,10 @@
   }
 }
 
-:global([data-theme='dark']) .row:hover,
-:global([data-theme='dark']) .row:focus-visible {
-  background-color: color-mix(in srgb, var(--sx-accent) 13%, transparent);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .row,
-  .rail,
+  .num,
   .cue {
     transition: none;
-  }
-
-  .rail {
-    transform: scaleY(1);
   }
 }

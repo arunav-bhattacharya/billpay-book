@@ -283,6 +283,14 @@ const config = {
             ],
           },
         ],
+        // The logo signs off the page, above the copyright line. Same file as
+        // the navbar, unaltered.
+        logo: {
+          alt: 'American Express',
+          src: 'img/amex-logo.png',
+          width: 40,
+          height: 40,
+        },
         copyright: `Billpay Wiki · © ${new Date().getFullYear()}`,
       },
       prism: {

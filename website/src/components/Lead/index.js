@@ -1,25 +1,20 @@
 import React from 'react';
-import {useLocation} from '@docusaurus/router';
-import {accentFromPath} from '../../lib/sections';
+import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
  * Lead: a prominent thesis statement for the top of a page.
  * Carries the "one larger message"; **bold** spans stand out further.
  *
- * The rule down its left edge takes the hue of whichever section the page is
- * in, worked out from the URL. It used to default to the Vision hue and take
- * an accent prop to say otherwise, which meant 83 of the 84 pages that use it
- * were quietly wearing Vision blue whatever section they were in. Deriving it
- * is one less thing every new page has to remember to pass.
+ * Straight after the page's H1 it is the lower half of the page banner:
+ * custom.css (section 12) finds it there through the global `doc-lead` class
+ * and sets it on the same Deep Blue field as the title and the section badge.
+ * Anywhere else it sits on a soft Bright Blue panel, from this module.
  *
- * The prop still overrides, for a page that wants a hue its URL does not imply.
+ * It used to take its colour from the section in the URL, as a rule down its
+ * left edge. The banner carries the section now, as a numbered badge, so the
+ * colour has nothing left to say and the prop is gone.
  */
-export default function Lead({children, accent}) {
-  const {pathname} = useLocation();
-  return (
-    <p className={styles.lead} style={{'--lead-accent': accent || accentFromPath(pathname)}}>
-      {children}
-    </p>
-  );
+export default function Lead({children}) {
+  return <p className={clsx('doc-lead', styles.lead)}>{children}</p>;
 }

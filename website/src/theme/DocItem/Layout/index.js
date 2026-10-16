@@ -5,6 +5,9 @@
  * column is removed and the article reflows to use the full content width
  * (the surrounding `.container` still supplies the page margins). A small
  * floating tab on the right edge re-opens it. State persists in localStorage.
+ *
+ * Also hands the page banner its section badge: the article carries the
+ * section number and name as custom properties, read by custom.css.
  */
 import React, {useState, useEffect, useCallback} from 'react';
 import clsx from 'clsx';
@@ -28,6 +31,21 @@ const TOC_STORAGE_KEY = 'billpay:toc-collapsed';
 function useDocSection() {
   const {metadata} = useDoc();
   return sectionFromPath(metadata.permalink);
+}
+
+/**
+ * The page banner (custom.css, section 12) prints the section badge and name
+ * from two custom properties, so the title can stay MDX's own <h1>. Their
+ * values are CSS strings, quotes included, because they feed `content`.
+ */
+function bannerVars(section) {
+  if (!section) {
+    return undefined;
+  }
+  return {
+    '--doc-sec-num': `"${section.number}"`,
+    '--doc-sec-label': `"${section.label}"`,
+  };
 }
 
 /**
@@ -117,7 +135,9 @@ export default function DocItemLayout({children}) {
         <ContentVisibility metadata={metadata} />
         <DocVersionBanner />
         <div className={styles.docItemContainer}>
-          <article>
+          <article
+            className={clsx(section && 'doc-has-section')}
+            style={bannerVars(section)}>
             <DocBreadcrumbs />
             <DocVersionBadge />
             {docTOC.mobile}
@@ -132,14 +152,9 @@ export default function DocItemLayout({children}) {
         <div className="col col--3">
           <div className={styles.tocSticky}>
             <div className={styles.tocHeader}>
-              {section && (
-                <div
-                  className={styles.tocSection}
-                  style={{'--cat': `var(--amex-cat-${section.slug})`}}>
-                  <span className={styles.tocSectionNum}>{section.number}</span>
-                  <span className={styles.tocSectionLabel}>{section.label}</span>
-                </div>
-              )}
+              {/* The section badge lives in the page banner now, so the rail
+                  just names itself. */}
+              <span className={styles.tocLabel}>On this page</span>
               <button
                 type="button"
                 className={styles.tocToggle}

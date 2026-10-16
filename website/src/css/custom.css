@@ -1,31 +1,31 @@
 /**
- * Billpay Wiki: the "Ledger Blue" design system.
+ * Billpay Wiki: the "Blue Box" design system.
  *
  * Every colour comes from the American Express design language (DLS):
- *   - Bright Blue   #006FCF   action, links, the current page, one rule per field
- *   - Deep Blue     #00175A   headings, the hero, the footer, table thresholds
+ *   - Bright Blue   #006FCF   action, links, the current page, every badge
+ *   - Deep Blue     #00175A   headings, the brand bar, banners, table heads
  *   - Light Blue    #66A9E2   accent only, never more than a fifth of a surface
- *   - The DLS grey scale (100 to 900) for every line, surface and quiet label
+ *   - The DLS grey scale (100 to 900) for surfaces and quiet labels
  *   - Typeface: Benton Sans (the Amex corporate face), SF Mono for code.
  *
- * Colour strategy. The page is white paper ruled with hairlines, and blue is
- * rationed by role:
+ * The one shape is the square from the Amex logo. Section numbers are white
+ * digits in a blue box, each h2 opens on a small blue box, and a section
+ * break is three of them. Structure comes from filled shapes, tints and soft
+ * elevation, not from ruled lines: no rule under headings, no outline on
+ * cards, no edge down the sidebar or the contents rail.
  *
- *   Surface   one full-strength field per page (the homepage hero) and the
- *             footer that closes it. Everything between them is white in
- *             light and DLS Deep Blue 900 in dark.
- *   Ink       headings in Deep Blue, body in DLS grey 900, so the brand runs
- *             through the hierarchy without tinting every line of prose.
- *   Accent    Bright Blue on links, indices, the active page and the short
- *             rule under each section heading.
+ * Colour strategy, by role:
  *
- * Structure is drawn in tone rather than colour: hairlines in grey 300, a
- * heavier rule only at a threshold (under a heading, under a table head).
- * There is no gold, violet or cyan, and no gradient that calls attention to
- * itself.
+ *   Frame     a Deep Blue brand bar at the top and a Deep Blue footer at the
+ *             bottom, in both themes.
+ *   Banners   every doc page opens on a Deep Blue banner carrying the section
+ *             badge, the title and the lead. Table heads are the same band.
+ *   Ink       headings in Deep Blue, body in DLS grey 900.
+ *   Accent    Bright Blue on links, badges, heading marks and the active page.
  *
- * Both light and dark modes are first-class. All values are CSS custom
- * properties, so components never hardcode a colour.
+ * There is no gold, violet or cyan. Both light and dark modes are
+ * first-class. All values are CSS custom properties, so components never
+ * hardcode a colour.
  */
 
 /* ==================================================================== *
@@ -42,6 +42,12 @@
   --amex-platinum: #737373;      /* Grey 600 */
   --amex-indigo: #2b438c;        /* Deep Blue 500 */
   --amex-temporal: #112a73;      /* Deep Blue 600, for the Billpay Core tier */
+
+  --amex-blue-100: #edf7ff;      /* Bright Blue 100 */
+
+  /* Every numbered badge on the site, whatever its size, shares this corner:
+     very slightly rounded, so the box still reads as the logo's square. */
+  --amex-badge-radius: 4px;
 }
 
 /* ==================================================================== *
@@ -56,8 +62,6 @@
      callers need no change; each is a single colour expressed as an image. */
   --amex-grad-btn: linear-gradient(#006fcf, #006fcf);
   --amex-grad-btn-hover: linear-gradient(#00559e, #00559e);
-  /* The closing rule on the hero and the footer: Bright Blue into Light Blue. */
-  --amex-grad-rule: linear-gradient(90deg, #006fcf 0%, #66a9e2 100%);
 }
 
 /* ==================================================================== *
@@ -213,12 +217,39 @@ h3 {
   --amex-row-alt: #fbfbfb;
   --amex-row-hover: #edf7ff;
 
-  /* The table head: a grey 200 band with Deep Blue labels, closed by a
-     heavier Deep Blue rule. The rule is the threshold between the column
-     names and the data, which is the one place a table needs weight. */
-  --amex-table-head-bg: #f4f4f4;
-  --amex-table-head-fg: #00175a;
+  /* The table head is a Deep Blue band with white labels, the same field as
+     the page banner. The threshold token matches the band, so the head ends
+     on a change of fill rather than on a drawn line. */
+  --amex-table-head-bg: #00175a;
+  --amex-table-head-fg: #ffffff;
   --amex-table-head-rule: #00175a;
+
+  /* Blue Box surfaces. The sidebar sits on a cool tint instead of behind a
+     ruled edge, the current page is a pill on it, and a section badge at rest
+     is Deep Blue 100 with navy digits. */
+  --amex-rail: #f6f7fb;
+  --amex-pill: #e3effb;
+  --amex-badge-quiet: #e0e4f1;
+  --amex-badge-quiet-ink: #00175a;
+  /* A Lead that is not the opening of a page sits on a soft Bright Blue
+     field. The one right under the title belongs to the banner below. */
+  --amex-tint: #edf7ff;
+  --amex-tint-ink: #22336b;
+
+  /* The page banner: Deep Blue, lit from the top-right corner. */
+  --amex-banner-bg: #00175a;
+  --amex-banner-glow: rgba(0, 111, 207, 0.5);
+  --amex-banner-ink: #d5dcf0;
+  --amex-banner-label: #a7b3d9;
+
+  /* The homepage banner: the brand bar's Deep Blue carried on down, lit from
+     behind the section board. */
+  --amex-hero-field: var(--amex-midnight);
+  --amex-hero-glow: rgba(0, 111, 207, 0.5);
+  --amex-hero-glow-soft: rgba(0, 111, 207, 0.2);
+  --amex-hero-ink: #c9d3ee;
+  --amex-hero-tile: rgba(255, 255, 255, 0.065);
+  --amex-hero-tile-hover: rgba(255, 255, 255, 0.12);
 
   /* Which Temporal cluster a thing runs on: Online takes Bright Blue,
      Offline the deeper navy. */
@@ -239,16 +270,15 @@ h3 {
   --chip-fill-base: 10%;
   --chip-line-base: 26%;
 
-  /* Shadows are rare and shallow, navy-tinted so they stay in the palette.
-     Lines do the structural work; a shadow only says "this lifts". */
+  /* Shadows are soft and navy-tinted so they stay in the palette. With the
+     outlines gone, elevation is what lifts a surface off the page. */
   --amex-sh-sm: 0 1px 2px rgba(0, 23, 90, 0.06);
   --amex-sh: 0 8px 24px rgba(0, 23, 90, 0.08), 0 1px 3px rgba(0, 23, 90, 0.06);
   --amex-glow: 0 1px 2px rgba(0, 23, 90, 0.16);
 
   /* ---- Card system ----
-     A card is white paper with a grey 300 hairline and almost no shadow. On
-     hover the edge takes a whisper of Bright Blue and the card lifts a little.
-     Section 9a has the recipe and how to apply it.
+     A card is white paper lifted by a soft shadow, with no outline. On hover
+     it lifts further. Section 9a has the recipe and how to apply it.
 
      --card-accent still exists and components still set it, because the hue
      drives headings, icons and rules inside the card. It does not paint the
@@ -259,25 +289,27 @@ h3 {
   --card-face: linear-gradient(#ffffff, #ffffff);
   --card-face-hover: linear-gradient(#ffffff, #ffffff);
   --card-radius: 12px;
-  --card-bw: 1px;
+  /* No edge by default. The ring and its colours stay as tokens, so a
+     component that genuinely needs an outline can set --card-bw itself. */
+  --card-bw: 0px;
   /* Painted as a background layer, not a border colour, because the recipe in
      section 9a stacks three layers and this is the middle one. It has to stay
      an <image>: CSS allows a background-color in the last layer only, so a
      one-stop gradient is the flat colour expressed as an image. */
   --card-border: linear-gradient(var(--amex-line), var(--amex-line));
   --card-border-hover: linear-gradient(#b5d7f4, #b5d7f4);
-  --card-sh: 0 1px 2px rgba(0, 23, 90, 0.04);
+  --card-sh: 0 1px 3px rgba(0, 23, 90, 0.07), 0 6px 20px rgba(0, 23, 90, 0.06);
   --card-sh-hover:
-    0 12px 28px rgba(0, 23, 90, 0.09),
-    0 2px 6px rgba(0, 23, 90, 0.05);
+    0 4px 10px rgba(0, 23, 90, 0.08),
+    0 18px 40px rgba(0, 23, 90, 0.12);
   --card-glow: none;
 
   /* Per-section accents, one per top-level section, all inside the DLS blue
      family plus one green and one grey. Each clears 4.5:1 on white, so the
-     indices and labels they colour stay legible. Mostly read as
-     var(--amex-cat-${slug}) from src/lib/sections.js, so a search for the
-     literal name will not find every use. Keep the full set: it is the
-     numbering. */
+     labels they colour stay legible. Components read them by literal name
+     (Principles, Highlights, JourneyIndex, the diagram maps). The numbering
+     itself is the Bright Blue badge, so deployment and operations have no
+     reader today; they stay so the set is complete. */
   --amex-cat-vision: #006fcf;        /* Bright Blue 600 */
   --amex-cat-architecture: #00175a;  /* Deep Blue 700 */
   --amex-cat-design: #00559e;        /* Bright Blue 700 */
@@ -325,11 +357,14 @@ h3 {
   --ifm-link-hover-color: var(--amex-blue-deep);
   --ifm-toc-border-color: var(--amex-line);
   --ifm-hr-border-color: var(--amex-line);
-  --ifm-navbar-background-color: rgba(255, 255, 255, 0.94);
-  --ifm-navbar-shadow: 0 1px 0 var(--amex-line);
+  /* The brand bar: Deep Blue in both themes, with white links. */
+  --ifm-navbar-background-color: var(--amex-midnight);
+  --ifm-navbar-shadow: none;
+  --ifm-navbar-link-color: rgba(255, 255, 255, 0.86);
+  --ifm-navbar-link-hover-color: #ffffff;
   --ifm-footer-background-color: var(--amex-midnight);
-  --ifm-menu-color-background-active: #edf7ff;
-  --ifm-menu-color-background-hover: #f4f4f4;
+  --ifm-menu-color-background-active: var(--amex-pill);
+  --ifm-menu-color-background-hover: #eceef5;
   --ifm-blockquote-color: var(--amex-mut);
   --ifm-blockquote-border-color: var(--amex-blue);
   --docusaurus-highlighted-code-line-bg: rgba(0, 111, 207, 0.1);
@@ -367,9 +402,28 @@ h3 {
   --amex-row-alt: color-mix(in srgb, #101b3d 70%, transparent);
   --amex-row-hover: rgba(86, 161, 227, 0.1);
 
-  --amex-table-head-bg: #0d2854; /* DLS dark secondary surface */
-  --amex-table-head-fg: #e0e4f1;
-  --amex-table-head-rule: #56a1e3;
+  --amex-table-head-bg: #112a73; /* Deep Blue 600 */
+  --amex-table-head-fg: #ffffff;
+  --amex-table-head-rule: #112a73;
+
+  --amex-rail: #050f2b;
+  --amex-pill: rgba(86, 161, 227, 0.16);
+  --amex-badge-quiet: #1a2b5e;
+  --amex-badge-quiet-ink: #e0e4f1;
+  --amex-tint: rgba(86, 161, 227, 0.09);
+  --amex-tint-ink: #d2dbf2;
+
+  --amex-banner-bg: #0d2257;
+  --amex-banner-glow: rgba(0, 111, 207, 0.4);
+  --amex-banner-ink: #d5dcf0;
+  --amex-banner-label: #a7b3d9;
+
+  --amex-hero-field: var(--amex-navy);
+  --amex-hero-glow: rgba(0, 111, 207, 0.38);
+  --amex-hero-glow-soft: rgba(0, 111, 207, 0.16);
+  --amex-hero-ink: #c9d3ee;
+  --amex-hero-tile: rgba(255, 255, 255, 0.065);
+  --amex-hero-tile-hover: rgba(255, 255, 255, 0.12);
 
   --amex-worker-online: #56a1e3;
   --amex-worker-offline: #a7b3d9;
@@ -388,17 +442,16 @@ h3 {
   --amex-sh: 0 10px 28px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
   --amex-glow: 0 1px 2px rgba(0, 0, 0, 0.4);
 
-  /* Same card, dark skin: the DLS surface with a hairline that lifts to the
-     regular border on hover. */
+  /* Same card, dark skin: the DLS surface, lifted by a deeper shadow. */
   --card-accent: var(--amex-blue-bright);
   --card-face: linear-gradient(#101b3d, #101b3d);
   --card-face-hover: linear-gradient(#13224a, #13224a);
   --card-border: linear-gradient(#1f336e, #1f336e);
   --card-border-hover: linear-gradient(#3d4f82, #3d4f82);
-  --card-sh: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --card-sh: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
   --card-sh-hover:
-    0 14px 32px rgba(0, 0, 0, 0.5),
-    0 2px 6px rgba(0, 0, 0, 0.3);
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 20px 44px rgba(0, 0, 0, 0.4);
   --card-glow: none;
 
   --amex-cat-vision: #56a1e3;        /* Bright Blue 400 */
@@ -448,8 +501,8 @@ h3 {
   --ifm-link-hover-color: #83baeb;
   --ifm-toc-border-color: var(--amex-line);
   --ifm-hr-border-color: var(--amex-line);
-  --ifm-navbar-background-color: rgba(0, 8, 31, 0.9);
-  --ifm-navbar-shadow: 0 1px 0 var(--amex-line);
+  --ifm-navbar-background-color: var(--amex-navy);
+  --ifm-navbar-shadow: none;
   --ifm-footer-background-color: var(--amex-navy);
   --ifm-menu-color-background-active: rgba(86, 161, 227, 0.14);
   --ifm-menu-color-background-hover: rgba(86, 161, 227, 0.08);
@@ -476,8 +529,8 @@ strong {
 /* Only the page title carries Medium. Every heading below it drops to Regular,
    the same cut as body copy, so a long page reads as one voice instead of a
    ladder of bold bars. The hierarchy is still there: it comes from size, the
-   rule under h2, and the space above each heading, which is enough once the
-   weight stops shouting. */
+   Blue Box mark on h2, and the space above each heading, which is enough once
+   the weight stops shouting. */
 .markdown h2,
 .markdown h3,
 .markdown h4,
@@ -486,38 +539,39 @@ strong {
   font-weight: 400;
 }
 
-/* Section headings sit on a grey hairline, with a short Bright Blue rule at
-   the left edge where the eye starts. One decisive mark, not a full-width
-   gradient. */
+/* A section heading opens on a small solid Blue Box, the square from the
+   logo, set on the cap height. No rule underneath: the extra space above is
+   what separates one section from the next. */
 .markdown > h2 {
-  position: relative;
-  padding-bottom: 0.4em;
-  border-bottom: 1px solid var(--amex-line);
+  margin-top: 2.9rem;
 }
-.markdown > h2::after {
+.markdown > h2::before {
   content: '';
-  position: absolute;
-  left: 0;
-  bottom: -1px;
-  width: 48px;
-  height: 2px;
+  display: inline-block;
+  width: 0.36em;
+  height: 0.36em;
+  margin-right: 0.5em;
+  vertical-align: 0.13em;
   background: var(--ifm-color-primary);
 }
 
-/* Horizontal rules are plain hairlines. */
+/* A section break is three Blue Boxes, centred, rather than a line. */
 hr {
+  width: 34px;
+  height: 6px;
+  margin: 2.6rem auto;
   border: 0;
-  height: 1px;
-  background: var(--amex-line);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ifm-color-primary) 0 6px,
+    transparent 6px 14px
+  );
 }
 
 /* ==================================================================== *
- * 7. Navbar — frosted, gradient hairline
+ * 7. Navbar: the Deep Blue brand bar
  * ==================================================================== */
 .navbar {
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  border-bottom: 1px solid var(--amex-line);
   /* Infima's 0.75rem put the seven section links about 25px apart, which read
      as one run of words rather than seven destinations. This opens each gap to
      roughly 32px. */
@@ -545,41 +599,54 @@ hr {
   font-weight: 400;
 }
 
-/* In light mode the links sit in the brand navy, the same ink as the headings,
-   so the bar reads as quiet, confident navigation. Bright Blue is kept for the
-   two signals that matter: the link under the pointer and the section you are
-   in. Dark keeps its default ink: the links already separate from that
-   surface without help. */
-html[data-theme='light'] .navbar__link {
-  color: var(--amex-txt-strong);
+/* White type on the bar in both themes. The wordmark is full white and the
+   links sit a step back from it until the pointer reaches them. */
+.navbar__title {
+  color: #ffffff;
 }
-html[data-theme='light'] .navbar__link:hover {
-  color: var(--amex-blue);
+.navbar__link {
+  color: var(--ifm-navbar-link-color);
+}
+.navbar__link:hover {
+  color: var(--ifm-navbar-link-hover-color);
 }
 
-/* The current section steps up to Medium. 600 lands in the 501-and-up bucket of
-   the two Benton cuts, so it renders the Medium face. Colour and the rule
-   below still mark it too; the weight is what makes it findable without
-   hunting for which link is a shade different from its neighbours. */
-.navbar__link--active {
-  color: var(--ifm-color-primary);
+/* The current section is a solid Bright Blue tab: a badge, not an underline.
+   600 lands in the 501-and-up bucket of the two Benton cuts, so it renders
+   the Medium face. */
+.navbar__link--active,
+.navbar__link--active:hover {
+  color: #ffffff;
   font-weight: 600;
+  background: var(--amex-blue);
+  border-radius: 6px;
 }
-html[data-theme='light'] .navbar__link--active {
-  color: var(--amex-blue);
+
+/* The menu button, the theme toggle and the search field all sit on Deep
+   Blue, so they take light ink and a translucent white field. */
+.navbar__toggle,
+.navbar [class*='toggleButton_'] {
+  color: #ffffff;
 }
-/* A solid Bright Blue rule under the current section only. */
-.navbar__link {
-  position: relative;
+.navbar [class*='toggleButton_']:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
-.navbar__link--active::after {
-  content: '';
-  position: absolute;
-  left: var(--ifm-navbar-item-padding-horizontal);
-  right: var(--ifm-navbar-item-padding-horizontal);
-  bottom: -11px;
-  height: 2px;
-  background: var(--ifm-color-primary);
+
+/* The phone drawer. Infima paints it with the navbar background, which is now
+   Deep Blue, behind menu links set in the page ink. The drawer body goes back
+   to the page surface; its top row keeps the bar's Deep Blue so the wordmark
+   and the close button stay white on blue. */
+.navbar-sidebar {
+  background-color: var(--amex-bg);
+}
+.navbar-sidebar__brand {
+  background-color: var(--ifm-navbar-background-color);
+}
+/* The close icon arrives with its stroke as an SVG attribute (a grey meant
+   for a white drawer). Any CSS rule outranks an attribute, so it is set on
+   the icon's group directly. */
+.navbar-sidebar__close g {
+  stroke: #ffffff;
 }
 
 /* ==================================================================== *
@@ -666,24 +733,43 @@ a {
   text-underline-offset: 2px;
 }
 
-/* Inline code is set in navy on a grey 200 chip: it reads as a term of art
-   without competing with the Bright Blue of real links. */
+/* Inline code is set in navy on a grey 200 chip with no outline: it reads as
+   a term of art without competing with the Bright Blue of real links. */
 :not(pre) > code {
   background: #f4f4f4;
-  border: 1px solid var(--amex-line);
+  border: 1px solid transparent;
   border-radius: 4px;
   color: var(--amex-txt-strong);
   font-size: 0.86em;
 }
 [data-theme='dark'] :not(pre) > code {
   background: rgba(86, 161, 227, 0.1);
-  border-color: var(--amex-line);
   color: #b5d7f4;
 }
 
+/* The contents rail drops its ruled edge. The entry you are reading is a
+   pill, the same as the current page in the sidebar. */
+.table-of-contents__left-border {
+  border-left: none;
+}
 .table-of-contents__link--active {
   color: var(--ifm-color-primary);
   font-weight: 600;
+  background: var(--amex-pill);
+  border-radius: 6px;
+  padding: 0.12rem 0.5rem;
+  margin-left: -0.5rem;
+}
+
+/* Previous and next: two cards on the house shadow, no outline. */
+.pagination-nav__link {
+  border: none;
+  background: var(--amex-card);
+  box-shadow: var(--card-sh);
+  transition: box-shadow 0.2s ease;
+}
+.pagination-nav__link:hover {
+  box-shadow: var(--card-sh-hover);
 }
 
 /* Markdown tables get their chrome from src/components/DataTable. */
@@ -697,9 +783,9 @@ a {
 }
 
 /* Collapsible blocks. Docusaurus renders <details> as an info alert, which
-   brings Infima's cyan in with it. The surface, the rule and the arrow all
-   take the same Amex blue the table headers use, and the text inside stays
-   ordinary body colour so a closed block reads as part of the page. */
+   brings Infima's cyan in with it. The tint and the arrow take Bright Blue,
+   and the text inside stays ordinary body colour so a closed block reads as
+   part of the page. */
 details.alert {
   --ifm-alert-background-color: color-mix(in srgb, var(--amex-blue) 6%, transparent);
   --ifm-alert-background-color-highlight: color-mix(in srgb, var(--amex-blue) 14%, transparent);
@@ -707,8 +793,10 @@ details.alert {
   --ifm-alert-foreground-color: var(--ifm-font-color-base);
   --docusaurus-details-decoration-color: var(--amex-blue);
 
+  /* A tinted field, no outline. */
+  border: none;
   border-radius: 12px;
-  box-shadow: var(--amex-sh-sm);
+  box-shadow: none;
 }
 
 details.alert > summary {
@@ -742,12 +830,17 @@ details.alert > summary {
 }
 
 /* The current page: leaf links, and section headers that are pages in their
-   own right. Both get the blue label and the Amex-blue left rail. */
+   own right. Both get the blue label on the pill; no rail down the edge. */
 .theme-doc-sidebar-menu .menu__link--active:not(.menu__link--sublist),
 .theme-doc-sidebar-menu .menu__list-item-collapsible--active > .menu__link.menu__link--active {
   color: var(--ifm-menu-color-active);
-  box-shadow: inset 3px 0 0 var(--ifm-color-primary);
   font-weight: 600;
+}
+
+/* The sidebar sits on a cool tint instead of behind a ruled edge. */
+.theme-doc-sidebar-container {
+  border-right: none;
+  background: var(--amex-rail);
 }
 
 /* ---- rail toggles ------------------------------------------------------ */
@@ -761,17 +854,16 @@ details.alert > summary {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--amex-line);
+  border: none;
   border-radius: 10px;
   background: var(--amex-card);
   color: var(--amex-mut);
   cursor: pointer;
   box-shadow:
-    var(--amex-sh-sm),
+    var(--card-sh),
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
   transition:
     color 0.18s ease,
-    border-color 0.18s ease,
     background 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
@@ -779,7 +871,6 @@ details.alert > summary {
 
 .rail-toggle:hover {
   color: var(--amex-blue);
-  border-color: color-mix(in srgb, var(--amex-blue) 45%, var(--amex-line));
   background: var(--amex-card-hover);
   box-shadow:
     var(--amex-sh),
@@ -805,7 +896,6 @@ details.alert > summary {
 
 [data-theme='dark'] .rail-toggle:hover {
   color: var(--amex-blue-bright);
-  border-color: color-mix(in srgb, var(--amex-blue-bright) 42%, var(--amex-line));
   box-shadow:
     var(--amex-sh),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -854,31 +944,39 @@ details.alert > summary {
 }
 
 /* Numbered top-level sidebar sections, mirroring the homepage card indices
-   (zero-padded). The homepage gives each card its own accent, but eight
-   accents stacked in a narrow rail read as noise. Section labels sit in the
-   ordinary menu colour and the index sits a shade back from it, so the rail
-   stays quiet and blue is left to mark the current page. With colour off the
-   table, size carries the hierarchy: sections run a step above their pages,
-   and the index scales with the label it sits beside. */
+   (zero-padded). Each number is a section badge: digits in a box, like the
+   logo. At rest the box is a quiet Deep Blue tint, so eight of them stacked in
+   a narrow rail do not shout; the section you are in takes the full Bright
+   Blue. Size carries the rest of the hierarchy: sections run a step above
+   their pages. */
 .sidebar-sec > .menu__list-item-collapsible > .menu__link {
   color: var(--ifm-menu-color);
   font-size: 1.1em;
 }
 
 .sidebar-sec > .menu__list-item-collapsible > .menu__link::before {
-  display: inline-block;
-  min-width: 1.75em;
-  margin-right: 0.55rem;
-  font-size: 0.72em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: 0.7rem;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-badge-quiet);
+  color: var(--amex-badge-quiet-ink);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--ifm-color-emphasis-600);
 }
 
-/* On the section's own page the whole row goes blue, index included. */
-.sidebar-sec > .menu__list-item-collapsible--active > .menu__link.menu__link--active::before {
-  color: inherit;
+/* Docusaurus marks every ancestor of the current page active, which is
+   exactly "the section you are in". */
+.sidebar-sec > .menu__list-item-collapsible > .menu__link.menu__link--active::before {
+  background: var(--amex-blue);
+  color: #ffffff;
 }
 
 .sidebar-sec--vision > .menu__list-item-collapsible > .menu__link::before { content: '01'; }
@@ -891,27 +989,18 @@ details.alert > summary {
 .sidebar-sec--operations > .menu__list-item-collapsible > .menu__link::before { content: '08'; }
 
 /* ==================================================================== *
- * 11. Footer — deep navy with gradient top stripe
+ * 11. Footer: Deep Blue, signed off with the logo
  * ==================================================================== */
 .footer {
   position: relative;
-  /* Deep Blue in light, a step deeper in dark, settling into Deep Blue 800
-     at the bottom edge. Flat enough to read as one mass, like the hero. */
+  /* Deep Blue in light, a step deeper in dark. One flat mass, like the brand
+     bar at the top, so the page is framed in the same blue at both ends. */
   background-color: var(--amex-footer-bg);
-  background-image: linear-gradient(180deg, var(--amex-footer-bg) 0%, #000f3c 100%);
-  /* White, not the warm off-white this used to carry. The cream picked up the
-     gold that runs through the rest of the palette, which on the navy field
-     read as a tint rather than as a neutral. */
   color: #ffffff;
 }
-.footer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--amex-grad-rule);
+/* The logo above the copyright line (themeConfig.footer.logo). */
+.footer__logo {
+  margin-bottom: 0.4rem;
 }
 .footer__title {
   color: #ffffff;
@@ -931,6 +1020,104 @@ details.alert > summary {
    line down there without going warm again. */
 .footer__copyright {
   color: rgba(255, 255, 255, 0.62);
+}
+
+/* ==================================================================== *
+ * 12. Page banner
+ * ==================================================================== */
+/* Every doc page opens on one Deep Blue banner: the section badge and its
+   name, the title, then the lead.
+
+     - The title is MDX's own <header><h1>.
+     - The badge and the name are that header's ::before and ::after. Their
+       text comes from --doc-sec-num and --doc-sec-label, which
+       DocItem/Layout sets on the article from the URL. Off a section (the
+       introduction), the properties are unset, `content` falls back to none,
+       and the banner simply has no eyebrow.
+     - Flex `order` puts the two pseudo-elements on one line above the title.
+     - The lead is the <Lead> straight after the header (global class
+       `doc-lead`). The header squares off its bottom corners and the lead
+       continues the same field below it.
+
+   The glow sits only in the header and is spent before the header's bottom
+   edge, so the seam with the lead is invisible. */
+.theme-doc-markdown > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.7rem;
+  margin: 0.4rem 0 2.4rem;
+  padding: 1.8rem 2.25rem 2rem;
+  border-radius: 16px;
+  background:
+    radial-gradient(45% 120% at 100% 0%, var(--amex-banner-glow) 0%, transparent 70%),
+    var(--amex-banner-bg);
+}
+.theme-doc-markdown > header:has(+ .doc-lead) {
+  margin-bottom: 0;
+  padding-bottom: 0.25rem;
+  border-radius: 16px 16px 0 0;
+}
+
+.theme-doc-markdown > header::before {
+  content: var(--doc-sec-num);
+  order: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-blue);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.theme-doc-markdown > header::after {
+  content: var(--doc-sec-label);
+  order: 1;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--amex-banner-label);
+}
+.theme-doc-markdown > header > h1 {
+  order: 2;
+  flex-basis: 100%;
+  margin: 0;
+  color: #ffffff;
+}
+.doc-has-section .theme-doc-markdown > header > h1 {
+  margin-top: 0.95rem;
+}
+
+.theme-doc-markdown > header + .doc-lead {
+  margin: 0 0 2.4rem;
+  padding: 0.85rem 2.25rem 2rem;
+  border-radius: 0 0 16px 16px;
+  background: var(--amex-banner-bg);
+  color: var(--amex-banner-ink);
+}
+.theme-doc-markdown > header + .doc-lead strong {
+  color: #ffffff;
+}
+
+@media (max-width: 700px) {
+  .theme-doc-markdown > header {
+    padding: 1.35rem 1.25rem 1.5rem;
+    border-radius: 12px;
+  }
+  .theme-doc-markdown > header:has(+ .doc-lead) {
+    padding-bottom: 0.2rem;
+    border-radius: 12px 12px 0 0;
+  }
+  .theme-doc-markdown > header + .doc-lead {
+    padding: 0.7rem 1.25rem 1.5rem;
+    border-radius: 0 0 12px 12px;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -968,28 +1155,37 @@ details.alert > summary {
   --search-local-input-active-border-color: var(--amex-blue-bright);
 }
 
-/* The navbar box. Infima gives it a pill; this puts it on the same surface
-   and hairline as everything else in the bar, and lights the edge on focus
-   rather than drawing a second ring around it. Infima sizes it at 12.5rem by
-   2rem, which the shortcut hint eats into, so the field is wider and a little
-   taller here and shrinks with the bar rather than overflowing it. */
+/* The navbar box. It sits on the Deep Blue bar, so it is a translucent white
+   field with light type, and lights its edge on focus rather than drawing a
+   second ring around it. Infima sizes it at 12.5rem by 2rem, which the
+   shortcut hint eats into, so the field is wider and a little taller here and
+   shrinks with the bar rather than overflowing it. */
 .navbar__search-input {
   width: 18rem;
   max-width: 100%;
   height: 2.25rem;
-  background-color: color-mix(in srgb, var(--amex-line) 40%, transparent);
-  border: 1px solid var(--amex-line);
-  color: var(--amex-txt);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
+  color: #ffffff;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.navbar__search-input::placeholder {
+  color: #a7b3d9;
 }
 .navbar__search-input:focus {
-  border-color: var(--amex-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amex-blue) 16%, transparent);
+  background-color: rgba(255, 255, 255, 0.14);
+  border-color: var(--amex-blue-bright);
+  box-shadow: 0 0 0 3px rgba(86, 161, 227, 0.25);
   outline: none;
 }
-[data-theme='dark'] .navbar__search-input:focus {
-  border-color: var(--amex-blue-bright);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amex-blue-bright) 20%, transparent);
+.navbar [class*='searchIcon_'] {
+  color: #a7b3d9;
+}
+.navbar [class*='searchHint_'] {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: none;
+  color: #a7b3d9;
 }
 
 /* Results page. */

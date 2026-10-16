@@ -5,15 +5,16 @@ import ordinal from '../../lib/ordinal';
 /**
  * Principles: numbered rules, one row each.
  *
- * A single-column table: no header, no columns, one rule per row. The numeral
- * leads the heading line, so the set reads in order without a list marker
- * competing with the rule itself.
+ * A single-column table: no header, no columns, one rule per row. A numbered
+ * badge leads the heading line, so the set reads in order without a list
+ * marker competing with the rule itself. Badges are the same blue on every
+ * page, so there is no accent prop.
  *
  * items: [{term, desc}]
  */
-export default function Principles({items = [], accent = 'var(--amex-cat-vision)'}) {
+export default function Principles({items = []}) {
   return (
-    <div className={styles.wrap} style={{'--pr-accent': accent}}>
+    <div className={styles.wrap}>
       <ol className={styles.rows}>
         {items.map((p, i) => (
           <li key={p.term} className={styles.row}>

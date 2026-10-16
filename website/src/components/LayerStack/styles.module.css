@@ -8,15 +8,16 @@
   flex-direction: column;
 
   --ly-surface: #ffffff;
+  /* Chips are plain white on the tinted block, so they read without an outline. */
   --ly-chip: #ffffff;
-  --ly-chip-mix: 12%;
+  --ly-chip-mix: 0%;
   --ly-lo: 5;
   --ly-hi: 11;
 }
 :global([data-theme='dark']) .map {
   --ly-surface: #0c173a;
-  --ly-chip: #0d2854;
-  --ly-chip-mix: 28%;
+  --ly-chip: #1a2b5e;
+  --ly-chip-mix: 10%;
   --ly-lo: 12;
   --ly-hi: 27;
 }
@@ -110,7 +111,9 @@
      tall card */
   align-items: start;
   padding: 1.05rem 1.15rem;
-  border: 1px solid color-mix(in srgb, var(--ly-accent) 26%, var(--amex-line));
+  /* The tint and the shadow carry the block; the edge stays as a transparent
+     ring only so the dashed aside below has a border to draw. */
+  border: 1px solid transparent;
   border-radius: 15px;
   background: color-mix(
     in srgb,
@@ -191,7 +194,7 @@
   gap: 0.4rem;
 }
 
-/* chips read as light pills on the raised surface */
+/* chips read as light pills on the raised surface, with no outline */
 .chip {
   font-size: 0.78rem;
   line-height: 1.3;
@@ -199,7 +202,7 @@
   border-radius: 8px;
   color: var(--amex-txt);
   background: color-mix(in srgb, var(--ly-accent) var(--ly-chip-mix), var(--ly-chip));
-  border: 1px solid color-mix(in srgb, var(--ly-accent) 34%, var(--amex-line));
+  border: none;
   white-space: nowrap;
 }
 :global([data-theme='dark']) .chip {

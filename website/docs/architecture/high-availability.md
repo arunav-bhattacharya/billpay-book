@@ -54,7 +54,6 @@ import HADiagram from '@site/src/components/HADiagram';
 Temporal is the only part of the platform that does not run on Hydra. Its cluster sits in AWS instead, and the three reasons for that are all about the way Kubernetes runs in each place.
 
 <Principles
-  accent="var(--amex-cat-architecture)"
   items={[
     {
       term: 'EKS across Availability Zones',

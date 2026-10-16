@@ -6,17 +6,16 @@
    0.56rem to 0.95rem, and the workflow name was monospaced. Emphasis comes
    from weight, colour and the pill fills instead.
 
-   Chrome comes from DataTable; this is only what this table does differently.
-   In dark it swaps the blue header band for the architecture tint the rest of
-   this page carries, which is why --dt-head-bg exists. */
+   Chrome comes from DataTable, Deep Blue head band included; this is only
+   what this table does differently. --rm-accent is the hue of the trigger
+   rail and the group tints: the architecture navy in light, Bright Blue in
+   dark, where that navy's light counterpart would read as a white rule. */
 
 .table {
+  --rm-accent: var(--amex-cat-architecture);
   --dt-min-width: 660px;
   --dt-pad: 0.6rem 0.95rem;
   --dt-th-pad: 0.72rem 0.95rem;
-  /* This table rules its first row too, so the body starts on a hairline
-     under the header band rather than against it. */
-  --dt-rule-first: 1px solid var(--amex-line);
   /* Chips (the Online/Offline worker pill, the account tag) sit a step below
      the text. They are uppercase and tracked, so matching the body size made
      them read larger than the prose beside them rather than equal to it. */
@@ -32,9 +31,9 @@
   --dt-cell-weight: 650;
   --dt-cell-color: var(--amex-txt-strong);
   white-space: nowrap;
-  background: color-mix(in srgb, var(--amex-cat-architecture) 5%, var(--ifm-background-color));
+  background: color-mix(in srgb, var(--rm-accent) 5%, var(--ifm-background-color));
   --dt-divider-right: 1px solid var(--amex-line);
-  box-shadow: inset 3px 0 0 var(--amex-cat-architecture);
+  box-shadow: inset 3px 0 0 var(--rm-accent);
 }
 
 /* Stronger rule between trigger groups. */
@@ -54,7 +53,7 @@
 }
 .branch {
   margin-right: 0.35rem;
-  color: color-mix(in srgb, var(--amex-cat-architecture) 60%, var(--amex-mut));
+  color: color-mix(in srgb, var(--rm-accent) 60%, var(--amex-mut));
   font-weight: 700;
 }
 
@@ -62,7 +61,7 @@
    tint, and the condition indented under the one it branches from. */
 .childRow > td {
   --dt-rule: none;
-  background: color-mix(in srgb, var(--amex-cat-architecture) 4%, transparent);
+  background: color-mix(in srgb, var(--rm-accent) 4%, transparent);
 }
 .childRow > .condCell {
   --dt-pad: 0.6rem 0.95rem 0.6rem 1.6rem;
@@ -131,14 +130,14 @@
 
 /* ---- dark theme ---- */
 :global([data-theme='dark']) .table {
+  --rm-accent: var(--amex-blue-bright);
   --dt-table-bg: var(--amex-panel);
-  --dt-head-bg: color-mix(in srgb, var(--amex-cat-architecture) 20%, var(--amex-panel));
 }
 :global([data-theme='dark']) .triggerCell {
-  background: color-mix(in srgb, var(--amex-cat-architecture) 16%, var(--amex-panel));
+  background: color-mix(in srgb, var(--rm-accent) 16%, var(--amex-panel));
 }
 :global([data-theme='dark']) .childRow > td {
-  background: color-mix(in srgb, var(--amex-cat-architecture) 12%, transparent);
+  background: color-mix(in srgb, var(--rm-accent) 12%, transparent);
 }
 :global([data-theme='dark']) .consumer {
   background: color-mix(in srgb, var(--amex-acct-consumer) 16%, transparent);

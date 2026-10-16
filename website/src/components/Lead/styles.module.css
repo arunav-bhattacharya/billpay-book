@@ -1,10 +1,13 @@
+/* The Lead away from the banner: a soft Bright Blue panel. The opening Lead
+   on a page is restyled by custom.css (section 12) as part of the banner. */
 .lead {
   font-size: 1.12rem;
   line-height: 1.6;
   font-weight: 450;
-  color: var(--ifm-color-emphasis-700);
-  border-left: 3px solid var(--lead-accent);
-  padding: 0.15rem 0 0.15rem 1.15rem;
+  color: var(--amex-tint-ink);
+  background: var(--amex-tint);
+  border-radius: 12px;
+  padding: 1.15rem 1.45rem;
   margin: 1.1rem 0 2.2rem;
   letter-spacing: -0.002em;
 }

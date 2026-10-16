@@ -13,17 +13,15 @@ import ordinal from '../../lib/ordinal';
  * one section, and they are in reading order.
  *
  * So this is a contents block, not a card grid. Titles run down one column so
- * the whole section can be scanned in a single pass, descriptions sit beside
- * them, and hairlines do the separating that the boxes used to do.
+ * the whole section can be scanned in a single pass, and descriptions sit
+ * beside them. Each row sits on a soft tint with a little air between rows,
+ * which separates them without a ruled line.
  *
- * The rail that appears down the left of a row on hover is the same 3px accent
- * bar the sidebar puts against the page you are on. There it means you are
- * here. Here it means you are going here.
- *
- * The numbers are the sidebar's, too. It counts the sections 01 to 08 and the
- * homepage counts them the same way, so a section counting its own pages is
- * the same habit one level down. They are grey until the cursor is on the row,
- * which is the only way a number should ever compete with a page title.
+ * The numbers are badges, the same as the sidebar's and the homepage board's:
+ * the sidebar counts the sections 01 to 08, so a section counting its own
+ * pages is the same habit one level down. A badge is a quiet tint until the
+ * cursor is on the row, when it turns Bright Blue; that is the only way a
+ * number should ever compete with a page title.
  *
  * There is no accent prop. Every section index carries the same Amex blue,
  * whichever section it is in: the colour here marks the row under the cursor,
@@ -38,7 +36,6 @@ export default function SectionIndex({items = []}) {
     <div className={styles.index}>
       {items.map((it, i) => (
         <Link key={i} to={it.to} className={styles.row}>
-          <span className={styles.rail} aria-hidden="true" />
           <span className={styles.num} aria-hidden="true">
             {ordinal(i + 1)}
           </span>

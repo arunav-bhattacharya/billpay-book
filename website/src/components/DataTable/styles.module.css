@@ -1,9 +1,9 @@
 /* DataTable: the house table shell, shared by the table components and by
    every markdown pipe table (src/theme/MDXComponents.js).
 
-   Every table on the site agrees on the panel, the head band with its navy
-   threshold rule, and the row rhythm, and disagrees only on size, alignment
-   and how rows are told apart. Those are the tokens below: retune the token, not the rule, so a row
+   Every table on the site agrees on the panel, the Deep Blue head band, and
+   the row rhythm, and disagrees only on size, alignment and how rows are
+   told apart. Those are the tokens below: retune the token, not the rule, so a row
    stays one tier.
 
    The base cell rule sits at one class plus one element, which is enough to
@@ -62,8 +62,9 @@
   border: none;
 }
 
-/* The head closes on a heavier rule: the threshold between the column names
-   and the data, which is the one line in a table allowed to carry weight. */
+/* The head band ends on --dt-head-rule. By default it is the band's own
+   colour, so the head ends on a change of fill; a table that wants a visible
+   threshold can set the token. */
 .shell thead th {
   padding: var(--dt-th-pad);
   font-size: calc(var(--dt-th-fs) * var(--dt-shrink, 1));

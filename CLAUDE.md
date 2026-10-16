@@ -19,7 +19,9 @@ The site is built and the eight sections are written. `CONTENT_PLAN.md` holds th
 ## Design system
 - Docusaurus, latest stable
 - Light mode default, dark mode supported, gradients via CSS custom properties (not hardcoded per-component)
-- Palette: Amex Blue Box blue with navy ink and a gold secondary, all as `--amex-*` tokens in `website/src/css/custom.css`. Theme-independent brand values sit in the palette block at the top; anything that changes between light and dark belongs in the two theme blocks, as a pair. Components never hardcode a colour.
+- Palette: the Amex design language (DLS) colours only. Bright Blue `#006FCF` for actions, links and badges, Deep Blue `#00175A` for headings, the brand bar, banners and table heads, Light Blue `#66A9E2` as a small accent, and the DLS greys. No gold, violet or cyan. All are `--amex-*` tokens in `website/src/css/custom.css`. Theme-independent brand values sit in the palette block at the top; anything that changes between light and dark belongs in the two theme blocks, as a pair. Components never hardcode a colour.
+- The "Blue Box" look: the square from the Amex logo is the one shape. Numbers are badges (white digits in a blue box, corner `--amex-badge-radius`), each h2 opens on a small blue box, and a section break is three of them. Structure comes from fills, tints and soft shadows, not from ruled lines: no rule under headings, no outline on cards, no edge on the sidebar or contents rail.
+- Every doc page opens on the Deep Blue page banner: section badge, H1 and Lead. It is CSS in `custom.css` (section 12) over MDX's own `<header><h1>` and the Lead's global `doc-lead` class, fed two custom properties from `src/theme/DocItem/Layout`. The homepage hero holds the eight sections as a board.
 
 ## Diagrams
 Four kinds, in the order to reach for them. Authoring guide: `DIAGRAMS.md`.
@@ -47,14 +49,14 @@ Reuse before building. Take colour from the `--amex-*` tokens so both themes wor
 
 **Shared behaviour lives in `website/src/lib/`** as flat files: `useOverlay` (Escape, scroll lock, focus return), `inlineMarkup` (`**bold**` and `` `code` `` in row data), `ordinal`, `sections`. It is deliberately not under `src/components/`, where every folder is a public MDX import surface.
 
-**Colour comes from tokens, always.** Worker tone is `--amex-worker-online` / `--amex-worker-offline`, applied through `WorkerChip`. The eight `--amex-cat-*` section accents are one set, read as `var(--amex-cat-${slug})` from `src/lib/sections.js`, so grepping for a literal name will not find every use and two of them look dead when they are not.
+**Colour comes from tokens, always.** Worker tone is `--amex-worker-online` / `--amex-worker-offline`, applied through `WorkerChip`. The eight `--amex-cat-*` section accents are one set, read by literal name in components; deployment and operations have no reader today but stay so the set is complete. Section numbering itself is the Bright Blue badge, not a per-section hue.
 
 **Prop names.** `term` and `desc` for a heading and the line under it, in every component that renders that pair. `rows` for a table's data. Keep a domain name where the concept really is different: a worker split has `workers`, a journey has `steps`.
 
 ## Page conventions
 Every doc page under `website/docs/`:
 - Front matter carries `title` and `description`. The description is the page's own lead sentence, which is what reaches search results and link previews.
-- One `#` H1, then `<Lead>`. Lead takes its section colour from the URL, so do not pass `accent`.
+- One `#` H1, then `<Lead>`. Together they form the page banner, so nothing goes between them. Lead takes no props besides its text.
 - A `<SectionIndex>` sits under a `## In this section` heading.
 - `desc` strings use backticks, unless the value needs JSX for inline markup.
 
