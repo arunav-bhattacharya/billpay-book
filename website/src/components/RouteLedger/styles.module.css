@@ -1,0 +1,710 @@
+/* RouteLedger: every road through Billpay on one sheet. Blue Box rules: the
+   only shape is the square, structure comes from tinted bands, and nothing
+   is outlined. The Router is the one heavy object, a Deep Blue bar every
+   routed row passes through. A line enters it grey and leaves in the tone of
+   the cluster the Router chose, so colour changes only at the Router.
+
+   Every length below is in em, and the sheet's font size follows the width
+   of its container (the scroller), so the whole sheet scales as one piece.
+   The column widths are custom properties on .sheet and add up to SPAN_EM in
+   index.js; change one and change the other. Elements that read a column
+   width keep the sheet's font size, so their em means the sheet's em. Only
+   leaf text sets its own size. Every colour is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --rl-online: var(--amex-worker-online);
+  --rl-offline: var(--amex-worker-offline);
+  --rl-router: var(--amex-banner-block);
+  --rl-router-ink: var(--amex-banner-block-label);
+  --rl-band: color-mix(in srgb, var(--amex-blue) 4%, var(--amex-rail));
+  --rl-stripe: color-mix(in srgb, var(--amex-blue) 5%, var(--amex-rail));
+  --rl-hover: color-mix(in srgb, var(--amex-blue) 6%, var(--amex-panel));
+  --rl-pick: color-mix(in srgb, var(--amex-blue) 11%, var(--amex-panel));
+  --rl-wire: var(--amex-line-strong);
+  --rl-lit: var(--amex-blue);
+  --rl-rest: var(--amex-temporal);
+  --rl-off: color-mix(in srgb, var(--amex-mut) 26%, transparent);
+  --rl-pill: var(--amex-pill);
+
+  margin: 1.4rem 0 2rem;
+  padding: 0.9rem 0.9rem 1rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --rl-band: color-mix(in srgb, var(--amex-blue-bright) 5%, var(--amex-rail));
+  --rl-stripe: color-mix(in srgb, var(--amex-blue-bright) 6%, var(--amex-rail));
+  --rl-hover: color-mix(in srgb, var(--amex-blue-bright) 8%, transparent);
+  --rl-pick: color-mix(in srgb, var(--amex-blue-bright) 17%, transparent);
+  --rl-lit: var(--amex-blue-bright);
+}
+
+/* Full screen. The panel recipe's shape changes through its own tokens, so
+   nothing here competes with it for the same property. The face is a
+   background layer above others, so it has to be an image: a gradient of
+   one colour, as the recipe's own tokens are. */
+.expanded {
+  --card-radius: 0;
+  --card-bw: 0px;
+  --card-sh: none;
+  --card-face: linear-gradient(var(--amex-bg), var(--amex-bg));
+
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  margin: 0;
+  overflow-y: auto;
+}
+
+/* ---- toolbar ---- */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--amex-mut);
+}
+
+.tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--amex-line-strong);
+  background: transparent;
+  color: var(--amex-mut);
+  cursor: pointer;
+}
+.tool:hover {
+  color: var(--amex-txt-strong);
+  border-color: var(--amex-mut);
+}
+
+.toolIcon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- the sheet ---- */
+.scroller {
+  margin-top: 0.8rem;
+  overflow-x: auto;
+  container-type: inline-size;
+}
+
+.sheet {
+  --rl-c1: 17.5em;
+  --rl-c2: 22.5em;
+  --rl-c3: 1.5em;
+  --rl-c4: 16em;
+  --rl-slot: 4.1em;
+  --rl-c10: 11.5em;
+  --rl-cols: var(--rl-c1) var(--rl-c2) var(--rl-c3) var(--rl-c4) repeat(5, var(--rl-slot)) var(--rl-c10);
+
+  width: calc(var(--rl-span) * 1em);
+  margin: 0 auto;
+  font-family: var(--amex-font-sans);
+  font-size: clamp(10.5px, calc(100cqi / var(--rl-span)), 14.5px);
+  line-height: 1.3;
+  color: var(--amex-txt);
+}
+
+.expanded .sheet {
+  font-size: clamp(10.5px, calc(100cqi / var(--rl-span)), 16px);
+}
+
+.heads,
+.band,
+.acts {
+  display: grid;
+  grid-template-columns: var(--rl-cols);
+}
+
+/* ---- the stations ---- */
+.heads {
+  grid-template-rows: auto auto;
+  row-gap: 0.55em;
+  padding-bottom: 0.75em;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  grid-row: 1;
+  padding-left: 1.1em;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+.head > span {
+  font-size: 0.98em;
+}
+.headApi {
+  padding-left: 0;
+}
+.headWf {
+  grid-column: 4;
+  padding-left: 1.45em;
+}
+.headStages {
+  grid-column: 5 / span 5;
+  padding-left: 0.4em;
+}
+
+.headRouter {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55em;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+.headRouter > span {
+  font-size: 0.88em;
+  white-space: nowrap;
+}
+
+.badge {
+  composes: ordinal from '../../css/recipes.module.css';
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2em;
+  height: 2em;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-blue);
+  color: var(--amex-banner-block-ink);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.stageName {
+  grid-row: 2;
+  justify-self: center;
+  font-size: 0.8em;
+  font-weight: 650;
+  color: var(--amex-txt);
+  white-space: nowrap;
+}
+
+.ownHead {
+  grid-row: 2;
+  grid-column: 10;
+  padding-left: 0.5em;
+  font-size: 0.8em;
+  color: var(--amex-mut);
+  white-space: nowrap;
+}
+
+/* ---- the bands ---- */
+.routed {
+  position: relative;
+  display: grid;
+  gap: 0.7em;
+}
+
+.band {
+  grid-template-rows: 2.5em;
+  grid-auto-rows: minmax(2.75em, auto);
+  padding: 0.2em 0 0.45em;
+  border-radius: 0.9em;
+  background: var(--rl-band);
+}
+.routed + .band {
+  margin-top: 0.7em;
+}
+
+.online {
+  --tone: var(--rl-online);
+}
+.offline {
+  --tone: var(--rl-offline);
+}
+
+.bandHead {
+  grid-row: 1;
+  grid-column: 1 / span 2;
+  align-self: center;
+  padding-left: 1.1em;
+}
+.bandTerm {
+  font-size: 0.9em;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+.bandDesc {
+  margin-left: 0.85em;
+  font-size: 0.82em;
+  color: var(--amex-mut);
+}
+
+.cluster {
+  grid-row: 1;
+  grid-column: 4 / span 2;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  padding-left: 1.45em;
+}
+.clusterName {
+  font-size: 0.82em;
+  font-weight: 650;
+  color: var(--tone);
+  white-space: nowrap;
+}
+
+/* ---- 1, the function ---- */
+.fn {
+  grid-column: 1;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  padding: 0.3em 0.3em 0.3em 1.1em;
+}
+.fnName {
+  font-size: 0.95em;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--amex-txt-strong);
+}
+.fnRow {
+  font-family: var(--amex-font-mono);
+  font-size: 0.86em;
+  color: var(--tone);
+}
+
+/* ---- 2, the API or the dispatcher, and the line into the Router ---- */
+.entry {
+  grid-column: 2;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  min-width: 0;
+}
+.entryDrain {
+  grid-column: 2 / span 2;
+}
+
+.method {
+  flex: none;
+  width: 5em;
+  padding: 0.28em 0;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-badge-quiet);
+  color: var(--amex-badge-quiet-ink);
+  font-family: var(--amex-font-mono);
+  font-size: 0.66em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.path {
+  font-family: var(--amex-font-mono);
+  font-size: 0.86em;
+  white-space: nowrap;
+}
+.by {
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.wire {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0.8em;
+  height: 0.13em;
+  background: var(--rl-wire);
+}
+.entryLit .wire {
+  height: 0.19em;
+  background: var(--rl-lit);
+}
+.wireDrain,
+.entryLit .wireDrain {
+  height: 0.13em;
+  background: repeating-linear-gradient(90deg, var(--amex-mut) 0 0.28em, transparent 0.28em 0.7em);
+}
+.wireLabel {
+  position: absolute;
+  right: 0;
+  bottom: 0.45em;
+  font-size: 0.76em;
+  font-style: italic;
+  color: var(--amex-mut);
+  white-space: nowrap;
+}
+
+/* ---- 3, the Router ---- */
+.router {
+  position: absolute;
+  z-index: 2;
+  top: 0.45em;
+  bottom: 0.45em;
+  left: calc(var(--rl-c1) + var(--rl-c2));
+  width: var(--rl-c3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--rl-router);
+}
+.routerSteps {
+  writing-mode: vertical-rl;
+  font-size: 0.68em;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--rl-router-ink);
+}
+
+/* ---- 4, 5 and the last column: one journey ----
+   The pick button is the row's surface. The text and the squares sit on it
+   and let the pointer through, so a click anywhere on the row picks it. */
+.pick {
+  position: relative;
+  z-index: 0;
+  grid-column: 4 / -1;
+  margin: 0.1em 0.45em 0.1em 0.3em;
+  padding: 0;
+  border: 0;
+  border-radius: 0.6em;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.pick:hover {
+  background: var(--rl-hover);
+}
+.pickOn,
+.pickOn:hover {
+  background: var(--rl-pick);
+}
+.pick:focus-visible {
+  outline: 2px solid var(--amex-blue);
+  outline-offset: -2px;
+}
+
+.wf,
+.track,
+.own {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.wf {
+  grid-column: 4;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  padding: 0.35em 0.4em 0.35em 0;
+}
+.out {
+  flex: none;
+  width: 1.15em;
+  height: 0.14em;
+  margin-right: 0.3em;
+  background: var(--tone);
+}
+.wfOn .out {
+  height: 0.2em;
+}
+.outDrain {
+  background: repeating-linear-gradient(90deg, var(--amex-mut) 0 0.28em, transparent 0.28em 0.7em);
+}
+
+.wfSq {
+  flex: none;
+  width: 0.78em;
+  height: 0.78em;
+  margin-right: 0.6em;
+  border-radius: 0.18em;
+  background: var(--tone);
+}
+
+.wfText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12em;
+  min-width: 0;
+}
+.wfName {
+  font-family: var(--amex-font-mono);
+  font-size: 0.88em;
+  line-height: 1.25;
+  color: var(--amex-txt-strong);
+}
+.wfWhy {
+  font-size: 0.8em;
+  color: var(--amex-mut);
+}
+
+.track {
+  grid-column: 5 / span 5;
+}
+.sq,
+.mq {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--rl-slot) * (var(--i) + 0.5));
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: 0.2em;
+  transform: translate(-50%, -50%);
+  background: var(--tone);
+}
+.trackLine {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--rl-slot) * (var(--a) + 0.5));
+  width: calc(var(--rl-slot) * (var(--b) - var(--a)));
+  height: 0.13em;
+  transform: translateY(-50%);
+  background: var(--tone);
+}
+.child .sq,
+.child .trackLine {
+  opacity: 0.38;
+}
+
+.own {
+  grid-column: 10;
+  align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.3em 0.6em 0.3em 0.5em;
+}
+.ownStage {
+  padding: 0.22em 0.6em;
+  border-radius: var(--amex-badge-radius);
+  background: var(--rl-pill);
+  color: var(--amex-txt-strong);
+  font-size: 0.8em;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.ownNote {
+  font-size: 0.8em;
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--amex-mut);
+}
+
+/* a journey with a name rather than a class, such as Pay & Plan */
+.wfNamePlain {
+  font-family: var(--amex-font-sans);
+  font-size: 0.92em;
+  font-weight: 650;
+}
+
+/* ---- 6, the activities ---- */
+.acts {
+  --pick-tone: var(--rl-rest);
+  grid-template-rows: 2.6em;
+  grid-auto-rows: minmax(2.15em, auto);
+  margin-top: 1.5em;
+}
+.pickOnline {
+  --pick-tone: var(--rl-online);
+}
+.pickOffline {
+  --pick-tone: var(--rl-offline);
+}
+
+.actsIntro {
+  grid-row: 1 / span 14;
+  grid-column: 1;
+  padding-right: 1em;
+}
+.actsIntro .head {
+  padding-left: 1.1em;
+  margin-bottom: 0.7em;
+}
+.actsDesc {
+  margin: 0 0 0.6em;
+  padding-left: 1.1em;
+  font-size: 0.82em;
+  line-height: 1.45;
+  color: var(--amex-mut);
+}
+.actsPick {
+  font-size: 0.95em;
+}
+
+.stageNameActs,
+.ownHeadActs {
+  grid-row: 1;
+  align-self: end;
+  padding-bottom: 0.45em;
+}
+
+.stripe {
+  grid-column: 2 / -1;
+  margin-left: calc(var(--rl-c2) - 6em);
+  border-radius: 0.5em;
+  background: var(--rl-stripe);
+}
+
+.actLabel {
+  grid-column: 2 / span 3;
+  align-self: center;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.9em;
+  padding-right: 0.9em;
+}
+.actName {
+  font-family: var(--amex-font-mono);
+  font-size: 0.84em;
+  color: var(--amex-txt-strong);
+}
+.actSystem {
+  flex: none;
+  width: 10.5em;
+  font-size: 0.78em;
+  color: var(--amex-mut);
+  white-space: nowrap;
+}
+.hasPick .actLabel:not(.actOn) .actName {
+  color: var(--amex-mut);
+}
+
+.matrix {
+  position: relative;
+  grid-column: 5 / span 5;
+}
+.mq {
+  background: var(--rl-rest);
+}
+.rail {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--rl-slot) * 0.5 - 0.48em);
+  width: calc(var(--rl-slot) * 4 + 0.96em);
+  height: 0.62em;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: var(--rl-rest);
+}
+.hasPick .mq,
+.hasPick .rail {
+  background: var(--rl-off);
+}
+.hasPick .mq.mOn,
+.hasPick .rail.mOn {
+  background: var(--pick-tone);
+}
+
+.actOwn {
+  grid-column: 10;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding-left: 0.5em;
+}
+.actOwnStage {
+  font-size: 0.8em;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+  white-space: nowrap;
+}
+.hasPick .actOwnStage {
+  color: var(--amex-mut);
+}
+.hasPick .actOwnStage.mOn {
+  color: var(--pick-tone);
+}
+.actNote {
+  font-size: 0.78em;
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--amex-mut);
+}
+
+/* ---- the legend ---- */
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  margin: 1rem 0 0.35rem;
+}
+
+.li {
+  composes: legendItem from '../../css/recipes.module.css';
+}
+
+.swSq {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--tone);
+}
+.swOnline {
+  --tone: var(--rl-online);
+}
+.swOffline {
+  --tone: var(--rl-offline);
+}
+.swPale {
+  opacity: 0.38;
+}
+
+.swWire {
+  flex: none;
+  width: 30px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--rl-wire) 0 50%, var(--rl-online) 50% 100%);
+}
+.swDash {
+  flex: none;
+  width: 30px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--amex-mut) 0 3px, transparent 3px 7px);
+}
+.swRail {
+  flex: none;
+  width: 30px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--rl-rest);
+}
+.swPick {
+  flex: none;
+  width: 30px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--rl-pick);
+}
+
+.note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--amex-mut);
+}
+
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
+}

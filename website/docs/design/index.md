@@ -46,6 +46,11 @@ The pages below start with the rules and the states, then follow the moving part
       desc: `The Router's six steps, the start mode for each kind of request, and which workflow each trigger starts, on which cluster.`,
     },
     {
+      term: 'Function to Activity',
+      to: '/docs/design/function-to-activity',
+      desc: `Every road on one sheet: the One-Data function, the core API or dispatcher, the Router, the workflow, its stages and the activities they call.`,
+    },
+    {
       term: 'Component Model',
       to: '/docs/design/component-model',
       desc: `Every workflow, the twelve stages they run, and the activities those stages call.`,
