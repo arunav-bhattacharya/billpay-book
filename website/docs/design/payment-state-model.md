@@ -152,7 +152,7 @@ The [stages](./component-model/stages.md) page says what each stage calls on the
 
 A payment can go to the customer's bank more than once. Each time is a presentment, numbered by `presentmentSequence` from 1, and each one is its own row in `trans_dtl`.
 
-When a return comes in, Return moves the presentment that came back to `RETURNED`, and that row stays `RETURNED`. If the payment can be presented again, QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`. On the representment date, Represent sends it to the bank and it turns `REPRESENTED`. If that one comes back too, it turns `RETURNED`, and the next presentment is number 3. If a representment fails its recheck, nothing is sent: its own row turns `DECLINED`, and the presentment before it stays `RETURNED`.
+When a return comes in, Return moves the presentment that came back to `RETURNED`, and that row stays `RETURNED`. If the payment can be presented again, QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with the representment date as its clearing date. On that date, Represent sends it to the bank and it turns `REPRESENTED`. If that one comes back too, it turns `RETURNED`, and the next presentment is number 3. If a representment fails its recheck, nothing is sent: its own row turns `DECLINED`, and the presentment before it stays `RETURNED`.
 
 | Presentment | Its row's states, for a payment returned twice |
 | --- | --- |

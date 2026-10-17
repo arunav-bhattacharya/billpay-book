@@ -13,7 +13,7 @@ import DomainModelMap from '@site/src/components/DomainModelMap';
 
 A common way to model a payment is a status column beside fields that may or may not be filled in. That leaves room for a `PAID` payment with no clearing date, or a `RETURNED` one that can't say why it came back. Billpay's model leaves no room for either, because the compiler refuses to build them.
 
-This page shows the model agreed on 2026-10-17, which covers the whole [lifecycle](./payment-state-model.md). The Kotlin supplied on 2026-10-16 doesn't have all of it yet. The map dashes what's missing, and [the last two sections](#what-the-code-still-needs) list it with the questions still open.
+This page shows the model agreed on 2026-10-17, which covers the whole [lifecycle](./payment-state-model.md). The Kotlin supplied on 2026-10-16 doesn't have all of it yet. The map dashes what's missing, and [the last two sections](#what-the-code-still-needs) list it, along with what's still open.
 
 ## The map
 
@@ -57,7 +57,7 @@ Every class from `SCHEDULED` to `REPRESENTED`, `ALLOCATING` and `ALLOCATED` incl
 
 A payment can go to the customer's bank more than once. Each time is a [presentment](./payment-state-model.md#presentments), with its own row and its own `presentmentSequence`, starting at 1.
 
-The model follows the rows. `toRepresentingFullPayment()` doesn't move the returned payment: it builds the next presentment, a `RepresentingFullPayment` numbered one higher, and the `ReturnedFullPayment` it came from stays as it is. Every other move keeps the number.
+The model follows the rows. `toRepresentingFullPayment(representmentDate)` doesn't move the returned payment: it builds the next presentment, a `RepresentingFullPayment` numbered one higher, and the `ReturnedFullPayment` it came from stays as it is. The new presentment clears on the representment date, the date the market's rules set when the return came in. Every other move keeps the number.
 
 That is also why a second return takes its own `ReturnedInfo`. A payment returned twice ends with two `RETURNED` rows, presentments 1 and 2, each with the details of its own return. If a representment fails its recheck, its own row turns `DECLINED`, and the presentment before it stays `RETURNED`.
 
@@ -75,12 +75,12 @@ The 36 functions, grouped by the class they start from. Leg classes mirror the f
 | `ProcessingFullPayment` | `toProcessedFullPayment()`, `toAcceptedSplitPayment(splitSlice)`, `toReturnedFullPayment(returnedInfo)` |
 | `ProcessedFullPayment` | `toPaidFullPayment()`, `toReturnedFullPayment(returnedInfo)` |
 | `PaidFullPayment` | `toReturnedFullPayment(returnedInfo)` |
-| `ReturnedFullPayment` | `toRepresentingFullPayment()`, which builds the next presentment |
+| `ReturnedFullPayment` | `toRepresentingFullPayment(representmentDate)`, which builds the next presentment with the representment date as its clearing date |
 | `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toDeclinedFullPayment(declineCode)` when the recheck fails |
 | `RepresentedFullPayment` | `toReturnedFullPayment(returnedInfo)` |
 | `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same ten moves at leg level: accepted to processing; processing to processed or returned; processed to paid or returned; paid to returned; returned to the next presentment; representing to represented, or declined when the recheck fails; represented to returned |
 
-The arguments say what each move needs. The move out of `PENDING` takes exactly what Verify resolves, so Verify's results are the arguments. Every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile.
+The arguments say what each move needs. The move out of `PENDING` takes exactly what Verify resolves, so Verify's results are the arguments. Every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile, and the move to the next presentment takes the date it clears on.
 
 Dates live in their own small hierarchy. An `InitialTimeline` is set at capture; an `ExecutableTimeline` adds the clearing date, the execution time, the cancel cutoff and whether it runs once or recurs; a `ScheduledTimeline` adds the schedule date. Since every verified class needs an executable timeline, a payment that moves money always knows when it clears and when it can no longer be cancelled.
 
@@ -96,15 +96,12 @@ These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The map d
 4. `bankConfirmation` on `PendingFullPayment`, holding the provider's reference.
 5. `DisallowedFullPayment`, for push payments only.
 6. A second return's details: `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)`, and the same for a leg. Today that move keeps the first return's.
-7. The presentment number: `toRepresentingFullPayment()` and the leg's version build the next presentment, numbered one higher. Today every move copies `presentmentSequence`.
+7. The next presentment: `toRepresentingFullPayment(representmentDate)` and the leg's version number it one higher and give it the representment date as its clearing date. Today they copy the returned presentment's number and timeline.
 8. A representment that fails its recheck turns the new presentment's row `DECLINED`: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`, plus `DeclinedSplitPayment` and its move for a leg. The supplied code's moves from `REPRESENTING` back to `RETURNED` go.
 9. `SplitSlice` gains `splitPaymentId` and `account`, and a leg takes its ID and card account from the slice. Today the code builds the ID with `paymentId.withSplit(seq)` and copies the parent's account.
 
 ## Still open
 
-| Question | What the model does for now |
-| --- | --- |
-| The next presentment's dates | Copied from the returned presentment. Whether a representment should carry its own clearing date is still to be decided |
-| Credit balance refunds | Skipped for now. `Refund` has no classes yet, and the refund steps are still to be defined |
+Credit balance refunds are skipped for now. `Refund` has no classes yet, and the refund steps are still to be defined.
 
 The supplied Kotlin, with the guard code and the build-side detail, is on the [Build Domain Model](../build/domain-model/index.md) pages.

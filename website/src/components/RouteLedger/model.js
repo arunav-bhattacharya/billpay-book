@@ -439,7 +439,7 @@ export const BANDS = [
               Return:
                 'It checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again. That presentment stays RETURNED.',
               QueueRepresentment:
-                'It judges whether the payment can be represented and sets the date from market rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with a REPRESENT row due on that date.',
+                'It judges whether the payment can be represented and sets the date from market rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with that date as its clearing date and a REPRESENT row due on it.',
             },
             then: [{to: 'represent', text: 'on the representment date, its REPRESENT row'}],
           },

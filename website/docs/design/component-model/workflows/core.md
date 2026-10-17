@@ -134,7 +134,7 @@ The same workflow cancels a payment the customer never confirmed at their bank. 
 1. Check the payment, full or split, the presentment that came back, and its status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
 2. Return: that presentment's row turns `RETURNED` and stays there.
 3. Judge whether the return can be represented, and set the representment date from the market's rules: today or later.
-4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with a `REPRESENT` Work Tracker row due on that date. A return never hands off to a representment workflow directly.
+4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never hands off to a representment workflow directly.
 
 ## Process Representment
 

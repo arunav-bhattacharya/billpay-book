@@ -115,7 +115,7 @@ const vert = (a, b, x) => (AT[b].row > AT[a].row ? `M${x},${bot(a)} V${top(b)}` 
 const FX = AT.pendF.cx; /* 396 */
 const SX = AT.accS.cx; /* 740 */
 
-const NEXT = 'builds the next presentment, numbered one higher';
+const NEXT = 'builds the next presentment, numbered one higher and clearing on the representment date; the code copies the number and timeline today';
 const SECOND = 'the code takes no returnedInfo here yet';
 
 const EDGES = [
@@ -162,7 +162,7 @@ const EDGES = [
   {a: 'prodF', b: 'retF', fn: 'toReturnedFullPayment(returnedInfo)',
     d: `M${L('prodF')},${r(6)} H270 V${r(8) - 8} H${L('retF')}`},
   {a: 'paidF', b: 'retF', fn: 'toReturnedFullPayment(returnedInfo)', d: vert('paidF', 'retF', FX)},
-  {a: 'retF', b: 'repingF', fn: 'toRepresentingFullPayment()', note: NEXT, d: vert('retF', 'repingF', FX - 40)},
+  {a: 'retF', b: 'repingF', fn: 'toRepresentingFullPayment(representmentDate)', note: NEXT, d: vert('retF', 'repingF', FX - 40)},
   {a: 'repingF', b: 'repedF', fn: 'toRepresentedFullPayment()', d: vert('repingF', 'repedF', FX)},
   {a: 'repingF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)', note: 'the recheck fails', todo: true,
     d: `M${L('repingF')},${r(9)} H226 V${r(4) + 12} H${R('decF')}`},
@@ -178,7 +178,7 @@ const EDGES = [
   {a: 'prodS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)',
     d: `M${L('prodS')},${r(6)} H${L('prodS') - 16} V${r(8) - 8} H${L('retS')}`},
   {a: 'paidS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)', d: vert('paidS', 'retS', SX)},
-  {a: 'retS', b: 'repingS', fn: 'toRepresentingSplitPayment()', note: NEXT, d: vert('retS', 'repingS', SX - 40)},
+  {a: 'retS', b: 'repingS', fn: 'toRepresentingSplitPayment(representmentDate)', note: NEXT, d: vert('retS', 'repingS', SX - 40)},
   {a: 'repingS', b: 'repedS', fn: 'toRepresentedSplitPayment()', d: vert('repingS', 'repedS', SX)},
   {a: 'repingS', b: 'decS', fn: 'toDeclinedSplitPayment(declineCode)', note: 'the recheck fails', todo: true,
     d: `M${L('repingS')},${r(9)} H606 V${r(11)} H${L('decS')}`},

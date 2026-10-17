@@ -969,7 +969,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
     {step: 1, text: 'Only a payment that got far enough can come back. The workflow checks the payment, whole or a leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment returned again.'},
     {step: 2, text: 'The presentment that came back moves to `RETURNED`, and its row stays there.'},
     {step: 3, text: 'Not every return is worth another try. Billpay judges whether this one can be represented, and sets the representment date from the market\'s rules: today or later.'},
-    {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with a `REPRESENT` Work Tracker row due on that date. A return never starts the representment itself; the date does.'},
+    {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never starts the representment itself; the date does.'},
     {text: 'What happens on that date is [A payment is represented](#a-payment-is-represented).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#7-return', label: 'Sequence diagram'}}
