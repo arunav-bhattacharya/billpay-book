@@ -16,8 +16,8 @@ Four kinds of diagram, in the order you should reach for them.
 | --- | --- | --- |
 | **Mermaid** | A fenced ` ```mermaid ` block in the page | Sequence diagrams, the payment state model, the domain model |
 | **Data-driven components** | React, props | `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, and the table set |
-| **CSS box diagrams** | React, CSS grid or flex | `LandscapeMap`, `ClusterMap` |
-| **Coordinate SVG** | React, hand-placed coordinates | `LegacyEstateMap`, `HADiagram` |
+| **CSS box diagrams** | React, CSS grid or flex | `LandscapeMap`, `ClusterMap`, `RouteLedger` |
+| **Coordinate SVG** | React, hand-placed coordinates | `LegacyEstateMap`, `HADiagram`, `CorporateTracks`, `DomainModelMap`, `OnboardingFlow` |
 
 Nothing on the site uses a charting or graph-layout library. Everything is either
 Mermaid or plain React with CSS and SVG.
@@ -299,7 +299,15 @@ colours.
 
 `LandscapeMap`, `LegacyEstateMap`, `HADiagram` and `StateLegend` hold their own content
 in arrays at the top of the file. They take no props, because they draw one specific
-picture. For a new diagram, copy the file into a new folder, replace the arrays, and
+picture. So do the newer ones:
+
+| Component | Draws | On |
+| --- | --- | --- |
+| `RouteLedger` | Every road on one sheet, from the One-Data function to the activities its stages call. CSS grid in em, so the sheet scales with its container | Design → The Complete Picture |
+| `CorporateTracks` | A corporate payment from intake to `PROCESSED`: pay today and scheduled lanes joining one shared path | Design → Corporate Allocations |
+| `DomainModelMap` | The payment classes, one row per state, with the transition functions as arrows | Design → Domain Model |
+| `OnboardingFlow` | A market release travelling from billpay-ui through the provisioning API to the three environments | Market Onboarding |
+ For a new diagram, copy the file into a new folder, replace the arrays, and
 delete what you do not need. The structure is worth keeping; the data is not.
 
 ---
