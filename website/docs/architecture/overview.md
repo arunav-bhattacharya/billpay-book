@@ -21,7 +21,7 @@ export const GROUPS = [
       },
       {
         title: 'One-Data Functions',
-        role: 'Versioned API gateway, and the inbox where settlement and AR posting wait',
+        role: 'Versioned API gateway, and the inbox that holds work nobody waits for',
         icon: 'gateway',
         items: [
           'CreatePayment.v3',
@@ -77,12 +77,12 @@ export const GROUPS = [
 ];
 
 export const ASIDE = {
-  title: 'Event Handlers & Schedules',
-  role: 'Late outcomes come back in; Schedules start the dispatchers and jobs',
+  title: 'Inbox & Schedules',
+  role: 'Work nobody waits for is held in the inbox; Schedules start the dispatchers that pull it',
   accent: 'var(--amex-cat-architecture)',
   icon: 'async',
-  items: ['Returns', 'Settlement', 'AR posting', 'Dispatchers', 'Periodic jobs'],
-  connectorLabel: 'returns, ready payments and due work come back in at the clusters',
+  items: ['Returns', 'Inbound', 'AR intake', 'Settlement', 'AR posting', 'Dispatchers', 'Periodic jobs'],
+  connectorLabel: 'pulled work and due work come back in at the clusters',
 };
 
 # Architecture Overview
@@ -99,18 +99,18 @@ export const ASIDE = {
 
 - Requests start at the customer and servicing channels, the Accounts Receivable platform, third parties pushing money in, and the allocations manager sending a corporate payment's breakdown. Events from other platforms arrive here too.
 - One-Data Functions are the contracts upstream integrates with. They are versioned, so `CreatePayment.v3` keeps working while what sits behind it changes.
-- Most functions do no work of their own: each delegates to a Billpay core API. The event handlers for settlement and Accounts Receivable posting are the exception. They keep those events in One-Data's inbox, a Postgres database of its own, separate from Temporal's, and mark a payment ready once both are in. Every function and the endpoint it calls is listed in [Build → API Spec](../build/api-spec/one-data.md).
+- Most functions do no work of their own: each delegates to a Billpay core API. Functions for work nobody waits for are the exception. Bulk intake from Accounts Receivable, inbound payments, returns, settlement and Accounts Receivable posting are kept in One-Data's inbox, a Postgres database of its own, separate from Temporal's, and Billpay pulls them from there. Every function and the endpoint it calls is listed in [Build → API Spec](../build/api-spec/one-data.md).
 
 ### Billpay Core layer
 
 The core REST APIs shape the request, and the payment's first step checks it against an idempotency record, so a retried call can never pay twice. Then every payment, whether a channel sent it or a dispatcher released it, starts through the **Billpay Router**. The Router is a library inside the core APIs and the dispatchers, and it runs the same six steps every time:
 
-1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. The traffic must be inside its budget, or the answer is 429 with `Retry-After`.
+1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. A request a dispatcher pulled is marked `REJECTED` instead, with an alert. An allocation callback over its budget gets 429 with `Retry-After`.
 2. Pick the journey from the routing table.
 3. Resolve the behaviors from the market's active release. A behavior set to BOTH becomes Y or N for this journey.
 4. Pin the plan key: the journey, the resolved behaviors and the config version.
 5. Place the work: cluster, task queue, priority and workflow ID.
-6. Start it. When a caller is waiting that means Update-With-Start: the caller gets the payment's state back, the decision once Verify has made it or `PENDING` until then, while the workflow carries on. When nobody is waiting, it means an async start, and the API replies 202 once the workflow exists.
+6. Start it. When a caller is waiting that means Update-With-Start: the caller gets the payment's state back, the decision once Verify has made it or `PENDING` until then, while the workflow carries on. When nobody is waiting, a dispatcher starts it at the governor's pace, as dated work falls due in Oracle or as it pulls requests from One-Data's inbox. Only an allocation callback is an async start, answered 202 once the workflow exists.
 
 [Design → Routing](../design/routing.md) has the full map of trigger to workflow. Below the Router:
 
@@ -127,8 +127,8 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 
 ### Event handlers and schedules
 
-- Event handlers take late outcomes back in. A return starts `ProcessReturnedPaymentWorkflow`. Settlement and Accounts Receivable posting can arrive at a thousand a second, so Billpay never takes them as events. One-Data holds them in its inbox until a payment has both. `ProcessPaidEventsWorkflow` is started every 30 seconds unless a run is still going. It pulls up to 500 ready payments at a time, at the pace the governor allows, marks each batch `PAID` in one transaction and sends their lifecycle events. A leg's events count toward its payment, so split and corporate payments turn `PAID` the same way. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
-- Work that falls due on a date waits in Oracle as a Work Tracker row. One dispatcher per kind of work releases it, each with its own Schedule and budget, at rates the governor resets every 15 seconds. Three periodic jobs, for paid events, missing paid events and the purge, run on Schedules too. [Design → Periodic Workflows](../design/component-model/workflows/periodic.md) has the list.
+- Event handlers take late outcomes back in, and none of them starts a workflow. A return waits in One-Data's inbox, as an inbound payment or a request from Accounts Receivable does, until its dispatcher pulls it at the governor's pace. Settlement and Accounts Receivable posting can arrive at a thousand a second, and they wait there too until a payment has both. `ProcessPaidEventsWorkflow` is started every 30 seconds unless a run is still going. It pulls up to 500 ready payments or legs at a time, at the pace the governor allows, marks each batch `PAID` in one transaction and sends their lifecycle events. A split payment turns `PAID` leg by leg: each leg once it has posted and its payment has settled. The handlers are listed in [Build → API Spec → One-Data Functions](../build/api-spec/one-data.md).
+- Work that falls due on a date waits in Oracle as a Work Tracker row, and work nobody waits for waits in One-Data's inbox. One dispatcher per kind of work releases it, each with its own Schedule and budget, at rates the governor resets every 15 seconds. Three periodic jobs, for paid events, missing paid events and the purge, run on Schedules too. [Design → Periodic Workflows](../design/component-model/workflows/periodic.md) has the list.
 
 ## Two clusters, one hand-off
 
@@ -138,9 +138,9 @@ The split comes from one question: is anyone waiting? A cardmember paying their 
 
 - The Online cluster runs the journeys where a caller is waiting: paying today, scheduling, updating or cancelling from a channel, payment intents, refunds a customer asks for, and the composite flows. At its busiest it handles about 100 payments a second.
 - The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, the periodic jobs, and the control workflows that do the pacing.
-- Each cluster has its own Aurora database, so no amount of midnight work on Offline can slow a payment on Online inside Temporal. What the two share is Oracle and the downstream systems, and the governor watches both. When either comes under pressure, offline work slows down and online traffic doesn't.
+- Each cluster has its own Aurora database, so no amount of midnight work on Offline can slow a payment on Online inside Temporal. What the two share is Oracle, the downstream systems and the app that runs their workers. The governor watches online response times as well as Oracle and the downstreams, so when any of them comes under pressure, offline work slows down and online traffic doesn't.
 - Nothing calls across. A payment scheduled on Online reaches Offline as a Work Tracker row, written in the same Oracle commit as its `SCHEDULED` state. On the due date a dispatcher on Offline claims the row and starts the execution there.
-- Two apps host the workers. The Online app runs the core APIs, the Router and the Online workers, and its core APIs hold a Temporal client for each cluster. The Offline app runs the dispatchers, the governor, the Offline workflows and one worker deployment per downstream queue. Where each physically runs is on [High Availability](./high-availability.md).
+- One app hosts it all: the core APIs, the Router, the dispatchers, the governor and the workers for both clusters, with a Temporal client for each. Offline work gets its own Oracle connection pool and a cap on how much runs at once, so it can't crowd out online work. If the app itself becomes the bottleneck, its online and offline parts can be deployed separately from the same build. Where it physically runs is on [High Availability](./high-availability.md).
 
 ## Why Temporal
 

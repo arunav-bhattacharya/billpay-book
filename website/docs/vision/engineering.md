@@ -74,16 +74,16 @@ Two problems shape almost every decision on this page. The first is variety. Eve
     },
     {
       term: 'Dispatchers and the governor',
-      desc: `Work due on a later date waits in Oracle. On the day, a dispatcher releases it into the Offline cluster at the rate the governor sets from live load.`,
+      desc: `Work due on a later date waits in Oracle, and work nobody waits for waits in One-Data's inbox. Dispatchers release both into the Offline cluster at the rate the governor sets from live load.`,
     },
     {
       term: 'The Event Handlers',
       desc: (
         <>
-          Settlement and Accounts Receivable posting come back later as events, often in bursts.
-          One-Data holds them in its own inbox and marks a payment ready once both are in. A periodic
-          job pulls ready payments in batches and marks them <code>PAID</code>. A return starts a
-          workflow of its own.
+          Settlement, Accounts Receivable posting and returns come back later as events, often in
+          bursts, and One-Data holds them in its own inbox. Dispatchers pull returns, inbound payments
+          and bulk intake from Accounts Receivable at the governor's pace. A periodic job marks payments
+          (a split payment leg by leg) <code>PAID</code> in batches once both confirmations are in.
         </>
       ),
     },
@@ -133,7 +133,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
     },
     {
       term: 'Pace at the door',
-      desc: `Billpay admits only what a cluster and the systems behind it can carry. Big bursts wait outside Temporal: dated work in Oracle, settlement and posting events in One-Data's inbox. A governor resets every offline rate every 15 seconds from database load, latency and downstream health, protecting online traffic first.`,
+      desc: `Billpay admits only what a cluster and the systems behind it can carry. Big bursts wait outside Temporal: dated work in Oracle, and everything nobody waits for in One-Data's inbox. A governor resets every offline rate every 15 seconds from online response times, database load and downstream health, protecting online traffic first.`,
     },
     {
       term: 'One commit per stage',

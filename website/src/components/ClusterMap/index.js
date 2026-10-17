@@ -38,8 +38,8 @@ const CLUSTERS = [
     name: 'Offline cluster',
     shards: '4K shards',
     desc: 'Work that can be paced',
-    start: 'Async start, then 202',
-    startNote: 'Started async; the API replies 202',
+    start: 'Dispatcher or async start',
+    startNote: 'Started by dispatchers, from Oracle or the One-Data inbox, at the pace the governor sets. An allocation callback starts at once and gets a 202',
     runs: ['Execution', 'Allocations', 'Corporate legs', 'AR intake', 'Returns', 'Inbound', 'Representments', 'Periodic jobs', 'Provisioning'],
     control: ['Dispatchers', 'Governor'],
   },
@@ -60,7 +60,7 @@ const DOWNSTREAM = [
 ];
 
 const LABEL =
-  'Two Temporal clusters joined only through Oracle. At the top, channels, where someone is waiting for the answer, and Accounts Receivable, returns, inbound payments and allocation callbacks, where nobody is. Both go through the Billpay core APIs and the Router, which admits each request, picks the journey, resolves the behaviors, pins the plan key, places the work and starts it. Journeys with a caller waiting start on the Online cluster with Update-With-Start: pay today, schedule, update, cancel, intent, refunds and composites, and the cluster responds back to the caller as PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. Work that can be paced starts on the Offline cluster with an async start and a 202: scheduled execution, allocations, corporate legs, AR intake, returns, inbound, representments, periodic jobs and provisioning, paced by the dispatchers and the governor. Each cluster has its own Aurora PostgreSQL database and OpenSearch 2 visibility store; Online has 2,000 history shards and Offline 4,000. Oracle runs under both clusters and holds payments and the Work Tracker. The only hand-off runs through it: a commit on the Online cluster writes a Work Tracker row, and a dispatcher on the Offline cluster claims the row when it falls due. Below, both clusters call the same downstream systems: clearing, Accounts Receivable, authorization, accounting, eBNC, risk, Raven for customer messages, RTF for lifecycle events, and the allocations manager. The governor watches Oracle and the downstreams, so pressure there slows offline work, never online traffic.';
+  'Two Temporal clusters joined only through Oracle. At the top, channels, where someone is waiting for the answer, and Accounts Receivable, returns, inbound payments and allocation callbacks, where nobody is. Both go through the Billpay Router, in the core APIs and the dispatchers, which admits each request, picks the journey, resolves the behaviors, pins the plan key, places the work and starts it. Journeys with a caller waiting start on the Online cluster with Update-With-Start: pay today, schedule, update, cancel, intent, refunds and composites, and the cluster responds back to the caller as PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. Work that can be paced starts on the Offline cluster from the dispatchers, at the pace the governor sets: they release dated work from Oracle and pull AR intake, returns and inbound payments from the One-Data inbox. An allocation callback starts at once instead, and gets a 202 once its workflow has started. Offline work covers scheduled execution, allocations, corporate legs, AR intake, returns, inbound, representments, periodic jobs and provisioning. Each cluster has its own Aurora PostgreSQL database and OpenSearch 2 visibility store; Online has 2,000 history shards and Offline 4,000. Oracle runs under both clusters and holds payments and the Work Tracker. The only hand-off runs through it: a commit on the Online cluster writes a Work Tracker row, and a dispatcher on the Offline cluster claims the row when it falls due. Below, both clusters call the same downstream systems: clearing, Accounts Receivable, authorization, accounting, eBNC, risk, Raven for customer messages, RTF for lifecycle events, and the allocations manager. The clusters share Oracle, the downstream systems and the app that runs their workers, and the governor watches online response times as well as Oracle and the downstreams, so pressure on any of them slows offline work, never online traffic.';
 
 function Chips({items, quiet}) {
   return (
@@ -147,7 +147,7 @@ export default function ClusterMap() {
         <div className={styles.stemIn} data-col="offline" />
 
         <div className={styles.router}>
-          <span className={styles.routerTerm}>Billpay core APIs · Router</span>
+          <span className={styles.routerTerm}>Core APIs · dispatchers · Router</span>
           <span className={styles.routerSteps}>admit · pick the journey · resolve behaviors · pin the plan key · place · start</span>
         </div>
 
@@ -191,8 +191,9 @@ export default function ClusterMap() {
       </div>
 
       <figcaption className={styles.caption}>
-        Only Oracle and the downstream systems are shared. The governor watches both, so pressure there slows offline
-        work, never online traffic.
+        The clusters share Oracle, the downstream systems and the app that runs their workers. The governor watches
+        online response times, Oracle and the downstreams, so pressure on any of them slows offline work, never online
+        traffic.
       </figcaption>
     </figure>
   );

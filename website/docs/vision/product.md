@@ -33,7 +33,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
     },
     {
       term: 'Bulk intake from AR',
-      desc: `Accept scheduled payments in bulk from the Accounts Receivable platform, answering each one as soon as its processing has safely started.`,
+      desc: `Accept scheduled payments in bulk from the Accounts Receivable platform, answering each one as soon as it is safely stored, then working through them at a pace the platform can carry.`,
     },
     {
       term: 'Inbound payments',
@@ -67,7 +67,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
 
 Every payment is either full or split. A **full payment** settles as one amount against one card account. A **split payment** is divided into **allocations**, and each allocation is processed and posted on its own before rolling back up to the original payment.
 
-The usual case is a **corporate payment**: one payment from a company, spread across the accounts it covers. A single one can carry up to 100,000 allocations. The company's payment clears with its bank once, as one amount, on its due date. The breakdown by account arrives separately, from the allocations manager. From the due date on, each allocation posts to its own account as it arrives, in parallel with the clearing. The company still sees one payment, and it counts as paid once its settlement and the first allocation's posting have come back.
+The usual case is a **corporate payment**: one payment from a company, spread across the accounts it covers. A single one can carry up to 100,000 allocations. The company's payment clears with its bank once, as one amount, on its due date. The breakdown by account arrives separately, from the allocations manager. From the due date on, each allocation posts to its own account as it arrives, in parallel with the clearing. The company still sees one payment, but paid is tracked allocation by allocation: each one counts as paid once the company's payment has settled and that allocation has posted.
 
 ## Scheduled payments at midnight
 
@@ -104,7 +104,7 @@ A market whose answers are all combinations Billpay already supports goes live o
 
 Behaviors change how a payment is handled. They do not change what it is called. Whatever the market, the account type or the clearing rule, every payment moves through the **same set of lifecycle states**, which is what lets operations, reporting and downstream systems read a corporate payment in one market and a consumer payment in another the same way.
 
-The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED` and `DISALLOWED` as the other outcomes. A payment can be cancelled only while it is `SCHEDULED`. A corporate payment uses the same states, and tracks its allocations on a separate **allocation status**, so a late breakdown never holds up the payment itself. What each state means, and every transition between them, is in the [Payment State Model](../design/payment-state-model.md).
+The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED` and `DISALLOWED` as the other outcomes. A payment can be cancelled only while it is `SCHEDULED`. A corporate payment uses the same states, and tracks its allocations on a separate **allocation status**, so a late breakdown never holds up the payment itself. It stops at `PROCESSED`, and each allocation turns `PAID` on its own. What each state means, and every transition between them, is in the [Payment State Model](../design/payment-state-model.md).
 
 ## Processing a payment
 
