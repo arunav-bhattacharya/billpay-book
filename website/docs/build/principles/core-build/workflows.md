@@ -1,6 +1,6 @@
 ---
 title: Building Workflows
-description: 'A workflow is the durable spine of one payment journey.'
+description: 'A workflow is the durable spine of one payment journey: it runs its stages in order and does nothing else.'
 sidebar_label: Workflows
 ---
 
@@ -8,99 +8,120 @@ import Lead from '@site/src/components/Lead';
 
 # Building Workflows
 
-<Lead>A workflow is the durable spine of one payment journey. It sequences stages, fans out child workflows, and waits on signals. It does nothing else. Workflow code orchestrates; it never does the work itself.</Lead>
+<Lead>A workflow is the durable spine of one payment journey: it runs its stages in order and does nothing else. It holds no market logic, reaches no database or outside system itself, and never sleeps until a date.</Lead>
 
 ## Why workflow code must be deterministic
 
-Temporal recovers a workflow after any failure by **replaying** its code against the event history it already recorded. That only works if the code takes the same path every time. So inside a workflow: no direct I/O, no wall clocks, no random numbers, no reaching for the database. Anything non-deterministic happens inside an [activity](./activities.md), whose *result* is recorded and replayed.
+Temporal recovers a workflow after any failure by replaying its code against the event history it already recorded. That only works if the code takes the same path every time. So inside a workflow there is no I/O, no wall clock, no random number and no database. Anything that could come out differently on a second run happens in an activity, whose result is recorded and replayed.
 
-You do not have to police this alone. The [module layout](./code-layout.md) keeps activity implementations and clients out of the workflow's compile-time reach. The discipline still matters, though. If you are tempted to compute a date inline, call an activity instead.
+The same goes for stages, which run inside the workflow and reach the outside world only through their activities. If you are tempted to compute a date inline, it belongs in an activity. When a workflow needs an ID of its own, `Workflow.randomUUID()` gives one that replays the same: that is how Process Paid Events makes a batch ID that a retried Settle reuses.
 
 ## Rules for workflow code
 
-- **One workflow per journey.** Create Immediate Payment, Execute Scheduled Payment, Process Returned Payment: one each, ever. There are no per-market workflow implementations.
-- **Never `abstract`.** Variation comes from composition, per the [composition rules](../../../design/principles.md#composition-not-inheritance). If you are adding a per-market `if` to workflow code, you are in the wrong layer. The branch belongs in a stage.
-- **Behaviors come first.** A workflow's behaviors must be in the payment context *before* it starts, because they are what select the implementations. Most workflows use the four standard ones (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`); Create Payment Intent takes `instrumentType` instead of the clearing and posting pair. Each workflow's set is listed in [Design → Core Workflows](../../../design/component-model/workflows/core.md). A combination the market never onboarded has no implementations, and the request is rejected before any workflow begins.
-- **Composite workflows call child workflows.** They never inline another workflow's body.
-- **Treat a running workflow's shape as a contract.** In-flight executions replay against the code that exists when they resume. Renaming or restructuring a workflow with live executions is a breaking change. Use Temporal's workflow-versioning facilities to branch behavior, and remove the old path only when the last old execution has drained.
+- One workflow per journey, with one implementation. Create Immediate Payment, Execute Scheduled Payment and Process Returned Payment exist once each, and no market has a workflow of its own.
+- Never `abstract`. Variation comes from composing different stage implementations, per the [composition rules](../../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
+- Call stages and, on the workflow's own cluster, child workflows. Nothing else: no activity, no client, no outside system and nothing on the other cluster. The [four layers](../../../design/principles.md#the-four-layers) have the full call rules.
+- Pass the payment ID, not the payment. Stages and activities load what they need.
+- Set search attributes once, at start. Use no signals or queries on the hot path.
+- Never wait for a date. Work due later is a Work Tracker row in Oracle, written in the same commit as the state change, and a dispatcher starts the next workflow when it falls due. Nothing waits on a Temporal timer until then.
 
-## The Temporal features we use
+## How a workflow finds its stages
 
-- **Child workflows** come from `newChildWorkflowStub<T>()`. Create Immediate Payment fans out to Get Corporate Payment Allocations, then one Execute Split Payment per allocation.
-- **Signals** replace polling. A corporate payment waits on *AllocationsReceived*, and Get Corporate Payment Allocations waits on *AllocationsReady*.
-- **Timed waits** use `Workflow.await(duration) { condition }`, which parks the workflow durably until the condition or the deadline.
-- **Async fan-out** uses `asyncFunction { }` and `asyncProcedure { }`, which return promises. `Promise.allOf(...)` joins them.
-- **Early return** answers the caller once a payment is `ACCEPTED`, and the workflow keeps processing in the background.
+The Router pins a plan key when it starts the workflow: the journey, the resolved behaviors and the market's config version. The workflow reads its plan key and looks up its stages at runtime, in an index that KSP (Kotlin Symbol Processing) generates at build time. The most specific match wins, and a market override is a more specific match for that market. Stage objects are never passed into a workflow.
+
+Every behavior combination has a default implementation. A combination with no implementation can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts.
+
+## How a workflow starts
+
+How a workflow starts depends on who is waiting for it, and the Router picks the start mode for the journey.
+
+| When | Start | Used by |
+| --- | --- | --- |
+| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | Pay today, schedule, composites, intent, update, cancel, refunds from channels |
+| Nobody waits | One-Data stores the request, and a dispatcher pulls it from the inbox | AR intake, returns, inbound |
+| An allocation callback | Async start, before the 202 reply | Allocation callbacks |
+| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit, which a dispatcher picks up | Scheduled execution, allocation requests, corporate execution, corporate legs, representments |
+
+When a caller waits, its update lands on the workflow's update method and returns as soon as the workflow has the answer, which for a new payment is Verify's decision. The workflow carries on after the reply. A repeated request joins the running workflow instead of starting a second one; that is what `USE_EXISTING` does.
+
+Eager workflow start is not used. The server refuses it with Update-With-Start, and online latency comes from Update-With-Start and local activities instead.
+
+Every one of these starts goes through the Router, and the Router places it: the cluster, task queue, priority, fairness key and workflow ID. [Design → Routing](../../../design/routing.md#start-modes) has the full picture.
+
+## Child workflows
+
+A child always runs on its parent's cluster. These journeys use them:
+
+- A composite runs core workflows as children. Multiple instructions runs one `CreateImmediatePaymentWorkflow` per instruction, and Pay & Plan runs one before it calls the Installments API.
+- Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
+- Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
+
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../../design/corporate-allocations.md) walks through it.
+
+## Versioning
+
+Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor aren't pinned: they move to the new build when they continue-as-new.
+
+Config is pinned the same way. The plan key carries the resolved behaviors and the config version, so a replay finds the same stages. A scheduled payment gets a new plan key on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
 
 ## A worked example: Create Immediate Payment
 
-This is the spec's own sketch of the workflow. It is worth reading line by line, because every rule above is visible in it.
+This is the spec's sketch of the workflow that pays a bill today. Names other than the stages and `PaymentStore` are illustrative.
 
 ```kotlin
-    // Check if the incoming payment is idempotent
-    val pendingPayment = InitiatedToPendingStage.execute(inputPayment)
-    if (!pendingPayment.isIdempotent) {
-        return newActivityStub<PaymentRepository>()
-		  .getExistingPayment(idempotencyKey)
+@WorkflowInterface
+interface CreateImmediatePaymentWorkflow {
+    @WorkflowMethod
+    fun run(paymentId: String, plan: PlanKey)
+
+    // The caller's Update-With-Start lands here and returns once Verify has decided.
+    @UpdateMethod
+    fun decision(): PaymentDecision
+}
+
+class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
+    private var decided: PaymentDecision? = null
+
+    override fun run(paymentId: String, plan: PlanKey) {
+        // Stage implementations come from the plan key, looked up at runtime.
+        val stages = StageIndex.lookup(plan)
+
+        stages.capture.run(paymentId)                  // PENDING, idempotent
+        decided = stages.verify.run(paymentId)         // ACCEPTED or DECLINED, one guarded commit
+        // The caller's update has its answer here. Announce both changes, in order.
+        stages.capture.announce(paymentId)             // the PENDING event to RTF
+        stages.verify.announce(paymentId)              // the decision to RTF, and to Raven where the customer is told
+        if (decided != PaymentDecision.ACCEPTED) return
+        // A corporate payment stops here: Verify's commit wrote its ALLOC_REQUEST row,
+        // and dispatchers start every later step.
+        if (plan.accountType == AccountType.CORPORATE) return
+
+        stages.execute.run(paymentId)                  // PROCESSING: clearing, AR and OTB in parallel
+        stages.execute.announce(paymentId)             // the PROCESSING event
+        stages.fulfil.run(paymentId)                   // accounting, eBNC and risk; then RTF and Raven; then PROCESSED
     }
 
-    // Validate the payment
-    val isValidPayment = paymentValidationActivityGroup.validate(pendingPayment)
-
-    // If payment is not valid then decline it
-    if (!isValidPayment) {
-        val declinedPayment = pendingToDeclinedStage(pendingPayment)
-        return paymentResponse(declinedPayment)
+    override fun decision(): PaymentDecision {
+        Workflow.await { decided != null }
+        return decided!!
     }
-
-    val acceptedPayment = pendingToAcceptedStage.execute(pendingPayment)
-    // This is temporal early return, workflow method will actually not return
-    early_return paymentResponse(acceptedPayment)
-
-    // Process based on Account-type and Split/Non-Split
-    return when {
-        // Corporate Account and the payment is split into allocations
-        acceptedPayment.account.type == CORPORATE && acceptedPayment.isSplit -> {
-            val processingPaymentPromise = asyncFunction {
-                acceptedToProcessingStage(acceptedPayment)
-            }
-            val childWorkflowPromise = asyncProcedure {
-                newChildWorkflowStub<CorporatePaymentAllocationsWorkflow>()
-                    .fetchAllocations(acceptedPayment)
-            }
-            Promise.allOf(processingPaymentPromise, childWorkflowPromise).get()
-            Workflow.await(duration) { allocationsReceivedPromise.isCompleted }
-            allocations.forEach {
-                newChildWorkflowStub<ExecuteSplitPaymentWorkflow>
-                    .execute(it)
-            }
-            paymentResponse(processingPaymentPromise.get())
-        }
-
-        // Consumer Non-split
-        acceptedPayment.isFull -> {
-            val processingPayment = acceptedToProcessingStage(acceptedPayment)
-            val processedPayment = processingToProcessedStage(processingPayment)
-            paymentResponse(processedPayment)
-        }
-
-        // Consumer Split
-        acceptedPayment.isSplit -> {
-            val acceptedPaymentSplits =
-                newActivityStub<CreatePaymentSplitsActivity>(acceptedPayment)
-            acceptedPaymentSplits.forEach {
-                newChildWorkflowStub<ExecuteSplitPaymentWorkflow>
-                    .execute(it)
-            }
-            paymentResponse(acceptedPayment)
-        }
-    }
+}
 ```
 
-Read it once through. The idempotency check happens before anything else. Every state move is a **stage**, validation is an **activity group**, and the caller is answered at `ACCEPTED` via early return. The corporate branch runs processing and the allocations child workflow *in parallel*, then waits on the signal before fanning out the splits. Nothing in the method touches a database, a clock, or a wire. The stages and activities behind it do.
+The workflow never names a market: `StageIndex.lookup(plan)` is the only place its stages come from. Capture and Verify commit back to back, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
-The sketch is reproduced as the spec writes it, so two of its type names differ from the catalogue: `CorporatePaymentAllocationsWorkflow` is `GetCorporatePaymentAllocationsWF`, and `CreatePaymentSplitsActivity` is `PaymentSplitsCreationActivity`. Follow the catalogue names when you write the real thing.
+A declined payment ends there, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
 
-## Which worker runs it
+Nothing in the method touches a database, a clock or a wire. The stages and their activities do. The sketch leaves out consumer splits, whose legs run as child workflows.
 
-Every workflow is pinned to a Temporal worker by one question: is a person waiting? **Online** runs the request path (create, update, cancel, intent). **Offline** runs everything driven by an event or a scheduler (scheduled execution, inbound, returns, representment, allocations, the periodic sweeps). Three run on either, depending on where in the journey they are invoked: Create Schedule Payment, Execute Split Payment, and Create Balance Refund. The catalogue with per-workflow worker and behaviors is in [Design → Workflows](../../../design/component-model/workflows/index.md).
+## Which cluster runs it
+
+The Router decides, when it places the start, and the workflow has no say. Work a caller waits for runs on the Online cluster. Work that a dispatcher, a Schedule or a callback starts runs on the Offline cluster. Three workflows run on either, depending on what started them:
+
+| Workflow | On Online | On Offline |
+| --- | --- | --- |
+| Create Scheduled Payment | From a channel | From AR, through the AR intake dispatcher |
+| Execute Split Payment | A consumer leg of an Online parent | A corporate leg, or a consumer leg of an Offline parent |
+| Create Balance Refund | From a channel | A refund AR raises, through the AR intake dispatcher |
+
+[Design → Workflows](../../../design/component-model/workflows/index.md) has every workflow with its cluster, workflow ID and behaviors.

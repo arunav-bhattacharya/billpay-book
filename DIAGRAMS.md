@@ -182,7 +182,7 @@ Pass the array, get the component.
 | Component | Props | Use it for |
 | --- | --- | --- |
 | `DataTable` | `columns`, `rows`, `rowKey`, `rowProps`, `separator`, `caption`, `toolbar`, `footer` | The house table. Every other table component is built on it. Also exports `TableShell`, the panel on its own, if you need the chrome around something that is not a `DataTable`. |
-| `ApiTable` | `rows: [{fn, method, path, purpose, tag?}]`, `base` | Listing API endpoints. |
+| `ApiTable` | `rows: [{fn, method?, path?, api?, purpose, tag?, link?}]`, `base` | Listing One-Data functions and the core API behind each. A function with no core API gives `api` in place of the method and path; `link: false` leaves a name the explorer doesn't list unlinked. A long name breaks before a capital and a long path before a slash. |
 | `ActivityTable` | `rows: [{name, behaviors, transition, does}]` | Workflow activities. |
 | `ScheduleTable` | `rows: [{schedule, workflow}]` | Cron-style schedules. |
 | `CompareTable` | `rows: [{what, legacy, modern}]` | Before-and-after comparisons. `**bold**` works inside cells. |
@@ -193,7 +193,7 @@ Pass the array, get the component.
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
 | `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more | One payment journey as a banded process flow. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
-| `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row` or `child`). A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
+| `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row` or `child`) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
 | `WorkflowMeta` | `worker`, `behaviors` | The metadata strip above a workflow section. |
 | `WorkerChip` | `worker`, `children` | The Online or Offline tag, inline. |

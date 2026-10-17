@@ -25,7 +25,7 @@ The call chain is strict, **Workflow → Stage → ActivityGroup → Activity �
     {
       term: 'Workflows',
       to: '/docs/build/principles/core-build/workflows',
-      desc: `Deterministic orchestration: one workflow per journey, composed from stages, with the spec's worked example.`,
+      desc: `Deterministic orchestration: one workflow per journey, its stages from the plan key, how it starts, and the spec's sketch.`,
     },
     {
       term: 'Stages',

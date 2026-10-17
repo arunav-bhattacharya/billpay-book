@@ -8,29 +8,70 @@ import Lead from '@site/src/components/Lead';
 
 # Database
 
-<Lead>One row in <code>trans_dtl</code> is the truth about a payment's current state. Everything else in the schema is either an append-only log of how it got there, a guard against processing it twice, or a tracker for the events and notifications still owed. Those four roles cover the whole schema.</Lead>
+<Lead>One row in <code>trans_dtl</code> is the truth about a payment's current state. The rest of Billpay's Oracle schema records how the payment got there, guards against doing the same work twice, and holds the work that is still to start.</Lead>
 
-## The tables
+`PaymentStore` is the only code that reads or writes these tables. Each of its operations is one transaction, and every write in it is either insert-if-absent or a conditional update on the current status, so a retried step can never apply twice. Settlement and AR posting events aren't here: they wait in One-Data's inbox, in its own Postgres database, and Billpay reaches them only through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions). There is no outbox either, because lifecycle events and customer messages are activity calls.
 
-| Table | Role | Written by |
+## Payment tables
+
+| Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | **Current state.** One row per payment: the status a workflow reads and every stage updates. | `PersistPendingPaymentActivity` creates it, and `PaymentStateTransitionActivity` moves it. |
-| `trans_lfcyc_event` | **The audit log.** Append-only, with a new row for every state a payment has ever been in. Never updated, only added to. | Same two activities, one row per transition. |
-| `split_trans_dtl` | Current state at the **split leg** level (corporate allocations, consumer splits). | `PaymentSplitsCreationActivity` creates the legs; `PaymentSplitStateTransitionActivity` moves them. |
-| `split_trans_lfcyc_event` | The append-only log at the split level. | Same, per split transition. |
-| `idempotency_checker` | **The duplicate guard.** One row per API request, and the unique constraint is the check. | Create paths via `PersistPendingPaymentActivity`, mutate paths via `IdempotencyCheckActivity`. |
-| `ORIG_TRANS_REFER_MAP` | Links a replacement payment to the original when Update Payment cancels and recreates. This is the audit trail across payment ids. | `MapNewPaymentIdToPreviousIdActivity`. |
-| External Transaction Events Tracker | Records the **clearing-settlement** and **AR-posted** events per payment; a payment closes to `PAID` only when both are present. Rows get flagged "picked-up-for-processing" so a sweep never double-reads. | The event-handler functions write; the Paid Events sweeps read and flag. |
-| Notification tracker | One row per outbound notification the execution and fulfillment steps owe a downstream system. | `PaymentExecutionActivityGroup` and `PaymentFulfillmentActivityGroup`, per notification. |
+| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. |
+| `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
+| `split_trans_dtl` | Leg of a split payment, consumer or corporate | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
+| `split_trans_lfcyc_event` | Status a leg reached | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
+| Idempotency table | Request | Capture's insert-if-absent check. A duplicate means the request was seen before. |
+| `ORIG_TRANS_REFER_MAP` | Replacement payment | The old and new payment IDs, when Update Payment cancels a payment and creates its replacement. |
+| `allocation_batch` (new) | Allocations callback | A corporate payment's allocations, stored before `ReceiveAllocationsWorkflow` starts, and when that batch's legs were written. It keeps big batches out of workflow inputs, holds every batch until the parent's Execute releases its legs, and makes sure each batch's legs are written once. |
 
-Column-level definitions are still settling and are deliberately not documented here. Treat this page as the authoritative *set of tables and responsibilities*, and the code's `Table` objects as the current truth for columns.
+Both timelines are append-only. A step adds a row and never updates one, so the history of a payment is exactly the rows it left behind.
 
-## How the code sees it
+## Work and config tables
 
-Every table has one [Exposed](./principles/tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Activities open one `transaction { }` per call, which is also the [retry boundary](./principles/core-build/activities.md). Workflow code never touches any of this, because it has to [stay deterministic](./principles/core-build/workflows.md#why-workflow-code-must-be-deterministic).
+| Table | One row per | Holds |
+| --- | --- | --- |
+| `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg or a representment, and when it is due. Written in the same commit as the state change that creates it. |
+| `market_config_version` (new) | Published version of a market profile | Immutable once saved. |
+| `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketProvisioningWorkflow` writes it. |
+| `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
+| `rate_allocation` (new) | Traffic class, market or corporate payment | The rate the governor sets, which dispatchers read every few seconds. Manual overrides live here too. |
+| `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, last 429. |
+| `governor_decision` (new) | Governor check, every 15 seconds | Its inputs and outputs, so any rate can be explained later. |
 
-## Three Oracle habits to know
+## The Work Tracker
 
-- **The unique index is the idempotency check.** Nobody SELECTs to see if a request was seen before. We insert, and `ORA-00001` on the duplicate *is* the answer. First write wins with no race window, and the losing request reads back the original outcome.
-- **Partitions are how the logs stay finite.** The lifecycle-event and notification logs only grow, so they are range-partitioned by event date and `DataPurgingWF` retires whole partitions. Dropping a partition is instant. Deleting a billion rows is not.
-- **The primary is for payments.** Reporting and analytics run against read replicas. If your query does not advance a payment, it does not belong on the primary.
+| Column | Holds |
+| --- | --- |
+| `item_id` | Primary key: a deterministic business key such as `exec:{paymentId}`, so a retried insert can't create duplicate work |
+| `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_EXEC`, `ALLOC_LEG` or `REPRESENT` |
+| `ref_id` | The payment or leg ID in the payment tables |
+| `group_key` | The market, or the parent payment ID for a leg |
+| `due_at` | The earliest start: the execution time, the fetch time, the time a leg is written, or the representment date |
+| `priority` | Claim order inside a type |
+| `status` | `SCHEDULED`, `DISPATCHING`, `DISPATCHED`, `DONE`, `FAILED` or `CANCELLED` |
+| `run_id`, `claimed_at` | Which dispatcher run claimed it, and when |
+| `attempts`, `last_error` | Dispatch retries, and the last failure |
+| `trace_parent` | The producer's OpenTelemetry context, for span links |
+
+Workflow IDs aren't stored, because each one is the payment ID plus its suffix. [Design → Pacing](../design/pacing.md#the-work-tracker) has what each type is due at, which dispatcher starts it and how a row's status moves.
+
+The table grows by millions of rows, so three choices keep it fast:
+
+- The claim index is function-based, on `CASE WHEN status = 'SCHEDULED' THEN … END` for `item_type`, `group_key`, `priority` and `due_at`. Oracle stores no entry when every key is NULL, so the index holds only rows that can be claimed and stays small beside the finished ones.
+- An in-flight index uses the same trick for `DISPATCHING` and `DISPATCHED` rows, so counting work in flight is a small index scan.
+- Daily interval partitions on `due_at`, with row movement on. The purge drops a partition 15 days after it falls due, so there are no mass `DELETE`s.
+
+A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetches up to N rows with `BULK COLLECT … LIMIT N`, marks those IDs `DISPATCHING` and commits. `ROWNUM <= N` doesn't work with SKIP LOCKED, because ROWNUM counts the locked rows too and can return fewer rows than asked, or none. `FETCH FIRST` doesn't work either: Oracle refuses it together with `FOR UPDATE`.
+
+## What PaymentStore does
+
+| Operation | In one transaction |
+| --- | --- |
+| Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table |
+| A stage commit | The guarded status update, the timeline row with the cluster, and any Work Tracker rows the step creates or closes |
+| Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, together with the note on the batch that its legs are written |
+| Cancel | The guarded update to `CANCELLED`, and cancelling the payment's Work Tracker rows |
+| Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
+| Settle | A batch of up to 500 inbox rows as JDBC batches: each a guarded update from `PROCESSED` to `PAID`, with a `PAID` timeline row tagged with the batch ID wherever the update changed a row |
+
+Every table has one [Exposed](./principles/tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Workflow code never touches any of this, because it has to [stay deterministic](./principles/core-build/workflows.md#why-workflow-code-must-be-deterministic).

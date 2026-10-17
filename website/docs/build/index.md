@@ -32,7 +32,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Database',
       to: '/docs/build/database',
-      desc: `The Oracle tables under the domain model, which activity writes each one, and the three Oracle habits worth knowing.`,
+      desc: `The Oracle tables under the domain model, the Work Tracker that holds dated work, and what each PaymentStore transaction writes.`,
     },
     {
       term: 'Schedules',

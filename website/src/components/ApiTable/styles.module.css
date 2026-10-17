@@ -18,15 +18,15 @@
 }
 
 /* ---- the function, linked to its contract ---- */
-/* The cell wraps but the name itself does not, so a row carrying a tag lets
-   the tag drop below the name instead of forcing the column ~95px wider and
-   taking that width out of the description. */
+/* The cell wraps, so a row carrying a tag lets the tag drop below the name
+   instead of forcing the column ~95px wider and taking that width out of the
+   description. A name breaks only where FnName allows it: before a capital,
+   in a name of 30 characters or more. */
 .fnCell {
   white-space: normal;
 }
 
 .fn {
-  white-space: nowrap;
   font-family: var(--amex-font-sans);
   font-size: inherit;
   font-weight: 500;
@@ -39,6 +39,12 @@
 .fn:hover {
   color: var(--amex-blue-deep);
   border-bottom-color: currentColor;
+}
+
+/* A name the explorer doesn't list yet, such as a placeholder, is text. */
+.fnPlain {
+  font-weight: 500;
+  color: var(--amex-txt);
 }
 
 .out {
@@ -59,7 +65,9 @@
 }
 
 /* ---- the core API ---- */
-.apiCell {
+/* The verb and the path's first segment never part. The rest of the path
+   may wrap before a slash, at the <wbr> Path puts there. */
+.lead {
   white-space: nowrap;
 }
 
@@ -92,6 +100,11 @@
   color: #2f7d54;
   background: color-mix(in srgb, #2f7d54 12%, transparent);
   border: 1px solid color-mix(in srgb, #2f7d54 30%, transparent);
+}
+
+/* No core API: the function stores its request in One-Data's inbox. */
+.noApi {
+  color: var(--amex-mut);
 }
 
 .path {
