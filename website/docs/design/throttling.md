@@ -83,3 +83,5 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 | `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
+
+The Online cluster needs none of this. Its one task queue, `online-wf`, carries the workflow tasks and their regular activities, with eager dispatch on. Online traffic is never throttled, so there are no `ds-*` queues on that side.

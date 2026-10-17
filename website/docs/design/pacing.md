@@ -46,6 +46,7 @@ stateDiagram-v2
   [*] --> SCHEDULED: written by the producer
   SCHEDULED --> DISPATCHING: claimed
   DISPATCHING --> DISPATCHED: workflow started
+  DISPATCHING --> FAILED: Router refused it
   DISPATCHED --> DONE: last commit
   DISPATCHED --> FAILED: retries ran out
   SCHEDULED --> CANCELLED: the payment is cancelled
@@ -56,7 +57,7 @@ stateDiagram-v2
 | `SCHEDULED` | The producer, in the same commit as the domain row. For a leg, that is `ReceiveAllocationsWorkflow` or the leg dispatcher's release, whichever writes it |
 | `DISPATCHING` | The dispatcher's claim |
 | `DISPATCHED` | The dispatcher, after a successful start |
-| `DONE` or `FAILED` | The workflow's last commit |
+| `DONE` or `FAILED` | The workflow's last commit; or `FAILED` from the dispatcher, when the Router refuses the row |
 | `CANCELLED` | `CancelPaymentWorkflow`, in the commit that cancels the payment |
 
 Workflow IDs aren't stored: each one is the payment ID plus its suffix. No row waits on another: a leg is written only once its parent is `ACCEPTED`, so its row starts `SCHEDULED`. Daily partitions are dropped 15 days after they fall due, so finished rows never pile up.

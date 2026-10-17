@@ -1,157 +1,834 @@
-/* RouteMap: the Billpay Router as a grouped, scannable table.
+/* RouteMap: the fork tree. Blue Box rules: tinted trays on the panel, filled
+   workflow boxes with a cluster square, grey connectors, no outlines.
 
-   Set in the body sans throughout, at one size in the body, with the header
-   band a step above it. The trigger, condition, workflow name, sequence arrow
-   and the two pill labels each used to carry their own font-size, spanning
-   0.56rem to 0.95rem, and the workflow name was monospaced. Emphasis comes
-   from weight, colour and the pill fills instead.
+   Colour means cluster only. The two cluster tones come from the worker
+   tokens, so they match WorkerChip everywhere; everything else is grey.
 
-   Chrome comes from DataTable, Deep Blue head band included; this is only
-   what this table does differently. --rm-accent is the hue of the trigger
-   rail and the group tints: the architecture navy in light, Bright Blue in
-   dark, where that navy's light counterpart would read as a white rule. */
+   Geometry. Every vertical line is 1px wide and runs down the centre of a
+   workflow's square: the square is 9px at an 8px inset, so its centre sits
+   12.5px in, which is the middle of a line drawn at 12px. Junction squares
+   are 7px, so a line at 13px runs through their middle when they sit at
+   10px. Every number below follows from those two facts. */
 
-.table {
-  --rm-accent: var(--amex-cat-architecture);
-  --dt-min-width: 820px;
-  --dt-pad: 0.6rem 0.95rem;
-  --dt-th-pad: 0.72rem 0.95rem;
-  /* Chips (the Online/Offline worker pill, the account tag) sit a step below
-     the text. They are uppercase and tracked, so matching the body size made
-     them read larger than the prose beside them rather than equal to it. */
-  --dt-chip: 0.72rem;
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+  container-type: inline-size;
+
+  --rm-tray: var(--amex-rail);
+  --rm-ink: var(--amex-txt);
+  --rm-mut: var(--amex-mut);
+  --rm-line: color-mix(in srgb, var(--amex-platinum) 80%, transparent);
+  --rm-on: var(--amex-worker-online);
+  --rm-off: var(--amex-worker-offline);
+  --rm-on-fill: color-mix(in srgb, var(--rm-on) 9%, var(--rm-tray));
+  --rm-off-fill: color-mix(in srgb, var(--rm-off) 9%, var(--rm-tray));
+
+  --rm-node-h: 26px;
+  --rm-mid: 13px; /* half a box: where every line meets it */
+  --rm-axis: 12px; /* a vertical line under a box's square */
+  --rm-indent: 30px; /* a child sits this far in from its parent */
+  --rm-head: 6px; /* arrowhead length */
+  --rm-lift: 7px; /* room above the first box for the label on the line into it */
+  --rm-trig: 7.4rem;
+  --rm-entry: 6.6rem;
+  --rm-arm: 9.5rem;
+  --rm-fs: 0.676rem; /* 11.5px on the site's 17px base */
+  --rm-fs-name: 0.706rem; /* 12px */
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 1.1rem 1rem 1rem;
+  font-family: var(--amex-font-sans);
 }
 
-.thTrigger { width: 1%; }
-.thCond { width: 22%; }
-.thStart { width: 20%; }
-
-/* What starts the workflow: a start mode or a dispatcher, in the muted ink so
-   the workflow chips stay the thing the eye lands on. */
-.startCell {
-  --dt-cell-color: var(--amex-mut);
+/* In dark mode the muted ink is a neutral grey: the site's muted blue is the
+   Offline colour here, and a label must never read as a cluster. */
+:global([data-theme='dark']) .wrap {
+  --rm-tray: var(--amex-card-hover);
+  --rm-mut: var(--amex-platinum);
+  --rm-line: color-mix(in srgb, var(--amex-platinum) 52%, transparent);
+  --rm-on-fill: color-mix(in srgb, var(--rm-on) 17%, var(--rm-tray));
+  --rm-off-fill: color-mix(in srgb, var(--rm-off) 13%, var(--rm-tray));
 }
 
-/* Trigger group cell — spans its rows, accented left rail, subtle tint. */
-.triggerCell {
-  --dt-valign: middle;
-  --dt-cell-weight: 650;
-  --dt-cell-color: var(--amex-txt-strong);
-  white-space: nowrap;
-  background: color-mix(in srgb, var(--rm-accent) 5%, var(--ifm-background-color));
-  --dt-divider-right: 1px solid var(--amex-line);
-  box-shadow: inset 3px 0 0 var(--rm-accent);
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
 }
 
-/* Stronger rule between trigger groups. */
-.groupStart > * {
-  --dt-rule: 2px solid var(--amex-line-strong);
-}
+/* ---- the key ---------------------------------------------------------- */
 
-/* Divider between conditions within one trigger group, so each condition and
-   its account variations read as a single block. */
-.condStart > td {
-  --dt-rule: 1px solid var(--amex-line-strong);
-}
-
-/* Condition column. */
-.condCell {
-  white-space: nowrap;
-}
-.branch {
-  margin-right: 0.35rem;
-  color: color-mix(in srgb, var(--rm-accent) 60%, var(--amex-mut));
-  font-weight: 700;
-}
-
-/* Child (split / allocation) rows attach to their parent — no top rule, faint
-   tint, and the condition indented under the one it branches from. */
-.childRow > td {
-  --dt-rule: none;
-  background: color-mix(in srgb, var(--rm-accent) 4%, transparent);
-}
-.childRow > .condCell {
-  --dt-pad: 0.6rem 0.95rem 0.6rem 1.6rem;
-  --dt-cell-color: var(--amex-mut);
-}
-
-/* ---- workflow pipeline ---- */
-.pipeline {
+.key {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.5rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 1rem;
+  padding: 0 0.25rem;
 }
-.wf {
+
+.keyGrid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem 1.4rem;
+}
+
+.keyHead {
+  font-size: 0.588rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rm-mut);
+}
+
+.keyItems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.4rem;
+}
+
+.keyItem {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-}
-.wfName {
-  font-family: var(--amex-font-sans);
-  font-size: inherit;
-  color: var(--amex-txt);
-  background: none;
-  border: none;
-  padding: 0;
-}
-.seq {
-  color: var(--amex-mut);
-  font-weight: 700;
+  gap: 0.55rem;
+  font-size: var(--rm-fs-name);
+  line-height: 18px;
+  color: var(--rm-ink);
 }
 
-/* Shape only. The tone is WorkerChip's, from the shared worker tokens. This
-   table used to paint its fill from a different hex than its text on both
-   tones, and a cyan rather than a blue in dark. */
-.worker {
-  --chip-radius: 5px;
-  --chip-pad: 0.1rem 0.4rem;
-  --chip-fs: var(--dt-chip);
-  --chip-line: 0%;
+.keyNote {
+  margin: 0;
+  font-size: var(--rm-fs);
+  line-height: 18px;
+  color: var(--rm-mut);
 }
 
-/* Account-type tag on split/allocation rows — the routing behavior, made visible. */
-/* 6px, the badge corner the rest of the site uses. This was the only 5px on
-   the site. */
-.acct {
-  composes: chip from '../../css/recipes.module.css';
-  --chip-fs: var(--dt-chip);
-  --chip-pad: 0.05rem 0.42rem;
-  margin-right: 0.45rem;
-  text-transform: uppercase;
-  vertical-align: 1px;
-}
-/* Tones come from the shared account-type tokens, which swap with the theme. */
-.consumer {
-  color: var(--amex-acct-consumer);
-  background: color-mix(in srgb, var(--amex-acct-consumer) 11%, transparent);
-}
-.corporate {
-  color: var(--amex-acct-corporate);
-  background: color-mix(in srgb, var(--amex-acct-corporate) 11%, transparent);
-}
-.travel {
-  color: var(--amex-acct-travel);
-  background: color-mix(in srgb, var(--amex-acct-travel) 11%, transparent);
+/* a box with nothing in it but its square */
+.swatch {
+  --rm-node-h: 18px;
+  padding: 0 7px;
+  min-width: 26px;
 }
 
-/* ---- dark theme ---- */
-:global([data-theme='dark']) .table {
-  --rm-accent: var(--amex-blue-bright);
-  --dt-table-bg: var(--amex-panel);
+.swatch .sq {
+  margin-top: 4.5px;
 }
-:global([data-theme='dark']) .triggerCell {
-  background: color-mix(in srgb, var(--rm-accent) 16%, var(--amex-panel));
+
+.kLine {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 8px;
 }
-:global([data-theme='dark']) .childRow > td {
-  background: color-mix(in srgb, var(--rm-accent) 12%, transparent);
+
+.kLine::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: var(--rm-head);
+  top: 3.5px;
+  border-top: 1px solid var(--rm-line);
 }
-:global([data-theme='dark']) .consumer {
-  background: color-mix(in srgb, var(--amex-acct-consumer) 16%, transparent);
+
+.kLine::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: var(--rm-head);
+  height: 8px;
+  background: var(--rm-line);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
-:global([data-theme='dark']) .corporate {
-  background: color-mix(in srgb, var(--amex-acct-corporate) 16%, transparent);
+
+.kDash::before {
+  border-top-style: dashed;
 }
-:global([data-theme='dark']) .travel {
-  background: color-mix(in srgb, var(--amex-acct-travel) 16%, transparent);
+
+.kElbow {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 14px;
+}
+
+.kElbow::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 8px;
+  height: 11px;
+  box-sizing: border-box;
+  border-left: 1px solid var(--rm-line);
+  border-bottom: 1px solid var(--rm-line);
+  border-bottom-left-radius: 4px;
+}
+
+.kElbow::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 6.5px;
+  width: var(--rm-head);
+  height: 8px;
+  background: var(--rm-line);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.kFork {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 16px;
+}
+
+.kFork::before {
+  content: '';
+  position: absolute;
+  left: 6.5px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--rm-line);
+}
+
+.kFork::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 4.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background: var(--rm-line);
+}
+
+/* ---- trays and routes ------------------------------------------------- */
+
+.tray {
+  display: block;
+  padding: 1rem 0.875rem 1.1rem;
+  border-radius: 10px;
+  background: var(--rm-tray);
+}
+
+.tray + .tray {
+  margin-top: 0.5rem;
+}
+
+/* Three columns where there is room: the trigger, the line from it, and the
+   workflows. Narrower, the trigger goes above (see the container queries). */
+.route {
+  display: grid;
+  grid-template-columns: var(--rm-trig) var(--rm-entry) minmax(0, 1fr);
+  grid-template-areas: 'trig entry flow';
+  align-items: start;
+}
+
+.route + .route {
+  margin-top: 1.6rem;
+}
+
+.trig {
+  grid-area: trig;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.6rem 0 0;
+}
+
+.term {
+  font-size: 0.824rem;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--rm-ink);
+}
+
+.desc {
+  font-size: 0.735rem;
+  line-height: 17px;
+  color: var(--rm-mut);
+}
+
+.entry {
+  grid-area: entry;
+  min-width: 0;
+}
+
+.flow {
+  grid-area: flow;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding-top: var(--rm-lift);
+}
+
+/* ---- a workflow box --------------------------------------------------- */
+
+.on {
+  --rm-tone: var(--rm-on);
+  --rm-fill: var(--rm-on-fill);
+}
+
+.off {
+  --rm-tone: var(--rm-off);
+  --rm-fill: var(--rm-off-fill);
+}
+
+.nodeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.3rem 0.9rem;
+  max-width: 100%;
+}
+
+.node {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  min-height: var(--rm-node-h);
+  box-sizing: border-box;
+  padding: 0 11px 0 8px;
+  border-radius: 5px;
+  background: var(--rm-fill);
+  color: var(--rm-ink);
+}
+
+.sq {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 8.5px;
+  border-radius: 2px;
+  background: var(--rm-tone);
+}
+
+.name {
+  min-width: 0;
+  padding: 5px 0;
+  font-family: var(--amex-font-mono);
+  font-size: var(--rm-fs-name);
+  line-height: 16px;
+  overflow-wrap: normal;
+}
+
+.self .selfText {
+  padding: 5px 0;
+  font-size: var(--rm-fs-name);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.aside {
+  align-self: center;
+  font-size: var(--rm-fs);
+  line-height: 16px;
+  color: var(--rm-mut);
+}
+
+.caption {
+  display: block;
+  font-size: var(--rm-fs);
+  line-height: 16px;
+  color: var(--rm-mut);
+}
+
+.self + .caption {
+  margin-top: 4px;
+}
+
+/* ---- how a workflow starts -------------------------------------------- */
+
+.mode {
+  font-weight: 500;
+  color: var(--rm-ink);
+}
+
+.det {
+  color: var(--rm-mut);
+}
+
+/* Down the page: a line under the box above, the words to its right, and a
+   head pointing at the box below. This is how every line inside a flow runs. */
+.edge {
+  position: relative;
+  display: block;
+  padding: 9px 0 13px calc(var(--rm-axis) + 12px);
+  font-size: var(--rm-fs);
+  line-height: 16px;
+}
+
+.edge::before {
+  content: '';
+  position: absolute;
+  left: var(--rm-axis);
+  top: 0;
+  bottom: var(--rm-head);
+  border-left: 1px solid var(--rm-line);
+}
+
+.edge::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--rm-axis) - 3.5px);
+  bottom: 0;
+  width: 8px;
+  height: var(--rm-head);
+  background: var(--rm-line);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.waits.edge::before {
+  border-left-style: dashed;
+}
+
+/* A child: the parent's line drops past the words, then turns into the child,
+   one indent in. */
+.child {
+  display: block;
+}
+
+.childHow {
+  position: relative;
+  display: block;
+  padding: 7px 0 5px calc(var(--rm-axis) + 12px);
+  font-size: var(--rm-fs);
+  line-height: 16px;
+}
+
+.childHow::before {
+  content: '';
+  position: absolute;
+  left: var(--rm-axis);
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--rm-line);
+}
+
+.childRow {
+  position: relative;
+  display: block;
+  padding-left: var(--rm-indent);
+}
+
+.childRow::before {
+  content: '';
+  position: absolute;
+  left: var(--rm-axis);
+  top: 0;
+  width: calc(var(--rm-indent) - var(--rm-axis) - var(--rm-head));
+  height: calc(var(--rm-mid) + 1px);
+  box-sizing: border-box;
+  border-left: 1px solid var(--rm-line);
+  border-bottom: 1px solid var(--rm-line);
+  border-bottom-left-radius: 4px;
+}
+
+.childRow::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--rm-indent) - var(--rm-head));
+  top: calc(var(--rm-mid) - 3.5px);
+  width: var(--rm-head);
+  height: 8px;
+  background: var(--rm-line);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* ---- the fork --------------------------------------------------------- */
+
+/* The trunk drops from the parent's square. Each branch draws its own piece
+   of it, so the line stops exactly at the last junction. */
+.fork {
+  position: relative;
+  display: block;
+  align-self: stretch;
+  margin-left: var(--rm-axis);
+  padding-top: 14px;
+}
+
+.fork::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 14px;
+  border-left: 1px solid var(--rm-line);
+}
+
+.branch {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--rm-arm) minmax(0, 1fr);
+  grid-template-areas:
+    'arm   end'
+    'notes notes';
+  padding-left: 24px;
+}
+
+.branch:not(:last-child) {
+  padding-bottom: 22px;
+}
+
+.branch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--rm-line);
+}
+
+.branch::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--rm-mid);
+  width: 10px;
+  border-top: 1px solid var(--rm-line);
+}
+
+.branch:last-child::before {
+  bottom: auto;
+  width: 10px;
+  height: calc(var(--rm-mid) + 1px);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--rm-line);
+  border-bottom-left-radius: 4px;
+}
+
+.branch:last-child::after {
+  display: none;
+}
+
+.junction {
+  position: absolute;
+  left: 10px;
+  top: calc(var(--rm-mid) - 3px);
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background: var(--rm-line);
+}
+
+.arm {
+  grid-area: arm;
+  display: block;
+  min-width: 0;
+}
+
+.armHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--rm-node-h);
+}
+
+.armTerm {
+  flex: none;
+  font-size: var(--rm-fs-name);
+  font-weight: 500;
+  color: var(--rm-ink);
+}
+
+/* across to the ending, which starts where the arm column ends */
+.armLine {
+  position: relative;
+  flex: 1;
+  min-width: 14px;
+  height: 0;
+  margin-top: 1px;
+  border-top: 1px solid var(--rm-line);
+}
+
+.waits .armLine {
+  border-top-style: dashed;
+}
+
+.armLine::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -4.5px;
+  width: var(--rm-head);
+  height: 8px;
+  background: var(--rm-line);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* the line runs straight into the workflow's own box: no head */
+.selfBranch .armLine::after {
+  display: none;
+}
+
+.armHow {
+  display: block;
+  margin-top: -4px;
+  padding-right: 0.75rem;
+  font-size: var(--rm-fs);
+  line-height: 16px;
+  color: var(--rm-mut);
+}
+
+.end {
+  grid-area: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.notes {
+  grid-area: notes;
+  display: block;
+  margin-top: 0.7rem;
+}
+
+.noteLine {
+  display: block;
+  font-size: var(--rm-fs);
+  line-height: 16px;
+  color: var(--rm-mut);
+}
+
+/* ---- wide: the trigger beside its tree, the first line running across --- */
+
+@container (min-width: 530px) {
+  .entry .edge {
+    padding: 0 calc(var(--rm-head) + 6px) 0 0;
+    min-height: calc(var(--rm-lift) + var(--rm-node-h));
+  }
+
+  .entry .edge::before {
+    left: 0;
+    right: 3px;
+    top: calc(var(--rm-lift) + var(--rm-mid));
+    bottom: auto;
+    border-left: 0;
+    border-top: 1px solid var(--rm-line);
+  }
+
+  .entry .waits.edge::before {
+    border-top-style: dashed;
+  }
+
+  .entry .edge::after {
+    left: auto;
+    right: 3px;
+    bottom: auto;
+    top: calc(var(--rm-lift) + var(--rm-mid) - 3.5px);
+    width: var(--rm-head);
+    height: 8px;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+
+  .entry .mode {
+    display: block;
+  }
+
+  /* the words may run under the head: they sit above and below the line */
+  .entry .mode,
+  .entry .det {
+    margin-right: calc((var(--rm-head) + 6px) * -1);
+  }
+
+  .entry .det {
+    display: block;
+    margin-top: 9px;
+  }
+
+  .entry .sep {
+    display: none;
+  }
+}
+
+/* A route with no fork may run left to right, when there is room for all of it. */
+@container (min-width: 820px) {
+  .across .flow {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .across .flow > .edge {
+    width: var(--rm-entry);
+    margin: calc(var(--rm-lift) * -1) 0.6rem 0 0.6rem;
+    padding: 0 calc(var(--rm-head) + 6px) 0 0;
+    min-height: calc(var(--rm-lift) + var(--rm-node-h));
+  }
+
+  .across .flow > .edge::before {
+    left: 0;
+    right: 3px;
+    top: calc(var(--rm-lift) + var(--rm-mid));
+    bottom: auto;
+    border-left: 0;
+    border-top: 1px solid var(--rm-line);
+  }
+
+  .across .flow > .waits.edge::before {
+    border-top-style: dashed;
+  }
+
+  .across .flow > .edge::after {
+    left: auto;
+    right: 3px;
+    bottom: auto;
+    top: calc(var(--rm-lift) + var(--rm-mid) - 3.5px);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+
+  .across .flow > .edge .mode {
+    display: block;
+  }
+
+  .across .flow > .edge .mode,
+  .across .flow > .edge .det {
+    margin-right: calc((var(--rm-head) + 6px) * -1);
+  }
+
+  .across .flow > .edge .det {
+    display: block;
+    margin-top: 9px;
+  }
+
+  .across .flow > .edge .sep {
+    display: none;
+  }
+}
+
+/* ---- middle: the trigger above its tree -------------------------------- */
+
+@container (max-width: 659.98px) {
+  .route {
+    grid-template-columns: var(--rm-entry) minmax(0, 1fr);
+    grid-template-areas:
+      'trig trig'
+      'entry flow';
+  }
+
+  .trig {
+    padding: 0 0 0.55rem;
+  }
+}
+
+/* ---- narrow: one column, and every fork runs down the page -------------- */
+
+@container (max-width: 529.98px) {
+  .wrap {
+    --rm-trig: auto;
+    padding: 0.9rem 0.75rem 0.75rem;
+  }
+
+  .tray {
+    padding: 0.85rem 0.75rem 0.95rem;
+  }
+
+  .route {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'trig'
+      'entry'
+      'flow';
+  }
+
+  .trig {
+    padding-bottom: 0.15rem;
+  }
+
+  .flow {
+    padding-top: 0;
+  }
+
+  .keyGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .keyHead:not(:first-child) {
+    margin-top: 0.45rem;
+  }
+
+  /* each branch: its words, then a line dropping from the junction and
+     turning into the ending, which sits one step in */
+  .branch {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'arm'
+      'end'
+      'notes';
+  }
+
+  .armLine {
+    display: none;
+  }
+
+  .arm {
+    position: relative;
+    padding-bottom: 8px;
+  }
+
+  .arm::before {
+    content: '';
+    position: absolute;
+    left: -11px;
+    top: calc(var(--rm-mid) + 4px);
+    bottom: 0;
+    border-left: 1px solid var(--rm-line);
+  }
+
+  .waits .arm::before {
+    border-left-style: dashed;
+  }
+
+  .armHow {
+    margin-top: -5px;
+  }
+
+  .end {
+    position: relative;
+    margin-left: 6px;
+  }
+
+  .end::before {
+    content: '';
+    position: absolute;
+    left: -17px;
+    top: 0;
+    width: calc(17px - var(--rm-head));
+    height: calc(var(--rm-mid) + 1px);
+    box-sizing: border-box;
+    border-left: 1px solid var(--rm-line);
+    border-bottom: 1px solid var(--rm-line);
+    border-bottom-left-radius: 4px;
+  }
+
+  .waits .end::before {
+    border-left-style: dashed;
+    border-bottom-style: dashed;
+  }
+
+  .end::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--rm-head) * -1);
+    top: calc(var(--rm-mid) - 3.5px);
+    width: var(--rm-head);
+    height: 8px;
+    background: var(--rm-line);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+
+  .selfBranch .end::before {
+    width: 17px;
+  }
+
+  .selfBranch .end::after {
+    display: none;
+  }
+
+  .notes {
+    margin-left: 6px;
+  }
 }

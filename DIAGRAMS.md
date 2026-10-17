@@ -193,7 +193,7 @@ Pass the array, get the component.
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
 | `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more | One payment journey as a banded process flow. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
-| `RouteMap` | `rows` | Trigger-to-workflow routing tables. |
+| `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row` or `child`). A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
 | `WorkflowMeta` | `worker`, `behaviors` | The metadata strip above a workflow section. |
 | `WorkerChip` | `worker`, `children` | The Online or Offline tag, inline. |

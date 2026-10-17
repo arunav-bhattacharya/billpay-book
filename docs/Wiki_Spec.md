@@ -60,13 +60,13 @@ One-Data functions are the versioned contracts that channels and partner systems
 5. [ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1): list the lifecycle states one payment has been through.
 6. [CreateCreditBalanceRefund.v1](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post): refund a credit balance on a card account.
 7. `CreateInboundPayment.v1`: take a payment pushed by a third party. One-Data stores it in its inbox and replies 202; the inbound dispatcher starts its workflow.
-8. `CreatePaymentIntent.v1`: record an intent to pay, processed only when the customer's financial institution confirms it.
+8. `CreatePaymentIntent.v1`: record an intent to pay, processed only when the customer's financial institution confirms it. Channels call it.
 9. `CreatePaymentAllocations.v1`: the allocations callback for corporate payments. **Placeholder name** until the real function name is known. Asynchronous: 202 once the batch is stored and its workflow has started.
 
 ### Composite
 
-1. [CreatePaymentInstallment.v1](https://explorer.aexp.com/functions/CreatePaymentInstallment.v1): create a payment and a plan of future installments (Pay & Plan).
-2. `CreateBillpayTransactionFromAccountsReceivable.v1`: payments and refunds raised by the Accounts Receivable platform. One-Data stores each in its inbox and replies 202; the AR intake dispatcher starts their workflows.
+1. [CreatePaymentInstallment.v1](https://explorer.aexp.com/functions/CreatePaymentInstallment.v1): create a payment and a plan of future installments (Pay & Plan). Channels call it.
+2. `CreateBillpayTransactionFromAccountsReceivable.v1`: payments and refunds raised by the Accounts Receivable platform, never a corporate payment. One-Data stores each in its inbox and replies 202; the AR intake dispatcher starts their workflows.
 
 ### Event Handlers
 
@@ -778,7 +778,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 
 ### The Router's six steps
 
-1. **Admit.** The market, account type and API must be live in this environment; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
+1. **Admit.** The market, account type and API must be live in this environment; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. A Work Tracker row is refused only if its market was taken out of service after the row was written: its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
 2. **Pick the journey** from the routing table.
 3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
 4. **Pin the plan key:** the journey, the resolved behaviors and the config version.
@@ -857,14 +857,14 @@ Workflow IDs are not stored: each is the payment ID plus its suffix.
 
 ### Status
 
-`SCHEDULED → DISPATCHING → DISPATCHED → DONE` or `FAILED`, and `CANCELLED` from `SCHEDULED`. A leg has no waiting status: it is written only once its parent is `ACCEPTED`, so its row starts `SCHEDULED`.
+`SCHEDULED → DISPATCHING → DISPATCHED → DONE` or `FAILED`, `DISPATCHING → FAILED` when the Router refuses the row, and `CANCELLED` from `SCHEDULED`. A leg has no waiting status: it is written only once its parent is `ACCEPTED`, so its row starts `SCHEDULED`.
 
 | Status | Set by |
 | --- | --- |
 | `SCHEDULED` | The producer, in the same commit as the domain row: for a leg, `ReceiveAllocationsWorkflow` or the leg dispatcher's release, whichever writes it |
 | `DISPATCHING` | The dispatcher's claim |
 | `DISPATCHED` | The dispatcher, after a successful start |
-| `DONE` or `FAILED` | The workflow's last commit |
+| `DONE` or `FAILED` | The workflow's last commit; or `FAILED` from the dispatcher, when the Router refuses the row |
 | `CANCELLED` | `CancelPaymentWorkflow`, in the commit that cancels the payment |
 
 ### Inbox: One-Data's Postgres tables
@@ -1119,7 +1119,7 @@ Priority decides who goes first on a shared downstream queue; fairness splits on
 
 ## Corporate Allocations
 
-The parent and its allocations run on separate tracks. The parent clears at payment level on its due date; legs post as their allocations arrive, in parallel with clearing.
+The parent and its allocations run on separate tracks. The parent clears at payment level on its due date; legs post as their allocations arrive, in parallel with clearing. A corporate payment always comes from a channel, through `CreatePayment.v3`: Accounts Receivable never raises one.
 
 - **Fetch timing** is a market setting: at scheduling, a set lead time before the due date, or on the due date. Pay today requests at once. The intake commit (`SCHEDULED`, or `ACCEPTED` for pay today) adds an `ALLOC_REQUEST` row due at that time. Once the allocations are fetched, the payment can no longer be cancelled or updated, so a cancel inside the window works only before the fetch.
 - **Request.** The allocation-request dispatcher starts `RequestAllocationsWorkflow`. It sets allocation status `ALLOCATING` with a guarded update, asks the allocations manager, and ends; no workflow waits for the answer. The guard races a cancel the way Reverify does: one wins, and a payment cancelled first is never asked about.
@@ -1224,6 +1224,10 @@ Both clusters run the latest server, at least 1.30.1, so visibility can use Open
 | Namespace RPS limits | Well above peak | About 2× the API requests per second at the governor's ceiling | A hard backstop if the governor misbehaves |
 
 All Schedules live on the Offline cluster.
+
+### Online namespace and task queue
+
+The Online namespace has one task queue, `online-wf`. It carries the workflow tasks and their regular activities, with eager dispatch on. Online traffic is never throttled, so the Online cluster has no `ds-*` queues.
 
 ### Offline namespace and task queues
 

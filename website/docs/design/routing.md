@@ -17,7 +17,7 @@ A request reaches Billpay through a One-Data function. Most then call a core API
 
 The Router runs the same six steps for every request.
 
-1. Admit the request. The market, account type and API must be live in this environment. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them.
+1. Admit the request. The market, account type and API must be live in this environment. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them.
 2. Pick the journey from the routing table below.
 3. Resolve the behaviors from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel.
 4. Pin the plan key: the journey, the resolved behaviors and the config version. The workflow looks up its stages from it at runtime (see [Principles](./principles.md#how-a-workflow-finds-its-stages)).
@@ -43,134 +43,154 @@ Update-With-Start is what keeps the online journeys fast. It starts the workflow
 
 ## Trigger to workflow
 
-Each chip is the Temporal cluster the workflow runs on.
+One tray per trigger. The square on each workflow is the cluster it runs on, and the line into it says how the Router starts it. Where a payment branches by account type, the tree forks three ways.
 
 <RouteMap
-  rows={[
+  triggers={[
     {
-      trigger: 'Create payment',
-      condition: 'Today, one instruction',
-      start: 'Update-With-Start',
-      workflows: [{name: 'CreateImmediatePaymentWorkflow', cluster: 'Online'}],
-      children: [
-        {account: 'Consumer', when: 'split', start: 'Child of the parent', workflows: [{name: 'ExecuteSplitPaymentWorkflow', cluster: 'Online'}]},
+      term: 'Create payment',
+      routes: [
         {
-          account: 'Corporate',
-          when: 'allocations',
-          start: 'Dispatchers, and the allocations callback',
-          workflows: [
-            {name: 'RequestAllocationsWorkflow', cluster: 'Offline'},
-            {name: 'ReceiveAllocationsWorkflow', cluster: 'Offline'},
-            {name: 'ExecuteSplitPaymentWorkflow', cluster: 'Offline'},
+          desc: 'Today, one instruction',
+          flow: [{via: 'uws', name: 'CreateImmediatePayment', cluster: 'Online'}],
+          fork: [
+            {term: 'Consumer, one amount', self: ['Capture, Verify, Execute, Fulfil', 'Execute runs clearing, AR and OTB']},
+            {term: 'Consumer, split', via: 'child', detail: 'one per leg', flow: [{name: 'ExecuteSplitPayment', cluster: 'Online'}]},
+            {
+              term: 'Corporate',
+              via: 'row',
+              detail: 'due at once',
+              flow: [
+                {name: 'RequestAllocations', cluster: 'Offline'},
+                {via: 'async', detail: 'the callback, one per batch', name: 'ReceiveAllocations', cluster: 'Offline'},
+                {via: 'row', detail: 'one per leg', name: 'ExecuteSplitPayment', cluster: 'Offline'},
+              ],
+              notes: ['No legs until the parent is ACCEPTED.'],
+            },
+          ],
+        },
+        {
+          desc: 'Today, several instructions',
+          flow: [
+            {via: 'uws', name: 'CreatePaymentWithMultipleInstructions', cluster: 'Online'},
+            {via: 'child', detail: 'one per instruction', name: 'CreateImmediatePayment', cluster: 'Online'},
+          ],
+        },
+        {
+          desc: 'Future-dated',
+          flow: [
+            {via: 'uws', name: 'CreateScheduledPayment', cluster: 'Online'},
+            {via: 'row', detail: 'on the due date', name: 'ExecuteScheduledPayment', cluster: 'Offline'},
+          ],
+          fork: [
+            {term: 'Consumer, one amount', self: ['Reverify, Execute, Fulfil']},
+            {term: 'Consumer, split', via: 'child', detail: 'one per leg', flow: [{name: 'ExecuteSplitPayment', cluster: 'Offline'}]},
+            {
+              term: 'Corporate',
+              via: 'row',
+              detail: 'at the fetch time, written when it was scheduled',
+              flow: [
+                {name: 'RequestAllocations', cluster: 'Offline'},
+                {via: 'async', detail: 'the callback, one per batch', name: 'ReceiveAllocations', cluster: 'Offline'},
+                {via: 'row', detail: 'one per leg', name: 'ExecuteSplitPayment', cluster: 'Offline'},
+              ],
+              notes: ['No legs until the parent is ACCEPTED.', 'No cancel or update once allocations are fetched.'],
+            },
           ],
         },
       ],
     },
     {
-      trigger: 'Create payment',
-      condition: 'Today, several instructions',
-      start: 'Update-With-Start',
-      workflows: [
-        {name: 'CreatePaymentWithMultipleInstructionsWorkflow', cluster: 'Online'},
-        {name: 'CreateImmediatePaymentWorkflow', cluster: 'Online'},
-      ],
-    },
-    {
-      trigger: 'Create payment',
-      condition: 'Future-dated',
-      start: 'Update-With-Start; on the due date, the scheduled-payments dispatcher',
-      workflows: [
-        {name: 'CreateScheduledPaymentWorkflow', cluster: 'Online'},
-        {name: 'ExecuteScheduledPaymentWorkflow', cluster: 'Offline'},
-      ],
-      children: [
-        {account: 'Consumer', when: 'split', start: 'Child of the parent', workflows: [{name: 'ExecuteSplitPaymentWorkflow', cluster: 'Offline'}]},
+      term: 'Pay & Plan',
+      routes: [
         {
-          account: 'Corporate',
-          when: 'allocations',
-          start: 'Dispatchers, and the allocations callback',
-          workflows: [
-            {name: 'RequestAllocationsWorkflow', cluster: 'Offline'},
-            {name: 'ReceiveAllocationsWorkflow', cluster: 'Offline'},
-            {name: 'ExecuteSplitPaymentWorkflow', cluster: 'Offline'},
+          desc: 'Pay today, plan future installments',
+          flow: [
+            {via: 'uws', name: 'Create Payment & Installments', cluster: 'Online'},
+            {via: 'child', name: 'CreateImmediatePayment', cluster: 'Online'},
           ],
         },
       ],
     },
     {
-      trigger: 'Pay & Plan',
-      condition: 'Pay today, plan future installments',
-      start: 'Update-With-Start',
-      workflows: [
-        {name: 'Create Payment & Installments', cluster: 'Online'},
-        {name: 'CreateImmediatePaymentWorkflow', cluster: 'Online'},
+      term: 'From Accounts Receivable',
+      routes: [
+        {
+          desc: 'Future-dated',
+          across: true,
+          flow: [
+            {via: 'inbox', detail: 'AR intake dispatcher', name: 'CreateScheduledPayment', cluster: 'Offline'},
+            {via: 'row', detail: 'on the due date', name: 'ExecuteScheduledPayment', cluster: 'Offline'},
+          ],
+        },
       ],
     },
     {
-      trigger: 'From Accounts Receivable',
-      condition: 'Future-dated',
-      start: 'AR intake dispatcher; on the due date, the scheduled-payments dispatcher',
-      workflows: [
-        {name: 'CreateScheduledPaymentWorkflow', cluster: 'Offline'},
-        {name: 'ExecuteScheduledPaymentWorkflow', cluster: 'Offline'},
+      term: 'Update payment',
+      routes: [
+        {
+          desc: 'SCHEDULED, inside the window',
+          flow: [
+            {via: 'uws', name: 'UpdatePayment', cluster: 'Online'},
+            {via: 'child', detail: 'the new payment', name: 'CreateScheduledPayment', cluster: 'Online'},
+          ],
+        },
       ],
     },
     {
-      trigger: 'Update payment',
-      condition: 'SCHEDULED, inside the window',
-      start: 'Update-With-Start',
-      workflows: [
-        {name: 'UpdatePaymentWorkflow', cluster: 'Online'},
-        {name: 'CreateScheduledPaymentWorkflow', cluster: 'Online'},
+      term: 'Cancel payment',
+      routes: [{desc: 'SCHEDULED, inside the window', flow: [{via: 'uws', name: 'CancelPayment', cluster: 'Online'}]}],
+    },
+    {
+      term: 'Payment intent',
+      routes: [{desc: 'Awaiting FI confirmation', flow: [{via: 'uws', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
+    },
+    {
+      term: 'Credit balance refund',
+      routes: [
+        {desc: 'From a channel', flow: [{via: 'uws', name: 'CreateBalanceRefund', cluster: 'Online'}]},
+        {
+          desc: 'Raised by AR',
+          flow: [{via: 'inbox', detail: 'AR intake dispatcher', name: 'CreateBalanceRefund', cluster: 'Offline'}],
+        },
       ],
     },
     {
-      trigger: 'Cancel payment',
-      condition: 'SCHEDULED, inside the window',
-      start: 'Update-With-Start',
-      workflows: [{name: 'CancelPaymentWorkflow', cluster: 'Online'}],
+      term: 'Money movement event',
+      routes: [
+        {
+          desc: 'A return',
+          flow: [{via: 'inbox', detail: 'returns dispatcher', name: 'ProcessReturnedPayment', cluster: 'Offline'}],
+        },
+      ],
     },
     {
-      trigger: 'Payment intent',
-      condition: 'Awaiting FI confirmation',
-      start: 'Update-With-Start',
-      workflows: [{name: 'CreatePaymentIntentWorkflow', cluster: 'Online'}],
+      term: 'Representment falls due',
+      routes: [
+        {
+          desc: 'A REPRESENT row',
+          flow: [{via: 'row', detail: 'representment dispatcher', name: 'ProcessRepresentment', cluster: 'Offline'}],
+        },
+      ],
     },
     {
-      trigger: 'Credit balance refund',
-      condition: 'From a channel',
-      start: 'Update-With-Start',
-      workflows: [{name: 'CreateBalanceRefundWorkflow', cluster: 'Online'}],
+      term: 'Inbound payment',
+      routes: [
+        {
+          desc: 'Pushed by a third party',
+          flow: [{via: 'inbox', detail: 'inbound dispatcher', name: 'ProcessInboundPayment', cluster: 'Offline'}],
+        },
+      ],
     },
     {
-      trigger: 'Credit balance refund',
-      condition: 'Raised by AR',
-      start: 'AR intake dispatcher',
-      workflows: [{name: 'CreateBalanceRefundWorkflow', cluster: 'Offline'}],
-    },
-    {
-      trigger: 'Money movement event',
-      condition: 'A return',
-      start: 'Returns dispatcher',
-      workflows: [{name: 'ProcessReturnedPaymentWorkflow', cluster: 'Offline'}],
-    },
-    {
-      trigger: 'Representment falls due',
-      condition: 'A REPRESENT row',
-      start: 'Representment dispatcher',
-      workflows: [{name: 'ProcessRepresentmentWorkflow', cluster: 'Offline'}],
-    },
-    {
-      trigger: 'Inbound payment',
-      condition: 'Pushed by a third party',
-      start: 'Inbound dispatcher',
-      workflows: [{name: 'ProcessInboundPaymentWorkflow', cluster: 'Offline'}],
-    },
-    {
-      trigger: 'Allocations callback',
-      condition: 'A corporate payment',
-      start: 'Async start, then 202',
-      workflows: [{name: 'ReceiveAllocationsWorkflow', cluster: 'Offline'}],
+      term: 'Allocations callback',
+      routes: [
+        {
+          desc: 'A corporate payment',
+          flow: [{via: 'async', detail: 'then 202', name: 'ReceiveAllocations', cluster: 'Offline'}],
+          note: 'One per batch, part of the corporate track above',
+        },
+      ],
     },
   ]}
 />
@@ -179,7 +199,7 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 
 ## Child workflows
 
-The indented rows are the extra workflows a payment of that account type runs, tagged with the `accountType` behavior that selects them. The child in the several-instructions row runs once per instruction.
+The `accountType` behavior picks the branch at each fork. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster.
 - A corporate payment starts its legs from Work Tracker rows instead, because one payment can have 100K of them. `RequestAllocationsWorkflow` asks for the breakdown. `ReceiveAllocationsWorkflow` writes a batch's legs once the parent is `ACCEPTED`; a batch that arrives earlier waits, and the leg dispatcher writes it on the due date. The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg. [Corporate Allocations](./corporate-allocations.md) has the whole track.

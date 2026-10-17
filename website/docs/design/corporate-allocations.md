@@ -11,7 +11,7 @@ import CorporateTracks from '@site/src/components/CorporateTracks';
 
 <Lead>A corporate payment runs on two tracks. The parent clears once, at payment level, on its due date, while its allocations arrive by callback and post as legs. Allocations never hold up the parent's clearing.</Lead>
 
-A corporate payment is paid once, as one amount, and the allocations manager knows how that amount divides into allocations. The breakdown can arrive before the due date, on it, or after, and one payment can split into as many as 100,000 allocations. Holding the payment until every allocation is in would put the company's clearing date at the mercy of another system. So the parent clears on time regardless, and the allocations catch up on their own track.
+A corporate payment is paid once, as one amount, and the allocations manager knows how that amount divides into allocations. The breakdown can arrive before the due date, on it, or after, and one payment can split into as many as 100,000 allocations. Holding the payment until every allocation is in would put the company's clearing date at the mercy of another system. So the parent clears on time regardless, and the allocations catch up on their own track. A corporate payment always comes from a channel, through `CreatePayment.v3`. Accounts Receivable never raises one.
 
 <CorporateTracks />
 
