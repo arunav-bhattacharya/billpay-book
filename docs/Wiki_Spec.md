@@ -9,21 +9,22 @@
 3. [Billpay APIs](#billpay-apis)
 4. [Billpay Workflows (Temporal)](#billpay-workflows-temporal)
 5. [Payment Lifecycle States](#payment-lifecycle-states)
-6. [Market Onboarding & Payment Dimensions](#market-onboarding--payment-dimensions)
-7. [Core Components in Workflows](#core-components-in-workflows)
-8. [Workflow Logic](#workflow-logic)
-9. [Periodic Workflows](#periodic-workflows)
-10. [Activities](#activities)
-11. [Overall Payments View](#overall-payments-view)
-12. [Routing and Start Modes](#routing-and-start-modes)
-13. [Work Tracker and Inbox](#work-tracker-and-inbox)
-14. [Dispatchers and the Governor](#dispatchers-and-the-governor)
-15. [Throttling, Priority and Fairness](#throttling-priority-and-fairness)
-16. [Corporate Allocations](#corporate-allocations)
-17. [Market Onboarding](#market-onboarding)
-18. [Platform](#platform)
-19. [Sequence and State Diagrams](#sequence-and-state-diagrams)
-20. [Open Items](#open-items)
+6. [Payment Domain Model](#payment-domain-model)
+7. [Market Onboarding & Payment Dimensions](#market-onboarding--payment-dimensions)
+8. [Core Components in Workflows](#core-components-in-workflows)
+9. [Workflow Logic](#workflow-logic)
+10. [Periodic Workflows](#periodic-workflows)
+11. [Activities](#activities)
+12. [Overall Payments View](#overall-payments-view)
+13. [Routing and Start Modes](#routing-and-start-modes)
+14. [Work Tracker and Inbox](#work-tracker-and-inbox)
+15. [Dispatchers and the Governor](#dispatchers-and-the-governor)
+16. [Throttling, Priority and Fairness](#throttling-priority-and-fairness)
+17. [Corporate Allocations](#corporate-allocations)
+18. [Market Onboarding](#market-onboarding)
+19. [Platform](#platform)
+20. [Sequence and State Diagrams](#sequence-and-state-diagrams)
+21. [Open Items](#open-items)
 
 Payments and credit balance refunds are both in scope.
 
@@ -288,6 +289,91 @@ Corporate rules:
 - If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
 - A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
 - A declined or cancelled parent cancels its legs.
+
+[^ Top](#table-of-contents)
+
+---
+
+## Payment Domain Model
+
+The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
+
+### Root types
+
+- `Transaction`: `id` (a `TransactionId`), `account` and `amount`, which may be null. It has two branches, `Payment` and `Refund`.
+- `Payment` adds `paymentId` (its `id`), `confirmationCode`, `status`, `source`, `timeline`, `option`, `instrument`, `presentmentSequence`, `hasMoneyMovement` and `planDetailData`.
+- `Refund` adds `refundId` (its `id`). It has no concrete types yet.
+- Every sealed type serializes with a `type` property holding the class's simple name, such as `"type": "PaidSplitPayment"`.
+
+### The type is the state
+
+Eleven sealed classes, one per state, each fixing `status`: `PendingPayment`, `ScheduledPayment`, `AcceptedPayment`, `ProcessingPayment`, `ProcessedPayment`, `PaidPayment`, `ReturnedPayment`, `RepresentingPayment`, `RepresentedPayment`, `CancelledPayment` and `DeclinedPayment`. Two traits narrow what a state must hold:
+
+| Trait | Guarantees | On |
+| --- | --- | --- |
+| `VerifiedPayment` | A `TokenizedAccount`, a non-null `amount`, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an `ExecutableTimeline` | `SCHEDULED` through `REPRESENTED` |
+| `RepresentmentPayment` | `returnedInfo` | `RETURNED`, `REPRESENTING` and `REPRESENTED` |
+
+`PENDING`, `CANCELLED` and `DECLINED` are not verified. `DeclinedPayment` adds a `declineCode`, and a declined payment has no confirmation code.
+
+### Full and split
+
+Two shapes cross the states. `FullPayment` settles as one amount. `SplitPayment` is a leg: it adds `originalPaymentId` (the parent's ID), `sequenceNumber` and a non-null `amount`. A leg's ID is its parent's plus the sequence number, `paymentId.withSplit(seq)`, which gives `{paymentId}_{seq}`.
+
+| State | Full | Split |
+| --- | --- | --- |
+| `PENDING` | `PendingFullPayment` | |
+| `SCHEDULED` | `ScheduledFullPayment` | |
+| `ACCEPTED` | `AcceptedFullPayment` | `AcceptedSplitPayment` |
+| `PROCESSING` | `ProcessingFullPayment` | `ProcessingSplitPayment` |
+| `PROCESSED` | `ProcessedFullPayment` | `ProcessedSplitPayment` |
+| `PAID` | `PaidFullPayment` | `PaidSplitPayment` |
+| `RETURNED` | `ReturnedFullPayment` | `ReturnedSplitPayment` |
+| `REPRESENTING` | `RepresentingFullPayment` | `RepresentingSplitPayment` |
+| `REPRESENTED` | `RepresentedFullPayment` | `RepresentedSplitPayment` |
+| `CANCELLED` | `CancelledFullPayment` | |
+| `DECLINED` | `DeclinedFullPayment` | |
+
+Eighteen data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice` (`sequenceNumber`, `splitAmount`).
+
+### Value types
+
+- `ReturnedInfo`: `effectiveDate`, `returnReason`, `returnSource`, `originalPaymentId`, `originalPresentmentSequence` and `originalPaymentDate`. Which fields are required is still to be confirmed.
+- `Timeline` holds `captureTimestamp`, `transactionDate` and `transactionTimestamp`. `ExecutableTimeline` adds `clearingDate`, `executionTimestamp`, `cancelCutoffTimestamp` and `frequency` (`ONCE` or `RECURRING`). `InitialTimeline` is the plain one, set at capture; `ImmediateTimeline` is executable with `frequency` `ONCE`; `ScheduledTimeline` adds `scheduleDate`.
+- `PendingFullPayment` checks its amount when built: an amount must be present for a verified option, an other amount or an initial payment amount, and absent for every other option, whose amount is worked out later. Its defaults are `presentmentSequence` 1, `hasMoneyMovement` true and `planDetailData` null.
+
+### Transitions
+
+There is no `setStatus`. Each allowed move is an extension function that takes one class and returns the next, 26 in all.
+
+| From | Functions |
+| --- | --- |
+| `PendingFullPayment` | `toAcceptedFullPayment(account, amount, timeline, option, instrument)`, `toScheduledFullPayment(...)` with a `ScheduledTimeline`, `toDeclinedFullPayment(option, instrument, declineCode)` |
+| `ScheduledFullPayment` | `toAcceptedFullPayment()`, `toDeclinedFullPayment(declineCode)`, `toCancelledFullPayment()` |
+| `AcceptedFullPayment` | `toProcessingFullPayment()`, `toAcceptedSplitPayment(splitSlice)` |
+| `ProcessingFullPayment` | `toProcessedFullPayment()`, `toAcceptedSplitPayment(splitSlice)` |
+| `ProcessedFullPayment` | `toPaidFullPayment()`, `toReturnedFullPayment(returnedInfo)` |
+| `PaidFullPayment` | `toReturnedFullPayment(returnedInfo)` |
+| `ReturnedFullPayment` | `toRepresentingFullPayment()` |
+| `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toReturnedFullPayment()` |
+| `RepresentedFullPayment` | `toReturnedFullPayment()` |
+| `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same nine moves at leg level, from accepted through processing, processed and paid, returned from processed or paid, representing, represented, and back to returned |
+
+Verify's results are the arguments of the move out of `PENDING`, and a return's `ReturnedInfo` is the argument of the move into `RETURNED`.
+
+### Gaps against the lifecycle
+
+The code does not yet cover all of [Payment Lifecycle States](#payment-lifecycle-states):
+
+| Lifecycle | In code |
+| --- | --- |
+| `DISALLOWED`, for inbound payments | No type |
+| `PROCESSING` → `RETURNED` | No function; a return starts from `PROCESSED` or `PAID` |
+| `REPRESENTING` → `DECLINED`, when the recheck fails | No function. The code has `REPRESENTING` → `RETURNED`, which the lifecycle does not |
+| Legs written while their parent is `SCHEDULED`, held until release | Legs come only from an `ACCEPTED` or `PROCESSING` parent |
+| A declined or cancelled parent cancels its legs | No cancelled leg type |
+| `allocation_status` on a corporate parent | No field |
+| Credit balance refunds | `Refund` has no concrete types |
 
 [^ Top](#table-of-contents)
 
@@ -794,7 +880,7 @@ Oracle holds no inbox. The handlers and functions write three tables in One-Data
 | `billpay_paid_ready` | Payment or leg, and presentment: `pymt_id`, `prsnt_seq_no` | `prnt_pymt_id` (the ID before any `_`), `acct_id`, `stlmt_ts`, `ar_pstd_ts`, `sta_cd`, `creat_ts`, `lst_updt_ts` |
 | `billpay_start_rqst` | Request to start, by its idempotency key: `rqst_id` | `rqst_type` (AR payment, AR refund, return or inbound), `rqst_body`, `sta_cd`, `creat_ts`, `lst_updt_ts` |
 
-A start request is `READY` as soon as it is stored. Its dispatcher starts the workflow and marks it `DONE`. A request the Router can't admit, because nothing live matches its market, account type or API, is marked `REJECTED` and raises an alert. A repeated request, with the same idempotency key, is stored once and answered 202 again.
+A start request is `READY` as soon as it is stored. Its dispatcher starts the workflow and marks it `DONE`. A request the Router can't admit, because nothing live matches its market, account type or API, is marked `REJECTED` and raises an alert for operations. The sender is not told. A repeated request, with the same idempotency key, is stored once and answered 202 again.
 
 A PAID row is `READY` once it has an AR posting and a settlement: its own, or for a leg, its payment's. Every payment gets both, even where `requiresArPosting` is N. A split payment's own row holds only its settlement, which its legs take.
 
@@ -1254,7 +1340,7 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | PAID backlog age | The oldest `READY` row in the inbox passes its age threshold | Check whether the governor is holding the drain, or RTF is down |
 | Payment not PAID | A payment, other than a split parent, or a leg is still `PROCESSED` after 48 hours, or an inbox row has stayed `UNMATCHED` for 48 hours | Read the inbox row for the missing event, or check the event's IDs against Oracle |
 | Event without a payment | An event with no payment ID matches no payment through `ReadPayments.v1`, or more than one | Find the payment and replay the event through its handler |
-| Rejected request | A dispatcher marks a pulled request `REJECTED`: nothing live matches its market, account type or API | Fix the market profile, or tell the sender |
+| Rejected request | A dispatcher marks a pulled request `REJECTED`: nothing live matches its market, account type or API | Fix the market profile. The sender is not told |
 | Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list |
 | Downstream outage | A `ds-*` queue drops to its 1 RPS probe | Contact the downstream's owner if it lasts |
 | RTF or Raven down | Their calls have failed for 5 minutes, so payments are waiting in Fulfil | Contact the owner; payments resume when they are back |
@@ -1287,7 +1373,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Allocations late | The parent still clears on time; its legs wait; an alert fires at the market's alert point | Chase the allocation source |
 | A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
 | A burst of AR intake, returns or inbound | Requests wait in One-Data's inbox; their dispatchers take them at the governor's rate | Nothing |
-| A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires | Fix the market profile, or tell the sender |
+| A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires; the sender is not told | Fix the market profile |
 | The single app becomes the bottleneck | Online p99 climbs while Oracle and the downstreams are healthy, so the governor cuts offline work, execution included | Split the app: deploy the same build twice, one part each |
 | One-Data's inbox database down | One-Data can't store requests or events, so senders retry; the dispatchers' and the drain's fetches retry; nothing new starts from the inbox and nothing turns `PAID` until it is back | Restore it; the dispatchers and PAID catch up on their own |
 | A burst of settlements and postings | Events wait in the inbox; the drain takes them at the governor's rate | Nothing |
@@ -1405,6 +1491,5 @@ These inputs are assumed for now. The first changes the numbers most.
 | Payment intent and balance refund steps | They follow the payment path | Detailed stages are still to be defined |
 | When a channel gets PENDING | The payment is captured but not yet decided | Decides how long the API waits for the decision before replying |
 | Which changes send a Raven message | `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED` | Each adds a call, and writes, to its workflow |
-| How a sender hears of a rejected request | Operations tell the sender after the alert | AR and third parties no longer get a 422 back, since One-Data answers 202 once a request is stored |
 
 [^ Top](#table-of-contents)

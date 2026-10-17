@@ -105,7 +105,7 @@ export const ASIDE = {
 
 The core REST APIs shape the request, and the payment's first step checks it against an idempotency record, so a retried call can never pay twice. Then every payment, whether a channel sent it or a dispatcher released it, starts through the **Billpay Router**. The Router is a library inside the core APIs and the dispatchers, and it runs the same six steps every time:
 
-1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. A request a dispatcher pulled is marked `REJECTED` instead, with an alert. An allocation callback over its budget gets 429 with `Retry-After`.
+1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. A request a dispatcher pulled is marked `REJECTED` instead, and only operations hear of it. An allocation callback over its budget gets 429 with `Retry-After`.
 2. Pick the journey from the routing table.
 3. Resolve the behaviors from the market's active release. A behavior set to BOTH becomes Y or N for this journey.
 4. Pin the plan key: the journey, the resolved behaviors and the config version.
