@@ -35,7 +35,7 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketProvisioningWorkflow` writes it. |
 | `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
 | `rate_allocation` (new) | Traffic class, market or corporate payment | The rate the governor sets, which dispatchers read every few seconds. Manual overrides live here too. |
-| `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, last 429. |
+| `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, Online cap and when it ends, last 429. |
 | `governor_decision` (new) | Governor check, every 15 seconds | Its inputs and outputs, so any rate can be explained later. |
 
 ## The Work Tracker

@@ -967,7 +967,7 @@ function runsOn(j, f) {
     return "One-Data's inbox functions, on the workflow's own queue, since nobody throttles them.";
   }
   const sys = f.long || f.system;
-  if (j.cluster === 'Online') return `${sys}, on online-wf, the Online cluster's one task queue. Online traffic is never throttled.`;
+  if (j.cluster === 'Online') return `${sys}, on online-wf, the Online cluster's main task queue. Online calls are capped only while a SEPA run needs the room.`;
   if (f.queue.startsWith('ds-')) {
     return `${sys}, on ${f.queue}. The governor sets that queue's rate limit, so it is the one choke point for ${f.system}.`;
   }
@@ -1042,7 +1042,7 @@ export function router(j) {
     j.cluster === 'Online'
       ? {
           main: `Online cluster, task queue online-wf, as ${j.wfId}.`,
-          note: "online-wf is the Online cluster's one task queue. Online traffic is never throttled.",
+          note: "online-wf is the Online cluster's main task queue. Online calls to a downstream are capped only while a SEPA run needs the room.",
         }
       : {
           main: j.prio

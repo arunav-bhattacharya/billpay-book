@@ -155,9 +155,9 @@ Billpay runs on two self-hosted Temporal clusters. Each has its own Aurora Postg
 - **Online cluster:** journeys where a caller waits for an answer. Peak 100 TPS.
 - **Offline cluster:** work we can pace: scheduled execution, AR intake, corporate allocations, returns, inbound payments, representments, confirmation expiries, periodic jobs and the control workflows.
 
-Separate databases mean offline load can never slow realtime traffic at the Temporal layer. Oracle, the downstream services and the app are shared, and the governor watches online p99 as well as Oracle and the downstreams, so pressure on any of them slows offline work, never online traffic.
+Separate databases mean offline load can never slow realtime traffic at the Temporal layer. Oracle, the downstream services and the app are shared, and the governor watches online p99 as well as Oracle and the downstreams, so pressure on any of them slows offline work first. The one exception is a SEPA cutoff: when Online would leave a SEPA run too little of a downstream, Online is capped on that downstream until the cutoff ([When the cutoff wins](#when-the-cutoff-wins)).
 
-**Nothing calls across clusters.** A payment accepted or scheduled on the Online cluster, or left waiting for bank confirmation, reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as its state change. Self-hosted Nexus cannot bridge the two: it works only inside one cluster or across multi-cluster replication.
+**Nothing calls across clusters.** A payment accepted or scheduled on the Online cluster, or left waiting for bank confirmation, reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as its state change. Self-hosted Nexus cannot bridge the two: it works only inside one cluster or across multi-cluster replication. The governor makes the one control call that crosses: during a cutoff run it sets limits on Online queues through that cluster's API. No payment or workflow ever does.
 
 **Standby.** Each cluster runs active-passive, like the single cluster it replaces: active in us-east-1, with a passive standby in us-west-1 whose database replicates from the east. An operator promotes each standby on its own, and the app reconnects to it.
 
@@ -788,6 +788,8 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 
 Throttled calls stay off eager dispatch: it hands the task straight back to the worker, which skips the queue's limit. RTF calls fall in the third row, since nobody throttles them. Raven has an agreed rate, so its calls run on `ds-comms`.
 
+On the Online cluster, downstream calls run on `online-wf` with eager dispatch, like calls nobody throttles. While a cutoff run caps Online on a downstream, each new Online payment places that downstream's calls on the Online cluster's own `ds-*` queue instead, so the cap is enforced the same way ([When the cutoff wins](#when-the-cutoff-wins)).
+
 [^ Top](#table-of-contents)
 
 ---
@@ -851,7 +853,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 2. **Pick the journey** from the routing table.
 3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
 4. **Pin the plan key:** the journey, the resolved behaviors and the config version.
-5. **Place:** cluster, task queue, priority, fairness key and workflow ID.
+5. **Place:** cluster, task queue, priority, fairness key and workflow ID. While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
 6. **Start** with the journey's start mode.
 
 ### Start modes
@@ -1048,7 +1050,7 @@ Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update
 | --- | --- | --- |
 | `dispatch_run` | Dispatcher run | Ops view: counts, current rate, paused or not |
 | `rate_allocation` | Traffic class, market or corporate payment | The governor writes it; dispatchers read it every few seconds; manual overrides live here |
-| `downstream_limit` | Downstream endpoint | Agreed TPS, online margin, current offline share, last 429 |
+| `downstream_limit` | Downstream endpoint | Agreed TPS, online margin, current offline share, Online cap and when it ends, last 429 |
 | `governor_decision` | Governor check, every 15 s | Inputs and outputs, to explain any rate later |
 
 [^ Top](#table-of-contents)
@@ -1103,7 +1105,7 @@ Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, 
 | SEPA (DE, IT) | 23:00 | Midnight CET, 6 PM ET | Up to 500K | 3 to 4 h | 46 TPS for 3 h; the governor aims at about 56 |
 | US | 05:00 | Midnight ET | Up to 1M | None | 50 TPS floor (5.6 h); 100 TPS takes 2.8 h |
 
-In summer both windows start an hour earlier in UTC. They never overlap, so one Offline cluster serves them in turn and the US window sets its size. SEPA runs during the US evening, so it is the window most likely to be slowed for online traffic.
+In summer both windows start an hour earlier in UTC. They never overlap, so one Offline cluster serves them in turn and the US window sets its size. SEPA runs during the US evening, so it is the window most likely to cap Online ([When the cutoff wins](#when-the-cutoff-wins)).
 
 ### The governor
 
@@ -1129,7 +1131,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget instead. Persistence
 
 **Handing it out, in order**
 
-1. **Online first.** If online p99 or shared Oracle degrade, every offline class is cut, execution included.
+1. **Online first.** If online p99 or shared Oracle degrade, every offline class is cut, execution included. One exception: online p99 never cuts a SEPA run below its cutoff floor. The cutoff comes first, and while a run caps Online, Online's p99 rises by design.
 2. **SEPA cutoff floor:** remaining ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
 3. **US execution floor:** 50 TPS.
 4. **AR intake:** its demand, the requests waiting in One-Data's inbox.
@@ -1139,6 +1141,8 @@ Every class is also capped by its downstreams (see [Throttling, Priority and Fai
 
 **Cutoff alert.** Projected finish = now + remaining ÷ current rate. The governor alerts when that passes the cutoff minus 15 minutes, or when the floor no longer fits the budget.
 
+**Cap warning (Proposed).** An hour before each SEPA run, the governor compares Online's peak for the run's hours over the last 4 weeks with each downstream's agreed TPS less the run's need, and warns when Online is likely to be capped.
+
 **Guardrails**
 
 - Missing metrics: hold. Still missing after 5 minutes: drop to the floors.
@@ -1146,7 +1150,7 @@ Every class is also capped by its downstreams (see [Throttling, Priority and Fai
 - Manual overrides always win.
 - Every decision goes to `governor_decision` with its inputs.
 
-It runs as `governor` on the Offline cluster, and a Schedule with overlap policy SKIP starts it again if it isn't running. One activity per check reads Prometheus and Oracle, then writes `rate_allocation`, downstream queue limits (only when they change) and the decision row. It continues-as-new hourly and costs about 20 writes a minute.
+It runs as `governor` on the Offline cluster, and a Schedule with overlap policy SKIP starts it again if it isn't running. One activity per check reads Prometheus and Oracle, then writes `rate_allocation`, downstream queue limits (only when they change; on the Online cluster only while a cap is on) and the decision row. It continues-as-new hourly and costs about 20 writes a minute.
 
 [^ Top](#table-of-contents)
 
@@ -1154,15 +1158,27 @@ It runs as `governor` on the Offline cluster, and a Schedule with overlap policy
 
 ## Throttling, Priority and Fairness
 
-Each downstream sees at most its agreed TPS. Offline traffic gets what online traffic isn't using, enforced at one place per downstream.
+Each downstream sees at most its agreed TPS. The two clusters share it by use, not by a fixed split: Offline gets whatever Online isn't using, less a headroom, and when a SEPA run and Online collide, the cutoff comes first (agreed 2026-10-17).
 
 ### Must-succeed calls: clearing, AR, OTB, accounting, eBNC, risk, Raven
 
-- **One choke point.** One activity task queue per downstream endpoint: `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-comms` and `ds-allocations`. Its server-side rate limit is the overall limit for the queue, across all pods. The governor changes it at runtime through the task queue config API.
-- **Offline share** = agreed TPS − online traffic's measured use (peak of the last minute) − a 10% margin. Online traffic is never throttled.
+- **One choke point.** One activity task queue per downstream endpoint on the Offline cluster: `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-comms` and `ds-allocations`. Its server-side rate limit is the overall limit for the queue, across all pods. The governor changes it at runtime through the task queue config API.
+- **Online's use, measured (Proposed).** Online's calls share one queue, so Temporal can't count them per downstream. Online workers count their calls and 429s per downstream in Prometheus, and the governor reads Online's use as the peak of the last minute.
+- **Offline share** = agreed TPS − Online's use − headroom, recomputed every 15 s. There is no fixed split: with an agreed TPS of 100, Online at 25 leaves Offline 65, Online at 80 leaves it 10, and an idle Online leaves it 90.
+- **Headroom (Proposed).** Offline reacts up to about 45 s late: one 15 s check plus about 30 s of metric lag. The headroom is the larger of 10% of the agreed TPS and the biggest rise in Online's use within 45 s over the last 4 weeks and in the load test. It is the online margin in `downstream_limit`.
 - **Admission.** Across all classes, the sum of start rate × calls per workflow to a downstream stays within its offline share, handed out in priority order. Admitting more only parks tasks in the queue backlog, and that backlog is DB rows.
-- **Reaction.** One call waits out `Retry-After`. If the 429 rate passes 1% or p99 doubles, the queue limit drops ×0.7, then probes back up 5% at a time. In an outage the queue trickles at 1 RPS to probe, and admissions for classes that need it pause; only work already in flight waits.
+- **Reaction.** One call waits out `Retry-After`. If the 429 rate passes 1% or p99 doubles, the queue limit drops ×0.7, then probes back up 5% at a time. A 429 on an Online call means Offline took room Online needed, so one halves that downstream's offline share at the next check (Proposed). Neither ever takes a SEPA run below its need. In an outage the queue trickles at 1 RPS to probe, and admissions for classes that need it pause; only work already in flight waits.
 - **Worker slots** ≈ queue limit × call latency: 100 RPS at 1 s needs about 100 slots across pods. More slots won't add throughput.
+
+### When the cutoff wins
+
+A SEPA run's cutoff comes before Online. The US run has no cutoff, so it never caps Online.
+
+- **The need.** During a run with a cutoff, Offline's share of a downstream never drops below the run's need: its cutoff floor ([the governor](#the-governor)) times its calls per payment to that downstream. A full SEPA run needs about 56 RPS of clearing.
+- **The cap.** If Online's use would leave less than the need, Online is capped on that downstream at agreed TPS − the run's need, until the run's cutoff. With an agreed TPS of 100 on clearing, that is 44 RPS.
+- **Enforcing it (Proposed).** The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor sets the cap as that queue's rate limit through the Online cluster's task queue config API, and records the cap and its end time in `downstream_limit`. While a cap is on, the Router places that downstream's calls for each new Online payment on the capped queue; otherwise they run on `online-wf` with eager dispatch, as before. Placement is pinned at start, so a running workflow never switches queues.
+- **Lifting it.** The cap ends at the run's cutoff. The Router ignores a cap past its end time and the governor clears it, so a stopped governor can't leave Online capped.
+- **The cost.** While capped, some Online payments wait for that downstream. A payment not decided before the API stops waiting replies PENDING and finishes afterwards.
 
 ### Comms and events
 
@@ -1306,7 +1322,7 @@ All Schedules live on the Offline cluster.
 
 ### Online namespace and task queue
 
-The Online namespace has one task queue, `online-wf`. It carries the workflow tasks and their regular activities, with eager dispatch on. Online traffic is never throttled, so the Online cluster has no `ds-*` queues.
+The Online namespace has one main task queue, `online-wf`. It carries the workflow tasks and their regular activities, with eager dispatch on. It also has a `ds-*` queue for each downstream a cutoff run calls, used only while a SEPA run caps Online on that downstream ([When the cutoff wins](#when-the-cutoff-wins)). Online workers poll them, with slots sized to the cap.
 
 ### Offline namespace and task queues
 
@@ -1387,7 +1403,7 @@ An announcement costs about 4 writes, or about 7 when RTF and Raven go together,
 - The PAID drain is light on Temporal and heavy on Oracle: at full speed it adds about 2,000 Oracle writes/s, an update and a timeline insert per payment or leg. That is why the governor gives it budget last and the Oracle signals cut it first.
 - 500K legs a day average about 180 writes/s. A 100K payment at 100 legs a second adds about 3,000 writes/s for about 17 minutes.
 - **Offline DB size.** Load-test run 2 measures writes/s at 60% CPU on 64 and on 192 vCPU. If 64 vCPU covers the worst overlap, Offline starts there and keeps 192 as headroom.
-- **Downstream demand.** Calls per second to a downstream = the sum over classes of rate × calls per workflow to it. US execution at 100 TPS calling clearing once needs 100 RPS of clearing's offline share. Each agreed TPS must cover online traffic's peak plus each window's need; SEPA needs at least about 56 RPS of offline share during the US evening.
+- **Downstream demand.** Calls per second to a downstream = the sum over classes of rate × calls per workflow to it. US execution at 100 TPS calling clearing once needs 100 RPS of clearing's offline share. During a SEPA run, Online is capped at a downstream's agreed TPS less the run's need, so an agreed TPS that covers Online's evening peak plus the run's need (about 56 RPS of clearing) keeps Online uncapped.
 
 ### Workflow IDs and tracing
 
@@ -1415,6 +1431,7 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | Alert | Fires when | People do |
 | --- | --- | --- |
 | SEPA cutoff at risk | The projected finish passes the cutoff minus 15 minutes, or the cutoff floor no longer fits the budget | Raise downstream limits or the rate override, or accept the delay |
+| Online capped | A SEPA run caps Online on a downstream, or the cap warning says one is likely | Raise that downstream's agreed TPS if it happens often |
 | Late allocations | A corporate payment is still `ALLOCATING` at the market's alert point | Chase the allocation source |
 | Returns backlog age | The oldest return waiting in One-Data's inbox passes its age threshold | Check whether higher priorities are holding the queue |
 | PAID backlog age | The oldest `READY` row in the inbox passes its age threshold | Check whether the governor is holding the drain, or RTF is down |
@@ -1435,12 +1452,13 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 
 | Failure | What the system does | People do |
 | --- | --- | --- |
-| Downstream sends 429 | Calls wait out `Retry-After`; the queue limit drops ×0.7; admissions follow | Nothing |
+| Downstream sends 429 | Calls wait out `Retry-After`; the queue limit drops ×0.7, or the offline share halves after an Online 429, never below a SEPA run's need; admissions follow | Nothing |
 | Downstream outage | The queue trickles at 1 RPS; dependent admissions pause; in-flight stays capped | Contact the owner if it lasts |
 | Raven or RTF outage | Payments wait in Fulfil, short of `PROCESSED`, and other announcements wait in their workflows, the PAID drain's included. Once the in-flight cap fills, the Work Tracker dispatchers stop, and the governor stops the inbox dispatchers, so a SEPA cutoff can be missed | Contact the owner; the cutoff alert fires if the run falls behind |
 | Oracle outage or patching | `PaymentStore` retries, then waits on durable timers; dispatchers stop claiming; work resumes when Oracle is back | Nothing, unless it outlasts the schedule-to-close |
 | Offline DB runs hot | The governor cuts; a hard breach halves the budget | Look if it lasts over 15 minutes |
-| Online p99 near its SLO | Every offline class is cut, execution included | Nothing, unless a cutoff alert follows |
+| Online p99 near its SLO | Every offline class is cut, execution included, but a SEPA run keeps its cutoff floor | Nothing, unless a cutoff alert follows |
+| Online would leave a SEPA run short | Online is capped on that downstream at agreed TPS less the run's need, until the cutoff | Nothing; raise the agreed TPS if it happens often |
 | SEPA cutoff at risk | Alert with the projected finish | Raise downstream limits, or accept the delay |
 | Governor down or metrics missing | Dispatchers hold their rates, then fall back to the floors after 5 minutes; a Schedule restarts the governor | Look if it keeps failing |
 | Worker dies mid-dispatch | Heartbeat timeout; the activity resumes; starts are idempotent | Nothing |
@@ -1471,12 +1489,12 @@ Seven runs show whether the design holds. Runs 1 and 2 measure costs and the DB 
 | 1. Cost per workflow | Each workflow type alone at 10 TPS | Measured writes within 20% of the model; otherwise the governor's costs are updated |
 | 2. DB ceiling | Execution at 25, 50, 100 and 150 TPS, then upward until 60% CPU, on 64, then 192 vCPU | Writes/s at 60% CPU and the persistence-p99 knee are recorded; they become the governor's ceiling and bands |
 | 3. US window | 1M executions, governor on | At least 50 TPS throughout; ramps up when healthy; Offline CPU under 60% |
-| 4. SEPA window | 500K executions with a 3-hour cutoff, plus 100 TPS synthetic realtime traffic on the Online cluster against the same stubs | Done with 15% of the cutoff to spare; online p99 unchanged on billpay-core |
+| 4. SEPA window | 500K executions with a 3-hour cutoff, plus synthetic realtime traffic on the Online cluster against the same stubs: below the cap for the first half, above it for the second | Done with 15% of the cutoff to spare; online p99 unchanged on billpay-core in the first half; in the second, Online's calls stay under the cap, and the cap lifts at the cutoff |
 | 5. Failures | During run 3: a 429 storm, a downstream outage, worker kills, a governor kill, an Offline Aurora failover, an Oracle restart | No duplicates, no lost items, recovery with no manual step |
 | 6. Corporate and intake | One 100K and twenty 10K corporate payments, with allocations arriving by callback in parts, some after the execution time, plus 100 TPS of AR intake and a 10-minute burst of 1,000 settlement and posting events a second, both into One-Data's inbox | Parents clear as soon as they are `ALLOCATED`; legs progress fairly; One-Data stores intake with p99 under 500 ms; the AR intake dispatcher and the PAID drain clear their backlogs at the governor's pace, with online p99 unchanged on billpay-core |
 | 7. Market release | Publish, test, activate and roll back a release in E1 while payments run | New payments use the new version; running ones keep theirs; rollback restores the old one |
 
-Runs 4 and 6 prove the app: online p99 must hold on billpay-core while offline work runs, and go-live waits until it does.
+Runs 4 and 6 prove the app: online p99 must hold on billpay-core while offline work runs, outside a cutoff run's cap, and go-live waits until it does.
 
 After every run, reconcile: Work Tracker rows by status match the completed workflows, and the stubs' ledger matches `PAID` payments and legs with no duplicates.
 
@@ -1578,7 +1596,7 @@ These inputs are assumed for now. The first changes the numbers most.
 
 | Item | Assumed for now | Why it matters |
 | --- | --- | --- |
-| Agreed TPS per downstream | Parameters in `downstream_limit` | Caps every window; SEPA needs about 56 RPS of offline share during the US evening |
+| Agreed TPS per downstream | Parameters in `downstream_limit` | Caps every window. During a SEPA run, Online is capped at agreed TPS less the run's need, about 56 RPS of clearing |
 | Inbound volume | Like returns: bursts of 100 TPS, up to 100K a day | Sizes the inbound budget |
 | AR intake time of day | Business hours, outside the midnight windows | Overlap with execution changes the budget split |
 | US execution time zone | Midnight ET for all 1M | Per-customer time zones would spread the load |

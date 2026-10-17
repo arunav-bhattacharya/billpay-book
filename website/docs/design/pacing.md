@@ -127,7 +127,7 @@ A tick costs about 5 Temporal writes. Releasing a million payments at 50 TPS tak
 | SEPA (DE, IT) | 23:00 | Midnight CET, 6 PM ET | Up to 500K | 3 to 4 hours | 46 TPS for 3 hours; the governor aims at about 56 |
 | US | 05:00 | Midnight ET | Up to 1M | None | 50 TPS floor (5.6 hours); 100 TPS takes 2.8 hours |
 
-In summer both windows start an hour earlier in UTC. They never overlap, so one Offline cluster serves them in turn, and the US window sets its size. SEPA runs during the US evening, which makes it the window most likely to be slowed down to protect online traffic. Its floor is there for its cutoff: it aims to finish the run 30 minutes early, but online traffic still comes first.
+In summer both windows start an hour earlier in UTC. They never overlap, so one Offline cluster serves them in turn, and the US window sets its size. SEPA runs during the US evening, which makes it the window most likely to meet heavy online traffic. Its floor is there for its cutoff: it aims to finish the run 30 minutes early, and if online traffic would take too much of a downstream, the cutoff wins and online calls are capped ([Throttling](./throttling.md#when-the-cutoff-wins)).
 
 ## The governor
 
@@ -154,7 +154,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget outright. Persistenc
 
 ### Handing it out, in order
 
-1. Online first. If online p99 or the shared Oracle degrade, every offline class is cut, execution included.
+1. Online first. If online p99 or the shared Oracle degrade, every offline class is cut, execution included. Online p99 never cuts a SEPA run below its cutoff floor, though: the cutoff comes first, and while a run caps online traffic, online p99 rises on purpose.
 2. The SEPA cutoff floor: remaining payments ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
 3. The US execution floor: 50 TPS.
 4. AR intake: its demand, the requests waiting in One-Data's inbox.
@@ -166,6 +166,8 @@ Every class is also capped by the downstream systems it calls (see [Throttling](
 
 Projected finish = now + remaining ÷ current rate. The governor alerts when that passes the cutoff minus 15 minutes, or when the floor no longer fits in the budget, which gives operations time to raise a downstream limit or set a rate override.
 
+An hour before each SEPA run, it also warns when online traffic is likely to be capped: when online's usual peak for those hours, over the last 4 weeks, won't fit under a downstream's agreed rate less the run's need (Proposed).
+
 ### Guardrails
 
 - If metrics go missing, the governor holds its rates. Still missing after 5 minutes, it drops to the floors.
@@ -173,4 +175,4 @@ Projected finish = now + remaining ÷ current rate. The governor alerts when tha
 - Manual overrides always win.
 - Every decision goes to `governor_decision` with its inputs, so any rate can be explained later.
 
-The governor runs as the workflow `governor` on the Offline cluster, and a Schedule with overlap policy SKIP starts it again if it isn't running. One activity per check reads Prometheus and Oracle, then writes `rate_allocation`, the downstream queue limits (only when they change) and the decision row. It continues-as-new every hour and costs about 20 Temporal writes a minute.
+The governor runs as the workflow `governor` on the Offline cluster, and a Schedule with overlap policy SKIP starts it again if it isn't running. One activity per check reads Prometheus and Oracle, then writes `rate_allocation`, the downstream queue limits (only when they change, and on the Online cluster only while a cap is on) and the decision row. It continues-as-new every hour and costs about 20 Temporal writes a minute.

@@ -701,7 +701,7 @@ function StagesStep({j, n, stages, corp, corpRow, open, onToggle, pickAct}) {
       <p className={styles.stepNote}>
         {offline
           ? "Each call runs on its system's task queue, shown beside it."
-          : "Every call runs on online-wf, the Online cluster's one task queue."}
+          : "Every call runs on online-wf, the Online cluster's main task queue, unless a SEPA run has capped its downstream."}
       </p>
       {!corp && j.first && <p className={styles.stepText}>{j.first}</p>}
       {!corp && j.tbd && <p className={styles.stepText}>{j.tbd}</p>}
@@ -1046,7 +1046,7 @@ function ActCard({f, go, onClear}) {
       )}
 
       {f.queue.startsWith('ds-') && (
-        <p className={clsx(styles.quietLine, styles.gapTop)}>On the Online cluster these calls run on online-wf, its one task queue.</p>
+        <p className={clsx(styles.quietLine, styles.gapTop)}>On the Online cluster these calls run on online-wf, its main task queue, unless a SEPA run has capped this downstream.</p>
       )}
       {f.name === 'InboxActivities' && (
         <p className={clsx(styles.quietLine, styles.gapTop)}>
@@ -1614,7 +1614,7 @@ export default function RouteLedger() {
           </div>
           <p className={styles.note}>
             Task queues are the Offline cluster&apos;s. On the Online cluster every regular activity runs on online-wf,
-            its one task queue. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
+            its main task queue, except calls to a downstream a SEPA run has capped. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
             it moves a corporate parent to PROCESSED, and ProcessMissingPaidEvents asks MR/M3 and GAR for a
             payment&apos;s state. The two reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}
             and <span className={styles.mono}>GET /payments/{'{payment-id}'}</span>, go straight to Oracle and start no

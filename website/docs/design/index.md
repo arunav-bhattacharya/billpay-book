@@ -1,6 +1,6 @@
 ---
 title: Design
-description: 'Design is the model the code follows: the states a payment moves through, which workflow runs each journey, and how work nobody is waiting for is paced so it never slows down a customer who is.'
+description: 'Design is the model the code follows: the states a payment moves through, which workflow runs each journey, and how work nobody is waiting for is paced around the customers who are.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Design
 
-<Lead>Design is the model the code follows: the states a payment moves through, which workflow runs each journey, and how work nobody is waiting for is paced so it never slows down a customer who is.</Lead>
+<Lead>Design is the model the code follows: the states a payment moves through, which workflow runs each journey, and how work nobody is waiting for is paced around the customers who are.</Lead>
 
 Four layers handle every journey. A **workflow** runs it, **stages** take its business steps, **activities** make the calls to one system each, and **clients** speak that system's contract. Only stages change with a market's behaviors, so adding a market rarely means new code.
 

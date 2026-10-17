@@ -1,6 +1,6 @@
 ---
 title: Throttling, Priority and Fairness
-description: 'Each downstream system sees at most the rate it agreed to. Online traffic takes what it needs, and offline traffic gets the rest.'
+description: 'Each downstream system sees at most the rate it agreed to, and the two clusters share that rate by use: offline work gets whatever online traffic leaves.'
 sidebar_label: Throttling
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Throttling, Priority and Fairness
 
-<Lead>Each downstream system sees at most the rate it agreed to. Online traffic takes what it needs, and offline traffic gets the rest, enforced in one place per downstream: its task queue.</Lead>
+<Lead>Each downstream system sees at most the rate it agreed to, and the two clusters share that rate by use: offline work gets whatever online traffic leaves. When a SEPA run would miss its cutoff, the cutoff wins, and online calls to that system are capped until it passes.</Lead>
 
 Billpay calls clearing, Accounts Receivable and several other systems for every payment it executes, and most of them have agreed a rate with us. Exceed it and they answer 429, for online and offline calls alike. So the limit lives in Temporal, where it holds across every pod at once, rather than in each worker's HTTP client.
 
@@ -25,20 +25,40 @@ temporal task-queue config set --task-queue ds-clearing --task-queue-type activi
   --queue-rps-limit 120 --queue-rps-limit-reason governor
 ```
 
-Online traffic is never throttled. The offline share of each downstream is what is left:
+## Sharing a downstream between the clusters
 
-> Offline share = agreed TPS − online traffic's measured use (the peak of the last minute) − a 10% margin
+There is no fixed split. Every 15 seconds the [governor](./pacing.md#the-governor) works out each downstream's offline share from what online traffic is actually using:
+
+> Offline share = agreed TPS − online traffic's use (the peak of the last minute) − headroom
+
+Say clearing has agreed to 100 calls a second. Online at 25 leaves offline 65, online at 80 leaves it 10, and an idle online cluster leaves it 90.
+
+The sum needs two inputs, both Proposed:
+
+- Online's calls all run on one queue, so Temporal can't count them per downstream. Online workers count their own calls and 429s per downstream in Prometheus, which the governor already reads.
+- Offline reacts up to about 45 seconds late: one 15-second check plus about 30 seconds of metric delay. So the headroom is the larger of 10% of the agreed rate and the biggest 45-second jump in online traffic seen over the last 4 weeks and in the load test.
+
+## When the cutoff wins
+
+A SEPA run has to reach the bank before its cutoff, and when it collides with online traffic, the cutoff comes first. During a run, offline's share of a downstream never drops below what the run needs to finish 30 minutes early. For a full SEPA run, that is about 56 calls a second of clearing.
+
+If online traffic would leave less than that, online is capped on that downstream at the agreed rate minus the run's need, until the cutoff passes. With clearing at 100 calls a second, the cap is 44. The US run has no cutoff, so it never caps online traffic.
+
+The cap works the same way as offline's limits (Proposed). The Online cluster has a `ds-*` queue for each downstream a cutoff run calls, and the governor sets the cap as that queue's limit. While a cap is on, the Router places that downstream's calls for each new online payment on the capped queue. The rest of the time they run on `online-wf` with eager dispatch, so normal traffic pays nothing for this. A cap lifts by itself at the cutoff, so a stopped governor can't leave customers capped.
+
+The cost falls on customers, and only during the run. Some online payments wait for the downstream, and one the API can't decide in time gets a PENDING reply and finishes shortly after. Because a cap raises online p99 on purpose, online p99 never cuts a SEPA run below its floor. An hour before each run, the governor warns when online traffic is likely to be capped (Proposed).
 
 ## Admitting only what fits
 
 A queue limit on its own isn't enough. Starting more workflows than a downstream can serve only parks their tasks in the queue's backlog, and that backlog is rows in the Offline database. So admission happens before the start: across every class of work, the sum of start rate times calls per workflow to a downstream must stay within its offline share, handed out in priority order. The [governor](./pacing.md#the-governor) does that sum every 15 seconds.
 
-Calls per second to a downstream is the sum over classes of rate times calls per workflow to it. US execution at 100 TPS, calling clearing once each, needs 100 calls a second of clearing's offline share. Each agreed TPS has to cover online traffic's peak plus each window's need; SEPA alone needs about 56 calls a second of offline share during the US evening.
+Calls per second to a downstream is the sum over classes of rate times calls per workflow to it. US execution at 100 TPS, calling clearing once each, needs 100 calls a second of clearing's offline share. An agreed rate that covers online's evening peak plus a SEPA run's need, about 56 calls a second of clearing, means online traffic is never capped.
 
 ## When a downstream pushes back
 
 - A single call that gets 429 waits out `Retry-After`, plus a little jitter, and tries again.
 - If the 429 rate passes 1%, or the downstream's p99 doubles, the governor drops the queue's limit by multiplying it by 0.7, then probes back up 5% at a time.
+- A 429 on an online call means offline took room online needed, so it halves that downstream's offline share at the next check (Proposed). Neither cut takes a SEPA run below its need.
 - In an outage the queue trickles at 1 call a second, just enough to notice when the downstream is back. Admissions for the classes that need it pause, and only the work already in flight waits.
 
 Worker slots follow the limit, not the other way round. A queue needs roughly its limit times the call latency in slots: 100 calls a second at 1 second each needs about 100 slots across all pods. Adding more slots adds no throughput.
@@ -85,4 +105,4 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
 
-The Online cluster needs none of this. Its one task queue, `online-wf`, carries the workflow tasks and their regular activities, with eager dispatch on. Online traffic is never throttled, so there are no `ds-*` queues on that side.
+On the Online cluster, the main queue is `online-wf`, which carries the workflow tasks and their regular activities, with eager dispatch on. Its `ds-*` queues carry calls only while a SEPA run caps online traffic on a downstream ([When the cutoff wins](#when-the-cutoff-wins)). Online workers poll them, with slots sized to the cap.
