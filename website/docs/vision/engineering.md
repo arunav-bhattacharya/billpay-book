@@ -25,6 +25,11 @@ export const BEHAVIORS = [
     ask: 'Should a mandate be verified?',
     answers: ['Y', 'N', 'BOTH'],
   },
+  {
+    name: 'requiresBankConfirmation',
+    ask: 'Should the customer confirm their bank first?',
+    answers: ['Y', 'N', 'BOTH'],
+  },
 ];
 
 export const SETTINGS = [
@@ -32,6 +37,7 @@ export const SETTINGS = [
   'Cancellation window',
   'Cutoff',
   'Allocation fetch',
+  'Bank confirmation window',
   'Representment rules',
   'Expected volumes',
 ];

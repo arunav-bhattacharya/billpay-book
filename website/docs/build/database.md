@@ -16,7 +16,7 @@ import Lead from '@site/src/components/Lead';
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. |
+| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. Proposed: a payment waiting for bank confirmation carries the provider's reference. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
@@ -30,7 +30,7 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg or a representment, and when it is due. Written in the same commit as the state change that creates it. |
+| `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg, a representment or a confirmation expiry, and when it is due. Written in the same commit as the state change that creates it. |
 | `market_config_version` (new) | Published version of a market profile | Immutable once saved. |
 | `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketProvisioningWorkflow` writes it. |
 | `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
@@ -43,10 +43,10 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | Column | Holds |
 | --- | --- |
 | `item_id` | Primary key: a deterministic business key such as `exec:{paymentId}`, so a retried insert can't create duplicate work |
-| `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_EXEC`, `ALLOC_LEG` or `REPRESENT` |
+| `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_EXEC`, `ALLOC_LEG`, `REPRESENT` or `CONFIRM_EXPIRY` |
 | `ref_id` | The payment or leg ID in the payment tables |
 | `group_key` | The market, or the parent payment ID for a leg |
-| `due_at` | The earliest start: the execution time, the fetch time, the time a leg is written, or the representment date |
+| `due_at` | The earliest start: the execution time, the fetch time, the time a leg is written, the representment date, or the end of a confirmation window |
 | `priority` | Claim order inside a type |
 | `status` | `SCHEDULED`, `DISPATCHING`, `DISPATCHED`, `DONE`, `FAILED` or `CANCELLED` |
 | `run_id`, `claimed_at` | Which dispatcher run claimed it, and when |
@@ -70,6 +70,7 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table |
 | A stage commit | The guarded status update, the timeline row with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, together with the note on the batch that its legs are written |
+| Bank confirmation | The provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and cancelling the payment's Work Tracker rows |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of up to 500 inbox rows as JDBC batches: each a guarded update from `PROCESSED` to `PAID`, with a `PAID` timeline row tagged with the batch ID wherever the update changed a row |

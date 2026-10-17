@@ -17,7 +17,7 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 
 ## Create Immediate Payment
 
-<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels" behaviors="all" />
+<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization', 'requiresBankConfirmation']} />
 
 `CreateImmediatePaymentWorkflow` pays a bill today. The caller waits only until Verify decides.
 
@@ -30,6 +30,8 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 A consumer split payment's commit also writes its legs, and each leg runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
 
 A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step from rows in Oracle, the same way as for a scheduled corporate payment (see [Corporate Allocations](../../corporate-allocations.md)).
+
+A payment the customer must confirm at their bank stops even earlier. When `requiresBankConfirmation` resolves to Y, RequestConfirmation runs after Capture in place of Verify: it gets the provider's redirect link and commits a `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. [Confirm Payment](#confirm-payment) takes over when the caller confirms.
 
 ## Create Scheduled Payment
 
@@ -51,7 +53,7 @@ A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_RE
 2. Execute, then Fulfil, as for pay today.
 3. The last commit marks its Work Tracker row, `SCHED_EXEC` or `ALLOC_EXEC`, `DONE`, or `FAILED` when retries run out. That frees a slot under the dispatcher's in-flight cap.
 
-For a corporate payment, Execute clears the parent once, at payment level, and its commit marks the legs released. The leg dispatcher then writes the legs of every stored batch and starts them. There is no Fulfil.
+For a corporate payment, Execute clears the parent once, at payment level, and makes no AR or open-to-buy call, because the legs do. Its commit marks the legs released. The leg dispatcher then writes the legs of every stored batch and starts them. There is no Fulfil.
 
 ## Execute Split Payment
 
@@ -113,13 +115,15 @@ stateDiagram-v2
 
 ## Cancel Payment
 
-<WorkflowMeta cluster="Online" id="{paymentId}-cancel" start="Update-With-Start" behaviors={['accountType', 'requiresArPosting']} />
+<WorkflowMeta cluster="Online / Offline" id="{paymentId}-cancel" start="Update-With-Start, on Online; the confirmation-expiry dispatcher, on Offline" behaviors={['accountType', 'requiresArPosting']} />
 
 `CancelPaymentWorkflow` withdraws a `SCHEDULED` payment inside the market's cancellation window. A corporate payment can be withdrawn only until its allocations are requested, when it moves to `ALLOCATING`.
 
 1. Check the window and eligibility with read-only calls.
 2. Cancel: one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
 3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409, which is what a corporate payment gets once it is `ALLOCATING`.
+
+The same workflow cancels a payment the customer never confirmed at their bank. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts it on the Offline cluster. It skips the window check, and Cancel's guard is on `PENDING`, so a payment confirmed first is left alone.
 
 ## Process Returned Payment
 
@@ -144,11 +148,16 @@ stateDiagram-v2
 
 `ProcessInboundPaymentWorkflow` takes a payment a third party pushed. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil.
 
-## Create Payment Intent
+## Confirm Payment
 
-<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start" />
+<WorkflowMeta cluster="Online" id="{paymentId}-confirm" start="Update-With-Start, from the Confirm API" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization', 'requiresBankConfirmation']} />
 
-`CreatePaymentIntentWorkflow` records an intent to pay. The payment is processed only when the customer's financial institution confirms it. Its detailed steps are still being defined.
+`ConfirmPaymentWorkflow` picks up a payment that waited for the customer's bank. The caller sends the same payment ID once the customer has confirmed their bank details on the provider's site, and the workflow runs the rest of the pay-today path.
+
+1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. Proposed: Verify also asks the provider whether the customer confirmed.
+2. Execute, then Fulfil, as for pay today.
+
+A repeated confirm joins the running workflow. A confirm for a payment that was cancelled when its window closed gets 409; Proposed: once the workflow has closed, a repeated confirm gets the payment's current state.
 
 ## Create Balance Refund
 

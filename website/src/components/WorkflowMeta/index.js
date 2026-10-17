@@ -26,7 +26,8 @@ const ALL = [
  *               needs words, such as '`governor`, plus its Schedule's trigger
  *               time', is set as text, with any code in backticks
  *   start       what starts it; `code` in backticks is rendered as code
- *   behaviors   'all' (the four) | 'generic' (none) | string[] of field names;
+ *   behaviors   'all' (the four) | 'generic' (none) | string[] of field names,
+ *               which is how a workflow names requiresBankConfirmation too;
  *               leave it out to skip the row
  */
 export default function WorkflowMeta({cluster, worker, id, start, behaviors}) {

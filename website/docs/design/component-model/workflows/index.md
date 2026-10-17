@@ -18,7 +18,7 @@ export const CLUSTERS = [
       'Create Scheduled Payment, from channels',
       'Update Payment',
       'Cancel Payment',
-      'Create Payment Intent',
+      'Confirm Payment',
       'Create Balance Refund, from channels',
       'Composites',
       'Execute Split Payment, consumer legs',
@@ -39,6 +39,7 @@ export const CLUSTERS = [
       'Process Representment',
       'Process Inbound Payment',
       'Create Balance Refund, from AR',
+      'Cancel Payment, when a confirmation window closes',
       'Periodic jobs',
       'Dispatchers and the governor',
       'Market provisioning',
@@ -57,7 +58,7 @@ export const CLUSTERS = [
     {
       term: 'Core',
       to: '/docs/design/component-model/workflows/core',
-      desc: `One business journey each: pay today, schedule, execute, split, allocate, update, cancel, return, represent, inbound, intent and refund.`,
+      desc: `One business journey each: pay today, schedule, execute, split, allocate, update, cancel, confirm, return, represent, inbound and refund.`,
     },
     {
       term: 'Composite',

@@ -57,8 +57,8 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
       ),
     },
     {
-      term: 'Payment intent',
-      desc: `Record an intent to pay, which becomes a real payment only once the customer's bank confirms it.`,
+      term: 'Pay by bank',
+      desc: `Pay from a bank account the customer confirms on their bank's side, such as Plaid in the US or Pay with Bank Transfer in the UK. The payment waits until they come back and confirm it.`,
     },
   ]}
 />
@@ -81,7 +81,7 @@ A market comes onto Billpay through **onboarding** in the Market Onboarding UI, 
 
 ### Behaviors
 
-The first kind sets the **behaviors**, the choices that change how a payment is handled. The account type is one; the other three are answered **Y**, **N** or **BOTH**. BOTH means the behavior applies to some journeys and not others, and onboarding records which ones. Realtime clearing is the clearest example: only a payment made today in a channel can clear in real time, so a market that clears today's payments in real time answers BOTH, and every future-dated payment clears in batch.
+The first kind sets the **behaviors**, the choices that change how a payment is handled. The account type is one; the other four are answered **Y**, **N** or **BOTH**. BOTH means the behavior applies to some journeys and not others, and onboarding records which ones. Realtime clearing is the clearest example: only a payment made today in a channel can clear in real time, so a market that clears today's payments in real time answers BOTH, and every future-dated payment clears in batch. Bank confirmation set to BOTH depends on how the customer pays instead: only the payment methods that need it send the customer to their bank.
 
 | Behavior | What it decides | Answers |
 | --- | --- | --- |
@@ -89,10 +89,11 @@ The first kind sets the **behaviors**, the choices that change how a payment is 
 | **Good faith credit** | Whether the cardmember gets credit for the payment before the money settles. Billpay tells Accounts Receivable, the system that tracks what they owe, to post the payment while it is still processing (`requiresArPosting`). | Y, N or BOTH |
 | **Realtime clearing** | Whether the payment goes to the customer's bank straight away or waits for a periodic batch (`requiresRealtimeClearing`). | Y, N or BOTH |
 | **Mandate authorization** | Whether Billpay has to verify a mandate, the standing authorization to collect the money, while the payment is processed (`requiresMandateAuthorization`). | Y, N or BOTH |
+| **Bank confirmation** | Whether the customer confirms their bank details on a provider's site, such as Plaid or Pay with Bank Transfer, before the payment is processed (`requiresBankConfirmation`). | Y, N or BOTH |
 
 ### Operations settings
 
-The second kind is about time. The **Operations step** asks when the market's scheduled payments run, how long before that a customer can still cancel, whether there is a cutoff they must finish by, when a corporate payment's allocations should be fetched and when their lateness should raise an alert, how a returned payment may be presented again, and what volumes to expect. Every answer drives something real at runtime, from the moment a market's payments are released to the pace they run at.
+The second kind is about time. The **Operations step** asks when the market's scheduled payments run, how long before that a customer can still cancel, whether there is a cutoff they must finish by, when a corporate payment's allocations should be fetched and when their lateness should raise an alert, how a returned payment may be presented again, which provider confirms bank details and how long a customer has to do it, and what volumes to expect. Every answer drives something real at runtime, from the moment a market's payments are released to the pace they run at.
 
 ### Releases
 

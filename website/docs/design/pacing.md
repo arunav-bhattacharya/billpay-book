@@ -38,6 +38,7 @@ One narrow table in Oracle, `work_tracker`, holds every piece of dated work. A r
 | `ALLOC_EXEC` | Corporate payment, written once it is `ALLOCATED` | At once for pay today; the execution time on the due date for a scheduled payment, or at once if that has passed | Allocated-payments dispatcher |
 | `ALLOC_LEG` | Allocation leg | When the leg is written, at its parent's release | Leg dispatcher |
 | `REPRESENT` | Representment | The date the market's rules set | Representment dispatcher |
+| `CONFIRM_EXPIRY` | Payment waiting for the customer to confirm at their bank | When the market's confirmation window closes | Confirmation-expiry dispatcher |
 
 A row moves through a short lifecycle:
 
@@ -59,7 +60,7 @@ stateDiagram-v2
 | `DISPATCHING` | The dispatcher's claim |
 | `DISPATCHED` | The dispatcher, after a successful start |
 | `DONE` or `FAILED` | The workflow's last commit; or `FAILED` from the dispatcher, when the Router refuses the row |
-| `CANCELLED` | `CancelPaymentWorkflow`, in the commit that cancels the payment |
+| `CANCELLED` | `CancelPaymentWorkflow`, in the commit that cancels the payment. A `CONFIRM_EXPIRY` row is also cancelled by Verify's commit when the customer confirms in time |
 
 Workflow IDs aren't stored: each one is the payment ID plus its suffix. No row waits on another: a leg is written only at its parent's release, so its row starts `SCHEDULED`. Daily partitions are dropped 15 days after they fall due, so finished rows never pile up.
 
@@ -74,6 +75,7 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 | Allocated payments | `ALLOC_EXEC` rows due | A Schedule every minute | `ExecuteScheduledPaymentWorkflow` |
 | Allocation legs | `ALLOC_LEG` rows, fair across parents | A Schedule every minute | `ExecuteSplitPaymentWorkflow` |
 | Representments, one per market | `REPRESENT` rows due | A Schedule every few minutes | `ProcessRepresentmentWorkflow` |
+| Confirmation expiries | `CONFIRM_EXPIRY` rows due | A Schedule every minute (Proposed) | `CancelPaymentWorkflow`, for a payment never confirmed |
 | AR intake | `READY` AR requests in One-Data's inbox, payments and refunds | A Schedule every minute | `CreateScheduledPaymentWorkflow`, `CreateBalanceRefundWorkflow` |
 | Returns | `READY` returns in One-Data's inbox | A Schedule every minute | `ProcessReturnedPaymentWorkflow` |
 | Inbound | `READY` inbound payments in One-Data's inbox | A Schedule every minute | `ProcessInboundPaymentWorkflow` |
@@ -156,7 +158,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget outright. Persistenc
 2. The SEPA cutoff floor: remaining payments ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
 3. The US execution floor: 50 TPS.
 4. AR intake: its demand, the requests waiting in One-Data's inbox.
-5. The rest by priority, up to demand: SEPA and US execution above their floors, then corporate (split evenly across the active corporate payments), then inbound, then representments, then returns, and the PAID drain last.
+5. The rest by priority, up to demand: SEPA and US execution above their floors, then corporate (split evenly across the active corporate payments), then inbound, then representments, then returns, then confirmation expiries (Proposed), and the PAID drain last.
 
 Every class is also capped by the downstream systems it calls (see [Throttling](./throttling.md)). The inbox dispatchers have no in-flight cap, so while RTF calls fail or a downstream they call is out, they get no rate at all.
 

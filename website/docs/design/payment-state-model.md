@@ -15,7 +15,7 @@ import StateLegend from '@site/src/components/StateLegend';
 
 ## The lifecycle
 
-Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal.
+Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal. A payment that waits for the customer to confirm at their bank stays `PENDING` the same way, until the caller confirms it or the market's confirmation window closes.
 
 <Tabs groupId="payment-type" className="toggle-tabs">
 <TabItem value="consumer" label="Consumer" default>
@@ -29,10 +29,11 @@ config:
 stateDiagram-v2
   direction TB
   [*] --> PENDING: Capture
-  PENDING --> ACCEPTED: Verify, pay today or inbound
+  PENDING --> ACCEPTED: Verify, pay today, inbound or at confirm
   PENDING --> SCHEDULED: Verify, future date
   PENDING --> DECLINED: Verify fails
   PENDING --> DISALLOWED: Verify, inbound not accepted
+  PENDING --> CANCELLED: Cancel, never confirmed at the bank
   SCHEDULED --> ACCEPTED: Reverify, on the due date
   SCHEDULED --> DECLINED: Reverify fails
   SCHEDULED --> CANCELLED: Cancel, inside the window
@@ -104,7 +105,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 
 | State | Meaning | Terminal? |
 | --- | --- | --- |
-| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation. | No |
+| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the customer to confirm their bank details. | No |
 | `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
 | `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. | No |
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager. Batches may be arriving. | No |
@@ -116,7 +117,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `RETURNED` | The payment did not settle; the customer's bank sent the funds back. | Yes, unless it is represented |
 | `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
 | `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
-| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed at the customer's bank before the market's confirmation window closed. | Yes |
 | `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
 
 `PROCESSED` is a higher bar than it looks. A payment reaches it only after every must-succeed system has answered and the customer has been told, which is why an outage at RTF or Raven holds payments at `PROCESSING` rather than letting them through with a gap.
@@ -128,6 +129,8 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
+| `PENDING` (bank confirmation) | `ACCEPTED` or `DECLINED` | Verify, once the caller confirms |
+| `PENDING` (bank confirmation) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
 | `SCHEDULED` (corporate) | `ALLOCATING` | RequestAllocations, at the market's fetch time |
@@ -158,7 +161,7 @@ UPDATE trans_dtl SET status = 'CANCELLED'
 
 When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both.
+A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm races the end of the confirmation window too: Verify and the expiry's Cancel are both guarded on `PENDING`, and a confirm that loses gets 409.
 
 ## Split payments
 

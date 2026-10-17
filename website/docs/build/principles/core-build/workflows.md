@@ -37,10 +37,10 @@ How a workflow starts depends on who is waiting for it, and the Router picks the
 
 | When | Start | Used by |
 | --- | --- | --- |
-| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | Pay today, schedule, composites, intent, update, cancel, refunds from channels |
+| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | Pay today, schedule, composites, confirm, update, cancel, refunds from channels |
 | Nobody waits | One-Data stores the request, and a dispatcher pulls it from the inbox | AR intake, returns, inbound |
 | An allocation callback | Async start, before the 202 reply | Allocation callbacks |
-| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit, which a dispatcher picks up | Scheduled execution, allocation requests, corporate execution, corporate legs, representments |
+| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit, which a dispatcher picks up | Scheduled execution, allocation requests, corporate execution, corporate legs, representments, confirmation expiries |
 
 When a caller waits, its update lands on the workflow's update method and returns as soon as the workflow has the answer, which for a new payment is Verify's decision. The workflow carries on after the reply. A repeated request joins the running workflow instead of starting a second one; that is what `USE_EXISTING` does.
 
@@ -56,7 +56,7 @@ A child always runs on its parent's cluster. These journeys use them:
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
 
-A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../../design/corporate-allocations.md) walks through it.
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation starts no child either: the caller's confirm starts `ConfirmPaymentWorkflow`, and a payment never confirmed is cancelled from a Work Tracker row.
 
 ## Versioning
 
@@ -87,6 +87,12 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
         val stages = StageIndex.lookup(plan)
 
         stages.capture.run(paymentId)                  // PENDING, idempotent
+        if (plan.requiresBankConfirmation) {
+            // The caller gets the provider's redirect link; the payment waits in Oracle, not here.
+            decided = stages.requestConfirmation.run(paymentId)  // still PENDING: the link, and a CONFIRM_EXPIRY row
+            stages.capture.announce(paymentId)
+            return
+        }
         decided = stages.verify.run(paymentId)         // ACCEPTED or DECLINED, one guarded commit
         // The caller's update has its answer here. Announce both changes, in order.
         stages.capture.announce(paymentId)             // the PENDING event to RTF
@@ -110,18 +116,21 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
 
 The workflow never names a market: `StageIndex.lookup(plan)` is the only place its stages come from. Capture and Verify commit back to back, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
-A declined payment ends there, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
+A payment that needs bank confirmation never reaches Verify here. RequestConfirmation gets the provider's redirect link and writes a `CONFIRM_EXPIRY` row, the caller's update returns `PENDING` with the link, and the workflow ends; `ConfirmPaymentWorkflow` runs Verify later, when the caller confirms. That branch reads the plan key, the same way the corporate stop does.
+
+A declined payment ends after Verify, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
 
 Nothing in the method touches a database, a clock or a wire. The stages and their activities do. The sketch leaves out consumer splits, whose legs run as child workflows.
 
 ## Which cluster runs it
 
-The Router decides, when it places the start, and the workflow has no say. Work a caller waits for runs on the Online cluster. Work that a dispatcher, a Schedule or a callback starts runs on the Offline cluster. Three workflows run on either, depending on what started them:
+The Router decides, when it places the start, and the workflow has no say. Work a caller waits for runs on the Online cluster. Work that a dispatcher, a Schedule or a callback starts runs on the Offline cluster. Four workflows run on either, depending on what started them:
 
 | Workflow | On Online | On Offline |
 | --- | --- | --- |
 | Create Scheduled Payment | From a channel | From AR, through the AR intake dispatcher |
 | Execute Split Payment | A consumer leg of an Online parent | A corporate leg, or a consumer leg of an Offline parent |
 | Create Balance Refund | From a channel | A refund AR raises, through the AR intake dispatcher |
+| Cancel Payment | A caller's cancel | A payment never confirmed at its bank, through the confirmation-expiry dispatcher |
 
 [Design → Workflows](../../../design/component-model/workflows/index.md) has every workflow with its cluster, workflow ID and behaviors.

@@ -69,6 +69,14 @@ const BANDS = [
             note: 'a child per instruction',
           },
           {id: 'scheduled', wf: 'CreateScheduledPayment', why: 'a future date', stages: [0, 1]},
+          {
+            id: 'bank',
+            wf: 'CreateImmediatePayment',
+            why: 'today, bank confirmation',
+            stages: [0],
+            own: ['RequestConfirmation'],
+            note: 'stops at PENDING with the link',
+          },
         ],
       },
       {
@@ -91,16 +99,9 @@ const BANDS = [
         journeys: [{id: 'cancel', wf: 'CancelPayment', why: 'SCHEDULED, inside the window', own: ['Cancel']}],
       },
       {
-        fn: ['CreatePaymentIntent.v1'],
-        api: ['POST', '/payments/intent'],
-        journeys: [
-          {
-            id: 'intent',
-            wf: 'CreatePaymentIntent',
-            why: 'once the bank confirms',
-            note: 'steps still to be defined',
-          },
-        ],
+        fn: ['ConfirmPayment.v1'],
+        api: ['POST', '/payments/{payment-id}/confirm'],
+        journeys: [{id: 'confirm', wf: 'ConfirmPayment', why: 'confirmed at the bank', stages: [1, 3, 4]}],
       },
       {
         fn: ['CreatePaymentInstallment.v1'],
@@ -202,6 +203,7 @@ const BANDS = [
             wf: 'ExecuteScheduledPayment',
             why: 'corporate, once ALLOCATED',
             stages: [2, 3],
+            skip: ['ReceivablesActivities', 'AuthorizationActivities'],
             note: 'Reverify only when scheduled',
           },
         ],
@@ -217,6 +219,11 @@ const BANDS = [
         row: 'REPRESENT',
         by: 'representment dispatcher',
         journeys: [{id: 'represent', wf: 'ProcessRepresentment', why: 'on the representment date', own: ['Represent']}],
+      },
+      {
+        row: 'CONFIRM_EXPIRY',
+        by: 'confirmation-expiry dispatcher',
+        journeys: [{id: 'expire', wf: 'CancelPayment', why: 'never confirmed at the bank', own: ['Cancel']}],
       },
     ],
   },
@@ -240,7 +247,7 @@ const DRAIN = {
 
 /* who calls each system: stage columns, stages of their own, or a source.
    A journey's `skip` drops a call its stage would otherwise make: a corporate
-   leg never clears. */
+   leg never clears, and a corporate parent only clears. */
 const ACTIVITIES = [
   {name: 'PaymentStore', system: 'Oracle', rail: true, note: 'every stage commits here'},
   {name: 'LifecycleEventActivities', system: 'RTF', rail: true, note: 'every state change'},
@@ -254,6 +261,7 @@ const ACTIVITIES = [
   {name: 'BalanceControlActivities', system: 'eBNC', stages: [4]},
   {name: 'RiskActivities', system: 'Risk', stages: [4]},
   {name: 'AllocationActivities', system: 'Allocations manager', own: ['RequestAllocations']},
+  {name: 'BankConfirmationActivities', system: 'Bank provider', own: ['RequestConfirmation']},
   {name: 'InboxActivities', system: 'One-Data', from: 'inbox', note: 'the PAID drain and the inbox dispatchers'},
 ];
 
@@ -299,7 +307,11 @@ function list(items) {
 
 function runs(j) {
   const own = j.own || [];
-  const steps = [...own, ...(j.stages || []).map((s) => STAGES[s])];
+  const named = (j.stages || []).map((s) => STAGES[s]);
+  /* A journey with a child runs its own stage first (Update cancels, then the
+     child captures and verifies); any other runs its own stage after the
+     shared ones (Capture, then RequestConfirmation). */
+  const steps = j.child ? [...own, ...named] : [...named, ...own];
   if (!steps.length) return 'Its steps are still to be defined.';
   let how = '';
   if (j.child) how = own.length ? ', the last of them through a child workflow' : ' through a child workflow';

@@ -51,7 +51,7 @@ Two assumptions sit under this, and both are open: the callback contract (batche
 The allocated-payments dispatcher runs every minute. When an `ALLOC_EXEC` row falls due, it starts `ExecuteScheduledPaymentWorkflow` through the Router, for a payment made today as much as for a scheduled one.
 
 - A scheduled payment is checked again first: Reverify moves it from `ALLOCATED` to `ACCEPTED`, or to `DECLINED`. A payment made today skips Reverify, because Verify passed it minutes earlier.
-- Execute clears the parent once, at payment level, and commits `PROCESSING`. Clearing never runs per allocation.
+- Execute clears the parent once, at payment level, and commits `PROCESSING`. That is its only call: the legs update the AR balance and open-to-buy, and clearing never runs per allocation.
 - The same commit marks the parent's legs released. A corporate parent has no Fulfil.
 
 ## Writing and running the legs

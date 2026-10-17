@@ -9,7 +9,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>A stage is one business step, named for the journey step it performs: Verify, Execute, Settle. It makes its calls, in parallel where they don't depend on each other, commits the result in one guarded Oracle transaction, and returns its outcome.</Lead>
 
-Stages are the only layer that changes between markets. Verify in a market that checks a mandate is a different implementation from Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its plan key, and the most specific match wins. Twelve stages cover every journey.
+Stages are the only layer that changes between markets. Verify in a market that checks a mandate is a different implementation from Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its plan key, and the most specific match wins. Thirteen stages cover every journey.
 
 ## What every stage does
 
@@ -26,47 +26,53 @@ Two stages bend that order, for good reasons:
 
 The changes that send a Raven message are assumed, for now, to be `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED`.
 
-## The twelve stages
+## The thirteen stages
 
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; inbound → `DISALLOWED` | All four behaviors |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller and writes the payment's `CONFIRM_EXPIRY` row | Nothing |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; inbound → `DISALLOWED` | All four behaviors, and bank confirmation |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
-| Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent clears once and releases its legs | Account type, AR posting, realtime clearing |
+| Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | `SCHEDULED`, or `ACCEPTED` for pay today, → `ALLOCATING` | Nothing |
 | ReceiveAllocations | `ALLOCATING` → `ALLOCATED` once the batches add up, with the payment's `ALLOC_EXEC` row; earlier batches change no state | Nothing |
-| Cancel | `SCHEDULED` → `CANCELLED` | Account type, AR posting |
+| Cancel | `SCHEDULED` → `CANCELLED`; `PENDING` → `CANCELLED` for a payment never confirmed at its bank | Account type, AR posting |
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
 | QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
 
-"All four" means account type, AR posting, realtime clearing and mandate authorization.
+"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and which Verify implementation confirms the payment.
 
 ## Which workflow runs which stages
 
 | Workflow | Stages, in order |
 | --- | --- |
-| Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate payment stops after Verify |
+| Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate payment stops after Verify; one that needs bank confirmation runs Capture and RequestConfirmation, then stops |
 | Create Scheduled Payment | Capture, Verify |
 | Execute Scheduled Payment | Reverify, Execute, Fulfil. A corporate parent has no Fulfil, and one paid today skips Reverify |
 | Execute Split Payment | Execute, Fulfil |
 | Request Allocations | RequestAllocations |
 | Receive Allocations | ReceiveAllocations |
 | Update Payment | Cancel, then the child runs Capture and Verify |
-| Cancel Payment | Cancel |
+| Cancel Payment | Cancel, from a caller or when a confirmation window closes |
+| Confirm Payment | Verify, Execute, Fulfil |
 | Process Returned Payment | Return, QueueRepresentment |
 | Process Representment | Represent |
 | Process Inbound Payment | Capture, Verify, Execute, Fulfil |
 | Process Paid Events | Settle, once per batch |
 
-Create Payment Intent and Create Balance Refund follow the payment path; their detailed stages are still being defined.
+Create Balance Refund follows the payment path; its detailed stages are still being defined.
 
 ## Capture
 
 Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent. A duplicate means the request was seen before, and the caller gets the existing payment. On the Online cluster Capture gets a short deadline, so a caller facing an Oracle problem gets a quick error instead of a long wait.
+
+## RequestConfirmation
+
+Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link. One commit guarded on `PENDING` stores the provider's reference and writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The payment stays `PENDING`, and the caller's update returns with the link.
 
 ## Verify
 
@@ -76,8 +82,9 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - An inbound payment Amex won't take commits `DISALLOWED`.
+- A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. Proposed: Verify also asks the provider whether the customer confirmed.
 
-Verify varies by all four behaviors. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
+Verify varies by all four behaviors and by bank confirmation. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
 
 ## Reverify
 
@@ -87,7 +94,7 @@ Checks a scheduled payment again on its due date, with the same calls as Verify,
 
 Moves the money and commits `PROCESSING`. Three calls go out in parallel, each on its own rate-limited queue: clearing (MR/M3), the AR balance (GAR) and open-to-buy (AMP).
 
-- A corporate parent clears once, at payment level. The same commit sets `legs_released_at`, which tells the leg dispatcher to write and start its legs.
+- A corporate parent clears once, at payment level, and makes no AR or open-to-buy call. The same commit sets `legs_released_at`, which tells the leg dispatcher to write and start its legs, and each leg makes those two calls.
 - A corporate leg updates the AR balance and open-to-buy only. It never clears.
 - A consumer leg also clears.
 
@@ -106,6 +113,8 @@ Checks one stored callback batch and writes no legs: every batch waits in `alloc
 ## Cancel
 
 Moves a `SCHEDULED` payment to `CANCELLED` with one guarded update, inside the market's cancellation window only. A corporate payment leaves `SCHEDULED` once its allocations are requested, so from `ALLOCATING` on there is nothing to cancel. The same commit cancels the payment's Work Tracker rows, so no dispatcher will ever start it. If the update changes nothing, the payment has already moved on.
+
+Cancel also ends a payment the customer never confirmed at their bank. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts Cancel Payment on the Offline cluster, and Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, so a confirm that got there first wins.
 
 ## Return
 

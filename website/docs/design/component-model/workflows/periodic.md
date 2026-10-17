@@ -23,6 +23,7 @@ A Schedule is a timer the cluster owns, not a workflow. It fires on its cadence 
     {schedule: 'Allocated payments', workflow: 'The allocated-payments dispatcher', runs: 'Every minute'},
     {schedule: 'Allocation legs', workflow: 'The leg dispatcher', runs: 'Every minute'},
     {schedule: 'Representments, one per market', workflow: 'The representment dispatcher', runs: 'Every few minutes'},
+    {schedule: 'Confirmation expiries', workflow: 'The confirmation-expiry dispatcher', runs: 'Every minute (Proposed)'},
     {schedule: 'AR intake', workflow: 'The AR intake dispatcher', runs: 'Every minute'},
     {schedule: 'Returns', workflow: 'The returns dispatcher', runs: 'Every minute'},
     {schedule: 'Inbound', workflow: 'The inbound dispatcher', runs: 'Every minute'},

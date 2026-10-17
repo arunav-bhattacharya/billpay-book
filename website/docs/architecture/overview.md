@@ -70,7 +70,7 @@ export const GROUPS = [
         title: 'External Systems',
         role: 'Where the money and the side effects land',
         icon: 'external',
-        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager'],
+        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider'],
       },
     ],
   },
@@ -124,6 +124,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 - Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, and last of all the customer's message (Raven) and the lifecycle event other systems consume (RTF). All eight must succeed before the payment is `PROCESSED`.
 - Every other state change sends its lifecycle event, and a customer message where one is due, straight after its commit. A workflow waits for them before its next step, so each payment's events arrive in order.
 - A corporate payment asks the allocations manager for its breakdown first, and the allocations arrive by callback. Once they are all in, the payment clears once, at payment level, and each allocation then posts as a leg of its own.
+- A payment the customer confirms at their bank asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for a redirect link first. The payment waits at `PENDING` until the caller confirms it, and only then is it verified and executed.
 
 ### Event handlers and schedules
 
@@ -136,8 +137,8 @@ The split comes from one question: is anyone waiting? A cardmember paying their 
 
 <ClusterMap />
 
-- The Online cluster runs the journeys where a caller is waiting: paying today, scheduling, updating or cancelling from a channel, payment intents, refunds a customer asks for, and the composite flows. At its busiest it handles about 100 payments a second.
-- The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, the periodic jobs, and the control workflows that do the pacing.
+- The Online cluster runs the journeys where a caller is waiting: paying today, scheduling, updating or cancelling from a channel, confirming a payment the customer has confirmed at their bank, refunds a customer asks for, and the composite flows. At its busiest it handles about 100 payments a second.
+- The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, cancelling payments nobody confirmed at their bank, the periodic jobs, and the control workflows that do the pacing.
 - Each cluster has its own Aurora database, so no amount of midnight work on Offline can slow a payment on Online inside Temporal. What the two share is Oracle, the downstream systems and the app that runs their workers. The governor watches online response times as well as Oracle and the downstreams, so when any of them comes under pressure, offline work slows down and online traffic doesn't.
 - Nothing calls across. A payment scheduled on Online reaches Offline as a Work Tracker row, written in the same Oracle commit as its `SCHEDULED` state. On the due date a dispatcher on Offline claims the row and starts the execution there.
 - One app hosts it all: the core APIs, the Router, the dispatchers, the governor and the workers for both clusters, with a Temporal client for each. Offline work gets its own Oracle connection pool and a cap on how much runs at once, so it can't crowd out online work. Where it physically runs is on [High Availability](./high-availability.md).

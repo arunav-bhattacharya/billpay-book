@@ -1,6 +1,6 @@
 ---
 title: Market Profile
-description: 'A market profile is one market and one account type: the APIs it takes, and four answers about how its payments behave.'
+description: 'A market profile is one market and one account type: the APIs it takes, and five answers about how its payments behave.'
 sidebar_label: Market Profile
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Market Profile
 
-<Lead>A market profile is one market and one account type: the APIs it takes, and four answers about how its payments behave. Those answers decide which stage implementations its payments run, so the same workflow code serves every market.</Lead>
+<Lead>A market profile is one market and one account type: the APIs it takes, and five answers about how its payments behave. Those answers decide which stage implementations its payments run, so the same workflow code serves every market.</Lead>
 
 Consumer accounts and corporate accounts in the same market are two profiles, because they behave differently: a corporate payment's legs come from allocations that arrive later by callback, while a consumer split writes its legs with the payment itself. Each profile is authored, released and switched on separately.
 
@@ -16,7 +16,7 @@ Consumer accounts and corporate accounts in the same market are two profiles, be
 
 Onboarding picks which Billpay APIs the profile accepts: paying today, scheduling, updates and cancels, refunds and so on. A request for an API, or a combination of behaviors, that the market hasn't onboarded is turned away with 422 by the Router's admit step, before any workflow starts. Senders don't retry a 422.
 
-## The four behaviors
+## The five behaviors
 
 These are the payment dimensions. Every stage that varies between markets varies by one or more of them.
 
@@ -26,12 +26,15 @@ These are the payment dimensions. Every stage that varies between markets varies
 | `requiresArPosting` | Y, N or BOTH | Whether the processed payment is posted to Accounts Receivable |
 | `requiresRealtimeClearing` | Y, N or BOTH | Whether clearing is realtime or batch |
 | `requiresMandateAuthorization` | Y, N or BOTH | Whether a mandate is verified before processing |
+| `requiresBankConfirmation` | Y, N or BOTH | Whether the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
 
 ## BOTH, resolved per journey
 
 BOTH means a behavior applies to some journeys and not others. Onboarding stores which journeys get Y, and the Router turns BOTH into Y or N for each request, before it pins the plan key. A running payment never sees BOTH; it sees the answer for its own journey.
 
 Realtime clearing shows how this works. Only a pay-today payment from a channel gets Y. Every future-dated payment clears in batch, whether it came from a channel or from Accounts Receivable.
+
+Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation.
 
 ## What the build can run
 

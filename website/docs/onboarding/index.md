@@ -17,7 +17,7 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. T
 
 A market is onboarded one **market profile** at a time: one market and one account type, such as consumer accounts in Germany. For each profile, onboarding records:
 
-- The Billpay APIs the profile takes, and its four behaviors, the answers that pick which stage implementations its payments run ([Market Profile](./market-profile.md)).
+- The Billpay APIs the profile takes, and its five behaviors, the answers that pick which stage implementations its payments run ([Market Profile](./market-profile.md)).
 - The operations settings that drive it at runtime: its time zone and execution time, its cancellation window, its cutoff and more ([Operations Settings](./operations-settings.md)).
 
 ## From draft to live
@@ -52,7 +52,7 @@ The control plane never reads or writes an environment's Oracle or Temporal, and
     {
       term: 'Market Profile',
       to: '/docs/onboarding/market-profile',
-      desc: `One market and account type: the APIs it takes, its four behaviors (three of them Y, N or BOTH per journey), and what the build's capability manifest allows.`,
+      desc: `One market and account type: the APIs it takes, its five behaviors (four of them Y, N or BOTH), and what the build's capability manifest allows.`,
     },
     {
       term: 'Operations Settings',

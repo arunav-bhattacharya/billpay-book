@@ -8,14 +8,14 @@ import Lead from '@site/src/components/Lead';
 import ApiTable from '@site/src/components/ApiTable';
 
 export const CORE = [
-  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date.'},
+  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link.'},
   {fn: 'UpdatePayment.v1', method: 'PUT', path: '/payments/{payment-id}', purpose: 'Updates a `SCHEDULED` payment inside the market\'s cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
   {fn: 'DeletePayment.v1', method: 'DELETE', path: '/payments/{payment-id}', purpose: 'Cancels a `SCHEDULED` payment inside the cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
   {fn: 'ReadPayments.v1', method: 'GET', path: '/payments/account/{account-id}', purpose: 'Lists the payments on a card account.'},
   {fn: 'ReadPaymentEventsById.v1', method: 'GET', path: '/payments/{payment-id}', purpose: 'Lists the lifecycle states one payment has been through.'},
   {fn: 'CreateCreditBalanceRefund.v1', method: 'POST', path: '/refunds', purpose: 'Refunds a credit balance on a card account.'},
   {fn: 'CreateInboundPayment.v1', api: "None (One-Data's inbox)", link: false, purpose: 'Takes a payment a third party pushed. One-Data stores it and replies 202, and the inbound dispatcher starts its workflow.'},
-  {fn: 'CreatePaymentIntent.v1', method: 'POST', path: '/payments/intent', link: false, purpose: "Records an intent to pay, processed only when the customer's financial institution confirms it. Channels call it."},
+  {fn: 'ConfirmPayment.v1', method: 'POST', path: '/payments/{payment-id}/confirm', link: false, tag: 'Placeholder', purpose: "Confirms a payment that waited for the customer's bank, with the same payment ID, once the customer has confirmed their bank details on the provider's site. It starts processing the payment. Channels call it."},
   {fn: 'CreatePaymentAllocations.v1', method: 'POST', path: '/payments/{payment-id}/allocations', link: false, tag: 'Placeholder', purpose: 'The allocations callback for corporate payments, one numbered batch at a time. Replies 202 once the batch is stored and its workflow has started.'},
 ];
 

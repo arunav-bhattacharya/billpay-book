@@ -68,12 +68,14 @@ On the wire, every sealed type carries a `type` property with its class's simple
 
 ## Where the code falls short
 
-The [Payment State Model](./payment-state-model.md) is the design. The code hasn't caught up with all of it yet. The map draws the missing move as a dashed line, where it would go.
+The [Payment State Model](./payment-state-model.md) is the design. The code hasn't caught up with all of it yet. The map draws the missing `PROCESSING` → `RETURNED` move as a dashed line, where it would go. The other gaps are in the table only.
 
 | The lifecycle has | The code has |
 | --- | --- |
 | `PROCESSING` → `RETURNED` | No function; a return starts from `PROCESSED` or `PAID` |
 | `ALLOCATING` and `ALLOCATED`, and the moves into and out of them | No classes or functions yet |
+| `PENDING` → `CANCELLED`, for a payment never confirmed at its bank | No function; `toCancelledFullPayment()` starts only from `ScheduledFullPayment` |
+| The bank-confirmation provider's reference on a pending payment | No field yet |
 | Credit balance refunds | `Refund` has no classes yet |
 
 The Kotlin itself, with the guard code and the build-side detail, is on the [Build Domain Model](../build/domain-model/index.md) pages.

@@ -16,23 +16,23 @@ The Router answers a write before any workflow starts when it can't take it:
 
 - 422 when the market, account type or API is not live in this environment. Senders don't retry a 422.
 - 429 with `Retry-After` when an allocations callback arrives over its traffic class's budget. The allocations manager retries. No other API gets a 429.
-- 409 when an update or cancel arrives for a payment that is no longer `SCHEDULED`, or after the cancellation window has closed. A corporate payment leaves `SCHEDULED` when its allocations are requested.
+- 409 when an update or cancel arrives for a payment that is no longer `SCHEDULED`, or after the cancellation window has closed. A corporate payment leaves `SCHEDULED` when its allocations are requested. A confirm gets 409 too when its payment is no longer `PENDING`, such as one cancelled when its confirmation window closed.
 - 503 with `Retry-After` for an allocations callback or a provisioning request while the Offline cluster is down.
 
 ## Endpoints
 
 | Endpoint | What it does | Start mode | Reply |
 | --- | --- | --- | --- |
-| `POST /payments` | Pays today or schedules for a future date. The Router picks the workflow from the date and the number of instructions | Update-With-Start | `PENDING`, `ACCEPTED`, `SCHEDULED` or `DECLINED` |
+| `POST /payments` | Pays today or schedules for a future date. The Router picks the workflow from the date and the number of instructions. A payment that needs bank confirmation stops at `PENDING` | Update-With-Start | `PENDING`, `ACCEPTED`, `SCHEDULED` or `DECLINED`; `PENDING` with the redirect link when the customer must confirm at their bank |
 | `PUT /payments/{payment-id}` | Updates a `SCHEDULED` payment inside the cancellation window, by cancelling it and creating a replacement with the same confirmation number | Update-With-Start | The new payment's result; 409 outside the window |
 | `DELETE /payments/{payment-id}` | Cancels a `SCHEDULED` payment inside the cancellation window | Update-With-Start | `CANCELLED`, again for a repeated cancel; 409 otherwise |
-| `POST /payments/intent` | Records an intent to pay, processed when the customer's financial institution confirms it | Update-With-Start | The intent's result |
+| `POST /payments/{payment-id}/confirm` | Confirms a `PENDING` payment once the customer has confirmed their bank details, then executes it | Update-With-Start | `ACCEPTED` or `DECLINED`; 409 once the payment is no longer `PENDING` |
 | `POST /payments/{payment-id}/allocations` | Takes one numbered batch of allocations for a corporate payment, from the allocations manager | Stores the batch, then an async start of `ReceiveAllocationsWorkflow` | 202 |
 | `POST /refunds` | Refunds a credit balance, from a channel | Update-With-Start | The refund's result |
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
 | `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment |
 
-`PENDING` in a reply means the payment is captured but not yet decided. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`.
+`PENDING` in a reply means the payment is captured but not yet decided. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID.
 
 One composite API runs core workflows as children:
 
@@ -54,6 +54,7 @@ Every write is safe to send twice. `PaymentStore`, the only code that reaches Or
 
 - A create is captured once. Capture inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent, and a repeated request joins the existing workflow (conflict policy `USE_EXISTING`). A duplicate gets the existing payment back.
 - An update or cancel is a guarded update on `SCHEDULED`. If a cancel changes no row and the payment is already `CANCELLED`, the API returns that result again; otherwise the answer is 409.
+- A confirm is a guarded update on `PENDING`, and a repeated confirm joins the running workflow. A confirm for a payment cancelled when its window closed gets 409.
 - An allocations callback stores its batch in `allocation_batch` first, then starts `ReceiveAllocationsWorkflow` with the ID `{paymentId}-allocations-{batch}`, which comes from the request. A repeated batch finds the same workflow: a start that fails as already started counts as done, and reuse policy `REJECT_DUPLICATE` stops a second run after the first one closes. The callback's full contract, including its idempotency rules, is still to be agreed with the allocations manager.
 
 ## Provisioning API

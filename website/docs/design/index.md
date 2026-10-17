@@ -53,7 +53,7 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Component Model',
       to: '/docs/design/component-model',
-      desc: `Every workflow, the twelve stages they run, and the activities those stages call.`,
+      desc: `Every workflow, the thirteen stages they run, and the activities those stages call.`,
     },
     {
       term: 'Pacing',
@@ -73,7 +73,7 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Sequence Diagrams',
       to: '/docs/design/sequence-diagrams',
-      desc: `Thirteen flows traced from the caller, through the Router, to the stages and the systems they call.`,
+      desc: `Fourteen flows traced from the caller, through the Router, to the stages and the systems they call.`,
     },
   ]}
 />

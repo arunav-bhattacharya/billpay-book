@@ -64,6 +64,7 @@ A queue's limit says how much gets through. Priority says who goes first on a sh
 | Inbound | 3 | `inbound` | None in effect: weight 100 |
 | Representments | 4 | Market | None in effect: weight 100 |
 | Returns | 5, the lowest | `returns` | None in effect: weight 100 |
+| Confirmation expiries (Proposed) | 5 | `expiry` | None in effect: weight 100 |
 
 - Priority keys run from 1, first, to 5.
 - Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is fine for work nobody is waiting on, and an alert on their backlog age keeps a long wait visible.
@@ -79,7 +80,7 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 | Task queue | Carries | Workers |
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
-| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
+| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-expiry`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
 | `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.

@@ -15,9 +15,9 @@ import styles from './styles.module.css';
  *                 a Work Tracker row)
  *   elbow         a child, started by its parent on the parent's cluster
  *
- * A payment workflow that branches by account type forks three ways at grey
- * junction squares. A branch with no child ends in a box saying the workflow
- * runs it all itself, so every branch ends on something.
+ * A payment workflow that branches, by account type or by bank confirmation,
+ * forks at grey junction squares. A branch with no child ends in a box saying
+ * the workflow runs it all itself, so every branch ends on something.
  *
  * HTML and CSS rather than SVG, so the text stays text and the tree reflows.
  * Container queries put the trigger beside its tree when there is room, then
@@ -46,7 +46,7 @@ const VIA = {
 const SELF = 'Runs it all itself';
 
 const LABEL =
-  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork three ways by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment.';
+  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A payment made today also forks for bank confirmation, which waits for the caller\'s confirm.';
 
 const offline = (cluster) => String(cluster).trim().toLowerCase() === 'offline';
 const tone = (cluster) => (offline(cluster) ? styles.off : styles.on);
@@ -259,7 +259,7 @@ function Key() {
           </span>
           <span className={styles.keyItem}>
             <i className={styles.kFork} aria-hidden="true" />
-            Branch the account type picks
+            Branch the behaviors pick
           </span>
         </span>
       </div>

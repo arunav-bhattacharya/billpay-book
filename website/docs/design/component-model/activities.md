@@ -36,13 +36,13 @@ export const ACTIVITIES = [
     name: 'ReceivablesActivities',
     system: 'Accounts Receivable (GAR)',
     queue: 'ds-receivables',
-    calledBy: "Execute, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
+    calledBy: "Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
   },
   {
     name: 'AuthorizationActivities',
     system: 'Authorizations (AMP), open-to-buy',
     queue: 'ds-authorization',
-    calledBy: 'Execute, and every leg',
+    calledBy: "Execute, except a corporate parent's, and every leg",
   },
   {
     name: 'AccountingActivities',
@@ -67,6 +67,12 @@ export const ACTIVITIES = [
     system: 'Allocations manager',
     queue: 'ds-allocations',
     calledBy: 'RequestAllocations',
+  },
+  {
+    name: 'BankConfirmationActivities',
+    system: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
+    queue: "The workflow's queue: only the Online cluster calls it",
+    calledBy: 'RequestConfirmation, for the redirect link; Proposed: Verify, at confirm',
   },
   {
     name: 'InboxActivities',
@@ -100,6 +106,8 @@ Activities take IDs, not payment objects, and load what they need. RTF lifecycle
 
 <ActivityTable rows={ACTIVITIES} />
 
+`BankConfirmationActivities` is a Proposed name, and what it asks the provider is still to be agreed.
+
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 
 ## PaymentStore, the only way into Oracle
@@ -111,6 +119,7 @@ A corporate payment is never declined because its allocations are slow. It waits
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before |
 | A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once |
+| Bank confirmation | The provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and the cancellation of the payment's Work Tracker rows |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of inbox rows as JDBC batches in one transaction: a guarded update from `PROCESSED` to `PAID` on `trans_dtl` for a payment or on `split_trans_dtl` for a leg, and a `PAID` timeline row tagged with the batch ID wherever the update changed a row. Then a read-back by batch ID |

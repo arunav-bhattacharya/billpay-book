@@ -8,9 +8,9 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Component Model
 
-<Lead>The [design principles](../principles.md) set out four layers and what each may call. These pages list what actually exists at three of them: every workflow, the twelve stages those workflows run, and the activities the stages call.</Lead>
+<Lead>The [design principles](../principles.md) set out four layers and what each may call. These pages list what actually exists at three of them: every workflow, the thirteen stages those workflows run, and the activities the stages call.</Lead>
 
-A journey reads top to bottom across the three. `ExecuteScheduledPaymentWorkflow` runs the Reverify, Execute and Fulfil stages in order. Execute calls `ClearingActivities`, `ReceivablesActivities` and `AuthorizationActivities` at the same time, each on its own rate-limited queue. Only the stages change between markets; the activities are shared, and none of them vary by behavior.
+A journey reads top to bottom across the three. `ExecuteScheduledPaymentWorkflow` runs the Reverify, Execute and Fulfil stages in order. For a consumer payment, Execute calls `ClearingActivities`, `ReceivablesActivities` and `AuthorizationActivities` at the same time, each on its own rate-limited queue. Only the stages change between markets; the activities are shared, and none of them vary by behavior.
 
 ## In this section
 
@@ -24,7 +24,7 @@ A journey reads top to bottom across the three. `ExecuteScheduledPaymentWorkflow
     {
       term: 'Stages',
       to: '/docs/design/component-model/stages',
-      desc: `The twelve business steps the workflows compose: the move each makes, what it calls, and which behaviors change it.`,
+      desc: `The thirteen business steps the workflows compose: the move each makes, what it calls, and which behaviors change it.`,
     },
     {
       term: 'Activities',

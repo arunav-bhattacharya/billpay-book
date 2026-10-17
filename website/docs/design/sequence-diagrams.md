@@ -1,6 +1,6 @@
 ---
 title: Sequence Diagrams
-description: "Thirteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make."
+description: "Fourteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make."
 sidebar_label: Sequence Diagrams
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Sequence Diagrams
 
-<Lead>Thirteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make. Each one shows which cluster runs every step, and when RTF and Raven hear about it.</Lead>
+<Lead>Fourteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make. Each one shows which cluster runs every step, and when RTF and Raven hear about it.</Lead>
 
 <details>
 <summary>How to read these diagrams</summary>
@@ -250,7 +250,7 @@ sequenceDiagram
     R->>XW: dispatcher start,<br/>{paymentId}-execute
     Note over XW,EXE: no Reverify: Verify passed it minutes earlier
     XW->>EXE: run
-    Note over EXE: clears once, at payment level
+    Note over EXE: clears once, at payment level.<br/>No AR or OTB call: the legs make those
     rect rgba(102,169,226,0.40)
       EXE->>PS: state → PROCESSING, legs_released_at set,<br/>the ALLOC_EXEC row DONE
     end
@@ -350,7 +350,7 @@ sequenceDiagram
     XW->>RTF: ACCEPTED event
     Note over XW,REV: if Reverify fails, the payment is DECLINED, and its legs are never written
     XW->>EXE: run
-    Note over EXE: clears once, at payment level
+    Note over EXE: clears once, at payment level.<br/>No AR or OTB call: the legs make those
     rect rgba(102,169,226,0.40)
       EXE->>PS: state → PROCESSING, legs_released_at set,<br/>the ALLOC_EXEC row DONE
     end
@@ -844,6 +844,106 @@ sequenceDiagram
         RW->>RTF: ALLOCATED event
       else more batches to come
         Note over RC,PS: the batch waits in allocation_batch,<br/>and the payment stays ALLOCATING
+      end
+    end
+  end
+```
+
+## 14. Pay by bank: create and confirm
+
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. The create call ends at `PENDING` with the provider's redirect link, and nothing runs in Temporal while the customer is away. The caller's confirm starts a second workflow that verifies, executes and fulfils the payment. If no confirm comes before the market's confirmation window closes, a dispatcher cancels the payment instead. Both sides are guarded on `PENDING`, so only one of them can win.
+
+```mermaid
+---
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
+sequenceDiagram
+  autonumber
+
+  box rgba(0,23,90,0.07) Caller
+    participant OD as CreatePayment.v3
+    participant OC as ConfirmPayment.v1
+  end
+
+  box rgba(0,111,207,0.05) Billpay Platform
+    participant R as Billpay Router
+    participant WF as CreateImmediate<br/>PaymentWorkflow
+    participant RQC as Request<br/>Confirmation
+    participant PS as PaymentStore (Oracle)
+    participant CW as ConfirmPayment<br/>Workflow
+    participant VER as Verify
+    participant ED as Confirmation-expiry<br/>dispatcher
+    participant XW as CancelPayment<br/>Workflow
+    participant CAN as Cancel
+  end
+
+  participant BP as Bank provider
+  participant RTF
+  participant RAV as Raven
+
+  OD->>R: POST /payments,<br/>today, bank confirmation
+  Note over R: admit, resolve requiresBankConfirmation<br/>to Y, pin plan key, place on Online
+  R->>WF: Update-With-Start,<br/>{paymentId}-init
+
+  rect rgba(0,111,207,0.12)
+    Note over WF,PS: Online cluster
+    Note over WF: Capture first: PENDING
+    WF->>RQC: run
+    RQC->>BP: ask for the customer's<br/>redirect link
+    rect rgba(102,169,226,0.40)
+      RQC->>PS: the provider's reference and the<br/>CONFIRM_EXPIRY row, guarded on PENDING
+    end
+  end
+
+  WF-->>R: update result
+  R-->>OD: PENDING, with the<br/>redirect link
+
+  rect rgba(0,111,207,0.12)
+    Note over WF,RTF: Online cluster, after the reply. Then the workflow ends
+    WF->>RTF: PENDING event
+  end
+
+  rect rgba(83,86,90,0.14)
+    Note over WF,BP: The customer confirms on the provider's site. The payment waits in Oracle as PENDING, and nothing runs in Temporal
+  end
+
+  alt the caller confirms inside the window
+    OC->>R: POST /payments/<br/>{payment-id}/confirm
+    Note over R: admit, pin plan key, place on Online
+    R->>CW: Update-With-Start,<br/>{paymentId}-confirm
+    rect rgba(0,111,207,0.12)
+      Note over CW,PS: Online cluster
+      CW->>VER: run
+      rect rgba(102,169,226,0.40)
+        VER->>PS: state → ACCEPTED or DECLINED, guarded on PENDING,<br/>and the CONFIRM_EXPIRY row cancelled, one commit
+      end
+    end
+    CW-->>R: update result
+    R-->>OC: ACCEPTED or DECLINED,<br/>or 409 if no longer PENDING
+    rect rgba(0,111,207,0.12)
+      Note over CW,RAV: Online cluster, after the reply
+      CW->>RTF: ACCEPTED or DECLINED event
+      Note over CW,VER: ACCEPTED: Execute, then Fulfil, as for pay today.<br/>DECLINED: the Raven message, then the workflow ends
+    end
+  else no confirm before the window closes
+    rect rgba(0,23,90,0.12)
+      Note over ED,RAV: Offline cluster, once the CONFIRM_EXPIRY row falls due
+      ED->>PS: claim due CONFIRM_EXPIRY<br/>rows: DISPATCHING
+      ED->>R: route the expiry
+      Note over R: admit, pin plan key, place on Offline
+      R->>XW: dispatcher start, {paymentId}-cancel
+      Note over XW,CAN: no window check
+      XW->>CAN: run
+      alt still PENDING
+        rect rgba(102,169,226,0.40)
+          CAN->>PS: state → CANCELLED, guarded on PENDING,<br/>and the row DONE, one commit
+        end
+        XW->>RTF: CANCELLED event
+        XW->>RAV: CANCELLED message
+      else confirmed first
+        Note over CAN,PS: zero rows updated: the row is marked DONE, and nothing else changes
       end
     end
   end

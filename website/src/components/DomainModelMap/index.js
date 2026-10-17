@@ -15,8 +15,10 @@ import styles from './styles.module.css';
  * traits are tinted bands behind the rows they cover, so "verified" reads as
  * a region of the lifecycle rather than a label on nineteen boxes.
  *
- * The one move the code does not have yet, PROCESSING to RETURNED, is drawn
- * as a dashed ghost where it would go. A leg is never made from a scheduled
+ * PROCESSING to RETURNED, a move the code does not have yet, is drawn as a
+ * dashed ghost where it would go. PENDING to CANCELLED, for a payment never
+ * confirmed at its bank, is missing too, but the page lists it under the map
+ * instead: no lane reaches CANCELLED from PENDING without crossing a line. A leg is never made from a scheduled
  * parent and is never cancelled, so neither move is drawn.
  *
  * Coordinates are hand-placed on a 1056 x 766 canvas. Lines run in lanes beside

@@ -13,6 +13,7 @@ export const GROUPS = [
     label: 'Make a payment',
     journeys: [
       {label: 'Pay my bill today', to: '#pay-my-bill-today', kind: 'customer'},
+      {label: 'Pay by bank', to: '#pay-by-bank', kind: 'customer'},
       {label: 'Pay on a future date', to: '#pay-on-a-future-date', kind: 'customer'},
       {label: 'Pay with several instructions', to: '#pay-with-several-instructions', kind: 'customer'},
       {label: 'Pay & Plan', to: '#pay--plan', kind: 'customer'},
@@ -30,10 +31,6 @@ export const GROUPS = [
     journeys: [
       {label: 'Initiate a credit balance refund', to: '#initiate-a-credit-balance-refund', kind: 'customer'},
     ],
-  },
-  {
-    label: 'Payment Intent',
-    journeys: [{label: 'Intent to pay', to: '#intent-to-pay', kind: 'customer'}],
   },
   {
     label: 'Read payments',
@@ -148,13 +145,108 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
   ]}
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent. A repeated request joins the workflow that is already running, so the customer gets the original answer back and is never charged twice.'},
-    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, and Payment Options confirms the amount they picked. Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there.'},
+    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, and Payment Options confirms the amount they picked. Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. A payment the customer must confirm at their bank goes another way, on [Pay by bank](#pay-by-bank).'},
     {text: 'Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF after the reply, in order.'},
     {step: 3, text: 'Three calls go out at once: clearing with the bank, the statement balance down in Accounts Receivable, and available credit up in Authorizations. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
     {step: 4, text: 'Accounting, eBNC and risk are told first, in parallel. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
     {step: 5, text: 'The payment waits at `PROCESSED` for two confirmations: the bank\'s settlement and Accounts Receivable\'s posting. Both land in One-Data\'s inbox, and a periodic workflow marks the payments that have both `PAID`, in batches. [A payment is paid](#a-payment-is-paid) shows how.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#1-pay-today-one-instruction', label: 'Sequence diagram'}}
+/>
+
+### Pay by bank
+
+Some markets let a customer pay from a bank account they confirm on the bank's own side: Plaid in the US, Pay with Bank Transfer in the UK. The customer starts the payment as usual, gets sent to the provider's site to confirm their bank details, and comes back. Billpay holds the payment at `PENDING` in Oracle meanwhile, so nothing waits in Temporal while the customer is away.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Immediate payment, bank confirmation"
+  title="Pay by bank"
+  origin={{
+    actor: 'Cardmember',
+    icon: 'user',
+    channels: [
+      {icon: 'monitor', label: 'Web'},
+      {icon: 'phone', label: 'Mobile app'},
+    ],
+    note: 'Which payment methods need bank confirmation is a market setting, resolved per request.',
+  }}
+  entry={[
+    {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
+    {kind: 'function', label: 'ConfirmPayment.v1', logo: 'oneData', note: 'once confirmed'},
+  ]}
+  core={[
+    {kind: 'api', label: 'POST /payments'},
+    {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
+  ]}
+  workflow={[
+    {label: 'CreateImmediatePaymentWorkflow'},
+    {label: 'ConfirmPaymentWorkflow', via: "then, on the caller's confirm"},
+  ]}
+  steps={[
+    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
+    {
+      icon: 'redirect',
+      name: 'Redirect',
+      state: 'PENDING',
+      mode: 'live',
+      caption: 'caller gets the link',
+      systems: ['Bank provider'],
+    },
+    {
+      icon: 'bank',
+      name: 'Customer confirms',
+      state: 'PENDING',
+      mode: 'awaiting',
+      caption: "on the provider's site",
+      exit: {state: 'CANCELLED'},
+    },
+    {
+      icon: 'shieldCheck',
+      name: 'Verify',
+      state: 'ACCEPTED',
+      mode: 'live',
+      caption: 'caller confirms, gets a response',
+      systems: ['Payment Instruments', 'Payment Options'],
+      exit: {state: 'DECLINED'},
+      handoffAfter: true,
+    },
+    {
+      icon: 'parallelArrows',
+      name: 'Execute',
+      state: 'PROCESSING',
+      mode: 'background',
+      systems: ['MR/M3', 'GAR', 'AMP'],
+      parallel: true,
+    },
+    {
+      icon: 'broadcast',
+      name: 'Fulfil',
+      state: 'PROCESSED',
+      mode: 'background',
+      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+    },
+    {
+      icon: 'doubleCheck',
+      name: 'Paid',
+      state: 'PAID',
+      mode: 'awaiting',
+      caption: 'settled and posted',
+      systems: ['MR/M3', 'GAR'],
+      exit: {state: 'RETURNED'},
+    },
+  ]}
+  detail={[
+    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
+    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and commits a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes. The caller\'s update returns `PENDING` with the link, the `PENDING` event goes to RTF, and `CreateImmediatePaymentWorkflow` ends.'},
+    {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the payment waits in Oracle. If no confirm comes before the window closes, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster, and the payment ends `CANCELLED`.'},
+    {step: 4, text: 'The caller comes back with the same payment ID. `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start, and Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
+    {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
+    {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
+    {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`.'},
+    {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
+  ]}
+  reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
 />
 
 ### Pay on a future date
@@ -458,33 +550,6 @@ When an account carries a credit balance, the money goes back to the customer. A
   status={{
     kind: 'tbd',
     note: 'From a channel, the refund starts on the Online cluster with Update-With-Start. A refund that Accounts Receivable raises waits in One-Data\'s inbox, and the AR intake dispatcher starts it on the Offline cluster. Either way it follows the payment path (Capture, Verify, Execute, Fulfil), but its detailed steps are still being defined.',
-  }}
-/>
-
-## Payment Intent
-
-### Intent to pay
-
-Some payments are not Amex's to accept. The customer records an intent, and the payment is processed only once their financial institution confirms it.
-
-<JourneyMap
-  kind="customer"
-  eyebrow="Payment intent"
-  title="Intent to pay"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'CreatePaymentIntent.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments/intent'}]}
-  workflow={{label: 'CreatePaymentIntentWorkflow'}}
-  status={{
-    kind: 'tbd',
-    note: 'The route is settled: the intent starts on the Online cluster with Update-With-Start. The workflow\'s detailed steps are still being defined, so there is no journey to draw yet.',
   }}
 />
 

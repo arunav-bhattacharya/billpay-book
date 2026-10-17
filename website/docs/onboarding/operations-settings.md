@@ -19,8 +19,9 @@ None of these settings is a code change. They travel in the market's release lik
 | Cutoff, if any | The governor's cutoff floor and alert | The time the market's execution must finish by. SEPA markets have a cutoff of three to four hours; the US has none |
 | Allocation fetch timing and alert point | The `ALLOC_REQUEST` due time, and the late-allocation alert | When to ask for a scheduled corporate payment's allocations (on the due date, or a set number of hours or days before it), and when to raise an alert if they haven't arrived. The request also ends cancel and update for that payment |
 | Representment rules | The representment date | When a returned payment can be presented again: today or later |
+| Bank confirmation: provider and confirmation window | RequestConfirmation, and the `CONFIRM_EXPIRY` due time | Which provider sends the customer to confirm their bank details, such as Plaid in the US or Pay with Bank Transfer in the UK, and how long the customer has to come back. A payment still `PENDING` when the window closes is cancelled, and a late confirm gets 409 |
 | Expected volumes | The governor's floors and budgets | How much execution work to plan for |
-| BOTH rules, per behavior | The Router | Which journeys get Y for a behavior set to BOTH |
+| BOTH rules, per behavior | The Router | Which journeys get Y for a behavior set to BOTH; for bank confirmation, which payment methods |
 
 ## Why some of these matter more than they look
 
