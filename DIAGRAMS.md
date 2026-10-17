@@ -303,7 +303,7 @@ picture. So do the newer ones:
 
 | Component | Draws | On |
 | --- | --- | --- |
-| `RouteLedger` | Every road on one sheet, from the One-Data function to the activities its stages call. CSS grid in em, so the sheet scales with its container | Design → The Complete Picture |
+| `RouteLedger` | Every road in one index, with one road open as a card from its trigger to the activities its stages call; picking a road greys out the others. CSS grid in em, so the board scales with its container | Design → The Complete Picture |
 | `CorporateTracks` | A corporate payment from intake to `PROCESSED`: pay today and scheduled lanes joining one shared path | Design → Corporate Allocations |
 | `DomainModelMap` | The payment classes, one row per state, with the transition functions as arrows | Design → Domain Model |
 | `OnboardingFlow` | A market release travelling from billpay-ui through the provisioning API to the three environments | Market Onboarding |

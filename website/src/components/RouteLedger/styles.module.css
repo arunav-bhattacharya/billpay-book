@@ -1,15 +1,13 @@
-/* RouteLedger: every road through Billpay on one sheet. Blue Box rules: the
-   only shape is the square, structure comes from tinted bands, and nothing
-   is outlined. The Router is the one heavy object, a Deep Blue bar every
-   routed row passes through. A line enters it grey and leaves in the tone of
-   the cluster the Router chose, so colour changes only at the Router.
+/* RouteLedger, the lens. Blue Box rules: the square is the one shape,
+   structure comes from fills and tints, and nothing is outlined. The board
+   is a pale field that holds the index; the card is the white column beside
+   it, and the picked road's row turns white and runs into it like a tab.
 
-   Every length below is in em, and the sheet's font size follows the width
-   of its container (the scroller), so the whole sheet scales as one piece.
-   The column widths are custom properties on .sheet and add up to SPAN_EM in
-   index.js; change one and change the other. Elements that read a column
-   width keep the sheet's font size, so their em means the sheet's em. Only
-   leaf text sets its own size. Every colour is a token. */
+   Every length is in em. The lens's font size follows its container's
+   width (the scroller is the container), so the wide board scales as one
+   piece. Elements that read --rail, --spine or the index widths keep the
+   lens's font size, so their em is the same em the variables were written
+   in: only leaf text sets its own size. Every colour is a token. */
 
 .wrap {
   composes: panel from '../../css/recipes.module.css';
@@ -17,44 +15,83 @@
   --rl-online: var(--amex-worker-online);
   --rl-offline: var(--amex-worker-offline);
   --rl-router: var(--amex-banner-block);
-  --rl-router-ink: var(--amex-banner-block-label);
-  --rl-band: color-mix(in srgb, var(--amex-blue) 4%, var(--amex-rail));
-  --rl-stripe: color-mix(in srgb, var(--amex-blue) 5%, var(--amex-rail));
-  --rl-hover: color-mix(in srgb, var(--amex-blue) 6%, var(--amex-panel));
-  --rl-pick: color-mix(in srgb, var(--amex-blue) 11%, var(--amex-panel));
-  --rl-wire: var(--amex-line-strong);
-  --rl-lit: var(--amex-blue);
-  --rl-rest: var(--amex-temporal);
-  --rl-off: color-mix(in srgb, var(--amex-mut) 26%, transparent);
-  --rl-pill: var(--amex-pill);
+  --rl-field: var(--amex-rail);
+  --rl-card: var(--amex-card);
+  --rl-badge: var(--amex-blue);
+  --rl-link: var(--amex-blue);
+  --rl-sky: var(--amex-sky);
+  --rl-pre: var(--amex-line-strong);
+  --rl-lane: color-mix(in srgb, var(--amex-blue) 5%, transparent);
+  --rl-col: color-mix(in srgb, var(--amex-blue) 9%, transparent);
+  --rl-hover: color-mix(in srgb, var(--amex-blue) 6%, transparent);
+  --rl-empty: color-mix(in srgb, var(--amex-mut) 22%, transparent);
+  --rl-rest: color-mix(in srgb, var(--amex-blue) 58%, var(--amex-card));
+  --rl-dim: 0.36;
+  --rl-stick: calc(var(--ifm-navbar-height) + 0.75rem);
 
   margin: 1.4rem 0 2rem;
-  padding: 0.9rem 0.9rem 1rem;
+  padding: 0.9rem 0.9rem 1.1rem;
 }
 
 :global([data-theme='dark']) .wrap {
-  --rl-band: color-mix(in srgb, var(--amex-blue-bright) 5%, var(--amex-rail));
-  --rl-stripe: color-mix(in srgb, var(--amex-blue-bright) 6%, var(--amex-rail));
-  --rl-hover: color-mix(in srgb, var(--amex-blue-bright) 8%, transparent);
-  --rl-pick: color-mix(in srgb, var(--amex-blue-bright) 17%, transparent);
-  --rl-lit: var(--amex-blue-bright);
+  --rl-link: var(--amex-blue-bright);
+  --rl-lane: color-mix(in srgb, var(--amex-blue-bright) 7%, transparent);
+  --rl-col: color-mix(in srgb, var(--amex-blue-bright) 13%, transparent);
+  --rl-hover: color-mix(in srgb, var(--amex-blue-bright) 9%, transparent);
+  --rl-empty: color-mix(in srgb, var(--amex-mut) 26%, transparent);
+  --rl-rest: color-mix(in srgb, var(--amex-blue-bright) 64%, var(--amex-card));
 }
 
 /* Full screen. The panel recipe's shape changes through its own tokens, so
-   nothing here competes with it for the same property. The face is a
-   background layer above others, so it has to be an image: a gradient of
-   one colour, as the recipe's own tokens are. */
+   nothing here competes with it for the same property. */
 .expanded {
   --card-radius: 0;
   --card-bw: 0px;
   --card-sh: none;
   --card-face: linear-gradient(var(--amex-bg), var(--amex-bg));
+  --rl-stick: 1rem;
 
   position: fixed;
   inset: 0;
   z-index: 500;
   margin: 0;
   overflow-y: auto;
+}
+
+/* infima spaces list items and the paragraphs in them through `.markdown li`,
+   which outranks one class. The lens spaces its own lists with gap and
+   padding, so these two put it back to nothing. */
+.wrap .lens li + li,
+.wrap .lens li > p {
+  margin-top: 0;
+}
+
+.Online {
+  --tone: var(--rl-online);
+}
+.Offline {
+  --tone: var(--rl-offline);
+}
+
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
+}
+
+.mono {
+  font-family: var(--amex-font-mono);
+}
+.strong {
+  color: var(--amex-txt-strong);
+}
+
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* ---- toolbar ---- */
@@ -67,8 +104,30 @@
 
 .hint {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--amex-mut);
+}
+
+.tools {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.showAll {
+  padding: 0.3rem 0.75rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--amex-tint);
+  color: var(--rl-link);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.showAll:hover {
+  background: var(--amex-pill);
 }
 
 .tool {
@@ -88,665 +147,1711 @@
   color: var(--amex-txt-strong);
   border-color: var(--amex-mut);
 }
-
-.toolIcon {
+.tool .icon {
   width: 14px;
   height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
-/* ---- the sheet ---- */
+/* ---- the lens ---- */
 .scroller {
   margin-top: 0.8rem;
-  overflow-x: auto;
   container-type: inline-size;
 }
 
-.sheet {
-  --rl-c1: 17.5em;
-  --rl-c2: 24.5em;
-  --rl-c3: 1.5em;
-  --rl-c4: 16em;
-  --rl-slot: 4.1em;
-  --rl-c10: 11.5em;
-  --rl-cols: var(--rl-c1) var(--rl-c2) var(--rl-c3) var(--rl-c4) repeat(5, var(--rl-slot)) var(--rl-c10);
+.lens {
+  --ix-pad: 1.1em;
+  --ix-trig: 14.6em;
+  --ix-where: 13em;
+  --ix-slot: 1.6em;
+  --ix-gap6: 0.7em;
+  --ix-strip: calc(6 * var(--ix-slot) + var(--ix-gap6));
+  --ix-end: 1em;
+  --ix-w: calc(var(--ix-pad) + var(--ix-trig) + var(--ix-where) + var(--ix-strip) + var(--ix-end));
+  --ix-head: 7em;
+  --gap: 1.1em;
+  --mx-own: 2.15em;
+  --mx-q: 9.4em;
+  --mx-note: 10em;
 
-  width: calc(var(--rl-span) * 1em);
-  margin: 0 auto;
   font-family: var(--amex-font-sans);
-  font-size: clamp(10.5px, calc(100cqi / var(--rl-span)), 14.5px);
-  line-height: 1.3;
+  line-height: 1.35;
   color: var(--amex-txt);
 }
 
-.expanded .sheet {
-  font-size: clamp(10.5px, calc(100cqi / var(--rl-span)), 16px);
+/* 76em is the whole width: the index, the gap and a card of about 32em */
+.wide {
+  font-size: clamp(11px, calc(100cqi / 76), 14.5px);
+}
+.narrow {
+  --ix-slot: 1.15em;
+  --ix-gap6: 0.4em;
+  font-size: 14px;
 }
 
-.heads,
-.band,
-.acts {
+.lens button:focus-visible {
+  outline: 2px solid var(--rl-link);
+  outline-offset: 1px;
+}
+
+.board {
+  border-radius: 1em;
+  background: var(--rl-field);
+  scroll-margin-top: var(--rl-stick);
+}
+.wide .board {
   display: grid;
-  grid-template-columns: var(--rl-cols);
+  grid-template-columns: var(--ix-w) minmax(0, 1fr);
+  column-gap: var(--gap);
+  padding: 0.9em 0.9em 0.9em 0;
+}
+.narrow .board {
+  padding: 0.5em;
 }
 
-/* ---- the stations ---- */
-.heads {
-  grid-template-rows: auto auto;
-  row-gap: 0.55em;
-  padding-bottom: 0.75em;
+/* ---- the index ---- */
+.index {
+  position: relative;
+  min-width: 0;
+  padding-bottom: 0.4em;
 }
 
-.head {
+/* the five stage lanes, behind the roads */
+.lanes {
+  position: absolute;
+  top: var(--ix-head);
+  bottom: 0.3em;
+  left: calc(var(--ix-pad) + var(--ix-trig) + var(--ix-where));
   display: flex;
-  align-items: center;
-  gap: 0.6em;
-  grid-row: 1;
-  padding-left: 1.1em;
-  font-weight: 650;
+  pointer-events: none;
+}
+.lanes i {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: var(--ix-slot);
+}
+.lanes i::before {
+  content: '';
+  width: 1.1em;
+  border-radius: 0.4em;
+  background: var(--rl-lane);
+}
+
+.ixHead {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: var(--ix-trig) var(--ix-where) var(--ix-strip);
+  align-items: end;
+  height: var(--ix-head);
+  padding: 0 0 0.45em var(--ix-pad);
+}
+
+.ixLabel {
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1.3;
   color: var(--amex-txt-strong);
 }
-.head > span {
-  font-size: 0.98em;
+.ixSub {
+  display: block;
+  font-weight: 400;
+  color: var(--amex-mut);
 }
-.headApi {
-  padding-left: 0;
+
+.ixStrip {
+  display: flex;
+  height: 100%;
 }
-.headWf {
-  grid-column: 4;
-  padding-left: 1.45em;
+
+/* a column name set on a slant, rising from the middle of its column */
+.slant {
+  position: relative;
+  flex: none;
+  width: var(--ix-slot);
+  height: 100%;
 }
-.headStages {
-  grid-column: 5 / span 5;
+.slant > span {
+  position: absolute;
+  left: 50%;
+  bottom: 0.15em;
+  transform-origin: 0 50%;
+  transform: rotate(-60deg);
+  white-space: nowrap;
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--amex-txt-strong);
+}
+.slantOwn > span {
+  font-weight: 400;
+  color: var(--amex-mut);
+}
+.ownSlot {
+  margin-left: var(--ix-gap6);
+}
+
+.key {
+  margin: 0;
+  padding: 0.35em 0.4em 0.2em;
+  font-size: 0.85em;
+  color: var(--amex-mut);
+}
+
+/* ---- bands and requests ---- */
+.bandHead {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 1.1em 0 0.25em var(--ix-pad);
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+.band:first-of-type .bandHead {
+  padding-top: 0.35em;
+}
+.narrow .bandHead {
   padding-left: 0.4em;
 }
 
-.headRouter {
-  grid-row: 1 / span 2;
-  grid-column: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.55em;
-  font-weight: 650;
-  color: var(--amex-txt-strong);
-}
-.headRouter > span {
-  font-size: 0.88em;
-  white-space: nowrap;
-}
-
-.badge {
-  composes: ordinal from '../../css/recipes.module.css';
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 2em;
-  height: 2em;
-  border-radius: var(--amex-badge-radius);
-  background: var(--amex-blue);
-  color: var(--amex-banner-block-ink);
-  font-size: 0.78em;
-  font-weight: 700;
-}
-
-.stageName {
-  grid-row: 2;
-  justify-self: center;
-  font-size: 0.8em;
-  font-weight: 650;
-  color: var(--amex-txt);
-  white-space: nowrap;
-}
-
-.ownHead {
-  grid-row: 2;
-  grid-column: 10;
-  padding-left: 0.5em;
-  font-size: 0.8em;
-  color: var(--amex-mut);
-  white-space: nowrap;
-}
-
-/* ---- the bands ---- */
-.routed {
-  position: relative;
-  display: grid;
-  gap: 0.7em;
-}
-
-.band {
-  grid-template-rows: 2.5em;
-  grid-auto-rows: minmax(2.75em, auto);
-  padding: 0.2em 0 0.45em;
-  border-radius: 0.9em;
-  background: var(--rl-band);
-}
-.routed + .band {
-  margin-top: 0.7em;
-}
-
-.online {
-  --tone: var(--rl-online);
-}
-.offline {
-  --tone: var(--rl-offline);
-}
-
-.bandHead {
-  grid-row: 1;
-  grid-column: 1 / span 2;
-  align-self: center;
-  padding-left: 1.1em;
-}
 .bandTerm {
-  font-size: 0.9em;
   font-weight: 650;
   color: var(--amex-txt-strong);
 }
 .bandDesc {
-  margin-left: 0.85em;
-  font-size: 0.82em;
+  margin-left: 0.55em;
+  font-size: 0.92em;
   color: var(--amex-mut);
 }
 
-.cluster {
-  grid-row: 1;
-  grid-column: 4 / span 2;
-  display: flex;
-  align-items: center;
-  align-self: center;
-  padding-left: 1.45em;
+.reqHead {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: var(--ix-trig) var(--ix-where);
+  padding: 0.55em 0 0.2em var(--ix-pad);
+  line-height: 1.3;
+  transition: opacity 0.18s ease, filter 0.18s ease;
 }
-.clusterName {
-  font-size: 0.82em;
-  font-weight: 650;
-  color: var(--tone);
+.narrow .reqHead {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 0.3em;
+  padding: 0.55em 0.4em 0.2em;
+}
+
+.trig {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-right: 0.9em;
+}
+
+.fnName {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+.from {
+  font-size: 0.86em;
+  color: var(--amex-mut);
+}
+
+.rowName {
+  color: var(--amex-txt-strong);
+}
+
+.where {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15em;
+  min-width: 0;
+}
+
+.door {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  font-size: 0.93em;
+}
+
+.rowMeta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.15em;
+  font-size: 0.84em;
+  color: var(--amex-mut);
+}
+.rowMeta .mono {
+  color: var(--amex-txt);
+}
+
+/* ---- endpoints and glyphs ---- */
+.api {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.45em;
+  min-width: 0;
+}
+.api:not(.apiBig) .glyphBox {
+  display: none;
+}
+
+.method {
+  flex: none;
+  margin-top: 0.12em;
+  padding: 0.2em 0.45em;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-badge-quiet);
+  color: var(--amex-badge-quiet-ink);
+  font-family: var(--amex-font-mono);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+
+.path {
+  min-width: 0;
+  font-family: var(--amex-font-mono);
+  font-size: 0.84em;
+  line-height: 1.45;
+}
+.seg {
   white-space: nowrap;
 }
 
-/* ---- 1, the function ---- */
-.fn {
-  grid-column: 1;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4em;
-  padding: 0.3em 0.3em 0.3em 1.1em;
+.apiBig {
+  align-items: center;
 }
-.fnName {
-  font-size: 0.95em;
-  font-weight: 650;
-  line-height: 1.25;
+.apiBig .method {
+  margin-top: 0;
+  font-size: 0.8em;
+}
+.apiBig .path {
+  font-size: 1em;
   color: var(--amex-txt-strong);
 }
-.fnRow {
-  font-family: var(--amex-font-mono);
-  font-size: 0.86em;
-  color: var(--tone);
-}
 
-/* ---- 2, the API or the dispatcher, and the line into the Router ---- */
-.entry {
-  grid-column: 2;
-  align-self: center;
-  display: flex;
-  align-items: center;
-  gap: 0.55em;
-  min-width: 0;
-}
-.entryDrain {
-  grid-column: 2 / span 2;
-}
-
-/* the kind of door: an endpoint, a paced dispatcher, or inbox rows. A
-   tinted square in the door's tone, with the glyph drawn in that tone. */
 .glyphBox {
   --glyph: var(--amex-mut);
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 1.6em;
-  height: 1.6em;
+  width: 1.55em;
+  height: 1.55em;
   border-radius: var(--amex-badge-radius);
-  background: color-mix(in srgb, var(--glyph) 13%, var(--amex-panel));
+  background: color-mix(in srgb, var(--glyph) 13%, transparent);
   color: var(--glyph);
 }
 .glyph {
-  width: 1.08em;
-  height: 1.08em;
+  width: 1.05em;
+  height: 1.05em;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.glyphApi {
-  --glyph: var(--amex-blue);
+.glyph_api {
+  --glyph: var(--rl-link);
 }
-.glyphDispatch {
+.glyph_dispatcher,
+.glyph_inbox {
   --glyph: var(--rl-offline);
 }
-.glyphInbox {
-  --glyph: var(--amex-mut);
-}
-:global([data-theme='dark']) .glyphApi {
-  --glyph: var(--amex-blue-bright);
-}
-:global([data-theme='dark']) .glyphBox {
-  background: color-mix(in srgb, var(--glyph) 18%, transparent);
-}
 
-.method {
-  flex: none;
-  width: 5em;
-  padding: 0.28em 0;
-  border-radius: var(--amex-badge-radius);
-  background: var(--amex-badge-quiet);
-  color: var(--amex-badge-quiet-ink);
-  font-family: var(--amex-font-mono);
-  font-size: 0.66em;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-align: center;
-}
-.path {
-  font-family: var(--amex-font-mono);
-  font-size: 0.86em;
-  white-space: nowrap;
-}
-.by {
-  font-size: 0.9em;
-  white-space: nowrap;
-}
-
-.wire {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0.8em;
-  height: 0.13em;
-  background: var(--rl-wire);
-}
-.entryLit .wire {
-  height: 0.19em;
-  background: var(--rl-lit);
-}
-.wireDrain,
-.entryLit .wireDrain {
-  height: 0.13em;
-  background: repeating-linear-gradient(90deg, var(--amex-mut) 0 0.28em, transparent 0.28em 0.7em);
-}
-.wireLabel {
-  position: absolute;
-  right: 0;
-  bottom: 0.45em;
-  font-size: 0.76em;
-  font-style: italic;
-  color: var(--amex-mut);
-  white-space: nowrap;
-}
-
-/* ---- 3, the Router ---- */
-.router {
-  position: absolute;
-  z-index: 2;
-  top: 0.45em;
-  bottom: 0.45em;
-  left: calc(var(--rl-c1) + var(--rl-c2));
-  width: var(--rl-c3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--rl-router);
-}
-.routerSteps {
-  writing-mode: vertical-rl;
-  font-size: 0.68em;
-  font-weight: 650;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--rl-router-ink);
-}
-
-/* ---- 4, 5 and the last column: one journey ----
-   The pick button is the row's surface. The text and the squares sit on it
-   and let the pointer through, so a click anywhere on the row picks it. */
-.pick {
-  position: relative;
-  z-index: 0;
-  grid-column: 4 / -1;
-  margin: 0.1em 0.45em 0.1em 0.3em;
-  padding: 0;
-  border: 0;
-  border-radius: 0.6em;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-.pick:hover {
-  background: var(--rl-hover);
-}
-.pickOn,
-.pickOn:hover {
-  background: var(--rl-pick);
-}
-.pick:focus-visible {
-  outline: 2px solid var(--amex-blue);
-  outline-offset: -2px;
-}
-
-.wf,
-.track,
-.own {
+/* ---- a road ---- */
+.road {
+  scroll-margin-top: calc(var(--rl-stick) + 1.6em);
   position: relative;
   z-index: 1;
+  display: grid;
+  grid-template-columns: var(--ix-trig) var(--ix-where) var(--ix-strip);
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0.3em var(--ix-end) 0.3em var(--ix-pad);
+  border: 0;
+  border-radius: 0.7em 0 0 0.7em;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.18s ease, filter 0.18s ease, background-color 0.18s ease;
+}
+.road:hover {
+  background: var(--rl-hover);
+}
+
+/* the picked road turns white and runs across the gap into the card, with a
+   curved join above and below it */
+.wide .roadOn,
+.wide .roadOn:hover {
+  z-index: 3;
+  width: calc(100% + var(--gap));
+  margin-right: calc(-1 * var(--gap));
+  padding-right: calc(var(--ix-end) + var(--gap));
+  background: var(--rl-card);
+}
+.wide .roadOn::before,
+.wide .roadOn::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  width: 0.7em;
+  height: 0.7em;
   pointer-events: none;
 }
-
-.wf {
-  grid-column: 4;
-  align-self: center;
-  display: flex;
-  align-items: center;
-  padding: 0.35em 0.4em 0.35em 0;
+.wide .roadOn::before {
+  top: -0.7em;
+  background: radial-gradient(circle at 0 0, transparent 0.7em, var(--rl-card) calc(0.7em + 0.5px));
 }
-.out {
-  flex: none;
-  width: 1.15em;
-  height: 0.14em;
-  margin-right: 0.3em;
-  background: var(--tone);
-}
-.wfOn .out {
-  height: 0.2em;
-}
-.outDrain {
-  background: repeating-linear-gradient(90deg, var(--amex-mut) 0 0.28em, transparent 0.28em 0.7em);
+.wide .roadOn::after {
+  bottom: -0.7em;
+  background: radial-gradient(circle at 0 100%, transparent 0.7em, var(--rl-card) calc(0.7em + 0.5px));
 }
 
-.wfSq {
-  flex: none;
-  width: 0.78em;
-  height: 0.78em;
-  margin-right: 0.6em;
-  border-radius: 0.18em;
-  background: var(--tone);
+.narrow .road {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name strip'
+    'choice choice';
+  row-gap: 0.1em;
+  padding: 0.45em 0.4em;
+  border-radius: 0.7em;
+}
+.narrow .roadOn,
+.narrow .roadOn:hover {
+  border-radius: 0.7em 0.7em 0 0;
+  background: var(--rl-card);
 }
 
-.wfText {
-  display: flex;
-  flex-direction: column;
-  gap: 0.12em;
-  min-width: 0;
-}
-.wfName {
-  font-family: var(--amex-font-mono);
-  font-size: 0.88em;
-  line-height: 1.25;
-  color: var(--amex-txt-strong);
-}
-.wfWhy {
-  font-size: 0.8em;
-  color: var(--amex-mut);
-}
-
-.track {
-  grid-column: 5 / span 5;
-}
-.sq,
-.mq {
-  position: absolute;
-  top: 50%;
-  left: calc(var(--rl-slot) * (var(--i) + 0.5));
-  width: 0.95em;
-  height: 0.95em;
-  border-radius: 0.2em;
-  transform: translate(-50%, -50%);
-  background: var(--tone);
-}
-.trackLine {
-  position: absolute;
-  top: 50%;
-  left: calc(var(--rl-slot) * (var(--a) + 0.5));
-  width: calc(var(--rl-slot) * (var(--b) - var(--a)));
-  height: 0.13em;
-  transform: translateY(-50%);
-  background: var(--tone);
-}
-.child .sq,
-.child .trackLine {
-  opacity: 0.38;
-}
-
-.own {
-  grid-column: 10;
-  align-self: center;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3em;
-  padding: 0.3em 0.6em 0.3em 0.5em;
-}
-.ownStage {
-  padding: 0.22em 0.6em;
-  border-radius: var(--amex-badge-radius);
-  background: var(--rl-pill);
-  color: var(--amex-txt-strong);
-  font-size: 0.8em;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.ownNote {
-  font-size: 0.8em;
-  font-style: italic;
-  line-height: 1.25;
-  color: var(--amex-mut);
-}
-
-/* a journey with a name rather than a class, such as Pay & Plan */
-.wfNamePlain {
-  font-family: var(--amex-font-sans);
-  font-size: 0.92em;
-  font-weight: 650;
-}
-
-/* ---- 6, the activities ---- */
-.acts {
-  --pick-tone: var(--rl-rest);
-  grid-template-rows: 2.6em;
-  grid-auto-rows: minmax(2.15em, auto);
-  margin-top: 1.5em;
-}
-.pickOnline {
-  --pick-tone: var(--rl-online);
-}
-.pickOffline {
-  --pick-tone: var(--rl-offline);
-}
-
-.actsIntro {
-  grid-row: 1 / span 14;
-  grid-column: 1;
-  padding-right: 1em;
-}
-.actsIntro .head {
-  padding-left: 1.1em;
-  margin-bottom: 0.7em;
-}
-.actsDesc {
-  margin: 0 0 0.6em;
-  padding-left: 1.1em;
-  font-size: 0.82em;
-  line-height: 1.45;
-  color: var(--amex-mut);
-}
-.actsPick {
-  font-size: 0.95em;
-}
-
-.stageNameActs,
-.ownHeadActs {
-  grid-row: 1;
-  align-self: end;
-  padding-bottom: 0.45em;
-}
-
-.stripe {
-  grid-column: 2 / -1;
-  margin-left: calc(var(--rl-c2) - 6em);
-  border-radius: 0.5em;
-  background: var(--rl-stripe);
-}
-
-.actLabel {
-  grid-column: 2 / span 3;
-  align-self: center;
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 0.9em;
-  padding-right: 0.9em;
-}
-.actName {
-  font-family: var(--amex-font-mono);
-  font-size: 0.84em;
-  color: var(--amex-txt-strong);
-}
-.actSystem {
-  flex: none;
-  width: 10.5em;
-  font-size: 0.78em;
-  color: var(--amex-mut);
-  white-space: nowrap;
-}
-.hasPick .actLabel:not(.actOn) .actName {
-  color: var(--amex-mut);
-}
-
-.matrix {
-  position: relative;
-  grid-column: 5 / span 5;
-}
-.mq {
-  background: var(--rl-rest);
-}
-.rail {
-  position: absolute;
-  top: 50%;
-  left: calc(var(--rl-slot) * 0.5 - 0.48em);
-  width: calc(var(--rl-slot) * 4 + 0.96em);
-  height: 0.62em;
-  border-radius: 999px;
-  transform: translateY(-50%);
-  background: var(--rl-rest);
-}
-.hasPick .mq,
-.hasPick .rail {
-  background: var(--rl-off);
-}
-.hasPick .mq.mOn,
-.hasPick .rail.mOn {
-  background: var(--pick-tone);
-}
-
-.actOwn {
-  grid-column: 10;
-  align-self: center;
+.roadName {
   display: flex;
   align-items: center;
   gap: 0.5em;
-  padding-left: 0.5em;
+  min-width: 0;
+  padding: 0 0.5em 0 0.35em;
 }
-.actOwnStage {
-  font-size: 0.8em;
-  font-weight: 650;
-  color: var(--amex-txt-strong);
-  white-space: nowrap;
-}
-.hasPick .actOwnStage {
-  color: var(--amex-mut);
-}
-.hasPick .actOwnStage.mOn {
-  color: var(--pick-tone);
-}
-.actNote {
-  font-size: 0.78em;
-  font-style: italic;
-  line-height: 1.25;
-  color: var(--amex-mut);
+.narrow .roadName {
+  grid-area: name;
+  padding-left: 0;
 }
 
-/* ---- the legend ---- */
-.legend {
-  composes: legendRow from '../../css/recipes.module.css';
-  margin: 1rem 0 0.35rem;
-}
-
-.li {
-  composes: legendItem from '../../css/recipes.module.css';
-}
-
-.swGlyph {
-  font-size: 13px;
-}
-
-.swSq {
+.tone {
   flex: none;
-  width: 11px;
-  height: 11px;
+  width: 0.6em;
+  height: 0.6em;
   border-radius: 2px;
   background: var(--tone);
 }
-.swOnline {
-  --tone: var(--rl-online);
+
+.wf {
+  min-width: 0;
+  font-family: var(--amex-font-mono);
+  font-size: 0.9em;
+  line-height: 1.3;
+  color: var(--amex-txt);
 }
-.swOffline {
-  --tone: var(--rl-offline);
-}
-.swPale {
-  opacity: 0.38;
+.roadOn .wf {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
 }
 
-.swWire {
-  flex: none;
-  width: 30px;
-  height: 2px;
-  background: linear-gradient(90deg, var(--rl-wire) 0 50%, var(--rl-online) 50% 100%);
-}
-.swDash {
-  flex: none;
-  width: 30px;
-  height: 2px;
-  background: repeating-linear-gradient(90deg, var(--amex-mut) 0 3px, transparent 3px 7px);
-}
-.swRail {
-  flex: none;
-  width: 30px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--rl-rest);
-}
-.swPick {
-  flex: none;
-  width: 30px;
-  height: 16px;
-  border-radius: 5px;
-  background: var(--rl-pick);
-}
-
-.note {
-  margin: 0.4rem 0 0;
-  font-size: 0.8rem;
+.tag {
+  margin-left: 0.5em;
+  font-family: var(--amex-font-sans);
+  font-size: 0.86em;
+  font-weight: 400;
+  white-space: nowrap;
   color: var(--amex-mut);
 }
 
-.srOnly {
-  composes: srOnly from '../../css/recipes.module.css';
+.choice {
+  padding-right: 0.6em;
+  font-size: 0.9em;
+  color: var(--amex-mut);
+}
+.choice b {
+  font-weight: 600;
+  color: var(--tone);
+}
+.narrow .choice {
+  grid-area: choice;
+  padding-left: 1.15em;
+  font-size: 0.85em;
+}
+
+/* the stage strip: five core stages, then one square for a stage of its own */
+.strip {
+  display: flex;
+  align-items: center;
+}
+.narrow .strip {
+  grid-area: strip;
+}
+
+.sq {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--ix-slot);
+  height: 1.1em;
+}
+.sq::before {
+  content: '';
+  width: 0.76em;
+  height: 0.76em;
+  border-radius: 2px;
+  background: var(--rl-empty);
+}
+.sq.call::before {
+  background: var(--tone);
+}
+.sq.child::before {
+  background: color-mix(in srgb, var(--tone) 40%, transparent);
+}
+.sq.cond::before {
+  width: 0.44em;
+  height: 0.44em;
+  background: var(--tone);
+}
+.ownSq {
+  margin-left: var(--ix-gap6);
+}
+
+/* everything not picked steps back */
+.dim {
+  opacity: var(--rl-dim);
+  filter: grayscale(1);
+}
+
+/* ---- the card column: the card sits level with its road ---- */
+.pane {
+  position: relative;
+  min-width: 0;
+}
+
+.cardBox {
+  border-radius: 1em;
+  background: var(--rl-card);
+  box-shadow: var(--amex-sh);
+  scroll-margin-top: var(--rl-stick);
+}
+
+.inlineCard {
+  margin: 0 0 0.6em;
+  border-radius: 0 0 0.8em 0.8em;
+  background: var(--rl-card);
+  box-shadow: var(--amex-sh);
+}
+.actList .inlineCard {
+  margin: 0.3em 0 0.4em;
+  border-radius: 0.8em;
+}
+
+/* ---- the card ---- */
+.card {
+  container-type: inline-size;
+  padding: 1.4em 1.5em 1.6em;
+  color: var(--amex-txt);
+}
+.narrow .card {
+  padding: 1.1em 1em 1.2em;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.cardBand {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.92em;
+  color: var(--amex-mut);
+}
+.cardBand b {
+  margin-right: 0.4em;
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+.clusterTag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.28em 0.65em;
+  border-radius: 0.45em;
+  background: color-mix(in srgb, var(--tone) 11%, transparent);
+  color: var(--tone);
+  font-size: 0.86em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.clusterTag::before {
+  content: '';
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.close {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.9em;
+  height: 1.9em;
+  margin: -0.2em -0.45em -0.2em 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.45em;
+  background: transparent;
+  color: var(--amex-mut);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--amex-tint);
+  color: var(--amex-txt-strong);
+}
+
+.cardTitle {
+  margin: 0;
+  padding-top: 0.45em;
+  font-family: var(--amex-font-mono);
+  font-size: 1.45em;
+  line-height: 1.2;
+  color: var(--amex-txt-strong);
+  overflow-wrap: anywhere;
+}
+.titleSans {
+  font-family: var(--amex-font-sans);
+  font-weight: 650;
+  font-size: 1.3em;
+}
+.titleTag {
+  display: inline-block;
+  margin-left: 0.55em;
+  padding: 0.18em 0.5em;
+  border-radius: 0.35em;
+  background: var(--amex-pill);
+  color: var(--amex-tint-ink);
+  font-family: var(--amex-font-sans);
+  font-size: 0.55em;
+  font-weight: 600;
+  vertical-align: 0.25em;
+  white-space: nowrap;
+}
+
+.leadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em 1em;
+  padding-top: 0.3em;
+}
+.cardLead {
+  margin: 0;
+  font-size: 1.04em;
+  line-height: 1.4;
+  color: var(--amex-banner-ink);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.switchLabel {
+  font-size: 0.84em;
+  color: var(--amex-mut);
+}
+.switchTrack {
+  display: inline-flex;
+  padding: 0.18em;
+  border-radius: 0.5em;
+  background: var(--amex-pill);
+}
+.switchBtn {
+  margin: 0;
+  padding: 0.28em 0.65em;
+  border: 0;
+  border-radius: 0.35em;
+  background: transparent;
+  color: var(--amex-tint-ink);
+  font: inherit;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.switchOn {
+  background: var(--rl-card);
+  color: var(--amex-txt-strong);
+  box-shadow: var(--amex-sh-sm);
+}
+
+/* ---- the card's numbered steps, on a spine ---- */
+.steps {
+  --rail: 2.85em;
+  --spine: 1.1em;
+  list-style: none;
+  margin: 0;
+  padding: 1.35em 0 0;
+}
+.narrow .steps {
+  --rail: 2.4em;
+  --spine: 0.95em;
+}
+
+.step {
+  position: relative;
+  padding: 0 0 1.45em var(--rail);
+}
+.step:last-child {
+  padding-bottom: 0;
+}
+.step::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--spine) - 1px);
+  top: 0.9em;
+  bottom: -0.9em;
+  width: 2px;
+  background: var(--rl-pre);
+}
+.segTone::before {
+  background: var(--tone);
+}
+.step:last-child::before {
+  display: none;
+}
+
+.badge {
+  position: absolute;
+  left: calc(var(--spine) - 0.9em);
+  top: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.8em;
+  height: 1.8em;
+  border-radius: var(--amex-badge-radius);
+  background: var(--rl-badge);
+  color: var(--amex-banner-block-ink);
+}
+.badge_router {
+  background: var(--rl-router);
+}
+.badge_then {
+  background: var(--amex-tint);
+  color: var(--rl-link);
+}
+.badgeNum {
+  font-size: 0.82em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepHead {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em 0.5em;
+  min-height: 1.8em;
+  line-height: 1.35;
+}
+.stepHead b {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+.stepNote {
+  margin: 0;
+  padding-top: 0.2em;
+  font-size: 0.93em;
+  line-height: 1.45;
+  color: var(--amex-mut);
+}
+
+.stepText {
+  margin: 0;
+  padding-top: 0.55em;
+  font-size: 0.95em;
+  line-height: 1.45;
+}
+
+.quiet {
+  font-size: 0.92em;
+  color: var(--amex-mut);
+}
+.quietLine {
+  margin: 0;
+  padding-top: 0.15em;
+  font-size: 0.88em;
+  line-height: 1.45;
+  color: var(--amex-mut);
+}
+
+.rowChip {
+  display: inline-block;
+  padding: 0.2em 0.55em;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-banner-block);
+  color: var(--amex-banner-block-ink);
+  font-family: var(--amex-font-mono);
+  font-size: 0.82em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.inlineLink {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rl-link);
+  font: inherit;
+  font-family: var(--amex-font-mono);
+  font-size: 0.95em;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--rl-link) 35%, transparent);
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+.inlineLink:hover {
+  text-decoration-color: currentColor;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+}
+.chip {
+  display: inline-block;
+  padding: 0.14em 0.55em;
+  border-radius: 0.35em;
+  background: var(--rl-card);
+  color: var(--amex-txt-strong);
+  font-size: 0.86em;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--amex-sh-sm);
+}
+.chipsPill .chip {
+  background: var(--amex-pill);
+  color: var(--amex-tint-ink);
+  box-shadow: none;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin: 0.35em 0 0;
+  padding: 0.3em 0.65em;
+  border: 0;
+  border-radius: 0.45em;
+  background: var(--amex-tint);
+  color: var(--rl-link);
+  font: inherit;
+  font-size: 0.86em;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stepHead .more {
+  margin: 0 0 0 auto;
+}
+.more[aria-expanded='true'] .icon {
+  transform: rotate(180deg);
+}
+
+/* ---- the Router: a Deep Blue bar along its six steps ---- */
+.routerPanel {
+  position: relative;
+  margin-left: calc(0.35em - var(--rail));
+  padding: 0.05em 1em 1em calc(var(--rail) - 0.35em);
+  border-radius: 0.8em;
+  background: var(--rl-field);
+}
+
+.routerBar {
+  position: absolute;
+  left: calc(var(--spine) - 0.35em - 0.42em);
+  top: 1em;
+  bottom: 0.8em;
+  width: 0.84em;
+  border-radius: 0.42em;
+  background: var(--rl-router);
+}
+
+.rSteps {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 1.1em;
+  row-gap: 0.75em;
+  margin: 0;
+  padding-top: 0.55em;
+}
+/* a card narrower than about 36em stacks each step's name over its outcome */
+@container (max-width: 36em) {
+  .rSteps {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.1em;
+  }
+  .rBody {
+    padding-bottom: 0.55em;
+  }
+}
+
+.rName {
+  position: relative;
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--amex-txt-strong);
+}
+.rName::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--spine) - var(--rail) - 0.2em);
+  top: 0.5em;
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 1px;
+  background: var(--rl-sky);
+}
+
+.rBody {
+  min-width: 0;
+  margin: 0;
+}
+
+.rMain {
+  display: block;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+.rNote {
+  display: block;
+  padding-top: 0.12em;
+  font-size: 0.87em;
+  line-height: 1.4;
+  color: var(--amex-mut);
+}
+.chips + .rNote {
+  padding-top: 0.4em;
+}
+
+/* ---- the stages and their calls ---- */
+.stageList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25em;
+  list-style: none;
+  margin: 0;
+  padding: 1.1em 0 0;
+}
+
+.stage {
+  position: relative;
+}
+
+.stageMark {
+  position: absolute;
+  left: calc(var(--spine) - var(--rail) - 0.5em);
+  top: 0.3em;
+  width: 1em;
+  height: 1em;
+  border-radius: 2.5px;
+  background: var(--tone);
+}
+.stageMark.child {
+  background: color-mix(in srgb, var(--tone) 40%, var(--rl-card));
+}
+.stageMark.cond {
+  left: calc(var(--spine) - var(--rail) - 0.32em);
+  top: 0.48em;
+  width: 0.64em;
+  height: 0.64em;
+  box-shadow: 0 0 0 0.22em var(--rl-card);
+}
+
+.stageHead {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15em 0.9em;
+}
+
+.stageName {
+  font-size: 1.05em;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+
+.move {
+  font-family: var(--amex-font-mono);
+  font-size: 0.8em;
+  color: var(--amex-mut);
+}
+
+.condNote {
+  margin: 0;
+  padding-top: 0.25em;
+  font-size: 0.92em;
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+.stageNote {
+  margin: 0;
+  padding-top: 0.3em;
+  font-size: 0.92em;
+  line-height: 1.45;
+}
+
+.calls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05em;
+  list-style: none;
+  margin: 0;
+  padding: 0.4em 0 0;
+}
+
+.callBtn,
+.railLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.55em;
+  width: calc(100% + 0.35em);
+  margin: 0 0 0 -0.35em;
+  padding: 0.12em 0.35em;
+  border: 0;
+  border-radius: 0.35em;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.92em;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.callBtn:hover,
+.railLine:hover {
+  background: var(--rl-hover);
+}
+
+.callSq,
+.railSq {
+  flex: none;
+  align-self: center;
+  width: 0.58em;
+  height: 0.58em;
+  border-radius: 1.5px;
+  background: var(--rl-sky);
+}
+.callBtn.cond .callSq {
+  width: 0.38em;
+  height: 0.38em;
+  margin: 0 0.1em;
+}
+.callBtn.child .callSq {
+  background: color-mix(in srgb, var(--rl-sky) 45%, transparent);
+}
+.callBtn.skip .callSq {
+  position: relative;
+  background: var(--rl-empty);
+}
+.callBtn.skip .callSq::after,
+.skipMark::after,
+.lgStrike::after,
+.mq.skip::after {
+  content: '';
+  position: absolute;
+  left: -0.25em;
+  right: -0.25em;
+  top: calc(50% - 0.75px);
+  height: 1.5px;
+  background: var(--amex-txt-strong);
+}
+
+.callName {
+  font-family: var(--amex-font-mono);
+  color: var(--amex-txt);
+}
+.callBtn.skip .callName {
+  color: var(--amex-mut);
+}
+
+.sys {
+  color: var(--amex-mut);
+}
+
+.queue {
+  font-family: var(--amex-font-mono);
+  font-size: 0.9em;
+  color: var(--amex-mut);
+}
+
+.callNote {
+  font-size: 0.95em;
+  color: var(--amex-mut);
+}
+.callBtn.skip .callNote {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+/* where a workflow stops: a bar across the spine */
+.stop {
+  position: relative;
+  padding-top: 1.2em;
+}
+.stopMark {
+  position: absolute;
+  left: calc(var(--spine) - var(--rail) - 0.55em);
+  top: calc(1.2em + 0.6em);
+  width: 1.1em;
+  height: 0.26em;
+  border-radius: 0.13em;
+  background: var(--amex-txt-strong);
+  box-shadow: 0 0 0 0.3em var(--rl-card);
+}
+.stopTitle {
+  margin: 0;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--amex-txt-strong);
+}
+
+/* the calls every stage makes */
+.rails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05em;
+  list-style: none;
+  margin: 1.2em 0 0 -0.75em;
+  padding: 0.6em 0.75em 0.65em;
+  border-radius: 0.7em;
+  background: var(--rl-field);
+}
+.railSq {
+  background: var(--amex-txt-strong);
+}
+.railSys {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+/* ---- then ---- */
+.thenRow + .thenRow {
+  padding-top: 0.8em;
+}
+
+.go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0.35em 0 0;
+  padding: 0.32em 0.7em;
+  border: 0;
+  border-radius: 0.45em;
+  background: var(--amex-tint);
+  color: var(--rl-link);
+  font: inherit;
+  font-family: var(--amex-font-mono);
+  font-size: 0.93em;
+  cursor: pointer;
+}
+.go:hover {
+  background: var(--amex-pill);
+}
+.goTag {
+  font-family: var(--amex-font-sans);
+  font-size: 0.9em;
+  color: var(--amex-mut);
+}
+
+.endMark {
+  position: absolute;
+  left: calc(var(--spine) - 0.55em);
+  top: 0.8em;
+  width: 1.1em;
+  height: 0.26em;
+  border-radius: 0.13em;
+  background: var(--amex-txt-strong);
+}
+
+/* ---- a corporate payment: what happens next ---- */
+.next {
+  --t-state: 6.6em;
+  --t-mark: 1.4em;
+  margin-top: 1.4em;
+  padding: 1em 1.1em 1.1em;
+  border-radius: 0.8em;
+  background: var(--rl-field);
+}
+.narrow .next {
+  --t-state: 5.6em;
+  --t-mark: 1.2em;
+  padding: 0.9em 0.8em 1em;
+}
+
+.nextHead {
+  margin: 0;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0.9em 0 0;
+}
+
+.tStop {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--t-state) var(--t-mark) minmax(0, 1fr);
+  padding-bottom: 0.95em;
+}
+.tStop:last-child {
+  padding-bottom: 0;
+}
+.tStop::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--t-state) + var(--t-mark) / 2 - 1px);
+  top: 1.05em;
+  bottom: -0.3em;
+  width: 2px;
+  background: var(--tone);
+}
+.tStop:last-child::after {
+  display: none;
+}
+
+.tState {
+  padding-top: 0.2em;
+  font-family: var(--amex-font-mono);
+  font-size: 0.76em;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: right;
+  color: var(--tone);
+}
+
+.tMark {
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  margin-top: 0.3em;
+  width: 0.78em;
+  height: 0.78em;
+  border-radius: 2px;
+  background: var(--tone);
+}
+
+.tBody {
+  min-width: 0;
+}
+.tHead {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1em 0.6em;
+}
+.tDid {
+  margin: 0;
+  padding-top: 0.15em;
+  font-size: 0.92em;
+  line-height: 1.45;
+}
+
+/* ---- the activity card ---- */
+.actStages {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1em;
+  list-style: none;
+  margin: 0;
+  padding: 1.1em 0 0;
+}
+
+.actMark,
+.skipMark {
+  position: relative;
+  flex: none;
+  align-self: center;
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 2px;
+  background: var(--amex-txt-strong);
+}
+.skipMark {
+  background: var(--rl-empty);
+}
+
+.roadChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  list-style: none;
+  margin: 0;
+  padding: 0.5em 0 0;
+}
+.actStages .roadChips {
+  padding-left: 1.5em;
+}
+
+.roadChip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2em 0.45em;
+  margin: 0;
+  padding: 0.28em 0.6em;
+  border: 0;
+  border-radius: 0.45em;
+  background: var(--amex-tint);
+  color: var(--amex-txt);
+  font: inherit;
+  font-size: 0.88em;
+  text-align: left;
+  cursor: pointer;
+}
+.roadChip:hover {
+  background: var(--amex-pill);
+}
+
+.chipSq {
+  flex: none;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 1.5px;
+  background: var(--tone);
+}
+.chipSq.child {
+  background: color-mix(in srgb, var(--tone) 40%, transparent);
+}
+.chipSq.cond {
+  width: 0.4em;
+  height: 0.4em;
+}
+
+.chipName {
+  font-family: var(--amex-font-mono);
+}
+.chipNote {
+  font-size: 0.95em;
+  color: var(--amex-mut);
+}
+
+.plainList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  margin: 0;
+  padding: 0.45em 0 0 1.2em;
+  font-size: 0.93em;
+  line-height: 1.45;
+}
+
+.skips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  list-style: none;
+  margin: 0;
+  padding: 1.1em 0 0;
+}
+.skips li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3em 0.55em;
+}
+
+/* placed after the rules it adds to */
+.gapTop {
+  padding-top: 0.7em;
+}
+
+/* ---- the activities ---- */
+.acts {
+  padding-top: 2em;
+}
+.narrow .acts {
+  padding-top: 1.4em;
+}
+
+.actsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3em 0.65em;
+  margin: 0;
+  padding-left: var(--ix-pad);
+}
+.narrow .actsHead,
+.narrow .actsHint {
+  padding-left: 0;
+}
+
+.actsBox {
+  flex: none;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 2px;
+  background: var(--rl-badge);
+}
+
+.actsTitle {
+  font-size: 1.12em;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+.actsDesc {
+  font-size: 0.95em;
+  color: var(--amex-mut);
+}
+.actsHint {
+  margin: 0;
+  padding: 0.3em 0 0 var(--ix-pad);
+  font-size: 0.93em;
+  color: var(--amex-mut);
+}
+
+.mxWrap {
+  overflow-x: auto;
+  padding-top: 0.4em;
+}
+
+.mx {
+  --mx-cols: var(--ix-trig) var(--ix-where) repeat(5, var(--ix-slot)) var(--ix-gap6) repeat(8, var(--mx-own))
+    var(--mx-q) minmax(var(--mx-note), 1fr);
+  min-width: calc(
+    var(--ix-pad) + var(--ix-trig) + var(--ix-where) + 5 * var(--ix-slot) + var(--ix-gap6) + 8 * var(--mx-own) +
+      var(--mx-q) + var(--mx-note)
+  );
+}
+
+.mxHead {
+  display: grid;
+  grid-template-columns: var(--mx-cols);
+  align-items: end;
+  height: 8.6em;
+  padding: 0 0 0.45em var(--ix-pad);
+}
+.mxHead .slant {
+  grid-row: 1;
+  width: auto;
+}
+.mxHLabel {
+  grid-row: 1;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+.slantLit > span {
+  font-weight: 700;
+  color: var(--tone);
+}
+
+.mxBody {
+  position: relative;
+}
+
+/* the picked road's stage columns, tinted over the rows */
+.mxLanes {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: var(--mx-cols);
+  padding-left: var(--ix-pad);
+  pointer-events: none;
+}
+.mxLane {
+  grid-row: 1;
+  justify-self: center;
+  width: 1.2em;
+  border-radius: 0.45em;
+  background: var(--rl-col);
+}
+
+.mxRow {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: var(--mx-cols);
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0.32em 0 0.32em var(--ix-pad);
+  border: 0;
+  border-radius: 0.5em;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mxStripe {
+  background: var(--rl-field);
+}
+.mxRow:hover {
+  background: var(--rl-hover);
+}
+.mxPicked,
+.mxPicked:hover {
+  background: var(--amex-tint);
+}
+
+.mxIf {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  min-width: 0;
+  margin-left: -0.85em;
+  font-family: var(--amex-font-mono);
+  font-size: 0.88em;
+  color: var(--amex-mut);
+  overflow-wrap: anywhere;
+}
+.mxBar {
+  flex: none;
+  width: 0.25em;
+  height: 1.1em;
+  border-radius: 1px;
+  background: transparent;
+}
+.mxLit .mxIf,
+.mxPicked .mxIf {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+.mxLit .mxBar {
+  background: var(--tone, var(--rl-link));
+}
+
+.mxSys {
+  grid-column: 2;
+  grid-row: 1;
+  padding-right: 0.6em;
+  font-size: 0.9em;
+  color: var(--amex-mut);
+}
+.mxLit .mxSys {
+  color: var(--amex-txt);
+}
+
+.mxCellWrap {
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+.mxCell {
+  display: grid;
+  place-items: center;
+}
+
+.mq {
+  position: relative;
+  display: block;
+  width: 0.74em;
+  height: 0.74em;
+  border-radius: 2px;
+}
+.mq.call,
+.mq.cond {
+  background: var(--tone);
+}
+.mq.child {
+  background: color-mix(in srgb, var(--tone) 40%, transparent);
+}
+.mq.empty,
+.mq.skip {
+  background: var(--rl-empty);
+}
+.mq.rest {
+  background: var(--rl-rest);
+}
+.mq.pickedRest {
+  background: var(--rl-link);
+}
+.mq.small,
+.mq.cond {
+  width: 0.42em;
+  height: 0.42em;
+}
+
+/* the two calls every stage makes: a line through the stage columns */
+.mxRail {
+  grid-row: 1;
+  align-self: center;
+  height: 0.2em;
+  margin: 0 calc(var(--ix-slot) / 2);
+  border-radius: 0.1em;
+  background: var(--rl-empty);
+}
+.mxRailOwn {
+  margin: 0 calc(var(--mx-own) / 2);
+}
+
+.mxQ {
+  grid-column: 17;
+  grid-row: 1;
+  padding: 0 0.6em 0 0.9em;
+  font-size: 0.84em;
+  color: var(--amex-mut);
+}
+
+.mxNote {
+  grid-column: 18;
+  grid-row: 1;
+  padding-right: 0.7em;
+  font-size: 0.8em;
+  line-height: 1.35;
+  color: var(--amex-mut);
+}
+.mxNoteHit {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+/* narrow: the activities as a list */
+.actList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  list-style: none;
+  margin: 0;
+  padding: 0.5em 0 0;
+}
+
+.actItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  width: 100%;
+  margin: 0;
+  padding: 0.6em 0.75em;
+  border: 0;
+  border-radius: 0.6em;
+  background: var(--rl-field);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.actPicked {
+  background: var(--amex-tint);
+}
+
+.actTop {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.2em 0.8em;
+}
+.actTop .mono {
+  font-size: 0.9em;
+  color: var(--amex-mut);
+}
+.actLit .actTop .mono,
+.actPicked .actTop .mono {
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+
+.sChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+}
+.sChip {
+  padding: 0.12em 0.45em;
+  border-radius: 0.3em;
+  background: var(--amex-pill);
+  color: var(--amex-tint-ink);
+  font-size: 0.76em;
+  font-weight: 600;
+}
+.sChipOn {
+  background: var(--tone);
+  color: var(--rl-card);
+}
+
+/* ---- legend and notes ---- */
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  --legend-gap: 0.45em 1.3em;
+  padding: 1.3em 0 0 var(--ix-pad);
+}
+.li {
+  composes: legendItem from '../../css/recipes.module.css';
+  --legend-fs: 0.85em;
+}
+
+.lgSq,
+.lgStrike {
+  position: relative;
+  flex: none;
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 2px;
+  background: var(--tone);
+}
+.lgPale {
+  background: color-mix(in srgb, var(--rl-online) 40%, transparent);
+}
+.lgSmall {
+  width: 0.46em;
+  height: 0.46em;
+  margin: 0 0.17em;
+  background: var(--rl-online);
+}
+.lgEmpty,
+.lgStrike {
+  background: var(--rl-empty);
+}
+
+.note {
+  max-width: 64em;
+  margin: 0;
+  padding: 0.8em 0 0 var(--ix-pad);
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: var(--amex-mut);
+}
+.narrow .legend,
+.narrow .note {
+  padding-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .road,
+  .reqHead,
+  .bandHead {
+    transition: none;
+  }
 }

@@ -10,29 +10,47 @@ import RouteLedger from '@site/src/components/RouteLedger';
 
 # The Complete Picture
 
-<Lead>Every request takes the same road through Billpay: a One-Data function, a core API or a dispatcher, the Router, one workflow, its stages, and the calls those stages make. This page puts every road on one sheet.</Lead>
+<Lead>Every request takes the same road through Billpay: a One-Data function, a core API or a dispatcher, the Router, one workflow, its stages, and the calls those stages make. This page lists every road in one index and opens any one of them as a card.</Lead>
 
-Each of the other Design pages covers one stretch of that road. [Routing](./routing.md) maps triggers to workflows, the [Component Model](./component-model/index.md) has the stages and the activities, and [Build → API Spec](../build/api-spec/index.md) has the contracts. When you are chasing one payment, say a scheduled one that never left on its due date, you want the whole road in front of you at once. That is what the sheet is for.
+Each of the other Design pages covers one stretch of that road. [Routing](./routing.md) maps triggers to workflows, the [Component Model](./component-model/index.md) has the stages and the activities, and [Build → API Spec](../build/api-spec/index.md) has the contracts. When you are chasing one payment, say a scheduled one that never left on its due date, you want its whole road in front of you and the other roads out of the way. That is what this page does.
 
 <RouteLedger />
 
-## How to read it
+## How it works
 
-Rows are grouped by how the work arrives. When a caller waits for an answer, the core API starts the workflow on the Online cluster with Update-With-Start. Work nobody waits for is stored first, in One-Data's inbox or as a Work Tracker row in Oracle, and a dispatcher starts it on the Offline cluster at the pace the governor sets. The allocations callback is the one request that starts its workflow asynchronously, before it replies.
+1. Pick a road. The index lists all 21, grouped by how the work arrives. Each row shows the trigger, where it lands, the Router's choice of cluster and start, and the stages the road runs. With nothing picked, every road looks the same. Pick one and the rest grey out.
+2. Read its card. The card opens beside the road and follows it from the trigger, through the Router's six steps, to every activity its stages call and the system behind each one. On pay today and on a scheduled payment, switch the account type to CORPORATE to follow a corporate payment through every later step.
+3. See every call. Under the index, the activities show each interface with its system, its task queue and the stages that call it, and a picked road's calls are lit. Pick an activity instead, and the roads that call it stay lit while its card lists them by stage.
 
-One line goes into the Router for each request, and one comes out for each workflow it can start. `CreatePayment.v3` has three ways out: the Router reads the date and the number of instructions, then picks pay today, multiple instructions or a scheduled payment. The line changes from grey to the cluster's colour at the Router, because that is where the cluster is chosen.
+Pick the road again, press Esc or use Show all to bring every road back. Inside a card, a call opens its activity and the road that comes next is one click away.
 
-The squares are the stages a workflow runs, in order. A pale square means a child workflow runs that stage: multiple instructions runs one `CreateImmediatePaymentWorkflow` per instruction, and an update cancels the old payment and leaves the new one to a child. Stages that only one kind of journey needs, such as Return or Settle, sit in the last column.
+## How to read the index
 
-Click a journey and the activity rows at the bottom light up the calls it makes. Or go the other way, and follow a stage's column down to see every system it reaches. The sheet shows each journey's usual shape. A corporate payment's own execution, from its `ALLOC_EXEC` row, only clears: its legs make the AR and open-to-buy calls and do Fulfil's work, and a corporate leg never clears.
+Roads are grouped by how the work arrives. When a caller waits for an answer, the core API starts the workflow on the Online cluster with Update-With-Start. Work nobody waits for is stored first, in One-Data's inbox or as a Work Tracker row in Oracle, and a dispatcher starts it on the Offline cluster at the pace the governor sets. The allocations callback is the one request that starts its workflow asynchronously, before it replies.
 
-## What the sheet shows
+One request can lead to several roads. `CreatePayment.v3` has four. The Router reads the date and the number of instructions to pick pay today, multiple instructions or a scheduled payment, and a payment that needs the customer to confirm at their bank takes the pay-today road but stops at `PENDING` until the confirm arrives.
+
+The squares are the stages a road runs, in order: Capture, Verify, Reverify, Execute and Fulfil, then one square for a stage only that kind of road has, such as Cancel, Return or Settle. A pale square means a child workflow runs that stage: multiple instructions runs one `CreateImmediatePaymentWorkflow` per instruction, and an update cancels the old payment and leaves the new one to a child. A small square means the stage runs only in some cases, like a corporate payment's Reverify, which pay today skips.
+
+## What the index shows
 
 A few things are easier to see here than anywhere else.
 
-- Execute sits in ten rows and Fulfil in nine, but there is one Execute stage and one Fulfil stage. Pay today, a payment confirmed at the customer's bank, a scheduled payment on its due date, a corporate payment once it is allocated, an inbound payment, both kinds of refund and a corporate leg all run Execute. The behaviors the Router resolves decide which implementation runs.
-- Every stage commits through `PaymentStore`, and every state change goes out to RTF, which is why those two rows run the full width. Raven is narrower. It is called only where the customer is told, such as a scheduled or declined payment at Verify, a processed one at Fulfil, or a cancellation.
+- Execute sits on ten roads and Fulfil on nine, but there is one Execute stage and one Fulfil stage. The behaviors the Router resolves decide which implementation runs.
+- Every stage commits through `PaymentStore`, and every state change goes out to RTF, which is why those two run the full width of the activities. Raven is narrower. It is called only where the customer is told, such as a scheduled or declined payment at Verify, a processed one at Fulfil, or a cancellation.
+- A corporate payment's own execution clears once, for the whole payment, and does nothing else. Its legs make the AR and open-to-buy calls and do Fulfil's work, and a corporate leg never clears.
 - Nothing One-Data stores ever reaches a core API. AR intake, returns and inbound payments wait in its inbox until their dispatcher pulls them, so a burst of returns waits its turn instead of competing with a customer who is paying today.
 - One road skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.
 
-Workflow names on the sheet drop the `Workflow` suffix to save room. Point at a row to see its full name.
+## When the Router says no
+
+The Router's first step, Admit, checks that the market, the account type and the API are live in this environment. What happens when it refuses depends on how the work arrived.
+
+| The work arrived as | What happens |
+| --- | --- |
+| A caller's request | 422, and the caller does not retry. |
+| A request One-Data stored | Its dispatcher marks it `REJECTED`, which raises an alert. The sender is not told. |
+| The allocations callback | 422, or 429 with `Retry-After` when it is over its traffic budget. |
+| A Work Tracker row | Refused only if its market was taken out of service after the row was written. Its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. |
+
+Workflow names in the index and the cards drop the `Workflow` suffix to save room. Each card's Pick the journey step gives the full name.
