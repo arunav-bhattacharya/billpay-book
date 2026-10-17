@@ -296,7 +296,7 @@ Corporate rules:
 
 ## Payment Domain Model
 
-The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
+The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model below adds two things the lifecycle needs and that file doesn't have yet: `DisallowedFullPayment`, and the move from `RepresentingFullPayment` to `DeclinedFullPayment`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
 
 ### Root types
 
@@ -307,14 +307,14 @@ The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-
 
 ### The type is the state
 
-Eleven sealed classes, one per state, each fixing `status`: `PendingPayment`, `ScheduledPayment`, `AcceptedPayment`, `ProcessingPayment`, `ProcessedPayment`, `PaidPayment`, `ReturnedPayment`, `RepresentingPayment`, `RepresentedPayment`, `CancelledPayment` and `DeclinedPayment`. Two traits narrow what a state must hold:
+Twelve sealed classes, one per state, each fixing `status`: `PendingPayment`, `ScheduledPayment`, `AcceptedPayment`, `ProcessingPayment`, `ProcessedPayment`, `PaidPayment`, `ReturnedPayment`, `RepresentingPayment`, `RepresentedPayment`, `CancelledPayment`, `DeclinedPayment` and `DisallowedPayment`. Two traits narrow what a state must hold:
 
 | Trait | Guarantees | On |
 | --- | --- | --- |
 | `VerifiedPayment` | A `TokenizedAccount`, a non-null `amount`, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an `ExecutableTimeline` | `SCHEDULED` through `REPRESENTED` |
 | `RepresentmentPayment` | `returnedInfo` | `RETURNED`, `REPRESENTING` and `REPRESENTED` |
 
-`PENDING`, `CANCELLED` and `DECLINED` are not verified. `DeclinedPayment` adds a `declineCode`, and a declined payment has no confirmation code.
+`PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` are not verified. `DeclinedPayment` adds a `declineCode`, and a declined payment has no confirmation code.
 
 ### Full and split
 
@@ -333,8 +333,9 @@ Two shapes cross the states. `FullPayment` settles as one amount. `SplitPayment`
 | `REPRESENTED` | `RepresentedFullPayment` | `RepresentedSplitPayment` |
 | `CANCELLED` | `CancelledFullPayment` | |
 | `DECLINED` | `DeclinedFullPayment` | |
+| `DISALLOWED` | `DisallowedFullPayment` | |
 
-Eighteen data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice` (`sequenceNumber`, `splitAmount`).
+Nineteen data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice` (`sequenceNumber`, `splitAmount`), so a leg is never made from a `SCHEDULED` payment, and a leg is never cancelled or declined.
 
 ### Value types
 
@@ -344,18 +345,18 @@ Eighteen data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlic
 
 ### Transitions
 
-There is no `setStatus`. Each allowed move is an extension function that takes one class and returns the next, 26 in all.
+There is no `setStatus`. Each allowed move is an extension function that takes one class and returns the next, 28 in all.
 
 | From | Functions |
 | --- | --- |
-| `PendingFullPayment` | `toAcceptedFullPayment(account, amount, timeline, option, instrument)`, `toScheduledFullPayment(...)` with a `ScheduledTimeline`, `toDeclinedFullPayment(option, instrument, declineCode)` |
+| `PendingFullPayment` | `toAcceptedFullPayment(account, amount, timeline, option, instrument)`, `toScheduledFullPayment(...)` with a `ScheduledTimeline`, `toDeclinedFullPayment(option, instrument, declineCode)`, `toDisallowedFullPayment(...)` for an inbound payment |
 | `ScheduledFullPayment` | `toAcceptedFullPayment()`, `toDeclinedFullPayment(declineCode)`, `toCancelledFullPayment()` |
 | `AcceptedFullPayment` | `toProcessingFullPayment()`, `toAcceptedSplitPayment(splitSlice)` |
 | `ProcessingFullPayment` | `toProcessedFullPayment()`, `toAcceptedSplitPayment(splitSlice)` |
 | `ProcessedFullPayment` | `toPaidFullPayment()`, `toReturnedFullPayment(returnedInfo)` |
 | `PaidFullPayment` | `toReturnedFullPayment(returnedInfo)` |
 | `ReturnedFullPayment` | `toRepresentingFullPayment()` |
-| `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toReturnedFullPayment()` |
+| `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toReturnedFullPayment()`, `toDeclinedFullPayment(declineCode)` when the recheck fails |
 | `RepresentedFullPayment` | `toReturnedFullPayment()` |
 | `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same nine moves at leg level, from accepted through processing, processed and paid, returned from processed or paid, representing, represented, and back to returned |
 
@@ -367,11 +368,7 @@ The code does not yet cover all of [Payment Lifecycle States](#payment-lifecycle
 
 | Lifecycle | In code |
 | --- | --- |
-| `DISALLOWED`, for inbound payments | No type |
 | `PROCESSING` → `RETURNED` | No function; a return starts from `PROCESSED` or `PAID` |
-| `REPRESENTING` → `DECLINED`, when the recheck fails | No function. The code has `REPRESENTING` → `RETURNED`, which the lifecycle does not |
-| Legs written while their parent is `SCHEDULED`, held until release | Legs come only from an `ACCEPTED` or `PROCESSING` parent |
-| A declined or cancelled parent cancels its legs | No cancelled leg type |
 | `allocation_status` on a corporate parent | No field |
 | Credit balance refunds | `Refund` has no concrete types |
 

@@ -66,7 +66,7 @@ The Oracle tables these types are persisted into, and how the code maps onto the
 :::info[Still to be modelled]
 The code does not yet cover everything the [spec's state model](../../design/payment-state-model.md) defines. These gaps are tracked deliberately rather than papered over.
 
-- No payment types for **`DISALLOWED`** (inbound), or corporate **`ALLOCATING`** / **`ALLOCATED`**.
+- No field for a corporate parent's allocation status (**`ALLOCATING`** / **`ALLOCATED`**).
 - No first-class **Allocation** entity. Corporate allocations are represented today as `SplitPayment` legs plus `SplitSlice`.
 - The four **processing behaviors** (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`) live in the payment *context* used for routing, not on these domain types.
 - **Idempotency and lifecycle events** are persistence-layer concerns (`idempotency_checker`, `trans_lfcyc_event`) with no domain type of their own.

@@ -1,9 +1,13 @@
 /* DomainModelMap: the payment classes on a grid of state by shape. Blue Box
    rules: tinted fields and filled boxes, no outlines, except the dashed
-   ghosts, which are outlines on purpose because they are what is missing.
-   Box tones are the lifecycle tokens the Mermaid state diagrams read, so a
-   state looks the same here as on the Payment State Model page. Every colour
-   is a token. */
+   ghost, which is an outline on purpose because it is what is missing.
+
+   Depth follows the hierarchy. The two root types are the deepest fills,
+   colour-coded: Payment in Deep Blue, Refund in a deep Bright Blue. The two
+   shapes under Payment take a pale tint of Payment's colour, so they read as
+   its family and sit a step below it. The classes keep the lifecycle tones
+   the Mermaid state diagrams read, so a state looks the same here as on the
+   Payment State Model page. Every colour is a token. */
 
 .wrap {
   composes: panel from '../../css/recipes.module.css';
@@ -16,6 +20,10 @@
   --dm-card: var(--amex-panel);
   --dm-band: color-mix(in srgb, var(--dm-accent) 6%, transparent);
   --dm-band-deep: color-mix(in srgb, var(--dm-accent) 8%, transparent);
+  --dm-root-pay: var(--amex-midnight);
+  --dm-root-ref: var(--amex-blue-deep);
+  --dm-root-ink: var(--amex-banner-block-ink);
+  --dm-shape: color-mix(in srgb, var(--amex-midnight) 11%, var(--dm-card));
 
   margin: 1.5rem 0 2.2rem;
   padding: 0.9rem 0.9rem 1.1rem;
@@ -27,6 +35,8 @@
   --dm-card: var(--amex-card);
   --dm-band: color-mix(in srgb, var(--dm-accent) 7%, transparent);
   --dm-band-deep: color-mix(in srgb, var(--dm-accent) 10%, transparent);
+  --dm-root-pay: var(--amex-banner-block);
+  --dm-shape: color-mix(in srgb, var(--amex-blue-bright) 15%, var(--dm-card));
 }
 
 .expanded {
@@ -149,38 +159,38 @@
 .box {
   transition: opacity 0.15s ease;
 }
-.rootBody {
-  fill: var(--dm-card);
+.rootPay {
+  --root: var(--dm-root-pay);
 }
-.rootGhost .rootBody {
-  fill: transparent;
-  stroke: var(--amex-mut);
-  stroke-width: 1.2;
-  stroke-dasharray: 4 3;
+.rootRef {
+  --root: var(--dm-root-ref);
+}
+.rootBody {
+  fill: var(--root);
 }
 .rootTitle {
   font-size: 14px;
   font-weight: 650;
-  fill: var(--amex-txt-strong);
+  fill: var(--dm-root-ink);
 }
 .rootFields {
   font-family: var(--amex-font-mono);
   font-size: 10.5px;
-  fill: var(--amex-mut);
+  fill: color-mix(in srgb, var(--dm-root-ink) 78%, transparent);
 }
 
 .shapeBody {
-  fill: var(--amex-table-head-bg);
+  fill: var(--dm-shape);
 }
 .shapeTitle {
   font-family: var(--amex-font-mono);
   font-size: 13px;
   font-weight: 650;
-  fill: var(--amex-table-head-fg);
+  fill: var(--amex-txt-strong);
 }
 .shapeNote {
   font-size: 11px;
-  fill: color-mix(in srgb, var(--amex-table-head-fg) 78%, transparent);
+  fill: var(--amex-mut);
 }
 
 .isa {
@@ -260,6 +270,7 @@
   fill: var(--amex-txt-strong);
 }
 
+/* a missing class, should one be drawn again: an outline, no fill */
 .ghost .boxBody {
   fill: transparent;
   stroke: var(--amex-mut);

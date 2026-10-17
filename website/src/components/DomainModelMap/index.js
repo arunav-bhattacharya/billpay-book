@@ -11,21 +11,23 @@ import styles from './styles.module.css';
  * payment on the left and a split leg on the right. Where a full payment
  * stops (declined, cancelled) sits in its own column at the far left, still
  * under the FullPayment header because both are full payments. Every arrow
- * is one of the 26 transition functions; the blue ones make a leg. The two
+ * is one of the 28 transition functions; the blue ones make a leg. The two
  * traits are tinted bands behind the rows they cover, so "verified" reads as
- * a region of the lifecycle rather than a label on eighteen boxes.
+ * a region of the lifecycle rather than a label on nineteen boxes.
  *
- * What the code does not have yet is drawn too, as dashed ghosts, because the
- * gaps are the useful part of the picture for anyone planning the next
- * change. Ghosts sit where the missing type or move would go.
+ * The one move the code does not have yet, PROCESSING to RETURNED, is drawn
+ * as a dashed ghost where it would go. A leg is never made from a scheduled
+ * parent and is never cancelled, so neither move is drawn.
  *
  * Coordinates are hand-placed on a 1056 x 766 canvas. Lines run in lanes beside
- * the boxes, so only one crossing remains: the ghost for legs under a
- * scheduled parent hops over the skip from PENDING to ACCEPTED.
+ * the boxes, so no two cross. A representment that fails its recheck runs
+ * round the left margin to DeclinedFullPayment, the one DECLINED box.
  *
- * Takes no props; the content is the arrays below. Colours are tokens: the
- * state tones are the lifecycle tokens the Mermaid state diagrams use, so a
- * PAID box here matches PAID on the Payment State Model page.
+ * Takes no props; the content is the arrays below. Colours are tokens. The two
+ * root types are the deepest fills, Payment in Deep Blue and Refund in a deep
+ * Bright Blue, and the shapes under Payment take a pale tint of its colour.
+ * The state tones are the lifecycle tokens the Mermaid state diagrams use, so
+ * a PAID box here matches PAID on the Payment State Model page.
  */
 
 const W = 1056;
@@ -42,17 +44,13 @@ const COL = {
   stop: {x: 24, w: 184},
   full: {x: 284, w: 224},
   split: {x: 628, w: 224},
-  legStop: {x: 892, w: 152},
 };
 
 /* tone: mid (in flight), ok (paid, returned, represented), stop (ends here) */
 const BOXES = [
-  {id: 'disallowed', col: 'stop', row: 0, state: 'DISALLOWED', cls: 'missing in code', ghost: true,
-    note: 'DISALLOWED, for inbound payments American Express did not accept, has no class yet.'},
+  {id: 'disallowed', col: 'stop', row: 0, state: 'DISALLOWED', cls: 'DisallowedFullPayment', tone: 'stop'},
   {id: 'decF', col: 'stop', row: 1, state: 'DECLINED', cls: 'DeclinedFullPayment', tone: 'stop'},
   {id: 'canF', col: 'stop', row: 2, state: 'CANCELLED', cls: 'CancelledFullPayment', tone: 'stop'},
-  {id: 'declinedGhost', col: 'stop', row: 7, state: 'DECLINED', cls: 'missing in code', ghost: true,
-    note: 'The lifecycle declines a representment that fails its recheck. The code has no move from REPRESENTING to DECLINED; it has one back to RETURNED instead.'},
 
   {id: 'pendF', col: 'full', row: 0, state: 'PENDING', cls: 'PendingFullPayment', tone: 'mid'},
   {id: 'schF', col: 'full', row: 1, state: 'SCHEDULED', cls: 'ScheduledFullPayment', tone: 'mid'},
@@ -71,8 +69,6 @@ const BOXES = [
   {id: 'retS', col: 'split', row: 6, state: 'RETURNED', cls: 'ReturnedSplitPayment', tone: 'ok'},
   {id: 'repingS', col: 'split', row: 7, state: 'REPRESENTING', cls: 'RepresentingSplitPayment', tone: 'mid'},
   {id: 'repedS', col: 'split', row: 8, state: 'REPRESENTED', cls: 'RepresentedSplitPayment', tone: 'ok'},
-  {id: 'cancelledLeg', col: 'legStop', row: 3, state: 'CANCELLED', cls: 'missing in code', ghost: true,
-    note: 'A leg has no cancelled class yet. The lifecycle cancels the held legs of a parent that is declined or cancelled.'},
 ];
 
 const AT = {};
@@ -107,6 +103,7 @@ const EDGES = [
     d: `M${R('pendF')},${r(0)} H${HOP_X} V${r(2) - 12} H${R('accF')}`},
   {a: 'pendF', b: 'decF', fn: 'toDeclinedFullPayment(option, instrument, declineCode)',
     d: `M${L('pendF')},${r(0) + 12} H236 V${r(1) - 12} H${R('decF')}`},
+  {a: 'pendF', b: 'disallowed', fn: 'toDisallowedFullPayment(...)', d: `M${L('pendF')},${r(0) - 8} H${R('disallowed')}`},
   {a: 'schF', b: 'accF', fn: 'toAcceptedFullPayment()', d: vert('schF', 'accF', FX)},
   {a: 'schF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)', d: `M${L('schF')},${r(1)} H${R('decF')}`},
   {a: 'schF', b: 'canF', fn: 'toCancelledFullPayment()', d: `M${L('schF')},${r(1) + 12} H226 V${r(2)} H${R('canF')}`},
@@ -122,6 +119,8 @@ const EDGES = [
   {a: 'retF', b: 'repingF', fn: 'toRepresentingFullPayment()', d: vert('retF', 'repingF', FX - 40)},
   {a: 'repingF', b: 'repedF', fn: 'toRepresentedFullPayment()', d: vert('repingF', 'repedF', FX)},
   {a: 'repingF', b: 'retF', fn: 'toReturnedFullPayment()', d: vert('repingF', 'retF', FX + 40)},
+  {a: 'repingF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)',
+    d: `M${L('repingF')},${r(7)} H12 V${r(1)} H${L('decF')}`},
   {a: 'repedF', b: 'retF', fn: 'toReturnedFullPayment()',
     d: `M${R('repedF')},${r(8)} H${R('repedF') + 20} V${r(6) + 8} H${R('retF')}`},
 
@@ -139,15 +138,8 @@ const EDGES = [
     d: `M${R('repedS')},${r(8)} H${R('repedS') + 16} V${r(6) + 8} H${R('retS')}`},
 
   /* missing in code: drawn where the move would go */
-  {a: 'pendF', b: 'disallowed', kind: 'ghost', fn: 'no class for DISALLOWED', d: `M${L('pendF')},${r(0) - 8} H${R('disallowed')}`},
-  {a: 'schF', b: 'accS', kind: 'ghost', fn: 'no move for legs written under a SCHEDULED parent',
-    d: `M${R('schF')},${r(1)} H${HOP_X - 5} A5,5 0 0 1 ${HOP_X + 5},${r(1)} H600 V${r(2) - 14} H${L('accS')}`},
-  {a: 'procF', b: 'retF', kind: 'ghost', fn: 'no move from PROCESSING to RETURNED',
+  {a: 'procF', b: 'retF', kind: 'ghost', fn: 'no move from PROCESSING to RETURNED yet',
     d: `M${L('procF')},${r(3) + 10} H254 V${r(6) + 8} H${L('retF')}`},
-  {a: 'repingF', b: 'declinedGhost', kind: 'ghost', fn: 'no move from REPRESENTING to DECLINED',
-    d: `M${L('repingF')},${r(7)} H${R('declinedGhost')}`},
-  {a: 'accS', b: 'cancelledLeg', kind: 'ghost', fn: 'no cancelled leg class',
-    d: `M${R('accS')},${r(2)} H872 V${r(3)} H${L('cancelledLeg')}`},
 ];
 
 /* the transition functions, by source class, for the reader line */
@@ -155,6 +147,9 @@ const MOVES = {};
 EDGES.forEach((e) => {
   (MOVES[e.a] = MOVES[e.a] || []).push(e);
 });
+
+/* the classes at either end of a move the code does not have yet */
+const GAP_ENDS = new Set(EDGES.filter((e) => e.kind === 'ghost').flatMap((e) => [e.a, e.b]));
 
 /* ------------------------------------------------------------- spotlight -- */
 
@@ -171,13 +166,13 @@ function litBox(b, light) {
     case 'full':
       return b.col === 'full' || b.col === 'stop';
     case 'split':
-      return b.col === 'split' || b.col === 'legStop';
+      return b.col === 'split';
     case 'verified':
       return isVerified(b);
     case 'represent':
       return isRepresent(b);
     case 'gaps':
-      return Boolean(b.ghost);
+      return Boolean(b.ghost) || GAP_ENDS.has(b.id);
     default:
       return true;
   }
@@ -289,7 +284,7 @@ function ToolIcon({name}) {
 }
 
 const LABEL =
-  "The payment domain model. At the top, a Transaction is either a Payment or a Refund; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, eighteen data classes in all, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have every state, from PendingFullPayment to RepresentedFullPayment, plus DeclinedFullPayment and CancelledFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have seven states. Twenty-six transition functions join them: a pending payment is accepted, scheduled or declined; a scheduled one is accepted, declined or cancelled; an accepted one moves on to processing, processed and paid; a processed or paid payment can be returned, a returned one goes to representing, a representing one to represented, and a representing or represented payment can be returned again. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. Dashed outlines show what the code does not have yet: a DISALLOWED class, a cancelled leg, legs written under a scheduled parent, and the moves from PROCESSING to RETURNED and from REPRESENTING to DECLINED.";
+  "The payment domain model. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have every state, from PendingFullPayment to RepresentedFullPayment, plus DisallowedFullPayment, DeclinedFullPayment and CancelledFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have seven states; a leg is never made from a scheduled payment and is never cancelled. The transition functions join them: a pending payment is accepted, scheduled or declined, and an inbound one Verify doesn't accept is disallowed; a scheduled one is accepted, declined or cancelled; an accepted one moves on to processing, processed and paid; a processed or paid payment can be returned, a returned one goes to representing, a representing one to represented, or to declined when its recheck fails, and a representing or represented payment can be returned again. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. One dashed line shows the move the code does not have yet, from PROCESSING to RETURNED.";
 
 /* ------------------------------------------------------------- the map --- */
 
@@ -407,7 +402,7 @@ export default function DomainModelMap() {
           <text x={150} y={34} className={styles.groupNote}>
             id (a TransactionId) · account · amount
           </text>
-          <g className={clsx(styles.root, light === 'gaps' && styles.dim)}>
+          <g className={clsx(styles.root, styles.rootPay, light === 'gaps' && styles.dim)}>
             <rect x={24} y={44} width={820} height={66} rx={9} className={styles.rootBody} />
             <text x={44} y={66} className={styles.rootTitle}>
               Payment
@@ -419,7 +414,7 @@ export default function DomainModelMap() {
               presentmentSequence · hasMoneyMovement · planDetailData
             </text>
           </g>
-          <g className={clsx(styles.root, styles.rootGhost, light && light !== 'gaps' && styles.dim)}>
+          <g className={clsx(styles.root, styles.rootRef, light && light !== 'gaps' && styles.dim)}>
             <rect x={860} y={44} width={184} height={66} rx={9} className={styles.rootBody} />
             <text x={880} y={66} className={styles.rootTitle}>
               Refund
