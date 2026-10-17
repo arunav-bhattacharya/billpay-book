@@ -1,7 +1,7 @@
 ---
 title: 'DataSource: AgroalDataSource'
 description: 'Opening an Oracle connection is far too expensive to do per request, so everything runs through a pool.'
-sidebar_label: DataSource
+sidebar_label: 'DataSource: Agroal'
 ---
 
 import Lead from '@site/src/components/Lead';

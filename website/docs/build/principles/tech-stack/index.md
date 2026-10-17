@@ -26,9 +26,10 @@ Four choices sit underneath everything and are not revisited per component:
 | [Database](./database.md) | **Oracle** | ACID for money movement, plus an operations story we don't have to build ourselves. |
 | [Connection pool](./datasource.md) | **AgroalDataSource** | Microsecond acquisition, first-class metrics, fails fast when the database is down. |
 | [ORM](./orm.md) | **Exposed** | SQL stays visible, Kotlin-native, no session magic anywhere near payments. |
-| [HTTP client](./http-client.md) | **OkHttpClient** | Pooling, HTTP/2, and four independent timeouts that respect the activity deadline above them. |
-| [Serialization](./serialization.md) | **Jackson** (today) | Polymorphic `type` discriminators carry our sealed domain model across every boundary. |
+| [HTTP client](./http-client.md) | **OkHttp** | Pooling, HTTP/2, and four independent timeouts that respect the activity deadline above them. |
+| [Serialization](./serialization.md) | **Jackson** | Polymorphic `type` discriminators carry our sealed domain model across every boundary, and Temporal's own converter already speaks it. |
+| Code generation | **KSP** | Builds the index that maps each behavior combination to its stages, and the build's capability manifest, at compile time. |
 
 ## Under evaluation
 
-A handful of tools show up in these pages as direction, not decision: **kotlinx.serialization** (compile-time codecs instead of reflection), **KSP** for build-time code generation, **Konsist** for architecture tests, and **Arrow's `Either`** for structured validation errors. Until any of those is adopted, what's documented here is what runs.
+Two tools show up in these pages as direction, not decision: **Konsist** for architecture tests and **Arrow's `Either`** for structured validation errors. Until either is adopted, what's documented here is what runs. kotlinx.serialization was weighed against Jackson and turned down, and the [Serialization](./serialization.md#why-not-kotlinxserialization) page says why.

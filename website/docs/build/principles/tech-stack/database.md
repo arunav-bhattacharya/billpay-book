@@ -1,7 +1,7 @@
 ---
 title: 'Database: Oracle'
 description: 'Every payment, lifecycle event, idempotency record, and tracker row lives in one Oracle schema.'
-sidebar_label: Database
+sidebar_label: 'Database: Oracle'
 ---
 
 import Lead from '@site/src/components/Lead';

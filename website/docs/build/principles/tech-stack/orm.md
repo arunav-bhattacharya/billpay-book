@@ -1,7 +1,7 @@
 ---
 title: 'ORM: Exposed'
 description: "Exposed, JetBrains' Kotlin SQL framework, is the only path from application code to Oracle."
-sidebar_label: ORM
+sidebar_label: 'ORM: Exposed'
 ---
 
 import Lead from '@site/src/components/Lead';
