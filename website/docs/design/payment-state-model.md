@@ -15,7 +15,7 @@ import StateLegend from '@site/src/components/StateLegend';
 
 ## The lifecycle
 
-Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states, and the toggle shows the path each one takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal.
+Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal.
 
 <Tabs groupId="payment-type" className="toggle-tabs">
 <TabItem value="consumer" label="Consumer" default>
@@ -69,10 +69,14 @@ stateDiagram-v2
   PENDING --> ACCEPTED: Verify, pay today
   PENDING --> SCHEDULED: Verify, future date
   PENDING --> DECLINED: Verify fails
-  SCHEDULED --> ACCEPTED: Reverify, on the due date
-  SCHEDULED --> DECLINED: Reverify fails
-  SCHEDULED --> CANCELLED: Cancel, before the fetch
-  ACCEPTED --> PROCESSING: Execute, clears once
+  ACCEPTED --> ALLOCATING: RequestAllocations, pay today
+  SCHEDULED --> ALLOCATING: RequestAllocations, at the fetch time
+  SCHEDULED --> CANCELLED: Cancel, inside the window
+  ALLOCATING --> ALLOCATED: ReceiveAllocations, the batches add up
+  ALLOCATED --> PROCESSING: Execute, pay today
+  ALLOCATED --> ACCEPTED: Reverify, scheduled
+  ALLOCATED --> DECLINED: Reverify fails
+  ACCEPTED --> PROCESSING: Execute, scheduled
   PROCESSING --> PROCESSED: Completion check
   PROCESSING --> RETURNED: Return
   PROCESSED --> RETURNED: Return
@@ -87,14 +91,14 @@ stateDiagram-v2
   CANCELLED --> [*]
 ```
 
-A corporate parent clears once, for the whole amount. It reaches `PROCESSED` through the leg dispatcher's completion check instead of Fulfil, and stays there: its legs turn `PAID`, never the parent. It can be cancelled only until its allocations are fetched. The legs and the allocation status that run beside it are in [Corporate payments](#corporate-payments) below.
+A corporate payment fetches its allocations before it moves money. Paid today, it asks right after `ACCEPTED`. Scheduled, it asks at the market's fetch time and is reverified once `ALLOCATED`. The parent clears once and reaches `PROCESSED` through the leg dispatcher's completion check instead of Fulfil, and stays there: its legs turn `PAID`, never the parent. [Corporate payments](#corporate-payments) below has the rules.
 
 </TabItem>
 </Tabs>
 
 <StateLegend />
 
-There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDULED` it can no longer be cancelled.
+There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDULED` it can no longer be cancelled, and a corporate payment leaves it when its allocations are requested.
 
 ## What each state means
 
@@ -102,7 +106,9 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | --- | --- | --- |
 | `PENDING` | Captured in Billpay, idempotency checked, waiting for validation. | No |
 | `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
-| `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. | No |
+| `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. | No |
+| `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager. Batches may be arriving. | No |
+| `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once if it was paid today, at its execution time if it was scheduled. | No |
 | `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. | No |
 | `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC and risk have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
 | `REPRESENTING` | A returned payment queued for another presentment, on the date the market's rules set. | No |
@@ -110,7 +116,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `RETURNED` | The payment did not settle; the customer's bank sent the funds back. | Yes, unless it is represented |
 | `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
 | `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
-| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; a corporate payment only before its allocations are fetched. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window. | Yes |
 | `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
 
 `PROCESSED` is a higher bar than it looks. A payment reaches it only after every must-succeed system has answered and the customer has been told, which is why an outage at RTF or Raven holds payments at `PROCESSING` rather than letting them through with a gap.
@@ -122,8 +128,13 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
-| `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date |
-| `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only; for a corporate payment, only before its allocations are fetched |
+| `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
+| `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
+| `SCHEDULED` (corporate) | `ALLOCATING` | RequestAllocations, at the market's fetch time |
+| `ACCEPTED` (corporate, pay today) | `ALLOCATING` | RequestAllocations, at once |
+| `ALLOCATING` | `ALLOCATED` | ReceiveAllocations, once the batches add up to the payment amount |
+| `ALLOCATED` (scheduled) | `ACCEPTED` or `DECLINED` | Reverify, at the execution time |
+| `ALLOCATED` (pay today) | `PROCESSING` | Execute |
 | `ACCEPTED` | `PROCESSING` | Execute |
 | `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
 | `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a split payment, each leg, never the parent |
@@ -147,7 +158,7 @@ UPDATE trans_dtl SET status = 'CANCELLED'
 
 When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-A corporate payment adds one more race. Its cancel's guard also requires allocation status `NONE`, and the allocation request's guard requires a payment that isn't `CANCELLED`, so a cancel and the fetch of its allocations can't both win either.
+A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both.
 
 ## Split payments
 
@@ -159,32 +170,21 @@ The [Domain Model](./domain-model.md) shows how the code models a leg as its own
 
 ## Corporate payments
 
-A corporate payment uses the same states. What it adds is an **allocation status**, a separate field on the parent that tracks the breakdown into allocations that the allocations manager sends. It sits beside the payment's state and never blocks its clearing.
+A corporate payment is paid once, as one amount, and the allocations manager supplies its breakdown into allocations. Billpay fetches that breakdown before the payment moves money, and `ALLOCATING` and `ALLOCATED` record how far it has got. The two kinds differ only until the payment is `ALLOCATED`:
 
-```mermaid
-stateDiagram-v2
-  direction LR
-  [*] --> NONE: Corporate payment captured
-  NONE --> ALLOCATING: RequestAllocations
-  ALLOCATING --> ALLOCATED: ReceiveAllocations, batches add up to the amount
-  ALLOCATED --> [*]
-```
+| | Pay today | Scheduled |
+| --- | --- | --- |
+| States | `ACCEPTED` → `ALLOCATING` → `ALLOCATED` → `PROCESSING` | `SCHEDULED` → `ALLOCATING` → `ALLOCATED` → `ACCEPTED` → `PROCESSING` |
+| Allocations requested | At once | At the market's fetch time: on the due date, or a set number of hours or days before it |
+| Executed | At once, once `ALLOCATED` | At the execution time on the due date, once `ALLOCATED`, after Reverify |
 
-| `allocation_status` | Meaning |
-| --- | --- |
-| `NONE` | No allocations requested yet |
-| `ALLOCATING` | Requested from the allocations manager; batches may be arriving |
-| `ALLOCATED` | The batches received add up to the payment amount |
+No workflow waits for the allocations, and no workflow starts the next step itself. Each step is a Work Tracker row in Oracle that a dispatcher picks up, and from `ALLOCATED` on both kinds take the same steps:
 
-The parent and its legs follow these rules:
-
-- The parent clears once, at payment level, on its due date. It does not wait for its allocations.
-- Once its allocations are fetched, the parent can no longer be cancelled or updated: both get 409.
-- Legs are written only once the parent is `ACCEPTED`. Until then each batch waits in `allocation_batch`.
-- The parent turns `PROCESSED`, by a guarded update, once it has cleared, it is `ALLOCATED`, every batch has its legs, and every leg is `PROCESSED` or `PAID`, and its own RTF event and Raven message have gone out. The leg dispatcher checks this every 60 seconds; there is no Fulfil for a corporate parent.
+- The parent clears once, at payment level. If its allocations are late, it waits in `ALLOCATING`, and an alert fires at the market's alert point.
+- Once its allocations are requested, the payment is no longer `SCHEDULED`, so a cancel or an update gets 409.
+- Legs are written when the parent's Execute commits, from the batches stored in `allocation_batch`. A declined parent never gets legs.
+- The parent turns `PROCESSED`, by a guarded update, once it has cleared and every leg is `PROCESSED` or `PAID`, and its own RTF event and Raven message have gone out. The leg dispatcher checks this every 60 seconds; there is no Fulfil for a corporate parent.
 - Legs turn `PAID` one by one, each once the parent has settled and the leg's own AR posting is in. The parent stays `PROCESSED`.
-- If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
 - A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
-- A declined parent never gets legs: its batches stay stored and are never written.
 
-[Corporate Allocations](./corporate-allocations.md) follows the two tracks in detail. [Core Workflows](./component-model/workflows/core.md) lists which workflow drives each move, and the [sequence diagrams](./sequence-diagrams.md) trace the same flows call by call.
+[Corporate Allocations](./corporate-allocations.md) follows the flow step by step. [Core Workflows](./component-model/workflows/core.md) lists which workflow drives each move, and the [sequence diagrams](./sequence-diagrams.md) trace the same flows call by call.

@@ -68,7 +68,7 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Corporate Allocations',
       to: '/docs/design/corporate-allocations',
-      desc: `How a corporate payment clears once while its allocations arrive by callback and post as legs, on a track of their own.`,
+      desc: `How a corporate payment fetches its allocations before it moves money, then clears once and posts each allocation as a leg.`,
     },
     {
       term: 'Sequence Diagrams',

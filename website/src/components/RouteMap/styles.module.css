@@ -335,7 +335,8 @@
   color: var(--rm-mut);
 }
 
-.self + .caption {
+.self + .caption,
+.nodeRow + .nodeCaption {
   margin-top: 4px;
 }
 

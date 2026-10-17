@@ -123,7 +123,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 - Clearing moves the money out to the customer's bank. Accounts Receivable reduces the statement balance, and Authorization raises open-to-buy. These three run in parallel in the Execute stage.
 - Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, and last of all the customer's message (Raven) and the lifecycle event other systems consume (RTF). All eight must succeed before the payment is `PROCESSED`.
 - Every other state change sends its lifecycle event, and a customer message where one is due, straight after its commit. A workflow waits for them before its next step, so each payment's events arrive in order.
-- A corporate payment clears once, at payment level, on its due date. Its allocations arrive separately, by callback from the allocations manager, and each one posts as a leg of its own, in parallel with the clearing.
+- A corporate payment asks the allocations manager for its breakdown first, and the allocations arrive by callback. Once they are all in, the payment clears once, at payment level, and each allocation then posts as a leg of its own.
 
 ### Event handlers and schedules
 

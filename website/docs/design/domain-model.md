@@ -21,7 +21,7 @@ Each box is a class. Rows are the lifecycle states, read top to bottom, and colu
 
 ## The class is the state
 
-There are twelve sealed classes, one per state: nine along the path from `PendingPayment` to `RepresentedPayment`, and `CancelledPayment`, `DeclinedPayment` and `DisallowedPayment` for a payment that stops. Each one fixes its own `status`. The status isn't a field anyone sets: it comes with the class, so it can't drift away from the data.
+There are twelve sealed classes, one for each state except the two corporate ones, `ALLOCATING` and `ALLOCATED`, which have none yet: nine along the path from `PendingPayment` to `RepresentedPayment`, and `CancelledPayment`, `DeclinedPayment` and `DisallowedPayment` for a payment that stops. Each one fixes its own `status`. The status isn't a field anyone sets: it comes with the class, so it can't drift away from the data.
 
 There is no `setStatus` either. Each allowed move is an extension function that takes one class and returns the next, such as `ProcessedFullPayment.toPaidFullPayment()`. A move without a function can't happen, which is why the gaps at the end matter.
 
@@ -31,7 +31,7 @@ The [stages](./component-model/stages.md) are where these moves run. Verify move
 
 Two shapes cross the states. A `FullPayment` settles as one amount. A `SplitPayment` is a leg: it carries its parent's ID as `originalPaymentId`, a `sequenceNumber` and its own amount. A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`, which is also how One-Data pairs a leg's Accounts Receivable (AR) posting with the settlement of its parent: it reads the part before the `_`.
 
-That makes nineteen classes in all. A full payment has a class for each of the twelve states. A leg has seven, because it starts at `ACCEPTED`: it is made from a parent Verify has already passed, by `toAcceptedSplitPayment(splitSlice)`, so a pending or scheduled leg can't exist. The parent can be `ACCEPTED` or already `PROCESSING` when that happens. That matters for a corporate payment, whose allocations can arrive while the company's payment is still clearing. [Corporate Allocations](./corporate-allocations.md) covers that track.
+That makes nineteen classes in all. A full payment has a class for each of those twelve states. A leg has seven, because it starts at `ACCEPTED`: it is made from a parent Verify has already passed, by `toAcceptedSplitPayment(splitSlice)`, so a pending or scheduled leg can't exist. The parent can be `ACCEPTED` or already `PROCESSING` when that happens. A corporate parent is always `PROCESSING` by then, because its legs are written only once its Execute has cleared it. [Corporate Allocations](./corporate-allocations.md) covers that path.
 
 ## What each state guarantees
 
@@ -73,7 +73,7 @@ The [Payment State Model](./payment-state-model.md) is the design. The code hasn
 | The lifecycle has | The code has |
 | --- | --- |
 | `PROCESSING` → `RETURNED` | No function; a return starts from `PROCESSED` or `PAID` |
-| `allocation_status` on a corporate parent | No field |
+| `ALLOCATING` and `ALLOCATED`, and the moves into and out of them | No classes or functions yet |
 | Credit balance refunds | `Refund` has no classes yet |
 
 The Kotlin itself, with the guard code and the build-side detail, is on the [Build Domain Model](../build/domain-model/index.md) pages.

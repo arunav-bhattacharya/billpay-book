@@ -3,117 +3,97 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * CorporateTracks: a scheduled corporate payment as three lanes on one
- * timeline.
+ * CorporateTracks: how a corporate payment gets from intake to PROCESSED.
  *
- * The point of the picture is that allocations never hold up the parent's
- * clearing, so the parent and its allocations get lanes of their own and time runs left to right
- * across all three. The legs get a third lane because they are where the two
- * tracks meet: no leg exists until the parent is accepted, so the stored
- * batches and the parent's acceptance together write them, and their
- * completion closes the parent. The fetch also reaches up to the parent: from
- * then on it can't be cancelled or updated. Those four meetings are the only
- * lines between lanes, and each is labelled with what crosses.
+ * Pay today and scheduled payments enter on lanes of their own and join one
+ * shared path at the allocation request. The middle lane is that path: each
+ * box is a step with the state it commits and the Work Tracker row (or the
+ * callback) that starts it, because no workflow waits and no workflow starts
+ * the next step itself. The two outer lanes hold only what differs between
+ * the kinds: the state Verify commits, and when the request and the
+ * execution rows fall due. Those timings sit right above and below the box
+ * they apply to, joined to it by a short dashed tick.
  *
- * Coordinates are hand-placed on a 980 x 400 canvas: six time columns 140
- * wide from x = 130, three lanes 92 tall with 30-unit gaps that hold the
- * connector labels. Every label is short enough to sit inside its box at the
- * sizes in the stylesheet. Takes no props.
+ * Coordinates are hand-placed on a 980 x 306 canvas: six columns 140 wide
+ * from x = 130, three lanes with 16-unit gaps. Every label is short enough to
+ * sit inside its box at the sizes in the stylesheet. Takes no props.
  */
 
 const W = 980;
-const H = 400;
+const H = 306;
 
 const COL_X0 = 130;
 const COL_W = 140;
 const cx = (c) => COL_X0 + COL_W / 2 + c * COL_W;
 
 const LANES = [
-  {id: 'parent', term: 'Parent', desc: 'one payment', top: 48, tone: 'parent'},
-  {id: 'alloc', term: 'Allocations', desc: 'the breakdown', top: 170, tone: 'alloc'},
-  {id: 'legs', term: 'Legs', desc: 'one per allocation', top: 292, tone: 'legs'},
+  {id: 'today', term: 'Pay today', desc: 'asks at once', top: 14, h: 70, tone: 'today'},
+  {id: 'path', term: 'Both kinds', desc: 'one path', top: 100, h: 110, tone: 'path'},
+  {id: 'sched', term: 'Scheduled', desc: 'asks at the fetch time', top: 226, h: 70, tone: 'sched'},
 ];
-const LANE_H = 92;
-const laneMid = (id) => {
-  const l = LANES.find((x) => x.id === id);
-  return l.top + LANE_H / 2;
-};
+const lane = (id) => LANES.find((l) => l.id === id);
+const mid = (id) => lane(id).top + lane(id).h / 2;
 
-const BOX_W = 120;
-const BOX_H = 60;
+const BOX_W = 116;
+const ENTRY_H = 50;
+const STEP_H = 76;
 
-const TIMES = ['At intake', 'Fetch time', 'Callbacks', 'Due date', 'Execution', 'Afterwards'];
-
-/* state tone: f = in flight, ok = paid, q = quiet (not a payment state) */
-const BOXES = [
-  {lane: 'parent', col: 0, title: 'Verify', sub: 'SCHEDULED', tone: 'f'},
-  {lane: 'parent', col: 3, title: 'Reverify', sub: 'ACCEPTED', tone: 'f'},
-  {lane: 'parent', col: 4, title: 'Execute', sub: 'clears once', tone: 'q'},
-  {lane: 'parent', col: 5, title: 'Completion', sub: 'PROCESSED', tone: 'f'},
-
-  {lane: 'alloc', col: 0, title: 'Request row', sub: 'ALLOC_REQUEST', tone: 'q'},
-  {lane: 'alloc', col: 1, title: 'Request', sub: 'ALLOCATING', tone: 'q'},
-  {lane: 'alloc', col: 2, title: 'Receive', sub: 'batches stored', tone: 'q'},
-
-  {lane: 'legs', col: 3, title: 'Legs written', sub: 'rows SCHEDULED', tone: 'q'},
-  {lane: 'legs', col: 4, title: 'Leg workflows', sub: 'PROCESSED', tone: 'f'},
-  {lane: 'legs', col: 5, title: 'Settle', sub: 'each leg PAID', tone: 'ok'},
+/* tone of the state line: f = in flight */
+const ENTRIES = [
+  {lane: 'today', title: 'Verify', state: 'ACCEPTED'},
+  {lane: 'sched', title: 'Verify', state: 'SCHEDULED'},
 ];
 
-const box = (lane, col) => ({
+const STEPS = [
+  {col: 1, title: 'Request', state: 'ALLOCATING', note: 'ALLOC_REQUEST row'},
+  {col: 2, title: 'Receive', state: 'ALLOCATED', note: 'each callback batch'},
+  {col: 3, title: 'Execute', state: 'PROCESSING', note: 'ALLOC_EXEC row'},
+  {col: 4, title: 'Legs', state: 'each PROCESSED', note: 'ALLOC_LEG rows'},
+  {col: 5, title: 'Complete', state: 'PROCESSED', note: 'leg dispatcher'},
+];
+
+/* what differs between the kinds, beside the step it applies to */
+const CHIPS = [
+  {lane: 'today', col: 1, lines: ['at once']},
+  {lane: 'today', col: 3, lines: ['at once']},
+  {lane: 'sched', col: 1, lines: ['at the fetch time']},
+  {lane: 'sched', col: 3, lines: ['at the execution time,', 'Reverify first']},
+];
+
+const CHIP_W = 124;
+const CHIP_LINE = 15;
+const chipH = (c) => 12 + c.lines.length * CHIP_LINE;
+
+const entryBox = (id) => ({x: cx(0) - BOX_W / 2, y: mid(id) - ENTRY_H / 2, r: cx(0) + BOX_W / 2, cy: mid(id)});
+const stepBox = (col) => ({
   x: cx(col) - BOX_W / 2,
-  y: laneMid(lane) - BOX_H / 2,
+  y: mid('path') - STEP_H / 2,
   r: cx(col) + BOX_W / 2,
-  b: laneMid(lane) + BOX_H / 2,
-  cx: cx(col),
-  cy: laneMid(lane),
+  b: mid('path') + STEP_H / 2,
 });
 
-/* arrows along a lane, from one box's right edge to the next box's left edge */
-const ALONG = [
-  ['parent', 0, 3, 'waits in Oracle'],
-  ['parent', 3, 4],
-  ['parent', 4, 5],
-  ['alloc', 0, 1],
-  ['alloc', 1, 2],
-  ['legs', 3, 4],
-  ['legs', 4, 5],
-];
-
-/* the four places the tracks meet */
-const ACROSS = [
-  {
-    id: 'fetch',
-    d: `M${cx(1)},${box('alloc', 1).y} V${laneMid('parent') + 4}`,
-    label: 'ends cancel and update',
-    lx: cx(1) + 8,
-    ly: LANES[0].top + LANE_H + 19,
-  },
-  {
-    id: 'write',
-    d: `M${cx(2)},${box('alloc', 2).b} V${laneMid('legs')} H${box('legs', 3).x}`,
-    label: 'the stored batches',
-    lx: cx(2) + 8,
-    ly: laneMid('alloc') + BOX_H / 2 + 19,
-  },
-  {
-    id: 'release',
-    d: `M${cx(3)},${box('parent', 3).b} V${box('legs', 3).y}`,
-    label: 'sets legs_released_at',
-    lx: cx(3) + 8,
-    ly: laneMid('parent') + BOX_H / 2 + 31,
-  },
-  {
-    id: 'complete',
-    d: `M${cx(4) + 22},${box('legs', 4).y} V${LANES[0].top + LANE_H + 15} H${cx(5)} V${box('parent', 5).b}`,
-    label: ['ALLOCATED, and every', 'leg PROCESSED or PAID'],
-    lx: cx(4) + 30,
-    ly: LANES[1].top + 34,
-  },
-];
-
 const LABEL =
-  "A scheduled corporate payment on three lanes, with time running left to right from intake, through the fetch time, the callbacks and the due date, to execution and afterwards. The parent lane: Verify commits SCHEDULED at intake, the payment waits as a row in Oracle, Reverify commits ACCEPTED on the due date, Execute clears the whole amount once, and the completion check commits PROCESSED. The allocations lane: the intake commit writes an ALLOC_REQUEST row; the request at the fetch time sets the allocation status to ALLOCATING, and from then on the parent can no longer be cancelled or updated; each callback batch is received and stored, the status turning ALLOCATED once the batches add up. The legs lane: no leg exists before the due date. Reverify sets legs_released_at, and the legs of the stored batches are written with SCHEDULED Work Tracker rows; each leg runs its own workflow to PROCESSED; and once the parent is ALLOCATED and every leg is PROCESSED or PAID, the completion check moves the parent to PROCESSED. Afterwards Settle marks each leg PAID while the parent stays PROCESSED.";
+  'How a corporate payment moves, on three lanes. A payment paid today enters on the top lane: Verify commits ACCEPTED, and it asks for its allocations at once. A scheduled payment enters on the bottom lane: Verify commits SCHEDULED, and it asks at the market\'s fetch time. Both then join one path in the middle lane, where each step is started by a Work Tracker row or a callback, never by a waiting workflow. Request, from an ALLOC_REQUEST row, moves the payment to ALLOCATING. Receive, one per callback batch, moves it to ALLOCATED once the batches add up. Execute, from an ALLOC_EXEC row, clears the parent once and moves it to PROCESSING: at once for pay today, or at the execution time for a scheduled payment, after Reverify. Execute releases the legs, which run from ALLOC_LEG rows, each to PROCESSED. The leg dispatcher\'s completion check then moves the parent to PROCESSED.';
+
+function Box({x, y, w, h, tone, title, state, note}) {
+  return (
+    <g className={styles[`lane_${tone}`]}>
+      <rect x={x} y={y} width={w} height={h} rx={8} className={styles.box} />
+      <path d={`M${x + 8},${y} A8,8 0 0 0 ${x},${y + 8} V${y + h - 8} A8,8 0 0 0 ${x + 8},${y + h} Z`} className={styles.block} />
+      <text x={x + 16} y={y + (note ? 23 : 21)} className={styles.title}>
+        {title}
+      </text>
+      <text x={x + 16} y={y + (note ? 41 : 39)} className={clsx(styles.sub, styles.s_f)}>
+        {state}
+      </text>
+      {note && (
+        <text x={x + 16} y={y + 60} className={styles.note}>
+          {note}
+        </text>
+      )}
+    </g>
+  );
+}
 
 export default function CorporateTracks() {
   return (
@@ -124,84 +104,79 @@ export default function CorporateTracks() {
             <marker id="ct-arrow" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="6.4" markerHeight="6.4" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" className={styles.head} />
             </marker>
-            <marker id="ct-arrow-x" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="6.8" markerHeight="6.8" orient="auto-start-reverse">
-              <path d="M0,0 L10,5 L0,10 z" className={styles.headAcross} />
-            </marker>
           </defs>
-
-          {/* time runs left to right */}
-          {TIMES.map((t, i) => (
-            <text key={t} x={cx(i)} y={30} textAnchor="middle" className={styles.time}>
-              {t}
-            </text>
-          ))}
 
           {/* the lanes */}
           {LANES.map((l) => (
             <g key={l.id} className={styles[`lane_${l.tone}`]}>
-              <rect x={8} y={l.top} width={W - 16} height={LANE_H} rx={12} className={styles.band} />
-              <text x={22} y={l.top + LANE_H / 2 - 4} className={styles.laneTerm}>
+              <rect x={8} y={l.top} width={W - 16} height={l.h} rx={12} className={styles.band} />
+              <text x={22} y={l.top + l.h / 2 - 4} className={styles.laneTerm}>
                 {l.term}
               </text>
-              <text x={22} y={l.top + LANE_H / 2 + 13} className={styles.laneDesc}>
+              <text x={22} y={l.top + l.h / 2 + 13} className={styles.laneDesc}>
                 {l.desc}
               </text>
             </g>
           ))}
 
-          {/* along each lane */}
-          {ALONG.map(([lane, a, b, label]) => {
-            const from = box(lane, a);
-            const to = box(lane, b);
+          {/* each entry joins the path at the request */}
+          {ENTRIES.map((e) => {
+            const b = entryBox(e.lane);
+            const into = stepBox(1);
+            const y = e.lane === 'today' ? mid('path') - 14 : mid('path') + 14;
+            const xTurn = b.r + 12;
             return (
-              <g key={`${lane}-${a}-${b}`}>
-                <path d={`M${from.r},${from.cy} H${to.x}`} className={styles.along} markerEnd="url(#ct-arrow)" />
-                {label && (
-                  <text x={(from.r + to.x) / 2} y={from.cy - 8} textAnchor="middle" className={styles.alongLabel}>
-                    {label}
+              <path
+                key={`in-${e.lane}`}
+                d={`M${b.r},${b.cy} H${xTurn - 5} Q${xTurn},${b.cy} ${xTurn},${b.cy + (y > b.cy ? 5 : -5)} V${y + (y > b.cy ? -5 : 5)} Q${xTurn},${y} ${xTurn + 5},${y} H${into.x}`}
+                className={styles.along}
+                markerEnd="url(#ct-arrow)"
+              />
+            );
+          })}
+
+          {/* along the shared path */}
+          {STEPS.slice(0, -1).map((s, i) => {
+            const from = stepBox(s.col);
+            const to = stepBox(STEPS[i + 1].col);
+            return <path key={`step-${s.col}`} d={`M${from.r},${mid('path')} H${to.x}`} className={styles.along} markerEnd="url(#ct-arrow)" />;
+          })}
+
+          {/* the timings, tied to the step they set */}
+          {CHIPS.map((c) => {
+            const h = chipH(c);
+            const x = cx(c.col) - CHIP_W / 2;
+            const y = mid(c.lane) - h / 2;
+            const step = stepBox(c.col);
+            const tick = c.lane === 'today' ? `M${cx(c.col)},${y + h} V${step.y}` : `M${cx(c.col)},${step.b} V${y}`;
+            return (
+              <g key={`${c.lane}-${c.col}`} className={styles[`lane_${lane(c.lane).tone}`]}>
+                <path d={tick} className={styles.tick} />
+                <rect x={x} y={y} width={CHIP_W} height={h} rx={6} className={styles.chip} />
+                {c.lines.map((line, i) => (
+                  <text key={line} x={cx(c.col)} y={y + 6 + CHIP_LINE * (i + 1) - 3} textAnchor="middle" className={styles.chipText}>
+                    {line}
                   </text>
-                )}
+                ))}
               </g>
             );
           })}
 
-          {/* where the tracks meet */}
-          {ACROSS.map((c) => (
-            <g key={c.id}>
-              <path d={c.d} className={styles.across} markerEnd="url(#ct-arrow-x)" />
-              {[].concat(c.label).map((line, i) => (
-                <text key={line} x={c.lx} y={c.ly + i * 16} className={styles.acrossLabel}>
-                  {line}
-                </text>
-              ))}
-            </g>
-          ))}
-
-          {/* the steps */}
-          {BOXES.map((bx) => {
-            const g = box(bx.lane, bx.col);
-            const lane = LANES.find((l) => l.id === bx.lane);
-            return (
-              <g key={`${bx.lane}-${bx.col}`} className={styles[`lane_${lane.tone}`]}>
-                <rect x={g.x} y={g.y} width={BOX_W} height={BOX_H} rx={8} className={styles.box} />
-                <path
-                  d={`M${g.x + 8},${g.y} A8,8 0 0 0 ${g.x},${g.y + 8} V${g.b - 8} A8,8 0 0 0 ${g.x + 8},${g.b} Z`}
-                  className={styles.block}
-                />
-                <text x={g.x + 16} y={g.cy - 4} className={styles.title}>
-                  {bx.title}
-                </text>
-                <text x={g.x + 16} y={g.cy + 14} className={clsx(styles.sub, styles[`s_${bx.tone}`])}>
-                  {bx.sub}
-                </text>
-              </g>
-            );
+          {/* the boxes */}
+          {ENTRIES.map((e) => {
+            const b = entryBox(e.lane);
+            return <Box key={`entry-${e.lane}`} x={b.x} y={b.y} w={BOX_W} h={ENTRY_H} tone={lane(e.lane).tone} title={e.title} state={e.state} />;
+          })}
+          {STEPS.map((s) => {
+            const b = stepBox(s.col);
+            return <Box key={`box-${s.col}`} x={b.x} y={b.y} w={BOX_W} h={STEP_H} tone="path" title={s.title} state={s.state} note={s.note} />;
           })}
         </svg>
       </div>
       <figcaption className={styles.caption}>
-        A pay-today corporate payment runs the same tracks, compressed: Verify accepts the parent, the request goes
-        out at once, and each batch's legs are written as soon as it arrives.
+        Until it reaches <code>ALLOCATING</code>, a scheduled payment can still be cancelled or updated inside the
+        window. Execute clears the parent once and releases the legs, which run apart from it. Settle later marks each
+        leg <code>PAID</code>; the parent stays <code>PROCESSED</code>.
       </figcaption>
     </figure>
   );

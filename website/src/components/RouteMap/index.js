@@ -25,8 +25,9 @@ import styles from './styles.module.css';
  *
  * Props: `triggers`, each {term, routes}. A route is
  *   {desc, flow, fork?, note?, across?}
- * `flow` lists the workflows in order, each {via, detail?, name, cluster},
- * where `via` says how it starts: 'uws', 'async', 'inbox', 'row' or 'child'.
+ * `flow` lists the workflows in order, each {via, detail?, name, cluster,
+ * caption?}, where `via` says how it starts: 'uws', 'async', 'inbox', 'row'
+ * or 'child', and `caption` is a line or two of what that workflow runs.
  * The first one's `via` is the line from the trigger. `fork` lists branches,
  *   {term, via, detail?, flow, notes?}   or   {term, self: [caption, ...]}
  * hanging from the last workflow in `flow`. `note` sits beside the last
@@ -117,10 +118,17 @@ function Edge({via, detail}) {
 
 function Step({step, first, aside}) {
   const node = (
-    <span className={styles.nodeRow}>
-      <Node name={step.name} cluster={step.cluster} />
-      {aside && <span className={styles.aside}>{aside}</span>}
-    </span>
+    <>
+      <span className={styles.nodeRow}>
+        <Node name={step.name} cluster={step.cluster} />
+        {aside && <span className={styles.aside}>{aside}</span>}
+      </span>
+      {(step.caption || []).map((line) => (
+        <span key={line} className={clsx(styles.caption, styles.nodeCaption)}>
+          {line}
+        </span>
+      ))}
+    </>
   );
   if (first) return node;
   if (step.via === 'child') {

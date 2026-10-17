@@ -33,7 +33,7 @@ How a workflow starts depends on who is waiting for it.
 | A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | The update's result: `PENDING`, `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED` | Pay today, schedule, composites, intent, update, cancel, refunds from channels |
 | Nobody waits | One-Data stores the request; a dispatcher pulls it from the inbox and starts it through the Router | AR intake and inbound: 202 from One-Data, once stored. A return arrives as an event | AR intake (payments and refunds), returns, inbound |
 | An allocation callback | Async start; the workflow exists before Billpay replies | 202; 429 with `Retry-After` over budget | Allocation callbacks |
-| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit; a dispatcher starts it through the Router | None | Scheduled execution, allocation requests, corporate legs, representments |
+| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit; a dispatcher starts it through the Router | None | Scheduled execution, allocation requests, corporate execution, corporate legs, representments |
 
 Update-With-Start is what keeps the online journeys fast. It starts the workflow and sends it an update in one call. The update returns as soon as there is an answer, such as Verify's decision on a new payment or `CANCELLED` for a cancel, and the rest of the workflow carries on without the caller.
 
@@ -63,9 +63,10 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
               flow: [
                 {name: 'RequestAllocations', cluster: 'Offline'},
                 {via: 'async', detail: 'the callback, one per batch', name: 'ReceiveAllocations', cluster: 'Offline'},
-                {via: 'row', detail: 'one per leg', name: 'ExecuteSplitPayment', cluster: 'Offline'},
+                {via: 'row', detail: 'once allocated, due at once', name: 'ExecuteScheduledPayment', cluster: 'Offline'},
+                {via: 'row', detail: 'one per leg, once it clears', name: 'ExecuteSplitPayment', cluster: 'Offline'},
               ],
-              notes: ['No legs until the parent is ACCEPTED.'],
+              notes: ['CreateImmediatePayment stops at ACCEPTED. Dispatchers start every later step.'],
             },
           ],
         },
@@ -78,23 +79,34 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         },
         {
           desc: 'Future-dated',
-          flow: [
-            {via: 'uws', name: 'CreateScheduledPayment', cluster: 'Online'},
-            {via: 'row', detail: 'on the due date', name: 'ExecuteScheduledPayment', cluster: 'Offline'},
-          ],
+          flow: [{via: 'uws', name: 'CreateScheduledPayment', cluster: 'Online'}],
           fork: [
-            {term: 'Consumer, one amount', self: ['Reverify, Execute, Fulfil']},
-            {term: 'Consumer, split', via: 'child', detail: 'one per leg', flow: [{name: 'ExecuteSplitPayment', cluster: 'Offline'}]},
+            {
+              term: 'Consumer, one amount',
+              via: 'row',
+              detail: 'on the due date',
+              flow: [{name: 'ExecuteScheduledPayment', cluster: 'Offline', caption: ['Runs it all itself: Reverify, Execute, Fulfil']}],
+            },
+            {
+              term: 'Consumer, split',
+              via: 'row',
+              detail: 'on the due date',
+              flow: [
+                {name: 'ExecuteScheduledPayment', cluster: 'Offline'},
+                {via: 'child', detail: 'one per leg', name: 'ExecuteSplitPayment', cluster: 'Offline'},
+              ],
+            },
             {
               term: 'Corporate',
               via: 'row',
-              detail: 'at the fetch time, written when it was scheduled',
+              detail: 'at the fetch time',
               flow: [
                 {name: 'RequestAllocations', cluster: 'Offline'},
                 {via: 'async', detail: 'the callback, one per batch', name: 'ReceiveAllocations', cluster: 'Offline'},
-                {via: 'row', detail: 'one per leg', name: 'ExecuteSplitPayment', cluster: 'Offline'},
+                {via: 'row', detail: 'once allocated, at the execution time', name: 'ExecuteScheduledPayment', cluster: 'Offline'},
+                {via: 'row', detail: 'one per leg, once it clears', name: 'ExecuteSplitPayment', cluster: 'Offline'},
               ],
-              notes: ['No legs until the parent is ACCEPTED.', 'No cancel or update once allocations are fetched.'],
+              notes: ['No cancel or update once ALLOCATING.', 'Reverify runs first, on the due date.'],
             },
           ],
         },
@@ -188,7 +200,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         {
           desc: 'A corporate payment',
           flow: [{via: 'async', detail: 'then 202', name: 'ReceiveAllocations', cluster: 'Offline'}],
-          note: 'One per batch, part of the corporate track above',
+          note: 'One per batch; the last one moves the payment to ALLOCATED',
         },
       ],
     },
@@ -202,7 +214,7 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 The `accountType` behavior picks the branch at each fork. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster.
-- A corporate payment starts its legs from Work Tracker rows instead, because one payment can have 100K of them. `RequestAllocationsWorkflow` asks for the breakdown. `ReceiveAllocationsWorkflow` writes a batch's legs once the parent is `ACCEPTED`; a batch that arrives earlier waits, and the leg dispatcher writes it on the due date. The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg. [Corporate Allocations](./corporate-allocations.md) has the whole track.
+- A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
 
@@ -219,7 +231,7 @@ Every workflow ID is the payment ID plus a suffix, so any payment can be traced 
 | Thing | Workflow ID |
 | --- | --- |
 | Create or schedule | `{paymentId}-init` |
-| Scheduled execution | `{paymentId}-execute` |
+| Scheduled or corporate execution | `{paymentId}-execute` |
 | Update and cancel | `{paymentId}-update`, `{paymentId}-cancel` |
 | Allocation request and received batch | `{paymentId}-allocations`, `{paymentId}-allocations-{batch}` |
 | Leg | `{paymentId}_{seq}-execute` |

@@ -24,13 +24,13 @@ One line goes into the Router for each request, and one comes out for each workf
 
 The squares are the stages a workflow runs, in order. A pale square means a child workflow runs that stage: multiple instructions runs one `CreateImmediatePaymentWorkflow` per instruction, and an update cancels the old payment and leaves the new one to a child. Stages that only one kind of journey needs, such as Return or Settle, sit in the last column.
 
-Click a journey and the activity rows at the bottom light up the calls it makes. Or go the other way, and follow a stage's column down to see every system it reaches. The sheet shows each journey's usual shape: a corporate parent skips Fulfil because its legs do that work, and a corporate leg never clears.
+Click a journey and the activity rows at the bottom light up the calls it makes. Or go the other way, and follow a stage's column down to see every system it reaches. The sheet shows each journey's usual shape. A corporate payment's own execution, from its `ALLOC_EXEC` row, skips Fulfil because its legs do that work, and a corporate leg never clears.
 
 ## What the sheet shows
 
 A few things are easier to see here than anywhere else.
 
-- Execute and Fulfil sit in eight rows, but there is one Execute stage and one Fulfil stage. Pay today, a scheduled payment on its due date, an inbound payment, both kinds of refund and a corporate leg all run them. The behaviors the Router resolves decide which implementation runs.
+- Execute sits in nine rows and Fulfil in eight, but there is one Execute stage and one Fulfil stage. Pay today, a scheduled payment on its due date, a corporate payment once it is allocated, an inbound payment, both kinds of refund and a corporate leg all run Execute. The behaviors the Router resolves decide which implementation runs.
 - Every stage commits through `PaymentStore`, and every state change goes out to RTF, which is why those two rows run the full width. Raven is narrower. It is called only where the customer is told, such as a scheduled or declined payment at Verify, a processed one at Fulfil, or a cancellation.
 - Nothing One-Data stores ever reaches a core API. AR intake, returns and inbound payments wait in its inbox until their dispatcher pulls them, so a burst of returns waits its turn instead of competing with a customer who is paying today.
 - One road skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.

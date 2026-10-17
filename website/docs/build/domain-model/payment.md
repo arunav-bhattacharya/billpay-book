@@ -165,7 +165,7 @@ There is no `setStatus`. Each legal edge is a top-level extension function that 
 | `ProcessedSplitPayment` | `toPaidSplitPayment()` · `toReturnedSplitPayment()` |
 | `PaidSplitPayment` / `ReturnedSplitPayment` / `RepresentingSplitPayment` / `RepresentedSplitPayment` | mirror the Full edges at the split level |
 
-The pending to accepted edge takes the verified pieces as arguments, so validation's outputs are the transition's inputs. `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)` is the corporate fan-out edge, where an already-processing parent spawns `ACCEPTED` split legs once its allocations arrive.
+The pending to accepted edge takes the verified pieces as arguments, so validation's outputs are the transition's inputs. `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)` is the corporate fan-out edge: a corporate parent is `PROCESSING` by the time its Execute releases the legs, and each leg starts `ACCEPTED`.
 
 A [stage](../principles/core-build/stages.md) is one of these functions plus the persistence and event publication around it, which is why stage signatures stay short.
 

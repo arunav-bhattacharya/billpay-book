@@ -1,24 +1,23 @@
-/* CorporateTracks: three lanes on one timeline. Blue Box rules: tinted lane
-   fields and filled boxes, no outlines. Each lane has one tone, used for its
-   field, its box blocks and nothing else; every colour is a token. */
+/* CorporateTracks: two entry lanes joining one shared path. Blue Box rules:
+   tinted lane fields and filled boxes, no outlines. Each lane has one tone,
+   used for its field, its box blocks and its timing chips, and nothing else;
+   every colour is a token. */
 
 .wrap {
   composes: panel from '../../css/recipes.module.css';
 
-  --ct-parent: var(--amex-blue);
-  --ct-alloc: var(--amex-indigo);
-  --ct-legs: var(--amex-sky);
+  --ct-today: var(--amex-blue);
+  --ct-sched: var(--amex-indigo);
+  --ct-path: var(--amex-temporal);
   --ct-card: var(--amex-panel);
-  --ct-link: var(--amex-blue);
 
   margin: 1.5rem 0 2.2rem;
   padding: 0.9rem 0.9rem 0.8rem;
 }
 
 :global([data-theme='dark']) .wrap {
-  --ct-parent: var(--amex-blue-bright);
+  --ct-today: var(--amex-blue-bright);
   --ct-card: var(--amex-card);
-  --ct-link: var(--amex-blue-bright);
 }
 
 .frame {
@@ -33,22 +32,14 @@
   font-family: var(--amex-font-sans);
 }
 
-.lane_parent {
-  --tone: var(--ct-parent);
+.lane_today {
+  --tone: var(--ct-today);
 }
-.lane_alloc {
-  --tone: var(--ct-alloc);
+.lane_sched {
+  --tone: var(--ct-sched);
 }
-.lane_legs {
-  --tone: var(--ct-legs);
-}
-
-.time {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  fill: var(--amex-mut);
+.lane_path {
+  --tone: var(--ct-path);
 }
 
 .band {
@@ -93,9 +84,26 @@
   font-weight: 600;
   fill: var(--amex-state-intermediate);
 }
-.s_ok {
-  fill: var(--amex-state-success);
+.note {
+  font-size: 10.5px;
+  fill: var(--amex-mut);
+}
+
+.chip {
+  fill: color-mix(in srgb, var(--tone) 12%, var(--ct-card));
+}
+
+.chipText {
+  font-size: 11px;
   font-weight: 600;
+  fill: var(--tone);
+}
+
+.tick {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
 }
 
 .along {
@@ -104,30 +112,8 @@
   stroke-width: 1.4;
 }
 
-.alongLabel {
-  font-size: 11px;
-  font-style: italic;
-  fill: var(--amex-mut);
-}
-
 .head {
   fill: var(--amex-mut);
-}
-
-.across {
-  fill: none;
-  stroke: var(--ct-link);
-  stroke-width: 1.8;
-}
-
-.headAcross {
-  fill: var(--ct-link);
-}
-
-.acrossLabel {
-  font-size: 11.5px;
-  font-weight: 600;
-  fill: var(--ct-link);
 }
 
 .caption {

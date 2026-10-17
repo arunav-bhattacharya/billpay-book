@@ -165,7 +165,6 @@ const BANDS = [
             wf: 'ReceiveAllocations',
             why: 'a batch of allocations',
             own: ['ReceiveAllocations'],
-            skip: ['LifecycleEventActivities'],
           },
         ],
       },
@@ -189,9 +188,21 @@ const BANDS = [
           {
             id: 'request',
             wf: 'RequestAllocations',
-            why: 'at the fetch time',
+            why: 'at the fetch time, or at once',
             own: ['RequestAllocations'],
-            skip: ['LifecycleEventActivities'],
+          },
+        ],
+      },
+      {
+        row: 'ALLOC_EXEC',
+        by: 'allocated-payments dispatcher',
+        journeys: [
+          {
+            id: 'corpExecute',
+            wf: 'ExecuteScheduledPayment',
+            why: 'corporate, once ALLOCATED',
+            stages: [2, 3],
+            note: 'Reverify only when scheduled',
           },
         ],
       },
@@ -229,8 +240,7 @@ const DRAIN = {
 
 /* who calls each system: stage columns, stages of their own, or a source.
    A journey's `skip` drops a call its stage would otherwise make: a corporate
-   leg never clears, and the allocation stages change no payment state, so
-   they send no lifecycle event. */
+   leg never clears. */
 const ACTIVITIES = [
   {name: 'PaymentStore', system: 'Oracle', rail: true, note: 'every stage commits here'},
   {name: 'LifecycleEventActivities', system: 'RTF', rail: true, note: 'every state change'},

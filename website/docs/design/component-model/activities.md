@@ -12,7 +12,7 @@ export const ACTIVITIES = [
     name: 'PaymentStore',
     system: 'Oracle',
     queue: 'Local activity',
-    calledBy: "Every stage's commit; Capture's insert-if-absent; the leg writes in ReceiveAllocations; the guarded cancel; the ID map in Update",
+    calledBy: "Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update",
   },
   {
     name: 'InstrumentActivities',
@@ -100,7 +100,7 @@ Activities take IDs, not payment objects, and load what they need. RTF lifecycle
 
 <ActivityTable rows={ACTIVITIES} />
 
-A corporate payment is never declined because its allocations are slow. The parent clears on its due date anyway, there are no legs to run until the allocations arrive, and an alert fires at the market's alert point if they are still missing.
+A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 
 ## PaymentStore, the only way into Oracle
 
