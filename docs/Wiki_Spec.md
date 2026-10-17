@@ -54,8 +54,8 @@ One-Data functions are the versioned contracts that channels and partner systems
 ### Core
 
 1. [CreatePayment.v3](https://explorer.aexp.com/functions/CreatePayment.v3?method=post): create a payment for today or schedule one for a future date.
-2. [UpdatePayment.v1](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post): update a `SCHEDULED` payment. Works only inside the market's cancellation window; after it closes the answer is 409.
-3. [DeletePayment.v1](https://explorer.aexp.com/functions/DeletePayment.v1?method=post): cancel a `SCHEDULED` payment. Works only inside the cancellation window; after it closes the answer is 409.
+2. [UpdatePayment.v1](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post): update a `SCHEDULED` payment. Works only inside the market's cancellation window, and for a corporate payment only until its allocations are fetched; after that the answer is 409.
+3. [DeletePayment.v1](https://explorer.aexp.com/functions/DeletePayment.v1?method=post): cancel a `SCHEDULED` payment. Works only inside the cancellation window, and for a corporate payment only until its allocations are fetched; after that the answer is 409.
 4. [ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1): list the payments on a card account.
 5. [ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1): list the lifecycle states one payment has been through.
 6. [CreateCreditBalanceRefund.v1](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post): refund a credit balance on a card account.
@@ -103,7 +103,7 @@ Every write API admits the request first, through the Router (see [Routing and S
 
 - **422** when the market, account type or API is not live in this environment. Senders do not retry a 422.
 - **429** with `Retry-After` when an allocation callback arrives over its traffic class's budget. The allocations manager retries on 429.
-- **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED`, or after the cancellation window has closed.
+- **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED`, after the cancellation window has closed, or for a corporate payment whose allocations have been fetched.
 - **503** with `Retry-After` for an allocation callback or a provisioning request while the Offline cluster is down.
 
 AR intake, returns and inbound payments never reach these APIs. One-Data stores them, and dispatchers pull them at the governor's pace (see [Dispatchers](#dispatchers)).
@@ -247,7 +247,7 @@ Consumer and corporate payments share one set of states. A corporate parent also
 | `RETURNED` | The payment did not settle; the customer's bank returned the funds. | Yes, unless it is represented |
 | `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
 | `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
-| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; a corporate payment only before its allocations are fetched. | Yes |
 | `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
 
 ### Transitions
@@ -258,7 +258,7 @@ Consumer and corporate payments share one set of states. A corporate parent also
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date |
-| `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
+| `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only; for a corporate payment, only before its allocations are fetched |
 | `ACCEPTED` | `PROCESSING` | Execute |
 | `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
 | `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a split payment, each leg, never the parent |
@@ -271,7 +271,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. A payment that has left `SCHEDU
 
 ### Guarded updates
 
-Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`.
+Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`. For a corporate payment the cancel's guard also requires allocation status `NONE`, and RequestAllocations' requires a payment that isn't `CANCELLED`, so a cancel and the allocation request can't both win.
 
 ### Allocation status (corporate parents)
 
@@ -279,16 +279,17 @@ Every status change is a conditional update on the current status, such as `UPDA
 | --- | --- |
 | `NONE` | No allocations requested yet |
 | `ALLOCATING` | Requested from the allocations manager; batches may be arriving |
-| `ALLOCATED` | The legs received add up to the payment amount |
+| `ALLOCATED` | The batches received add up to the payment amount |
 
 Corporate rules:
 
 - The parent clears once, at payment level, on its due date. It does not wait for allocations.
-- The parent turns `PROCESSED`, by a guarded update, once it has cleared **and** every leg is `PROCESSED` or `PAID`, and its own RTF event and Raven message have gone out.
+- The parent turns `PROCESSED`, by a guarded update, once it has cleared, it is `ALLOCATED`, every batch has its legs, **and** every leg is `PROCESSED` or `PAID`, and its own RTF event and Raven message have gone out.
 - Legs turn `PAID` one by one, through Settle: each once the parent has settled and the leg's own AR posting is in. The parent stays `PROCESSED`; `PAID` is set only on legs.
 - If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
 - A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
-- A declined or cancelled parent cancels its legs.
+- Once its allocations are fetched (allocation status `ALLOCATING` or `ALLOCATED`), a corporate payment can no longer be cancelled or updated: both get 409.
+- Legs are written only once the parent is `ACCEPTED`. Until then each batch waits in `allocation_batch`. A declined parent never has legs: batches that arrived for it stay stored and are never written.
 
 [^ Top](#table-of-contents)
 
@@ -427,7 +428,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | Execute | `ACCEPTED` → `PROCESSING` | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | Allocation status → `ALLOCATING` | Nothing |
-| ReceiveAllocations | Legs written; allocation status → `ALLOCATED` | Nothing |
+| ReceiveAllocations | The batch's legs written, once the parent is `ACCEPTED`; allocation status → `ALLOCATED` when the batches add up | Nothing |
 | Cancel | `SCHEDULED` → `CANCELLED` | Account type, AR posting |
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
 | QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
@@ -484,7 +485,7 @@ Each journey is one workflow built from stages. Pay today and scheduled executio
 A scheduled payment is a row in Oracle from intake to its due date. Temporal sees it only while it is checked and while it executes.
 
 1. **Intake.** `CreateScheduledPaymentWorkflow` runs Capture and Verify, calling services in parallel where they don't depend on each other. One Oracle commit writes `SCHEDULED` and the `SCHED_EXEC` Work Tracker row (due at the market's execution time on the due date). A corporate payment also gets an `ALLOC_REQUEST` row, due at its fetch time. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
-2. **Wait.** Nothing runs in Temporal, for up to 30 days. Cancel and update work until the cancellation window closes.
+2. **Wait.** Nothing runs in Temporal, for up to 30 days. Cancel and update work until the cancellation window closes, or for a corporate payment until its allocations are fetched, whichever comes first.
 3. **Release.** At the market's execution time its dispatcher claims the row, calls the Router with today's config, and starts `ExecuteScheduledPaymentWorkflow` `{paymentId}-execute`.
 4. **Execute.** Reverify (`SCHEDULED` → `ACCEPTED`), Execute (→ `PROCESSING`), Fulfil (→ `PROCESSED`). `PAID` follows once One-Data's inbox has both the settlement and the AR posting, and `ProcessPaidEventsWorkflow` picks the payment up. A split payment turns `PAID` leg by leg instead.
 5. **Close.** The last commit marks the Work Tracker row `DONE`, which frees an in-flight slot.
@@ -501,7 +502,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 - **Execute:** `PROCESSING`. Clearing, AR and OTB run in parallel, varied by account type, AR posting and realtime clearing.
 - **Fulfil:** `PROCESSED`. Accounting, eBNC and risk run in parallel; then the RTF event and the Raven message; then the commit. Comms go last, so the customer hears only once everything else has succeeded.
 - **Consumer split:** the parent's commit writes its split legs, and each runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
-- **Corporate:** Verify's commit also writes the `ALLOC_REQUEST` row and releases the legs; Execute clears at payment level; there is no Fulfil. The parent completes through the leg dispatcher (see [Corporate Allocations](#corporate-allocations)).
+- **Corporate:** Verify's commit also writes the `ALLOC_REQUEST` row and marks the legs released, so each batch's legs are written as it arrives; Execute clears at payment level; there is no Fulfil. The parent completes through the leg dispatcher (see [Corporate Allocations](#corporate-allocations)).
 
 #### 2. CreateScheduledPaymentWorkflow
 
@@ -517,7 +518,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 
 - **Reverify:** `ACCEPTED` or `DECLINED`. Its guard (`SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`) means a cancel and the execution can never both win.
 - **Execute**, then **Fulfil**, as for pay today.
-- **Corporate:** Reverify's commit releases the held legs; Execute clears at payment level; there is no Fulfil.
+- **Corporate:** Reverify's commit marks the legs released, and the leg dispatcher writes the legs of the batches stored so far; Execute clears at payment level; there is no Fulfil.
 - The last commit marks the `SCHED_EXEC` row `DONE` (or `FAILED` when retries run out).
 
 #### 4. ExecuteSplitPaymentWorkflow
@@ -532,21 +533,21 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 
 > `{paymentId}-allocations` · Offline · started by the allocation-request dispatcher at the fetch time
 
-- **RequestAllocations:** asks the allocations manager for the breakdown and sets allocation status `ALLOCATING`, then ends. No workflow waits for the answer.
+- **RequestAllocations:** sets allocation status `ALLOCATING` with a guarded update, then asks the allocations manager for the breakdown and ends. A payment cancelled first gets no request. No workflow waits for the answer.
 
 #### 6. ReceiveAllocationsWorkflow
 
 > `{paymentId}-allocations-{batch}` · Offline · started by the allocations callback API with only the payment ID and batch number
 
-- **ReceiveAllocations:** checks the stored batch, then writes each allocation as a leg `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` Work Tracker row. Rows are `HELD` while the parent is not yet `ACCEPTED`, and `SCHEDULED` once it has been released.
-- Allocation status turns `ALLOCATED` once the legs add up to the payment amount.
+- **ReceiveAllocations:** checks the stored batch. If the parent is already `ACCEPTED` or further on, it writes each allocation as a leg `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` Work Tracker row. If the parent is still `SCHEDULED`, the batch waits in `allocation_batch` and nothing is written; the leg dispatcher writes it once the parent is `ACCEPTED`.
+- Allocation status turns `ALLOCATED` once the batches add up to the payment amount.
 
 #### 7. UpdatePaymentWorkflow
 
 > `{paymentId}-update` · Online · Update-With-Start
 
 - Checks the cancellation window and eligibility with read-only calls.
-- Cancels the old payment with the guarded update; 409 if it is no longer `SCHEDULED`.
+- Cancels the old payment with the guarded update; 409 if it is no longer `SCHEDULED`, or if it is a corporate payment whose allocations have been fetched.
 - Starts the new payment as child `CreateScheduledPaymentWorkflow` `{newId}-init`, with the same confirmation number.
 - Maps the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
 
@@ -556,7 +557,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 
 - Checks the window and eligibility with read-only calls.
 - **Cancel:** one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
-- Zero rows updated: if the payment is already `CANCELLED`, the API returns that result again; otherwise 409.
+- Zero rows updated: if the payment is already `CANCELLED`, the API returns that result again; otherwise 409. A corporate payment whose allocations have been fetched always gets 409.
 
 #### 9. ProcessReturnedPaymentWorkflow
 
@@ -704,8 +705,8 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 `PaymentStore` is the only code that reads or writes Oracle. Each operation is one transaction:
 
 - **Capture:** insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before.
-- **A stage commit:** the guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates, releases or closes.
-- **Writing legs:** split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row.
+- **A stage commit:** the guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes.
+- **Writing legs:** a batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once.
 - **Cancel:** the guarded update to `CANCELLED` and the cancellation of the payment's Work Tracker rows.
 - **Mapping a replacement:** the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
 - **Settle:** a batch of inbox rows, sent as JDBC batches in one transaction. Each row is a guarded update, `PROCESSED` → `PAID` with `stlmt_ts` and `ar_pstd_ts`: on `trans_dtl` for a payment, or on `split_trans_dtl` for a leg (an ID with `_{seq}`). Wherever the update count is 1, a `PAID` row tagged with the batch ID goes into that table's timeline. Then it reads back the payments and legs whose timeline row carries the batch ID. A row is `UNMATCHED` if its payment or leg isn't `PAID` afterwards.
@@ -838,7 +839,7 @@ One narrow Work Tracker table drives all dated work. The **inbox**, where AR int
 | `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_LEG`, `REPRESENT` |
 | `ref_id` | Payment or leg ID in the domain tables |
 | `group_key` | Market, or the parent payment ID for legs |
-| `due_at` | Earliest start: execution time, fetch time, release time or representment date |
+| `due_at` | Earliest start: execution time, fetch time, the time a leg is written, or representment date |
 | `priority` | Claim order inside a type |
 | `status` | See below |
 | `run_id`, `claimed_at` | Which dispatcher run claimed it, and when |
@@ -851,21 +852,20 @@ Workflow IDs are not stored: each is the payment ID plus its suffix.
 | --- | --- | --- | --- |
 | `SCHED_EXEC` | Scheduled payment, corporate parents included | The market's execution time on the due date | Scheduled-payments dispatcher |
 | `ALLOC_REQUEST` | Corporate payment | Its fetch time | Allocation-request dispatcher |
-| `ALLOC_LEG` | Allocation leg | The parent's due date, reset when the leg is released | Leg dispatcher |
+| `ALLOC_LEG` | Allocation leg | When the leg is written, which is never before its parent is `ACCEPTED` | Leg dispatcher |
 | `REPRESENT` | Representment | The date market rules set | Representment dispatcher |
 
 ### Status
 
-`SCHEDULED → DISPATCHING → DISPATCHED → DONE` or `FAILED`, plus `HELD → SCHEDULED` for legs waiting on their parent, and `CANCELLED` from `SCHEDULED` or `HELD`. `HELD` rows stay out of the claim index, so no dispatcher sees them until they are released.
+`SCHEDULED → DISPATCHING → DISPATCHED → DONE` or `FAILED`, and `CANCELLED` from `SCHEDULED`. A leg has no waiting status: it is written only once its parent is `ACCEPTED`, so its row starts `SCHEDULED`.
 
 | Status | Set by |
 | --- | --- |
-| `HELD` | `ReceiveAllocationsWorkflow`, for legs whose parent is not yet `ACCEPTED` |
-| `SCHEDULED` | The producer, in the same commit as the domain row; or the leg dispatcher, when it releases legs |
+| `SCHEDULED` | The producer, in the same commit as the domain row: for a leg, `ReceiveAllocationsWorkflow` or the leg dispatcher's release, whichever writes it |
 | `DISPATCHING` | The dispatcher's claim |
 | `DISPATCHED` | The dispatcher, after a successful start |
 | `DONE` or `FAILED` | The workflow's last commit |
-| `CANCELLED` | `CancelPaymentWorkflow`; or a declined or cancelled parent, for its legs |
+| `CANCELLED` | `CancelPaymentWorkflow`, in the commit that cancels the payment |
 
 ### Inbox: One-Data's Postgres tables
 
@@ -959,11 +959,11 @@ update bpyevnts.billpay_paid_ready
 
 | Table | Change | Why |
 | --- | --- | --- |
-| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at`. On every payment but a split parent: `stlmt_ts` and `ar_pstd_ts`, set by Settle | Allocations never block clearing; legs know when they may run. The two timestamps say when the money settled and when AR posted |
+| `trans_dtl` | On corporate parents: `allocation_status` (`NONE`, `ALLOCATING`, `ALLOCATED`) and `legs_released_at`. On every payment but a split parent: `stlmt_ts` and `ar_pstd_ts`, set by Settle | Allocations never block clearing, and a fetched payment can't be cancelled; legs are written once the parent is released. The two timestamps say when the money settled and when AR posted |
 | `split_trans_dtl` | `stlmt_ts` and `ar_pstd_ts`, set by Settle when the leg turns `PAID` | A split payment turns `PAID` leg by leg |
 | `trans_lfcyc_event` | One row per status per presentment. Two new columns, set on insert: the cluster that ran the step, and `batch_id` on the `PAID` rows Settle writes | Says which cluster's UI holds each step; lets a retried Settle find the payments it moved |
 | `split_trans_lfcyc_event` | The same two columns, set on insert; `batch_id` goes on the `PAID` rows Settle writes for legs | Legs run on both clusters; a retried Settle finds the legs it moved |
-| `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts | Keeps big batches out of workflow inputs |
+| `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts, and when its legs were written | Keeps big batches out of workflow inputs; holds a batch until its parent is `ACCEPTED`, and makes sure its legs are written once |
 | `market_config_version`, `market_config_active` (new) | Published market config: immutable versions, and the active one per market and account type | The Router reads it; only `MarketProvisioningWorkflow` writes it |
 
 Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update on the current status. Their timelines, `trans_lfcyc_event` and `split_trans_lfcyc_event`, are append-only: a step adds a row and never updates one.
@@ -991,7 +991,7 @@ One dispatcher per kind of work releases work into Temporal at the governor's ra
 | --- | --- | --- | --- |
 | Scheduled payments, one per market per day | `SCHED_EXEC` due in that market | Schedule at the market's execution time; drains, sweeps stragglers, then ends | `ExecuteScheduledPaymentWorkflow` |
 | Allocation requests | `ALLOC_REQUEST` at its fetch time | Schedule every minute | `RequestAllocationsWorkflow` |
-| Allocation legs | Released `ALLOC_LEG` rows, fair across parents | Schedule every minute | `ExecuteSplitPaymentWorkflow` |
+| Allocation legs | `ALLOC_LEG` rows, fair across parents | Schedule every minute | `ExecuteSplitPaymentWorkflow` |
 | Representments, one per market | `REPRESENT` rows due | Schedule every few minutes | `ProcessRepresentmentWorkflow` |
 | AR intake | `READY` AR requests in One-Data's inbox, payments and refunds | Schedule every minute | `CreateScheduledPaymentWorkflow`, `CreateBalanceRefundWorkflow` |
 | Returns | `READY` returns in One-Data's inbox | Schedule every minute | `ProcessReturnedPaymentWorkflow` |
@@ -1016,7 +1016,7 @@ Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, 
 
 **Crash safety.** A worker that dies mid-tick trips the heartbeat timeout (10 s), and the retried activity resumes from its last heartbeat. A repeated start fails as already started and counts as done; `REJECT_DUPLICATE` stops a second execution. Rows claimed but never started are caught by the sweep or by the next run.
 
-**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position. Completion: every 60 s it counts legs by status for parents in `PROCESSING`. Once every leg of a parent is `PROCESSED` or `PAID`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`.
+**The leg dispatcher's extra jobs.** Release: once a parent is marked released, it writes the legs of every batch stored for it that has none yet, 1,000 rows at a time, each with a `SCHEDULED` row, heartbeating its position. A batch is written once, whether the release or `ReceiveAllocationsWorkflow` gets to it first. Completion: every 60 s it counts legs by status for parents in `PROCESSING`. Once a parent is `ALLOCATED`, every one of its batches has its legs, and every leg is `PROCESSED` or `PAID`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`.
 
 **Cost and scale.** About 5 Temporal writes per tick: 1M payments at 50 TPS is about 1,000 ticks, so about 5K writes. One activity can issue a few hundred starts a second. Past that, split into lanes, each owning a hash bucket of `ref_id` at rate ÷ lanes.
 
@@ -1121,13 +1121,13 @@ Priority decides who goes first on a shared downstream queue; fairness splits on
 
 The parent and its allocations run on separate tracks. The parent clears at payment level on its due date; legs post as their allocations arrive, in parallel with clearing.
 
-- **Fetch timing** is a market setting: at scheduling, a set lead time before the due date, or on the due date. Pay today requests at once. The intake commit (`SCHEDULED`, or `ACCEPTED` for pay today) adds an `ALLOC_REQUEST` row due at that time.
-- **Request.** The allocation-request dispatcher starts `RequestAllocationsWorkflow`. It asks the allocations manager, sets allocation status `ALLOCATING`, and ends; no workflow waits for the answer.
-- **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`, a placeholder name), once or several times, with batches numbered per payment. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch and writes each allocation as a leg `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` row. Allocation status turns `ALLOCATED` once the legs add up to the payment amount.
-- **Release.** `ALLOC_LEG` rows wait as `HELD` until the parent is `ACCEPTED` on its due date. The commit that makes the parent `ACCEPTED` (Reverify, or Verify for pay today) sets its `legs_released_at`, and the leg dispatcher moves its rows from `HELD` to `SCHEDULED` in 5,000-row chunks. Rows for legs that arrive later are written as `SCHEDULED`. A declined parent cancels its legs.
+- **Fetch timing** is a market setting: at scheduling, a set lead time before the due date, or on the due date. Pay today requests at once. The intake commit (`SCHEDULED`, or `ACCEPTED` for pay today) adds an `ALLOC_REQUEST` row due at that time. Once the allocations are fetched, the payment can no longer be cancelled or updated, so a cancel inside the window works only before the fetch.
+- **Request.** The allocation-request dispatcher starts `RequestAllocationsWorkflow`. It sets allocation status `ALLOCATING` with a guarded update, asks the allocations manager, and ends; no workflow waits for the answer. The guard races a cancel the way Reverify does: one wins, and a payment cancelled first is never asked about.
+- **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`, a placeholder name), once or several times, with batches numbered per payment. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch. If the parent is `ACCEPTED` or further on, it writes each allocation as a leg `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` row; if the parent is still `SCHEDULED`, the batch waits. Allocation status turns `ALLOCATED` once the batches add up to the payment amount.
+- **Release.** No leg exists before its parent is `ACCEPTED`. The commit that makes the parent `ACCEPTED` (Reverify, or Verify for pay today) sets its `legs_released_at`, and the leg dispatcher writes the legs of the batches already stored, 1,000 rows at a time, each with a `SCHEDULED` `ALLOC_LEG` row. Batches that arrive later are written by their own `ReceiveAllocationsWorkflow`. A declined parent never gets legs: its batches stay stored and are never written.
 - **Legs.** Each runs `ExecuteSplitPaymentWorkflow`: AR balance and OTB in parallel, then accounting, eBNC and risk, then RTF and Raven. Clearing never runs per allocation.
 - **Fairness.** Legs run at priority 2 with the parent's ID as fairness key and a per-key limit. At 100 legs a second, a 100K payment takes about 17 minutes without starving other payments.
-- **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared and every leg is `PROCESSED` or `PAID`; the check sends the parent's RTF event and Raven message first. Its legs turn `PAID` one by one through Settle, each once the parent has settled and the leg's AR posting is in; the parent stays `PROCESSED`. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
+- **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared, it is `ALLOCATED`, every batch has its legs, and every leg is `PROCESSED` or `PAID`; the check sends the parent's RTF event and Raven message first. Its legs turn `PAID` one by one through Settle, each once the parent has settled and the leg's AR posting is in; the parent stays `PROCESSED`. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
 - **Late allocations.** The parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
 - **Volume.** Up to 50K parents and 500K allocations a day, and 100K in one payment. One workflow per leg handles that, so there is no chunk mode.
 
@@ -1182,7 +1182,7 @@ A step in billpay-ui. Each setting drives something at runtime.
 | Setting | Used by |
 | --- | --- |
 | Time zone and execution time | The scheduled-payments dispatcher's Schedule |
-| Cancellation window | Cancel and update. It closes before execution starts |
+| Cancellation window | Cancel and update. It closes before execution starts. For a corporate payment, cancel and update also stop once its allocations are fetched |
 | Cutoff, if any | The governor's cutoff floor and alert |
 | Allocation fetch timing and alert point | The `ALLOC_REQUEST` due time, and the late-allocation alert |
 | Representment rules | The representment date |
@@ -1367,7 +1367,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Cancel at the window's edge | The guarded update lets one side win; a late cancel gets 409 | Nothing |
 | Validation fails | `DECLINED`, with notifications | Nothing |
 | Retries run out | Work Tracker row `FAILED`; the payment goes on the exception list in its last state | Review the list |
-| Allocations late | The parent still clears on time; its legs wait; an alert fires at the market's alert point | Chase the allocation source |
+| Allocations late | The parent still clears on time; there are no legs to run until they arrive; an alert fires at the market's alert point | Chase the allocation source |
 | A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
 | A burst of AR intake, returns or inbound | Requests wait in One-Data's inbox; their dispatchers take them at the governor's rate | Nothing |
 | A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires; the sender is not told | Fix the market profile |
@@ -1409,17 +1409,17 @@ Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin 
 | --- | --- | --- |
 | 1 | Pay today, one instruction | Update-With-Start on Online; the reply at Verify, then the announcements; Execute and Fulfil; RTF and Raven last in Fulfil, before `PROCESSED` |
 | 2 | Scheduled payment, created today and executed later | Intake on Online writes `SCHEDULED` and a `SCHED_EXEC` row; on the due date the dispatcher re-routes and starts `ExecuteScheduledPaymentWorkflow` on Offline |
-| 3 | Corporate payment, pay today | The parent clears on its own track; `RequestAllocationsWorkflow`; the callback; legs released at once and started by the leg dispatcher; the completion check |
-| 4 | Corporate payment, scheduled | Allocations fetched at the market's fetch time; legs `HELD` until Reverify makes the parent `ACCEPTED`, then released |
+| 3 | Corporate payment, pay today | The parent clears on its own track; `RequestAllocationsWorkflow`; the callback; each batch's legs written as it arrives, since the parent is already `ACCEPTED`, and started by the leg dispatcher; the completion check |
+| 4 | Corporate payment, scheduled | Allocations fetched at the market's fetch time, after which the payment can't be cancelled; batches wait in `allocation_batch` until Reverify makes the parent `ACCEPTED`; then the leg dispatcher writes their legs, and later batches are written as they arrive |
 | 5 | Update a scheduled payment | The guarded cancel, then child `CreateScheduledPaymentWorkflow` `{newId}-init`; 409 when late |
-| 6 | Cancel a payment | The guarded update; the payment's Work Tracker rows cancelled in the same commit; 409 outside the window |
+| 6 | Cancel a payment | The guarded update; the payment's Work Tracker rows cancelled in the same commit; 409 outside the window, or for a corporate payment once its allocations are fetched |
 | 7 | Return | One-Data stores the return; the returns dispatcher starts the workflow through the Router; Return; QueueRepresentment writes a `REPRESENT` row |
 | 8 | Representment | The representment dispatcher on the date; Represent rechecks, then `REPRESENTED` or `DECLINED` |
 | 9 | Inbound payment | One-Data stores it and replies 202; the inbound dispatcher starts it through the Router; Verify to `ACCEPTED` or `DISALLOWED` |
 | 10 | Paid events | MR/M3 and GAR events recorded in One-Data's inbox, the second one setting the row `READY` (a leg's posting takes its payment's settlement); the Schedule starts `ProcessPaidEventsWorkflow`; fetch up to 500 `READY` rows; Settle in one transaction; the `PAID` events to RTF; the rows marked `DONE` or `UNMATCHED` |
 | 11 | Missing paid events | `ProcessMissingPaidEventsWorkflow` finds payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and sends any event it finds through One-Data's handler |
 | 12 | Pay & Plan | The composite on Online with its children on the same cluster |
-| 13 | Allocations callback | One-Data, `POST /payments/{payment-id}/allocations`, the batch stored in `allocation_batch`, async start, 202; `ReceiveAllocationsWorkflow` writes legs and `ALLOC_LEG` rows |
+| 13 | Allocations callback | One-Data, `POST /payments/{payment-id}/allocations`, the batch stored in `allocation_batch`, async start, 202; `ReceiveAllocationsWorkflow` writes legs and `ALLOC_LEG` rows if the parent is `ACCEPTED`, and otherwise leaves the batch waiting |
 
 ### Payment states
 
@@ -1457,7 +1457,7 @@ Corporate parents use the same states, but a corporate parent reaches `PROCESSED
 stateDiagram-v2
     [*] --> NONE: Corporate payment captured
     NONE --> ALLOCATING: RequestAllocations
-    ALLOCATING --> ALLOCATED: ReceiveAllocations, legs add up to the amount
+    ALLOCATING --> ALLOCATED: ReceiveAllocations, batches add up to the amount
     ALLOCATED --> [*]
 ```
 
@@ -1476,9 +1476,9 @@ These inputs are assumed for now. The first changes the numbers most.
 | AR intake time of day | Business hours, outside the midnight windows | Overlap with execution changes the budget split |
 | US execution time zone | Midnight ET for all 1M | Per-customer time zones would spread the load |
 | AT and other SEPA volumes | Below DE and IT, same window | Adds to the 3-hour cutoff |
-| Allocation callback contract | `POST /payments/{payment-id}/allocations`, batches numbered per payment; complete when the legs add up to the payment amount | Idempotency and the completeness check |
+| Allocation callback contract | `POST /payments/{payment-id}/allocations`, batches numbered per payment; complete when the batches add up to the payment amount | Idempotency and the completeness check |
 | Allocation callback function name | `CreatePaymentAllocations.v1`, a placeholder | The One-Data contract |
-| Allocations changing after they arrive | They don't | If they can, legs need replacing before release |
+| Allocations changing after they arrive | They don't | If they can, a batch needs replacing before its legs are written |
 | Cancellation window per market | A market setting that closes before the execution time | The dispatcher must never start inside it |
 | Representable Return behavior | Set in billpay-ui; not yet a behavior in this spec | Decides whether QueueRepresentment varies by it |
 | Holiday calendars | Execution runs every day | A market that skips holidays needs a calendar in its dispatcher |

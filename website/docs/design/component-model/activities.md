@@ -100,7 +100,7 @@ Activities take IDs, not payment objects, and load what they need. RTF lifecycle
 
 <ActivityTable rows={ACTIVITIES} />
 
-A corporate payment is never declined because its allocations are slow. The parent clears on its due date anyway, its legs wait, and an alert fires at the market's alert point if they are still missing.
+A corporate payment is never declined because its allocations are slow. The parent clears on its due date anyway, there are no legs to run until the allocations arrive, and an alert fires at the market's alert point if they are still missing.
 
 ## PaymentStore, the only way into Oracle
 
@@ -109,8 +109,8 @@ A corporate payment is never declined because its allocations are slow. The pare
 | Operation | What it writes |
 | --- | --- |
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before |
-| A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates, releases or closes |
-| Writing legs | Split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row |
+| A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes |
+| Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once |
 | Cancel | The guarded update to `CANCELLED`, and the cancellation of the payment's Work Tracker rows |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of inbox rows as JDBC batches in one transaction: a guarded update from `PROCESSED` to `PAID` on `trans_dtl` for a payment or on `split_trans_dtl` for a leg, and a `PAID` timeline row tagged with the batch ID wherever the update changed a row. Then a read-back by batch ID |

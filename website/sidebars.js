@@ -42,7 +42,7 @@ const sidebars = {
         'design/domain-model',
         'design/journeys/index',
         'design/routing',
-        'design/function-to-activity',
+        'design/complete-picture',
         {
           type: 'category',
           label: 'Component Model',

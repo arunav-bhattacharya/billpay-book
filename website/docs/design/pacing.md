@@ -35,7 +35,7 @@ One narrow table in Oracle, `work_tracker`, holds every piece of dated work. A r
 | --- | --- | --- | --- |
 | `SCHED_EXEC` | Scheduled payment, corporate parents included | The market's execution time on the due date | Scheduled-payments dispatcher |
 | `ALLOC_REQUEST` | Corporate payment | Its fetch time | Allocation-request dispatcher |
-| `ALLOC_LEG` | Allocation leg | The parent's due date, reset when the leg is released | Leg dispatcher |
+| `ALLOC_LEG` | Allocation leg | When the leg is written, never before its parent is `ACCEPTED` | Leg dispatcher |
 | `REPRESENT` | Representment | The date the market's rules set | Representment dispatcher |
 
 A row moves through a short lifecycle:
@@ -43,27 +43,23 @@ A row moves through a short lifecycle:
 ```mermaid
 stateDiagram-v2
   direction LR
-  [*] --> HELD: a leg whose parent isn't ACCEPTED yet
   [*] --> SCHEDULED: written by the producer
-  HELD --> SCHEDULED: released
   SCHEDULED --> DISPATCHING: claimed
   DISPATCHING --> DISPATCHED: workflow started
   DISPATCHED --> DONE: last commit
   DISPATCHED --> FAILED: retries ran out
-  SCHEDULED --> CANCELLED
-  HELD --> CANCELLED
+  SCHEDULED --> CANCELLED: the payment is cancelled
 ```
 
 | Status | Set by |
 | --- | --- |
-| `HELD` | `ReceiveAllocationsWorkflow`, for legs whose parent is not yet `ACCEPTED` |
-| `SCHEDULED` | The producer, in the same commit as the domain row; or the leg dispatcher, when it releases legs |
+| `SCHEDULED` | The producer, in the same commit as the domain row. For a leg, that is `ReceiveAllocationsWorkflow` or the leg dispatcher's release, whichever writes it |
 | `DISPATCHING` | The dispatcher's claim |
 | `DISPATCHED` | The dispatcher, after a successful start |
 | `DONE` or `FAILED` | The workflow's last commit |
-| `CANCELLED` | `CancelPaymentWorkflow`; or a declined or cancelled parent, for its legs |
+| `CANCELLED` | `CancelPaymentWorkflow`, in the commit that cancels the payment |
 
-Workflow IDs aren't stored: each one is the payment ID plus its suffix. `HELD` rows stay out of the claim index, so no dispatcher sees them until they are released, and daily partitions are dropped 15 days after they fall due, so finished rows never pile up.
+Workflow IDs aren't stored: each one is the payment ID plus its suffix. No row waits on another: a leg is written only once its parent is `ACCEPTED`, so its row starts `SCHEDULED`. Daily partitions are dropped 15 days after they fall due, so finished rows never pile up.
 
 ## Dispatchers
 
@@ -73,7 +69,7 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 | --- | --- | --- | --- |
 | Scheduled payments, one per market per day | `SCHED_EXEC` rows due in that market | A Schedule at the market's execution time; drains, sweeps stragglers, then ends | `ExecuteScheduledPaymentWorkflow` |
 | Allocation requests | `ALLOC_REQUEST` rows at their fetch time | A Schedule every minute | `RequestAllocationsWorkflow` |
-| Allocation legs | Released `ALLOC_LEG` rows, fair across parents | A Schedule every minute | `ExecuteSplitPaymentWorkflow` |
+| Allocation legs | `ALLOC_LEG` rows, fair across parents | A Schedule every minute | `ExecuteSplitPaymentWorkflow` |
 | Representments, one per market | `REPRESENT` rows due | A Schedule every few minutes | `ProcessRepresentmentWorkflow` |
 | AR intake | `READY` AR requests in One-Data's inbox, payments and refunds | A Schedule every minute | `CreateScheduledPaymentWorkflow`, `CreateBalanceRefundWorkflow` |
 | Returns | `READY` returns in One-Data's inbox | A Schedule every minute | `ProcessReturnedPaymentWorkflow` |
@@ -112,8 +108,8 @@ A worker that dies mid-tick trips the 10-second heartbeat timeout, and the retri
 
 ### The leg dispatcher's two extra jobs
 
-- Release. Once a parent payment is marked released, the leg dispatcher moves that parent's `HELD` legs to `SCHEDULED` in 5,000-row chunks, heartbeating its position as it goes.
-- Completion. Every 60 seconds it counts legs by status for parents in `PROCESSING`. Once every leg of a parent is `PROCESSED` or `PAID`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`.
+- Release. Once a parent payment is marked released, the leg dispatcher writes the legs of every batch that arrived for it before then, 1,000 rows at a time, heartbeating its position as it goes. A batch is written once, whether the release or its own `ReceiveAllocationsWorkflow` gets to it first.
+- Completion. Every 60 seconds it counts legs by status for parents in `PROCESSING`. Once a parent is `ALLOCATED`, every batch has its legs, and every leg is `PROCESSED` or `PAID`, it sends the parent's RTF event and Raven message, then moves the parent to `PROCESSED`.
 
 ### What it costs
 

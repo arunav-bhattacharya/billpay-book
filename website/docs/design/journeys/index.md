@@ -385,7 +385,7 @@ Nothing is edited in place. Billpay cancels the original and raises a new paymen
   ]}
   detail={[
     {step: 1, text: 'Read-only calls check the market\'s cancellation window and whether the payment can still change. Outside the window the answer is 409.'},
-    {step: 2, text: 'The original is cancelled with a guarded update, the same one [Cancel a payment](#cancel-a-payment) uses. If the payment has already left `SCHEDULED`, no row changes and the answer is 409.'},
+    {step: 2, text: 'The original is cancelled with a guarded update, the same one [Cancel a payment](#cancel-a-payment) uses. If the payment has already left `SCHEDULED`, or it is a corporate payment whose allocations have been fetched, no row changes and the answer is 409.'},
     {step: 3, text: 'The new payment starts as a child, `CreateScheduledPaymentWorkflow` with the ID `{newId}-init`. It gets a new payment ID but keeps the confirmation number, so the customer sees one payment rather than two. Its result is the caller\'s answer.'},
     {step: 4, text: 'The old and new payment IDs are mapped in `ORIG_TRANS_REFER_MAP`, so anyone can follow the chain later.'},
   ]}
@@ -394,7 +394,7 @@ Nothing is edited in place. Billpay cancels the original and raises a new paymen
 
 ### Cancel a payment
 
-A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled.
+A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled. A corporate payment closes sooner: once its allocations are fetched, a cancel gets 409.
 
 <JourneyMap
   kind="customer"
@@ -431,6 +431,7 @@ A payment can be pulled back while it is `SCHEDULED`, inside the market's cancel
     {step: 1, text: 'Read-only calls check the cancellation window, which always closes before execution starts, and whether the payment is still eligible.'},
     {step: 2, text: 'One guarded update moves the payment to `CANCELLED`, and the same commit cancels its Work Tracker rows, so no dispatcher will ever pick it up. The `CANCELLED` event and message go out after the reply.'},
     {text: 'If the update changes nothing, the payment has moved on. When it is already `CANCELLED`, the caller gets that answer again, so cancelling twice is harmless. Otherwise the answer is 409.'},
+    {text: 'For a corporate payment the guard also requires allocation status `NONE`. Once its allocations are fetched the update changes nothing and the answer is 409, the same as outside the window.'},
     {text: 'There is no path from `ACCEPTED` to `CANCELLED`, so the window is the only chance to pull a payment back.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#6-cancel-a-payment', label: 'Sequence diagram'}}
@@ -622,12 +623,12 @@ The customer gets the same quick answer a consumer does. Behind it, the payment 
     },
   ]}
   detail={[
-    {step: 2, text: 'The payment is checked as one amount. Verify\'s commit also writes the `ALLOC_REQUEST` row and releases the legs, because a pay-today payment asks for its allocations at once.'},
+    {step: 2, text: 'The payment is checked as one amount. Verify\'s commit also writes the `ALLOC_REQUEST` row and marks the legs released, because a pay-today payment asks for its allocations at once and is already accepted.'},
     {step: 3, text: 'The parent clears once, at payment level. Clearing never runs per allocation.'},
-    {step: 4, text: 'The allocation-request dispatcher starts `RequestAllocationsWorkflow` on the Offline cluster. It asks the allocations manager for the breakdown, sets the allocation status to `ALLOCATING`, and ends. No workflow sits waiting for the answer: the allocations manager calls back with the batches, as [Allocations arrive by callback](#allocations-arrive-by-callback) shows.'},
-    {step: 5, text: 'Each allocation becomes a leg, `{paymentId}_{seq}`, written as `ACCEPTED` with a Work Tracker row of its own. Once the legs add up to the payment amount, the allocation status turns `ALLOCATED`.'},
+    {step: 4, text: 'The allocation-request dispatcher starts `RequestAllocationsWorkflow` on the Offline cluster. It sets the allocation status to `ALLOCATING`, asks the allocations manager for the breakdown, and ends. No workflow sits waiting for the answer: the allocations manager calls back with the batches, as [Allocations arrive by callback](#allocations-arrive-by-callback) shows.'},
+    {step: 5, text: 'Each allocation becomes a leg, `{paymentId}_{seq}`, written as `ACCEPTED` with a Work Tracker row of its own as soon as its batch arrives, because the parent is already accepted. Once the batches add up to the payment amount, the allocation status turns `ALLOCATED`.'},
     {step: 6, text: 'The leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg: the statement balance and available credit for that account, then accounting, eBNC and risk, then the leg\'s RTF event and Raven message. Legs run at priority 2 with the parent\'s ID as their fairness key, so one big payment can\'t starve the others.'},
-    {step: 7, text: 'Every 60 seconds the leg dispatcher counts each parent\'s legs. Once the parent has cleared and every leg is `PROCESSED` or `PAID`, it sends the parent\'s RTF event and Raven message, then moves the parent to `PROCESSED`.'},
+    {step: 7, text: 'Every 60 seconds the leg dispatcher counts each parent\'s legs. Once the parent has cleared, it is `ALLOCATED` and every leg is `PROCESSED` or `PAID`, it sends the parent\'s RTF event and Raven message, then moves the parent to `PROCESSED`.'},
     {text: 'From there each leg turns `PAID` on its own, once the parent has settled and that leg has posted. The parent stays `PROCESSED`.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#3-corporate-payment-pay-today', label: 'Sequence diagram'}}
@@ -635,7 +636,7 @@ The customer gets the same quick answer a consumer does. Behind it, the payment 
 
 ### Schedule a corporate payment
 
-The same two tracks, with the allocations usually arriving while the payment waits for its date. The legs are written early and held until the parent is accepted on the day.
+The same two tracks, with the allocations usually arriving while the payment waits for its date. Batches that come early wait as they arrived, and their legs are written once the parent is accepted on the day.
 
 <JourneyMap
   kind="customer"
@@ -680,15 +681,15 @@ The same two tracks, with the allocations usually arriving while the payment wai
       name: 'Wait',
       state: 'SCHEDULED',
       mode: 'awaiting',
-      caption: 'legs held until the day',
-      exit: {state: 'CANCELLED', label: 'inside the window, legs too'},
+      caption: 'batches wait for the day',
+      exit: {state: 'CANCELLED', label: 'inside the window, until the fetch'},
     },
     {
       icon: 'recheck',
       name: 'Reverify',
       state: 'ACCEPTED',
       mode: 'background',
-      caption: 'releases the held legs',
+      caption: 'then the legs are written',
       exit: {state: 'DECLINED'},
     },
     {
@@ -711,18 +712,18 @@ The same two tracks, with the allocations usually arriving while the payment wai
   detail={[
     {text: 'The shape is [Pay on a future date](#pay-on-a-future-date), with the allocation track running beside it.'},
     {step: 2, text: '`SCHEDULED`, as for a consumer payment. The same commit writes two Work Tracker rows: `SCHED_EXEC` for the due date, and `ALLOC_REQUEST` for the fetch time.'},
-    {step: 3, text: 'The fetch time is a market setting: at scheduling, a set lead time before the due date, or on the due date. Legs written before the parent is `ACCEPTED` get Work Tracker rows marked `HELD`, which no dispatcher can see.'},
-    {step: 4, text: 'The customer can still update or cancel inside the window. A declined or cancelled parent cancels its legs.'},
-    {step: 5, text: 'On the due date the scheduled-payments dispatcher starts `ExecuteScheduledPaymentWorkflow`. The commit that makes the parent `ACCEPTED` sets its `legs_released_at`, and the leg dispatcher moves its legs from `HELD` to `SCHEDULED`, 5,000 at a time. Legs that arrive later are written straight as `SCHEDULED`.'},
+    {step: 3, text: 'The fetch time is a market setting: at scheduling, a set lead time before the due date, or on the due date. A batch that arrives before the parent is `ACCEPTED` waits in `allocation_batch`, and no legs are written yet.'},
+    {step: 4, text: 'The customer can update or cancel inside the window only until the allocations are fetched. After the fetch both get 409, so a payment fetched at scheduling can\'t be withdrawn at all.'},
+    {step: 5, text: 'On the due date the scheduled-payments dispatcher starts `ExecuteScheduledPaymentWorkflow`. The commit that makes the parent `ACCEPTED` sets its `legs_released_at`, and the leg dispatcher writes the legs of the waiting batches, 1,000 at a time. Batches that arrive later are written as they come. If Reverify declines the parent, no leg is ever written.'},
     {step: 6, text: 'The parent clears on its due date whether or not every allocation has arrived.'},
-    {step: 7, text: 'Legs run as in [Pay a corporate bill today](#pay-a-corporate-bill-today), and the completion check moves the parent to `PROCESSED` once every leg is done. If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market\'s alert point.'},
+    {step: 7, text: 'Legs run as in [Pay a corporate bill today](#pay-a-corporate-bill-today), and the completion check moves the parent to `PROCESSED` once it is `ALLOCATED` and every leg is done. If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market\'s alert point.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#4-corporate-payment-scheduled', label: 'Sequence diagram'}}
 />
 
 ### Allocations arrive by callback
 
-The breakdown itself. Billpay asks for it and then stops: no workflow waits for the answer. The allocations manager calls back, once or several times, and each batch it sends becomes legs.
+The breakdown itself. Billpay asks for it and then stops: no workflow waits for the answer. The allocations manager calls back, once or several times, and each batch it sends becomes legs once the parent is accepted.
 
 <JourneyMap
   kind="system"
@@ -763,13 +764,13 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
       state: 'ACCEPTED',
       table: 'split_trans_dtl',
       mode: 'background',
-      caption: 'in 1,000-row inserts',
+      caption: 'once the parent is accepted',
     },
     {
       icon: 'doubleCheck',
       name: 'Allocated',
       mode: 'background',
-      caption: 'once the legs add up',
+      caption: 'once the batches add up',
     },
     {
       icon: 'broadcast',
@@ -782,9 +783,9 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
     {text: 'Billpay doesn\'t work the breakdown out for itself. The allocations manager owns the breakdown, and it sends it back in numbered batches.'},
     {step: 1, text: 'The API stores the batch in `allocation_batch` first. A batch can hold thousands of allocations, and keeping them out of the workflow\'s input keeps its history small.'},
     {step: 2, text: 'Then it starts `ReceiveAllocationsWorkflow` with only the payment ID and the batch number, and replies 202. Over its traffic budget the callback gets 429 with `Retry-After`, and while the Offline cluster is down, 503. The allocations manager retries both.'},
-    {step: 3, text: 'The workflow checks the batch and writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`. Each leg gets an `ALLOC_LEG` Work Tracker row: `HELD` while the parent isn\'t yet `ACCEPTED`, and `SCHEDULED` once it has been released.'},
-    {step: 4, text: 'Once the legs add up to the payment amount, the allocation status turns `ALLOCATED`.'},
-    {step: 5, text: 'The leg dispatcher runs every minute and starts released legs fairly across parents, so a payment with 100K allocations takes its turn with everyone else. At 100 legs a second, it finishes in about 17 minutes.'},
+    {step: 3, text: 'The workflow checks the batch. If the parent is already accepted, it writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`, in 1,000-row inserts, each with a `SCHEDULED` `ALLOC_LEG` Work Tracker row. If the parent is still `SCHEDULED`, the batch waits, and the leg dispatcher writes it once the parent is accepted.'},
+    {step: 4, text: 'Once the batches add up to the payment amount, the allocation status turns `ALLOCATED`.'},
+    {step: 5, text: 'The leg dispatcher runs every minute and starts the legs fairly across parents, so a payment with 100K allocations takes its turn with everyone else. At 100 legs a second, it finishes in about 17 minutes.'},
     {text: '`CreatePaymentAllocations.v1` is a placeholder name until the real function name is known.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#13-allocations-callback', label: 'Sequence diagram'}}

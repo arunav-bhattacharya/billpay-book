@@ -16,7 +16,7 @@ Stages are the only layer that changes between markets. Verify in a market that 
 Every stage follows the same three beats.
 
 1. It calls its activities, in parallel where the calls don't depend on each other.
-2. It commits in one guarded `PaymentStore` transaction: the new state, a timeline entry that names the cluster, and any Work Tracker rows the step creates, releases or closes.
+2. It commits in one guarded `PaymentStore` transaction: the new state, a timeline entry that names the cluster, and any Work Tracker rows the step creates or closes.
 3. After the commit, the workflow calls the stage's announcement: an RTF lifecycle event for every state change, plus a Raven message where the customer is told. The workflow waits for it before the next stage, so each payment's events reach RTF in order.
 
 Two stages bend that order, for good reasons:
@@ -36,7 +36,7 @@ The changes that send a Raven message are assumed, for now, to be `SCHEDULED`, `
 | Execute | `ACCEPTED` → `PROCESSING` | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | Allocation status → `ALLOCATING` | Nothing |
-| ReceiveAllocations | Legs written; allocation status → `ALLOCATED` | Nothing |
+| ReceiveAllocations | The batch's legs written, once the parent is `ACCEPTED`; allocation status → `ALLOCATED` when the batches add up | Nothing |
 | Cancel | `SCHEDULED` → `CANCELLED` | Account type, AR posting |
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
 | QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
@@ -74,14 +74,14 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 
 - A business failure, such as a closed account or insufficient funds, is not retried. The payment goes to `DECLINED`.
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row, plus an `ALLOC_REQUEST` row for a corporate payment.
-- A corporate pay-today payment commits `ACCEPTED` together with its `ALLOC_REQUEST` row, and sets `legs_released_at` so its legs can run as soon as they arrive.
+- A corporate pay-today payment commits `ACCEPTED` together with its `ALLOC_REQUEST` row, and sets `legs_released_at` so each batch's legs are written as soon as it arrives.
 - An inbound payment Amex won't take commits `DISALLOWED`.
 
 Verify varies by all four behaviors. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
 
 ## Reverify
 
-Checks a scheduled payment again on its due date, with the same calls as Verify, and commits `ACCEPTED` or `DECLINED`. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. For a corporate parent, the `ACCEPTED` commit sets `legs_released_at`, which tells the leg dispatcher to release the held legs.
+Checks a scheduled payment again on its due date, with the same calls as Verify, and commits `ACCEPTED` or `DECLINED`. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. For a corporate parent, the `ACCEPTED` commit sets `legs_released_at`, which tells the leg dispatcher to write the legs of the batches that arrived while the payment waited.
 
 ## Execute
 
@@ -97,15 +97,15 @@ Tells everyone who needs to know, then commits `PROCESSED`. Accounting, eBNC and
 
 ## RequestAllocations
 
-Asks the allocations manager for a corporate payment's breakdown and sets the allocation status to `ALLOCATING`. Nothing waits for the answer; the allocations manager calls back.
+Sets a corporate payment's allocation status to `ALLOCATING` with a guarded update, then asks the allocations manager for the breakdown. Nothing waits for the answer; the allocations manager calls back. The guard needs a payment that isn't `CANCELLED`, and from this commit on a cancel or an update gets 409, so the fetch and a cancel never both win.
 
 ## ReceiveAllocations
 
-Checks one stored callback batch, then writes each allocation as a leg in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` Work Tracker row. The rows are `HELD` while the parent is not yet `ACCEPTED`, and `SCHEDULED` once it has been released. The allocation status turns `ALLOCATED` once the legs add up to the payment amount.
+Checks one stored callback batch. If the parent is `ACCEPTED`, or further on, it writes each allocation as a leg in `ACCEPTED`, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` Work Tracker row. If the parent is still `SCHEDULED`, the batch waits, and the leg dispatcher writes its legs once the parent is accepted. Either way a batch is written once. The allocation status turns `ALLOCATED` once the batches add up to the payment amount.
 
 ## Cancel
 
-Moves a `SCHEDULED` payment to `CANCELLED` with one guarded update, inside the market's cancellation window only. The same commit cancels the payment's Work Tracker rows, so no dispatcher will ever start it. If the update changes nothing, the payment has already moved on.
+Moves a `SCHEDULED` payment to `CANCELLED` with one guarded update, inside the market's cancellation window only, and for a corporate payment only while its allocation status is `NONE`. The same commit cancels the payment's Work Tracker rows, so no dispatcher will ever start it. If the update changes nothing, the payment has already moved on, or its allocations have been fetched.
 
 ## Return
 

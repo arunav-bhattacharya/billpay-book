@@ -28,7 +28,25 @@ import styles from './styles.module.css';
 const STAGES = ['Capture', 'Verify', 'Reverify', 'Execute', 'Fulfil'];
 
 /* how far the sheet spans, in em: the sum of the column widths in the CSS */
-const SPAN_EM = 89.5;
+const SPAN_EM = 91.5;
+
+/* Small monoline glyphs on a 24-unit grid, in the JourneyMap style, marking
+   what kind of door a request comes through: a core API endpoint, a
+   dispatcher the governor paces, or rows waiting in One-Data's inbox. */
+const GLYPHS = {
+  api: {
+    label: 'billpay-core API endpoint',
+    d: ['M9 3.8v3.8', 'M15 3.8v3.8', 'M6.6 7.6h10.8v3a5.4 5.4 0 0 1-10.8 0z', 'M12 16v4.2'],
+  },
+  dispatcher: {
+    label: 'Dispatcher, paced by the governor',
+    d: ['M3.6 6.6h8', 'M3.6 12h8', 'M3.6 17.4h8', 'M14.4 12h6', 'M17.8 9.4l2.6 2.6-2.6 2.6'],
+  },
+  inbox: {
+    label: "Rows in One-Data's inbox",
+    d: ['M3.6 13.2V6.4a2 2 0 0 1 2-2h12.8a2 2 0 0 1 2 2v6.8', 'M3.6 13.2h4.2l1.4 2.4h5.6l1.4-2.4h4.2v4.4a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2z'],
+  },
+};
 
 /* `|` marks where a long name may break onto a second line */
 const BANDS = [
@@ -287,7 +305,7 @@ function summary(j) {
 }
 
 const LABEL =
-  'Function to activity. Every road through Billpay, one row per journey, read left to right: the One-Data function a sender calls, the billpay-core API or dispatcher it reaches, the Router, the workflow the Router picks on the Online or Offline cluster, and the stages that workflow runs. Rows are grouped by how work arrives: a caller waits, stored by One-Data then pulled, the allocations callback, work that falls due from a Work Tracker row, and the PAID drain, which a Schedule starts without the Router. Below, one row per activity interface shows which stages call which system. Pick a journey to light the calls it makes.';
+  'The complete picture. Every road through Billpay, one row per journey, read left to right: the One-Data function a sender calls, the billpay-core API or dispatcher it reaches, the Router, the workflow the Router picks on the Online or Offline cluster, and the stages that workflow runs. Rows are grouped by how work arrives: a caller waits, stored by One-Data then pulled, the allocations callback, work that falls due from a Work Tracker row, and the PAID drain, which a Schedule starts without the Router. Below, one row per activity interface shows which stages call which system. Pick a journey to light the calls it makes.';
 
 /* ---------------------------------------------------------------- parts -- */
 
@@ -307,6 +325,19 @@ function Badge({n}) {
     <b className={styles.badge} aria-hidden="true">
       {n}
     </b>
+  );
+}
+
+/* the glyph sits in a small tinted square, the site's one shape */
+function Glyph({kind, className}) {
+  return (
+    <span className={clsx(styles.glyphBox, className)} aria-hidden="true">
+      <svg viewBox="0 0 24 24" className={styles.glyph}>
+        {GLYPHS[kind].d.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </svg>
+    </span>
   );
 }
 
@@ -361,11 +392,15 @@ function Band({band, pick, onPick}) {
         style={{gridRow: rows}}>
         {q.api ? (
           <>
+            <Glyph kind="api" className={styles.glyphApi} />
             <span className={styles.method}>{q.api[0]}</span>
             <span className={styles.path}>{q.api[1]}</span>
           </>
         ) : (
-          <span className={styles.by}>{q.by}</span>
+          <>
+            <Glyph kind={band.drain ? 'inbox' : 'dispatcher'} className={band.drain ? styles.glyphInbox : styles.glyphDispatch} />
+            <span className={styles.by}>{q.by}</span>
+          </>
         )}
         <i className={clsx(styles.wire, band.drain && styles.wireDrain)} aria-hidden="true">
           {band.drain && <span className={styles.wireLabel}>not routed</span>}
@@ -447,7 +482,7 @@ export default function RouteLedger() {
       className={clsx(styles.wrap, expanded && styles.expanded)}
       role={expanded ? 'dialog' : undefined}
       aria-modal={expanded ? true : undefined}
-      aria-label={expanded ? 'Function to activity, full screen' : undefined}>
+      aria-label={expanded ? 'The complete picture, full screen' : undefined}>
       <div className={styles.bar}>
         <p className={styles.hint}>Click a journey to light the calls it makes. Click it again to clear.</p>
         <button
@@ -582,6 +617,18 @@ export default function RouteLedger() {
       </p>
 
       <div className={styles.legend}>
+        <span className={styles.li}>
+          <Glyph kind="api" className={clsx(styles.swGlyph, styles.glyphApi)} />
+          Core API endpoint
+        </span>
+        <span className={styles.li}>
+          <Glyph kind="dispatcher" className={clsx(styles.swGlyph, styles.glyphDispatch)} />
+          Dispatcher, paced by the governor
+        </span>
+        <span className={styles.li}>
+          <Glyph kind="inbox" className={clsx(styles.swGlyph, styles.glyphInbox)} />
+          Rows in One-Data&apos;s inbox
+        </span>
         <span className={styles.li}>
           <i className={clsx(styles.swSq, styles.swOnline)} />
           Online cluster

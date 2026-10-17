@@ -939,6 +939,48 @@ details.alert > summary {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+/* ---- toggle tabs ------------------------------------------------------- */
+/* A Tabs group drawn as a toggle: the options sit on one tinted rail and the
+   chosen one is filled Bright Blue, like an action. For tabs that switch one
+   picture, such as the Consumer and Corporate state diagrams. Pass
+   className="toggle-tabs" to Tabs, which puts it on the tab list. */
+.tabs.toggle-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-bottom: 0.4rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--amex-rail);
+}
+
+.tabs.toggle-tabs .tabs__item {
+  padding: 0.32rem 1.05rem;
+  border: none;
+  border-radius: 999px;
+  color: var(--amex-txt);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.4;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.tabs.toggle-tabs .tabs__item:hover {
+  background: var(--amex-row-hover);
+}
+
+.tabs.toggle-tabs .tabs__item--active,
+.tabs.toggle-tabs .tabs__item--active:hover {
+  background: var(--amex-blue);
+  color: var(--amex-banner-block-ink);
+}
+
+.tabs.toggle-tabs .tabs__item:focus-visible {
+  outline: 2px solid var(--amex-blue);
+  outline-offset: 2px;
+}
+
 /* Give the collapsed rail enough room for the button to sit in. */
 @media (min-width: 997px) {
   :root {

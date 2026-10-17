@@ -18,8 +18,9 @@ A corporate payment is paid once, as one amount, and the allocations manager kno
 ## The parent's track
 
 - The intake commit, `SCHEDULED` (or `ACCEPTED` for a pay-today payment), also writes an `ALLOC_REQUEST` Work Tracker row, due at the market's fetch time.
+- Until that fetch, a scheduled corporate payment can be cancelled or updated inside the window like any other. Once its allocations are fetched, both get 409.
 - On the due date the parent is accepted and clears once, at payment level. It doesn't wait for its allocations.
-- A corporate parent has no Fulfil. The leg dispatcher's completion check moves it to `PROCESSED` once it has cleared and every leg is `PROCESSED` or `PAID`, after sending the parent's RTF event and Raven message.
+- A corporate parent has no Fulfil. The leg dispatcher's completion check moves it to `PROCESSED` once it has cleared, it is `ALLOCATED`, every batch has its legs, and every leg is `PROCESSED` or `PAID`, after sending the parent's RTF event and Raven message.
 - The parent stays `PROCESSED` from then on. `PAID` is set on its legs, never on the parent.
 
 Progress on the breakdown is tracked in a field of its own on the parent, the allocation status, rather than in the payment's state:
@@ -28,13 +29,15 @@ Progress on the breakdown is tracked in a field of its own on the parent, the al
 | --- | --- |
 | `NONE` | No allocations requested yet |
 | `ALLOCATING` | Requested from the allocations manager; batches may be arriving |
-| `ALLOCATED` | The legs received add up to the payment amount |
+| `ALLOCATED` | The batches received add up to the payment amount |
 
 ## Asking for the allocations
 
 When to ask is a market setting, the fetch timing: at scheduling, a set lead time before the due date, or on the due date itself. A pay-today payment asks at once.
 
-At the fetch time the allocation-request dispatcher starts `RequestAllocationsWorkflow`. It asks the allocations manager for the breakdown, sets the allocation status to `ALLOCATING` and ends. No workflow sits waiting for the answer, which matters at 50,000 corporate payments a day.
+At the fetch time the allocation-request dispatcher starts `RequestAllocationsWorkflow`. It sets the allocation status to `ALLOCATING`, asks the allocations manager for the breakdown, and ends. No workflow sits waiting for the answer, which matters at 50,000 corporate payments a day.
+
+The fetch is also the point of no return for the customer. From then on a cancel or an update gets 409, so a corporate payment fetched at scheduling can't be withdrawn at all, while one fetched on its due date stays open until the window closes. A cancel and the request can't both win: the cancel's guarded update requires allocation status `NONE`, and the request's requires a payment that isn't `CANCELLED`. It is the same race a cancel and Reverify run on the due date, settled the same way in Oracle.
 
 ## Receiving them
 
@@ -42,16 +45,18 @@ The allocations manager calls back through One-Data, once or several times, with
 
 1. The API stores the batch in `allocation_batch`, so a big batch never travels inside a workflow's input.
 2. It starts `ReceiveAllocationsWorkflow` with only the payment ID and the batch number, and replies 202. A callback over its traffic budget gets 429 with `Retry-After`, and one that arrives while the Offline cluster is down gets 503. The allocations manager retries both.
-3. The workflow checks the batch and writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`, in 1,000-row array inserts, each leg with its own `ALLOC_LEG` Work Tracker row.
-4. Once the legs add up to the payment amount, the allocation status turns `ALLOCATED`.
+3. The workflow checks the batch. If the parent is already `ACCEPTED`, or further on, it writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`, in 1,000-row array inserts, each leg with its own `ALLOC_LEG` Work Tracker row. If the parent is still `SCHEDULED`, the batch waits in `allocation_batch` and nothing is written yet.
+4. Once the batches add up to the payment amount, the allocation status turns `ALLOCATED`, whether their legs are written yet or not.
 
-Two assumptions sit under this, and both are open: the callback contract (batches numbered per payment, complete when the legs add up to the amount), and that allocations don't change once they have arrived. If they could change, legs would need replacing before they are released.
+Two assumptions sit under this, and both are open: the callback contract (batches numbered per payment, complete when they add up to the amount), and that allocations don't change once they have arrived. If they could change, a batch would need replacing before its legs are written.
 
-## Releasing the legs
+## Writing the legs
 
-A leg can't run before its parent has been accepted, so a leg written early waits with its Work Tracker row marked `HELD`. `HELD` rows stay out of the dispatchers' claim index altogether.
+No leg exists before its parent is accepted. A leg couldn't run before then anyway, and writing it later leaves nothing to hold back, and nothing to cancel if the parent never gets there. It is also what the [domain model](./domain-model.md) allows: a leg is made only from an `ACCEPTED` or `PROCESSING` payment, and a leg is never cancelled.
 
-The commit that makes the parent `ACCEPTED` (Reverify on the due date, or Verify for pay today) sets its `legs_released_at`. The leg dispatcher sees that and moves the parent's rows from `HELD` to `SCHEDULED`, 5,000 at a time. A leg that arrives after its parent was released is written straight as `SCHEDULED`. A declined or cancelled parent cancels its legs.
+The commit that makes the parent `ACCEPTED` (Reverify on the due date, or Verify for pay today) sets its `legs_released_at`. The leg dispatcher sees that and writes the legs of every batch that has been waiting, 1,000 rows at a time, each leg with a `SCHEDULED` `ALLOC_LEG` row. A batch that arrives after the release is written by its own `ReceiveAllocationsWorkflow` straight away. Both writers check under a lock on the parent's row whether a batch already has its legs, so none is written twice.
+
+A declined parent never gets legs: its batches stay stored and are never written. A cancelled parent has none either, because a payment can only be cancelled before its allocations are fetched.
 
 ## Running the legs
 
@@ -63,7 +68,7 @@ Each leg turns `PAID` on its own, through Settle, once the parent has settled an
 
 ## When allocations are late, or a leg fails
 
-- If allocations are late, the parent still clears on time and its legs simply wait. The parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point so someone can chase the source.
+- If allocations are late, the parent still clears on time, and there are simply no legs to run yet. The parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point so someone can chase the source.
 - A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
 
 ## Volume

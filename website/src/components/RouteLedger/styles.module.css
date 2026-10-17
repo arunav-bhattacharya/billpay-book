@@ -108,7 +108,7 @@
 
 .sheet {
   --rl-c1: 17.5em;
-  --rl-c2: 22.5em;
+  --rl-c2: 24.5em;
   --rl-c3: 1.5em;
   --rl-c4: 16em;
   --rl-slot: 4.1em;
@@ -301,6 +301,44 @@
 }
 .entryDrain {
   grid-column: 2 / span 2;
+}
+
+/* the kind of door: an endpoint, a paced dispatcher, or inbox rows. A
+   tinted square in the door's tone, with the glyph drawn in that tone. */
+.glyphBox {
+  --glyph: var(--amex-mut);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: var(--amex-badge-radius);
+  background: color-mix(in srgb, var(--glyph) 13%, var(--amex-panel));
+  color: var(--glyph);
+}
+.glyph {
+  width: 1.08em;
+  height: 1.08em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.glyphApi {
+  --glyph: var(--amex-blue);
+}
+.glyphDispatch {
+  --glyph: var(--rl-offline);
+}
+.glyphInbox {
+  --glyph: var(--amex-mut);
+}
+:global([data-theme='dark']) .glyphApi {
+  --glyph: var(--amex-blue-bright);
+}
+:global([data-theme='dark']) .glyphBox {
+  background: color-mix(in srgb, var(--glyph) 18%, transparent);
 }
 
 .method {
@@ -653,6 +691,10 @@
 
 .li {
   composes: legendItem from '../../css/recipes.module.css';
+}
+
+.swGlyph {
+  font-size: 13px;
 }
 
 .swSq {

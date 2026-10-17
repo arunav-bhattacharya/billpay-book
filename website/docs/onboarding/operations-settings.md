@@ -15,9 +15,9 @@ None of these settings is a code change. They travel in the market's release lik
 | Setting | Used by | What it controls |
 | --- | --- | --- |
 | Time zone and execution time | The scheduled-payments dispatcher's Schedule | When the market's due payments start executing. The Schedule takes the market's time zone, so the execution time holds across daylight saving |
-| Cancellation window | Cancel and update | How long a customer can still change or cancel a scheduled payment. It closes before execution starts, and a late request gets 409 |
+| Cancellation window | Cancel and update | How long a customer can still change or cancel a scheduled payment. It closes before execution starts, and a late request gets 409. A corporate payment closes sooner if its allocations are fetched first |
 | Cutoff, if any | The governor's cutoff floor and alert | The time the market's execution must finish by. SEPA markets have a cutoff of three to four hours; the US has none |
-| Allocation fetch timing and alert point | The `ALLOC_REQUEST` due time, and the late-allocation alert | When to ask for a corporate payment's allocations (at scheduling, a lead time before the due date, or on it), and when to raise an alert if they haven't arrived |
+| Allocation fetch timing and alert point | The `ALLOC_REQUEST` due time, and the late-allocation alert | When to ask for a corporate payment's allocations (at scheduling, a lead time before the due date, or on it), and when to raise an alert if they haven't arrived. The fetch also ends cancel and update for that payment |
 | Representment rules | The representment date | When a returned payment can be presented again: today or later |
 | Expected volumes | The governor's floors and budgets | How much execution work to plan for |
 | BOTH rules, per behavior | The Router | Which journeys get Y for a behavior set to BOTH |

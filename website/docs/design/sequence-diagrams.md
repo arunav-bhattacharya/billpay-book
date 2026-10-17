@@ -209,7 +209,7 @@ sequenceDiagram
     Note over WF: Capture first: PENDING
     WF->>VER: run
     rect rgba(102,169,226,0.40)
-      VER->>PS: state → ACCEPTED, with the ALLOC_REQUEST row,<br/>legs released, one commit
+      VER->>PS: state → ACCEPTED, with the ALLOC_REQUEST row,<br/>legs marked released, one commit
     end
   end
 
@@ -235,21 +235,21 @@ sequenceDiagram
     AD->>R: start through the Router
     Note over R: admit, pin plan key, place on Offline
     R->>RQ: start RequestAllocationsWorkflow, {paymentId}-allocations
-    Note over RQ: asks the allocations manager, then ends
     rect rgba(102,169,226,0.40)
-      RQ->>PS: allocation status → ALLOCATING
+      RQ->>PS: allocation status → ALLOCATING, guarded
     end
+    Note over RQ: then asks the allocations manager, and ends
   end
 
   rect rgba(0,23,90,0.12)
     Note over R,RQ: Offline cluster: the allocations manager calls back through One-Data
     Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then admit, pin plan key, place on Offline, async start of ReceiveAllocationsWorkflow, and 202
-    Note over PS,RQ: ReceiveAllocationsWorkflow writes each leg ACCEPTED with its ALLOC_LEG row, SCHEDULED at once because the parent is released. Allocation status → ALLOCATED once the legs add up
+    Note over PS,RQ: ReceiveAllocationsWorkflow writes each leg ACCEPTED with a SCHEDULED ALLOC_LEG row at once, because the parent is already ACCEPTED. Allocation status → ALLOCATED once the batches add up
   end
 
   rect rgba(0,23,90,0.12)
     Note over R,RQ: Offline cluster: the leg dispatcher, every minute
-    AD->>PS: claim released ALLOC_LEG<br/>rows, fair across parents
+    AD->>PS: claim due ALLOC_LEG<br/>rows, fair across parents
     AD->>R: start each leg through the Router
     Note over R,WF: admit, pin plan key, place on Offline: priority 2, the parent's ID as fairness key
     Note over R,PS: One ExecuteSplitPaymentWorkflow per leg, {paymentId}_{seq}-execute: AR and OTB, no clearing, then accounting, eBNC and risk, then the leg's RTF event and Raven message, then PROCESSED
@@ -258,7 +258,7 @@ sequenceDiagram
   rect rgba(0,23,90,0.12)
     Note over PS,RAV: Offline cluster: the completion check, every 60 s
     AD->>PS: count the parent's<br/>legs by status
-    Note over AD: cleared, and every leg PROCESSED or PAID
+    Note over AD: cleared, ALLOCATED, and every leg PROCESSED or PAID
     AD->>RTF: parent's PROCESSED event
     AD->>RAV: parent's PROCESSED message
     rect rgba(102,169,226,0.40)
@@ -269,7 +269,7 @@ sequenceDiagram
 
 ## 4. Corporate payment, scheduled
 
-Scheduled, the allocations can arrive days before the parent executes, so the legs wait. Their rows are written `HELD`, which keeps them out of the claim index, until Reverify makes the parent `ACCEPTED` on its due date and sets `legs_released_at`. The leg dispatcher then moves the rows to `SCHEDULED` in chunks of 5,000 and starts the legs as it does for pay today.
+Scheduled, the allocations can arrive days before the parent executes. Nothing is written for them yet: each batch waits in `allocation_batch`. The fetch also ends the customer's chance to change the payment, so from then on a cancel or an update gets 409. On the due date Reverify makes the parent `ACCEPTED` and sets `legs_released_at`. The leg dispatcher then writes the waiting batches' legs, 1,000 rows at a time, and starts them as it does for pay today. A batch that arrives after that is written by its own `ReceiveAllocationsWorkflow`.
 
 ```mermaid
 ---
@@ -303,24 +303,24 @@ sequenceDiagram
     AD->>R: start through the Router
     Note over R: admit, pin plan key, place on Offline
     R->>RQ: start RequestAllocationsWorkflow, {paymentId}-allocations
-    Note over RQ: asks the allocations manager, then ends
     rect rgba(102,169,226,0.40)
-      RQ->>PS: allocation status → ALLOCATING
+      RQ->>PS: allocation status → ALLOCATING, guarded:<br/>no cancel or update from here
     end
+    Note over RQ: then asks the allocations manager, and ends
   end
 
   rect rgba(0,23,90,0.12)
     Note over R,RC: Offline cluster: the allocations manager calls back through One-Data
     Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then admit, pin plan key, place on Offline
     R->>RC: async start ReceiveAllocationsWorkflow, then 202
-    RC->>PS: legs ACCEPTED, each ALLOC_LEG row HELD while the parent is not yet ACCEPTED
+    RC->>PS: read the parent: still SCHEDULED,<br/>so the batch waits
     rect rgba(102,169,226,0.40)
-      RC->>PS: allocation status → ALLOCATED, once the legs add up
+      RC->>PS: allocation status → ALLOCATED, once the batches add up
     end
   end
 
   rect rgba(83,86,90,0.14)
-    Note over PS,RC: HELD rows stay out of the claim index, so no dispatcher sees them
+    Note over PS,RC: The batches wait in allocation_batch. No leg exists yet
   end
 
   rect rgba(0,23,90,0.12)
@@ -339,14 +339,14 @@ sequenceDiagram
 
   rect rgba(0,23,90,0.12)
     Note over PS,RC: Offline cluster: the leg dispatcher, every minute
-    AD->>PS: move the parent's HELD rows<br/>to SCHEDULED, 5,000 at a time
+    AD->>PS: write the waiting batches' legs,<br/>1,000 rows at a time, rows SCHEDULED
     AD->>R: start each leg, as for pay today
   end
 ```
 
 ## 5. Update a scheduled payment
 
-An update is a cancel followed by a new payment. The cancel is guarded, so it only lands while the payment is still `SCHEDULED` and inside its cancellation window. A child `CreateScheduledPaymentWorkflow` then creates the replacement under a new ID, with the same confirmation number. Too late, and the caller gets 409.
+An update is a cancel followed by a new payment. The cancel is guarded, so it only lands while the payment is still `SCHEDULED` and inside its cancellation window, and for a corporate payment only before its allocations are fetched. A child `CreateScheduledPaymentWorkflow` then creates the replacement under a new ID, with the same confirmation number. Too late, and the caller gets 409.
 
 ```mermaid
 ---
@@ -392,7 +392,7 @@ sequenceDiagram
       Note over PS,CW: old and new IDs mapped in ORIG_TRANS_REFER_MAP
       UW-->>R: new payment's result
       R-->>OD: new payment's result
-    else no longer SCHEDULED, or the window has closed
+    else no longer SCHEDULED, the window has closed,<br/>or a corporate payment's allocations are fetched
       UW-->>R: 409
       R-->>OD: 409
     end
@@ -401,7 +401,7 @@ sequenceDiagram
 
 ## 6. Cancel a payment
 
-A cancel is one guarded update. It sets `CANCELLED` only if the payment is still `SCHEDULED`, and cancels the payment's Work Tracker rows in the same commit, so no dispatcher can start a cancelled payment. Asking twice is safe: a payment that is already `CANCELLED` returns that result again. Anything else that loses the race, or arrives outside the window, gets 409.
+A cancel is one guarded update. It sets `CANCELLED` only if the payment is still `SCHEDULED`, and for a corporate payment only while its allocation status is `NONE`. It cancels the payment's Work Tracker rows in the same commit, so no dispatcher can start a cancelled payment. Asking twice is safe: a payment that is already `CANCELLED` returns that result again. Anything else that loses the race, arrives outside the window, or comes after a corporate payment's allocations were fetched, gets 409.
 
 ```mermaid
 ---
@@ -445,7 +445,7 @@ sequenceDiagram
     else zero rows updated, already CANCELLED
       CW-->>R: CANCELLED again
       R-->>OD: CANCELLED
-    else zero rows updated otherwise, or outside the window
+    else zero rows updated otherwise, outside the window,<br/>or a corporate payment's allocations are fetched
       CW-->>R: 409
       R-->>OD: 409
     end
@@ -773,7 +773,7 @@ sequenceDiagram
 
 ## 13. Allocations callback
 
-The allocations manager sends a corporate payment's allocations in numbered batches. Billpay stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202 once the workflow exists. It is the only async start in Billpay, and the only start that can get 429, because an async start must stay inside its traffic class's budget.
+The allocations manager sends a corporate payment's allocations in numbered batches. Billpay stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202 once the workflow exists. It is the only async start in Billpay, and the only start that can get 429, because an async start must stay inside its traffic class's budget. The workflow writes the batch's legs only if the parent is already `ACCEPTED`; otherwise the batch waits for the leg dispatcher to write it on the due date.
 
 ```mermaid
 ---
@@ -814,11 +814,14 @@ sequenceDiagram
     rect rgba(0,23,90,0.12)
       Note over RW,RC: Offline cluster
       RW->>RC: run
-      Note over RC: checks the stored batch
-      RC->>PS: legs {paymentId}_{seq} in ACCEPTED,<br/>each with its ALLOC_LEG row,<br/>in 1,000-row inserts
-      Note over PS,RW: rows HELD while the parent is not yet ACCEPTED, SCHEDULED once it is released
+      Note over RC: checks the stored batch and the parent
+      alt the parent is ACCEPTED or further on
+        RC->>PS: legs {paymentId}_{seq} in ACCEPTED,<br/>each with a SCHEDULED ALLOC_LEG row,<br/>in 1,000-row inserts
+      else the parent is still SCHEDULED
+        Note over RC,PS: the batch waits in allocation_batch,<br/>and the leg dispatcher writes it once the parent is ACCEPTED
+      end
       rect rgba(102,169,226,0.40)
-        RC->>PS: allocation status → ALLOCATED, once the legs add up
+        RC->>PS: allocation status → ALLOCATED, once the batches add up
       end
     end
   end

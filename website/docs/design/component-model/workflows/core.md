@@ -29,7 +29,7 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 
 A consumer split payment's commit also writes its legs, and each leg runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
 
-A corporate payment takes a different path after Verify. Verify's commit also writes the `ALLOC_REQUEST` row and releases the legs. Execute clears at payment level, and there is no Fulfil: the parent completes through the leg dispatcher (see [Corporate Allocations](../../corporate-allocations.md)).
+A corporate payment takes a different path after Verify. Verify's commit also writes the `ALLOC_REQUEST` row and marks the legs released, so each batch's legs are written as soon as it arrives. Execute clears at payment level, and there is no Fulfil: the parent completes through the leg dispatcher (see [Corporate Allocations](../../corporate-allocations.md)).
 
 ## Create Scheduled Payment
 
@@ -51,7 +51,7 @@ A corporate payment takes a different path after Verify. Verify's commit also wr
 2. Execute, then Fulfil, as for pay today.
 3. The last commit marks the `SCHED_EXEC` row `DONE`, or `FAILED` when retries run out. That frees a slot under the dispatcher's in-flight cap.
 
-For a corporate payment, Reverify's commit releases the held legs, Execute clears at payment level, and there is no Fulfil.
+For a corporate payment, Reverify's commit marks the legs released, and the leg dispatcher writes the legs of the batches that arrived while the payment waited. Execute clears at payment level, and there is no Fulfil.
 
 ## Execute Split Payment
 
@@ -68,7 +68,7 @@ Corporate legs run at priority 2 with the parent's payment ID as fairness key, s
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-allocations" start="The allocation-request dispatcher, at the market's fetch time" behaviors="generic" />
 
-`RequestAllocationsWorkflow` runs one stage. RequestAllocations asks the allocations manager for the breakdown, sets the allocation status to `ALLOCATING` and ends. No workflow waits for the answer: the allocations manager calls back.
+`RequestAllocationsWorkflow` runs one stage. RequestAllocations sets the allocation status to `ALLOCATING` with a guarded update, asks the allocations manager for the breakdown, and ends. No workflow waits for the answer: the allocations manager calls back. From this commit on, the payment can no longer be cancelled or updated, and a payment cancelled first is never asked about.
 
 ## Receive Allocations
 
@@ -76,8 +76,8 @@ Corporate legs run at priority 2 with the parent's payment ID as fairness key, s
 
 `ReceiveAllocationsWorkflow` turns one callback batch into legs.
 
-1. ReceiveAllocations checks the stored batch, then writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` Work Tracker row. The rows are `HELD` while the parent is not yet `ACCEPTED`, and `SCHEDULED` once it has been released.
-2. The allocation status turns `ALLOCATED` once the legs add up to the payment amount.
+1. ReceiveAllocations checks the stored batch. If the parent is `ACCEPTED`, or further on, it writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` Work Tracker row. If the parent is still `SCHEDULED`, the batch waits in `allocation_batch`, and the leg dispatcher writes it once the parent is accepted.
+2. The allocation status turns `ALLOCATED` once the batches add up to the payment amount.
 
 ## Update Payment
 
@@ -86,7 +86,7 @@ Corporate legs run at priority 2 with the parent's payment ID as fairness key, s
 `UpdatePaymentWorkflow` changes a scheduled payment. Nothing is edited in place: the original is cancelled and a replacement is created, so every payment record stays as it was written.
 
 1. Check the cancellation window and eligibility with read-only calls.
-2. Cancel the old payment with the guarded update. If it is no longer `SCHEDULED`, the answer is 409.
+2. Cancel the old payment with the guarded update. If it is no longer `SCHEDULED`, or it is a corporate payment whose allocations have been fetched, the answer is 409.
 3. Start the new payment as child `CreateScheduledPaymentWorkflow` `{newId}-init`, with the same confirmation number. Its result is the caller's answer.
 4. Map the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
 
@@ -115,11 +115,11 @@ stateDiagram-v2
 
 <WorkflowMeta cluster="Online" id="{paymentId}-cancel" start="Update-With-Start" behaviors={['accountType', 'requiresArPosting']} />
 
-`CancelPaymentWorkflow` withdraws a `SCHEDULED` payment inside the market's cancellation window.
+`CancelPaymentWorkflow` withdraws a `SCHEDULED` payment inside the market's cancellation window. A corporate payment can be withdrawn only until its allocations are fetched.
 
 1. Check the window and eligibility with read-only calls.
 2. Cancel: one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
-3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409.
+3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409. For a corporate payment the guard also requires allocation status `NONE`, so a cancel after the fetch changes nothing and gets 409.
 
 ## Process Returned Payment
 

@@ -182,7 +182,7 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 The indented rows are the extra workflows a payment of that account type runs, tagged with the `accountType` behavior that selects them. The child in the several-instructions row runs once per instruction.
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster.
-- A corporate payment starts its legs from Work Tracker rows instead, because one payment can have 100K of them. `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` writes the legs as the batches arrive, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg. [Corporate Allocations](./corporate-allocations.md) has the whole track.
+- A corporate payment starts its legs from Work Tracker rows instead, because one payment can have 100K of them. `RequestAllocationsWorkflow` asks for the breakdown. `ReceiveAllocationsWorkflow` writes a batch's legs once the parent is `ACCEPTED`; a batch that arrives earlier waits, and the leg dispatcher writes it on the due date. The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg. [Corporate Allocations](./corporate-allocations.md) has the whole track.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
 

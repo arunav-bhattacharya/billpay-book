@@ -9,9 +9,11 @@ import styles from './styles.module.css';
  * The point of the picture is that allocations never hold up the parent's
  * clearing, so the parent and its allocations get lanes of their own and time runs left to right
  * across all three. The legs get a third lane because they are where the two
- * tracks meet: the allocation lane writes them, the parent's acceptance
- * releases them, and their completion closes the parent. Those three meetings
- * are the only vertical lines, and each is labelled with what crosses.
+ * tracks meet: no leg exists until the parent is accepted, so the stored
+ * batches and the parent's acceptance together write them, and their
+ * completion closes the parent. The fetch also reaches up to the parent: from
+ * then on it can't be cancelled or updated. Those four meetings are the only
+ * lines between lanes, and each is labelled with what crosses.
  *
  * Coordinates are hand-placed on a 980 x 400 canvas: six time columns 140
  * wide from x = 130, three lanes 92 tall with 30-unit gaps that hold the
@@ -51,10 +53,9 @@ const BOXES = [
 
   {lane: 'alloc', col: 0, title: 'Request row', sub: 'ALLOC_REQUEST', tone: 'q'},
   {lane: 'alloc', col: 1, title: 'Request', sub: 'ALLOCATING', tone: 'q'},
-  {lane: 'alloc', col: 2, title: 'Receive', sub: 'until ALLOCATED', tone: 'q'},
+  {lane: 'alloc', col: 2, title: 'Receive', sub: 'batches stored', tone: 'q'},
 
-  {lane: 'legs', col: 2, title: 'Legs written', sub: 'rows HELD', tone: 'q'},
-  {lane: 'legs', col: 3, title: 'Released', sub: 'now SCHEDULED', tone: 'q'},
+  {lane: 'legs', col: 3, title: 'Legs written', sub: 'rows SCHEDULED', tone: 'q'},
   {lane: 'legs', col: 4, title: 'Leg workflows', sub: 'PROCESSED', tone: 'f'},
   {lane: 'legs', col: 5, title: 'Settle', sub: 'each leg PAID', tone: 'ok'},
 ];
@@ -70,22 +71,28 @@ const box = (lane, col) => ({
 
 /* arrows along a lane, from one box's right edge to the next box's left edge */
 const ALONG = [
-  ['parent', 0, 3, 'waits as a row in Oracle'],
+  ['parent', 0, 3, 'waits in Oracle'],
   ['parent', 3, 4],
   ['parent', 4, 5],
   ['alloc', 0, 1],
   ['alloc', 1, 2],
-  ['legs', 2, 3],
   ['legs', 3, 4],
   ['legs', 4, 5],
 ];
 
-/* the three places the tracks meet */
+/* the four places the tracks meet */
 const ACROSS = [
   {
+    id: 'fetch',
+    d: `M${cx(1)},${box('alloc', 1).y} V${laneMid('parent') + 4}`,
+    label: 'ends cancel and update',
+    lx: cx(1) + 8,
+    ly: LANES[0].top + LANE_H + 19,
+  },
+  {
     id: 'write',
-    d: `M${cx(2)},${box('alloc', 2).b} V${box('legs', 2).y}`,
-    label: 'writes the legs',
+    d: `M${cx(2)},${box('alloc', 2).b} V${laneMid('legs')} H${box('legs', 3).x}`,
+    label: 'the stored batches',
     lx: cx(2) + 8,
     ly: laneMid('alloc') + BOX_H / 2 + 19,
   },
@@ -99,14 +106,14 @@ const ACROSS = [
   {
     id: 'complete',
     d: `M${cx(4) + 22},${box('legs', 4).y} V${LANES[0].top + LANE_H + 15} H${cx(5)} V${box('parent', 5).b}`,
-    label: ['every leg', 'PROCESSED or PAID'],
+    label: ['ALLOCATED, and every', 'leg PROCESSED or PAID'],
     lx: cx(4) + 30,
     ly: LANES[1].top + 34,
   },
 ];
 
 const LABEL =
-  "A scheduled corporate payment on three lanes, with time running left to right from intake, through the fetch time, the callbacks and the due date, to execution and afterwards. The parent lane: Verify commits SCHEDULED at intake, the payment waits as a row in Oracle, Reverify commits ACCEPTED on the due date, Execute clears the whole amount once, and the completion check commits PROCESSED. The allocations lane: the intake commit writes an ALLOC_REQUEST row, the request at the fetch time sets the allocation status to ALLOCATING, and each callback batch is received, the status turning ALLOCATED once the legs add up. The legs lane: the receive step writes the legs as ACCEPTED, with their Work Tracker rows HELD; Reverify sets legs_released_at, which releases them from HELD to SCHEDULED; each leg runs its own workflow to PROCESSED; and once every leg is PROCESSED or PAID the completion check moves the parent to PROCESSED. Afterwards Settle marks each leg PAID while the parent stays PROCESSED.";
+  "A scheduled corporate payment on three lanes, with time running left to right from intake, through the fetch time, the callbacks and the due date, to execution and afterwards. The parent lane: Verify commits SCHEDULED at intake, the payment waits as a row in Oracle, Reverify commits ACCEPTED on the due date, Execute clears the whole amount once, and the completion check commits PROCESSED. The allocations lane: the intake commit writes an ALLOC_REQUEST row; the request at the fetch time sets the allocation status to ALLOCATING, and from then on the parent can no longer be cancelled or updated; each callback batch is received and stored, the status turning ALLOCATED once the batches add up. The legs lane: no leg exists before the due date. Reverify sets legs_released_at, and the legs of the stored batches are written with SCHEDULED Work Tracker rows; each leg runs its own workflow to PROCESSED; and once the parent is ALLOCATED and every leg is PROCESSED or PAID, the completion check moves the parent to PROCESSED. Afterwards Settle marks each leg PAID while the parent stays PROCESSED.";
 
 export default function CorporateTracks() {
   return (
@@ -194,7 +201,7 @@ export default function CorporateTracks() {
       </div>
       <figcaption className={styles.caption}>
         A pay-today corporate payment runs the same tracks, compressed: Verify accepts the parent, the request goes
-        out at once, and each leg is released as soon as it is written.
+        out at once, and each batch's legs are written as soon as it arrives.
       </figcaption>
     </figure>
   );

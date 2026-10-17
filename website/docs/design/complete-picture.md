@@ -1,14 +1,14 @@
 ---
-title: Function to Activity
+title: The Complete Picture
 description: 'Every request takes the same road through Billpay: a One-Data function, a core API or a dispatcher, the Router, one workflow, its stages, and the calls those stages make.'
-sidebar_label: Function to Activity
+sidebar_label: The Complete Picture
 hide_table_of_contents: true
 ---
 
 import Lead from '@site/src/components/Lead';
 import RouteLedger from '@site/src/components/RouteLedger';
 
-# Function to Activity
+# The Complete Picture
 
 <Lead>Every request takes the same road through Billpay: a One-Data function, a core API or a dispatcher, the Router, one workflow, its stages, and the calls those stages make. This page puts every road on one sheet.</Lead>
 

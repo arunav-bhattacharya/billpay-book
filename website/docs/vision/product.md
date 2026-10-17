@@ -29,7 +29,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
     },
     {
       term: 'Update or cancel',
-      desc: `Change or withdraw a scheduled payment until the market's cancellation window closes. After that the payment is committed, and a late request is turned away.`,
+      desc: `Change or withdraw a scheduled payment until the market's cancellation window closes, or for a corporate payment until its allocations are fetched. After that the payment is committed, and a late request is turned away.`,
     },
     {
       term: 'Bulk intake from AR',
@@ -104,7 +104,7 @@ A market whose answers are all combinations Billpay already supports goes live o
 
 Behaviors change how a payment is handled. They do not change what it is called. Whatever the market, the account type or the clearing rule, every payment moves through the **same set of lifecycle states**, which is what lets operations, reporting and downstream systems read a corporate payment in one market and a consumer payment in another the same way.
 
-The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED` and `DISALLOWED` as the other outcomes. A payment can be cancelled only while it is `SCHEDULED`. A corporate payment uses the same states, and tracks its allocations on a separate **allocation status**, so a late breakdown never holds up the payment itself. It stops at `PROCESSED`, and each allocation turns `PAID` on its own. What each state means, and every transition between them, is in the [Payment State Model](../design/payment-state-model.md).
+The main path is `PENDING` → `ACCEPTED` → `PROCESSING` → `PROCESSED` → `PAID`, with `SCHEDULED` for future-dated payments, and `RETURNED`, `REPRESENTING` / `REPRESENTED`, `DECLINED`, `CANCELLED` and `DISALLOWED` as the other outcomes. A payment can be cancelled only while it is `SCHEDULED`, and a corporate payment only until its allocations are fetched. A corporate payment uses the same states, and tracks its allocations on a separate **allocation status**, so a late breakdown never holds up the payment itself. It stops at `PROCESSED`, and each allocation turns `PAID` on its own. What each state means, and every transition between them, is in the [Payment State Model](../design/payment-state-model.md).
 
 ## Processing a payment
 
