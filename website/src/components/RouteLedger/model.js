@@ -37,7 +37,7 @@ export const MOVE = {
   RequestAllocations: 'ALLOCATING',
   ReceiveAllocations: 'ALLOCATED',
   Return: 'RETURNED',
-  QueueRepresentment: 'REPRESENTING',
+  QueueRepresentment: 'REPRESENTING, as the next presentment',
   Represent: 'REPRESENTED or DECLINED',
   Settle: 'PAID',
 };
@@ -437,9 +437,9 @@ export const BANDS = [
               'Example values. Return varies by account type, and QueueRepresentment by the four behaviors other than bank confirmation.',
             notes: {
               Return:
-                'It checks the payment, full or split, and its status first: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again.',
+                'It checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again. That presentment stays RETURNED.',
               QueueRepresentment:
-                'It judges whether the payment can be represented and sets the date from market rules, then commits REPRESENTING with a REPRESENT row due on that date.',
+                'It judges whether the payment can be represented and sets the date from market rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with a REPRESENT row due on that date.',
             },
             then: [{to: 'represent', text: 'on the representment date, its REPRESENT row'}],
           },
@@ -449,20 +449,20 @@ export const BANDS = [
         fn: ['CreateInboundPayment.v1'],
         from: 'a third party',
         calls: 'A third party calls',
-        does: 'a payment a third party pushed. One-Data stores it and replies 202',
+        does: 'a push payment, sent in by a third party. One-Data stores it and replies 202',
         inbox: 'inbound dispatcher',
         ctl: 'ctl-inbound',
         roads: [
           {
             id: 'inbound',
             wf: 'ProcessInboundPayment',
-            lead: 'A payment a third party pushed.',
+            lead: 'A push payment, sent in by a third party.',
             stages: CVEF,
             journey: 'Inbound payment, initiated by a third party',
             wfId: '{paymentId}-init',
             prio: [3, '"inbound"'],
             chips: five('CONSUMER', 'N', 'N'),
-            behave: "Example values. Verify's inbound implementation answers ACCEPTED or DISALLOWED.",
+            behave: "Example values. Verify's inbound implementation answers ACCEPTED or DISALLOWED; only a push payment can be disallowed.",
             move: {Verify: 'ACCEPTED or DISALLOWED'},
             then: [PAID],
           },
@@ -652,7 +652,7 @@ export const BANDS = [
           {
             id: 'represent',
             wf: 'ProcessRepresentment',
-            lead: 'A returned payment, presented again.',
+            lead: "A returned payment's next presentment.",
             own: ['Represent'],
             journey: 'Representment falls due, a REPRESENT row',
             wfId: '{paymentId}-represent-{seq}',
@@ -661,9 +661,9 @@ export const BANDS = [
             behave: 'Example values. Represent varies by the four behaviors other than bank confirmation.',
             notes: {
               Represent:
-                'It rechecks eligibility before anything goes to clearing: REPRESENTED, or DECLINED if the recheck fails.',
+                'It rechecks eligibility before anything goes to clearing, then sends the new presentment: REPRESENTED, or DECLINED if the recheck fails and nothing is sent.',
             },
-            then: [{to: 'returned', text: 'if it is returned again, under a new workflow ID'}],
+            then: [{to: 'returned', text: 'if this presentment is returned too, under its own workflow ID'}],
           },
         ],
       },

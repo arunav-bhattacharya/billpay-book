@@ -129,24 +129,24 @@ The same workflow cancels a payment the customer never confirmed at their bank. 
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-return-{seq}" start="The returns dispatcher, from One-Data's inbox" behaviors="all" />
 
-`ProcessReturnedPaymentWorkflow` handles a payment the bank sends back, and queues another attempt when one makes sense.
+`ProcessReturnedPaymentWorkflow` handles a payment the bank sends back, and queues another attempt when one makes sense. Each attempt is a [presentment](../../payment-state-model.md#presentments) with its own row, and `{seq}` here is the one that came back.
 
-1. Check the payment, full or split, and its current status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
-2. Return: `RETURNED`.
+1. Check the payment, full or split, the presentment that came back, and its status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
+2. Return: that presentment's row turns `RETURNED` and stays there.
 3. Judge whether the return can be represented, and set the representment date from the market's rules: today or later.
-4. QueueRepresentment commits `REPRESENTING` with a `REPRESENT` Work Tracker row due on that date. A return never hands off to a representment workflow directly.
+4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with a `REPRESENT` Work Tracker row due on that date. A return never hands off to a representment workflow directly.
 
 ## Process Representment
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-represent-{seq}" start="The representment dispatcher, on the representment date" behaviors="all" />
 
-`ProcessRepresentmentWorkflow` presents a returned payment again. Represent rechecks eligibility before anything goes to clearing, then commits `REPRESENTED`, or `DECLINED` if the recheck fails.
+`ProcessRepresentmentWorkflow` sends a returned payment's next presentment to the bank, and `{seq}` is that presentment's number. Represent rechecks eligibility before anything goes to clearing, then commits `REPRESENTED`, or `DECLINED` if the recheck fails and nothing is sent.
 
 ## Process Inbound Payment
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-init" start="The inbound dispatcher, from One-Data's inbox" behaviors="all" />
 
-`ProcessInboundPaymentWorkflow` takes a payment a third party pushed. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil.
+`ProcessInboundPaymentWorkflow` takes a push payment: one a third party sends in. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil. A push payment is the only kind that can end `DISALLOWED`.
 
 ## Confirm Payment
 

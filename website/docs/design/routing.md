@@ -257,4 +257,4 @@ Every workflow ID is the payment ID plus a suffix, so any payment can be traced 
 | Governor | `governor`, plus its Schedule's trigger time |
 | Market provisioning | `provision-{market}-{accountType}-v{N}` |
 
-On returns and representments, `{seq}` is the presentment sequence, so a payment returned again after its representment gets a new workflow ID.
+On returns and representments, `{seq}` is the [presentment](./payment-state-model.md#presentments) sequence. A return's is the presentment that came back, and a representment's is the new one it sends, so a payment returned twice runs `-return-1`, `-represent-2`, `-return-2` and `-represent-3`.

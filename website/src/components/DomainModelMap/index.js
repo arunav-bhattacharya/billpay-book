@@ -4,26 +4,34 @@ import useOverlay from '../../lib/useOverlay';
 import styles from './styles.module.css';
 
 /**
- * DomainModelMap: the payment domain model as code has it.
+ * DomainModelMap: the payment domain model, as agreed on 2026-10-17.
  *
  * A payment's class is its state, so the map is a grid: one row per state,
  * read top to bottom in lifecycle order, and one column per shape, a full
- * payment on the left and a split leg on the right. Where a full payment
- * stops (declined, cancelled) sits in its own column at the far left, still
- * under the FullPayment header because both are full payments. Every arrow
- * is one of the 28 transition functions; the blue ones make a leg. The two
- * traits are tinted bands behind the rows they cover, so "verified" reads as
- * a region of the lifecycle rather than a label on nineteen boxes.
+ * payment in the middle and a split leg on the right. Where a full payment
+ * stops (disallowed, cancelled, declined) sits in its own column at the far
+ * left, still under the FullPayment header because both are full payments.
+ * A leg stops in one way only, a representment that fails its recheck, so its
+ * DECLINED class sits under its own column. Every arrow is one of the 36
+ * transition functions; the blue ones make a leg. The two traits are tinted
+ * bands behind the rows they cover, so "verified" reads as a region of the
+ * lifecycle rather than a label on twenty-two boxes.
  *
- * PROCESSING to RETURNED, a move the code does not have yet, is drawn as a
- * dashed ghost where it would go. PENDING to CANCELLED, for a payment never
- * confirmed at its bank, is missing too, but the page lists it under the map
- * instead: no lane reaches CANCELLED from PENDING without crossing a line. A leg is never made from a scheduled
- * parent and is never cancelled, so neither move is drawn.
+ * What the supplied code does not have yet is dashed: the two corporate
+ * classes and their six moves, PENDING to CANCELLED, PROCESSING to RETURNED,
+ * the disallowed class, and the representment that fails its recheck, for a
+ * payment and a leg. A move that stays but changes (a second return takes its
+ * own returnedInfo, a representment builds the next presentment) keeps a
+ * solid line and says so in its note. The supplied code's moves from
+ * REPRESENTING back to RETURNED are gone from the model, so they aren't drawn.
  *
- * Coordinates are hand-placed on a 1056 x 766 canvas. Lines run in lanes beside
- * the boxes, so no two cross. A representment that fails its recheck runs
- * round the left margin to DeclinedFullPayment, the one DECLINED box.
+ * Coordinates are hand-placed on a 1056 x 952 canvas. Lines run in lanes
+ * beside the boxes, so no two cross. PENDING and SCHEDULED both reach
+ * CANCELLED and DECLINED, which no two lanes can do without crossing, so
+ * PENDING to DECLINED leaves by the top and runs down the left margin.
+ * ACCEPTED to PROCESSING runs down the right, because the corporate states
+ * sit between them, and ALLOCATED's Reverify climbs back to ACCEPTED on the
+ * right for the same reason.
  *
  * Takes no props; the content is the arrays below. Colours are tokens. The two
  * root types are the deepest fills, Payment in Deep Blue and Refund in a deep
@@ -33,7 +41,7 @@ import styles from './styles.module.css';
  */
 
 const W = 1056;
-const H = 766;
+const H = 952;
 
 /* ------------------------------------------------------------ geometry -- */
 
@@ -43,34 +51,44 @@ const BH = 44;
 const r = (i) => ROW0 + i * PITCH;
 
 const COL = {
-  stop: {x: 24, w: 184},
+  stop: {x: 32, w: 180},
   full: {x: 284, w: 224},
   split: {x: 628, w: 224},
 };
 
-/* tone: mid (in flight), ok (paid, returned, represented), stop (ends here) */
+/* tone: mid (in flight), ok (paid, returned, represented), stop (ends here).
+   corp: only a corporate payment is ever in this state. todo: the supplied
+   code does not have this class yet. */
 const BOXES = [
-  {id: 'disallowed', col: 'stop', row: 0, state: 'DISALLOWED', cls: 'DisallowedFullPayment', tone: 'stop'},
-  {id: 'decF', col: 'stop', row: 1, state: 'DECLINED', cls: 'DeclinedFullPayment', tone: 'stop'},
-  {id: 'canF', col: 'stop', row: 2, state: 'CANCELLED', cls: 'CancelledFullPayment', tone: 'stop'},
+  {id: 'disallowed', col: 'stop', row: 0, state: 'DISALLOWED', cls: 'DisallowedFullPayment', tone: 'stop', todo: true,
+    extra: 'Only a push payment ends here.'},
+  {id: 'canF', col: 'stop', row: 1, state: 'CANCELLED', cls: 'CancelledFullPayment', tone: 'stop',
+    extra: 'It may have no amount and only a plain Timeline, because a payment cancelled while PENDING was never verified.'},
+  {id: 'decF', col: 'stop', row: 4, state: 'DECLINED', cls: 'DeclinedFullPayment', tone: 'stop',
+    extra: 'It carries a declineCode and no confirmation code.'},
 
-  {id: 'pendF', col: 'full', row: 0, state: 'PENDING', cls: 'PendingFullPayment', tone: 'mid'},
+  {id: 'pendF', col: 'full', row: 0, state: 'PENDING', cls: 'PendingFullPayment', tone: 'mid',
+    extra: "While it waits for the customer's bank it holds bankConfirmation, the provider's reference (not in the code yet)."},
   {id: 'schF', col: 'full', row: 1, state: 'SCHEDULED', cls: 'ScheduledFullPayment', tone: 'mid'},
   {id: 'accF', col: 'full', row: 2, state: 'ACCEPTED', cls: 'AcceptedFullPayment', tone: 'mid'},
-  {id: 'procF', col: 'full', row: 3, state: 'PROCESSING', cls: 'ProcessingFullPayment', tone: 'mid'},
-  {id: 'prodF', col: 'full', row: 4, state: 'PROCESSED', cls: 'ProcessedFullPayment', tone: 'mid'},
-  {id: 'paidF', col: 'full', row: 5, state: 'PAID', cls: 'PaidFullPayment', tone: 'ok'},
-  {id: 'retF', col: 'full', row: 6, state: 'RETURNED', cls: 'ReturnedFullPayment', tone: 'ok'},
-  {id: 'repingF', col: 'full', row: 7, state: 'REPRESENTING', cls: 'RepresentingFullPayment', tone: 'mid'},
-  {id: 'repedF', col: 'full', row: 8, state: 'REPRESENTED', cls: 'RepresentedFullPayment', tone: 'ok'},
+  {id: 'allocF', col: 'full', row: 3, state: 'ALLOCATING', cls: 'AllocatingFullPayment', tone: 'mid', corp: true, todo: true},
+  {id: 'allocdF', col: 'full', row: 4, state: 'ALLOCATED', cls: 'AllocatedFullPayment', tone: 'mid', corp: true, todo: true},
+  {id: 'procF', col: 'full', row: 5, state: 'PROCESSING', cls: 'ProcessingFullPayment', tone: 'mid'},
+  {id: 'prodF', col: 'full', row: 6, state: 'PROCESSED', cls: 'ProcessedFullPayment', tone: 'mid'},
+  {id: 'paidF', col: 'full', row: 7, state: 'PAID', cls: 'PaidFullPayment', tone: 'ok'},
+  {id: 'retF', col: 'full', row: 8, state: 'RETURNED', cls: 'ReturnedFullPayment', tone: 'ok'},
+  {id: 'repingF', col: 'full', row: 9, state: 'REPRESENTING', cls: 'RepresentingFullPayment', tone: 'mid'},
+  {id: 'repedF', col: 'full', row: 10, state: 'REPRESENTED', cls: 'RepresentedFullPayment', tone: 'ok'},
 
   {id: 'accS', col: 'split', row: 2, state: 'ACCEPTED', cls: 'AcceptedSplitPayment', tone: 'mid'},
-  {id: 'procS', col: 'split', row: 3, state: 'PROCESSING', cls: 'ProcessingSplitPayment', tone: 'mid'},
-  {id: 'prodS', col: 'split', row: 4, state: 'PROCESSED', cls: 'ProcessedSplitPayment', tone: 'mid'},
-  {id: 'paidS', col: 'split', row: 5, state: 'PAID', cls: 'PaidSplitPayment', tone: 'ok'},
-  {id: 'retS', col: 'split', row: 6, state: 'RETURNED', cls: 'ReturnedSplitPayment', tone: 'ok'},
-  {id: 'repingS', col: 'split', row: 7, state: 'REPRESENTING', cls: 'RepresentingSplitPayment', tone: 'mid'},
-  {id: 'repedS', col: 'split', row: 8, state: 'REPRESENTED', cls: 'RepresentedSplitPayment', tone: 'ok'},
+  {id: 'procS', col: 'split', row: 5, state: 'PROCESSING', cls: 'ProcessingSplitPayment', tone: 'mid'},
+  {id: 'prodS', col: 'split', row: 6, state: 'PROCESSED', cls: 'ProcessedSplitPayment', tone: 'mid'},
+  {id: 'paidS', col: 'split', row: 7, state: 'PAID', cls: 'PaidSplitPayment', tone: 'ok'},
+  {id: 'retS', col: 'split', row: 8, state: 'RETURNED', cls: 'ReturnedSplitPayment', tone: 'ok'},
+  {id: 'repingS', col: 'split', row: 9, state: 'REPRESENTING', cls: 'RepresentingSplitPayment', tone: 'mid'},
+  {id: 'repedS', col: 'split', row: 10, state: 'REPRESENTED', cls: 'RepresentedSplitPayment', tone: 'ok'},
+  {id: 'decS', col: 'split', row: 11, state: 'DECLINED', cls: 'DeclinedSplitPayment', tone: 'stop', todo: true,
+    extra: 'A leg ends here only when its representment fails the recheck. It carries a declineCode and no confirmation code.'},
 ];
 
 const AT = {};
@@ -79,9 +97,10 @@ BOXES.forEach((b) => {
   AT[b.id] = {...b, x: c.x, w: c.w, y: r(b.row) - BH / 2, cx: c.x + c.w / 2, cy: r(b.row)};
 });
 
-/* the traits each class carries, worked out from where it sits */
-const isVerified = (b) => !b.ghost && b.col !== 'stop' && b.row >= 1;
-const isRepresent = (b) => !b.ghost && b.col !== 'stop' && b.row >= 6;
+/* the traits each class carries, worked out from where it sits; a class
+   where a payment stops carries neither */
+const isVerified = (b) => b.tone !== 'stop' && b.row >= 1;
+const isRepresent = (b) => b.tone !== 'stop' && b.row >= 8;
 
 /* ---------------------------------------------------------------- paths -- */
 
@@ -96,52 +115,75 @@ const vert = (a, b, x) => (AT[b].row > AT[a].row ? `M${x},${bot(a)} V${top(b)}` 
 const FX = AT.pendF.cx; /* 396 */
 const SX = AT.accS.cx; /* 740 */
 
-const HOP_X = R('pendF') + 16; /* the lane of the skip from PENDING to ACCEPTED */
+const NEXT = 'builds the next presentment, numbered one higher';
+const SECOND = 'the code takes no returnedInfo here yet';
 
 const EDGES = [
-  /* full payment */
+  /* PENDING */
   {a: 'pendF', b: 'schF', fn: 'toScheduledFullPayment(account, amount, timeline, option, instrument)', d: vert('pendF', 'schF', FX)},
   {a: 'pendF', b: 'accF', fn: 'toAcceptedFullPayment(account, amount, timeline, option, instrument)',
-    d: `M${R('pendF')},${r(0)} H${HOP_X} V${r(2) - 12} H${R('accF')}`},
+    d: `M${R('pendF')},${r(0)} H520 V${r(2) - 14} H${R('accF')}`},
+  {a: 'pendF', b: 'disallowed', fn: 'toDisallowedFullPayment(...)', note: 'a push payment only', todo: true,
+    d: `M${L('pendF')},${r(0) - 8} H${R('disallowed')}`},
+  {a: 'pendF', b: 'canF', fn: 'toCancelledFullPayment()', note: 'the confirmation window closed', todo: true,
+    d: `M${L('pendF')},${r(0) + 8} H250 V${r(1) - 14} H${R('canF')}`},
   {a: 'pendF', b: 'decF', fn: 'toDeclinedFullPayment(option, instrument, declineCode)',
-    d: `M${L('pendF')},${r(0) + 12} H236 V${r(1) - 12} H${R('decF')}`},
-  {a: 'pendF', b: 'disallowed', fn: 'toDisallowedFullPayment(...)', d: `M${L('pendF')},${r(0) - 8} H${R('disallowed')}`},
+    d: `M300,${top('pendF')} V189 H10 V${r(4)} H${L('decF')}`},
+
+  /* SCHEDULED */
   {a: 'schF', b: 'accF', fn: 'toAcceptedFullPayment()', d: vert('schF', 'accF', FX)},
-  {a: 'schF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)', d: `M${L('schF')},${r(1)} H${R('decF')}`},
-  {a: 'schF', b: 'canF', fn: 'toCancelledFullPayment()', d: `M${L('schF')},${r(1) + 12} H226 V${r(2)} H${R('canF')}`},
-  {a: 'accF', b: 'procF', fn: 'toProcessingFullPayment()', d: vert('accF', 'procF', FX)},
-  {a: 'accF', b: 'accS', fn: 'toAcceptedSplitPayment(splitSlice)', kind: 'split', d: `M${R('accF')},${r(2)} H${L('accS')}`},
+  {a: 'schF', b: 'canF', fn: 'toCancelledFullPayment()', d: `M${L('schF')},${r(1) - 4} H${R('canF')}`},
+  {a: 'schF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)',
+    d: `M${L('schF')},${r(1) + 7} H238 V${r(4) - 12} H${R('decF')}`},
+  {a: 'schF', b: 'allocF', fn: 'toAllocatingFullPayment()', note: 'corporate, at the fetch time', todo: true,
+    d: `M${L('schF')},${r(1) + 17} H264 V${r(3)} H${L('allocF')}`},
+
+  /* ACCEPTED */
+  {a: 'accF', b: 'allocF', fn: 'toAllocatingFullPayment()', note: 'corporate, paid today', todo: true, d: vert('accF', 'allocF', FX)},
+  {a: 'accF', b: 'procF', fn: 'toProcessingFullPayment()',
+    d: `M${R('accF')},${r(2) + 8} H548 V${r(5) - 12} H${R('procF')}`},
+  {a: 'accF', b: 'accS', fn: 'toAcceptedSplitPayment(splitSlice)', kind: 'split', d: `M${R('accF')},${r(2) - 3} H${L('accS')}`},
+
+  /* the corporate states */
+  {a: 'allocF', b: 'allocdF', fn: 'toAllocatedFullPayment()', note: 'the batches add up', todo: true, d: vert('allocF', 'allocdF', FX)},
+  {a: 'allocdF', b: 'procF', fn: 'toProcessingFullPayment()', note: 'paid today', todo: true, d: vert('allocdF', 'procF', FX)},
+  {a: 'allocdF', b: 'accF', fn: 'toAcceptedFullPayment()', note: 'scheduled, at Reverify', todo: true,
+    d: `M${R('allocdF')},${r(4)} H530 V${r(2) + 18} H${R('accF')}`},
+  {a: 'allocdF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)', note: 'Reverify fails', todo: true,
+    d: `M${L('allocdF')},${r(4)} H${R('decF')}`},
+
+  /* PROCESSING on */
   {a: 'procF', b: 'prodF', fn: 'toProcessedFullPayment()', d: vert('procF', 'prodF', FX)},
   {a: 'procF', b: 'accS', fn: 'toAcceptedSplitPayment(splitSlice)', kind: 'split',
-    d: `M${R('procF')},${r(3)} H572 V${r(2) + 14} H${L('accS')}`},
+    d: `M${R('procF')},${r(5)} H572 V${r(2) + 14} H${L('accS')}`},
+  {a: 'procF', b: 'retF', fn: 'toReturnedFullPayment(returnedInfo)', todo: true,
+    d: `M${L('procF')},${r(5) + 10} H256 V${r(8) + 8} H${L('retF')}`},
   {a: 'prodF', b: 'paidF', fn: 'toPaidFullPayment()', d: vert('prodF', 'paidF', FX)},
   {a: 'prodF', b: 'retF', fn: 'toReturnedFullPayment(returnedInfo)',
-    d: `M${L('prodF')},${r(4)} H268 V${r(6) - 8} H${L('retF')}`},
+    d: `M${L('prodF')},${r(6)} H270 V${r(8) - 8} H${L('retF')}`},
   {a: 'paidF', b: 'retF', fn: 'toReturnedFullPayment(returnedInfo)', d: vert('paidF', 'retF', FX)},
-  {a: 'retF', b: 'repingF', fn: 'toRepresentingFullPayment()', d: vert('retF', 'repingF', FX - 40)},
+  {a: 'retF', b: 'repingF', fn: 'toRepresentingFullPayment()', note: NEXT, d: vert('retF', 'repingF', FX - 40)},
   {a: 'repingF', b: 'repedF', fn: 'toRepresentedFullPayment()', d: vert('repingF', 'repedF', FX)},
-  {a: 'repingF', b: 'retF', fn: 'toReturnedFullPayment()', d: vert('repingF', 'retF', FX + 40)},
-  {a: 'repingF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)',
-    d: `M${L('repingF')},${r(7)} H12 V${r(1)} H${L('decF')}`},
-  {a: 'repedF', b: 'retF', fn: 'toReturnedFullPayment()',
-    d: `M${R('repedF')},${r(8)} H${R('repedF') + 20} V${r(6) + 8} H${R('retF')}`},
+  {a: 'repingF', b: 'decF', fn: 'toDeclinedFullPayment(declineCode)', note: 'the recheck fails', todo: true,
+    d: `M${L('repingF')},${r(9)} H226 V${r(4) + 12} H${R('decF')}`},
+  {a: 'repedF', b: 'retF', fn: 'toReturnedFullPayment(returnedInfo)', note: SECOND,
+    d: `M${R('repedF')},${r(10)} H${R('repedF') + 20} V${r(8) + 8} H${R('retF')}`},
 
   /* split leg */
   {a: 'accS', b: 'procS', fn: 'toProcessingSplitPayment()', d: vert('accS', 'procS', SX)},
   {a: 'procS', b: 'prodS', fn: 'toProcessedSplitPayment()', d: vert('procS', 'prodS', SX)},
+  {a: 'procS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)', todo: true,
+    d: `M${L('procS')},${r(5) + 10} H${L('procS') - 28} V${r(8) + 8} H${L('retS')}`},
   {a: 'prodS', b: 'paidS', fn: 'toPaidSplitPayment()', d: vert('prodS', 'paidS', SX)},
   {a: 'prodS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)',
-    d: `M${L('prodS')},${r(4)} H${L('prodS') - 16} V${r(6) - 8} H${L('retS')}`},
+    d: `M${L('prodS')},${r(6)} H${L('prodS') - 16} V${r(8) - 8} H${L('retS')}`},
   {a: 'paidS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)', d: vert('paidS', 'retS', SX)},
-  {a: 'retS', b: 'repingS', fn: 'toRepresentingSplitPayment()', d: vert('retS', 'repingS', SX - 40)},
+  {a: 'retS', b: 'repingS', fn: 'toRepresentingSplitPayment()', note: NEXT, d: vert('retS', 'repingS', SX - 40)},
   {a: 'repingS', b: 'repedS', fn: 'toRepresentedSplitPayment()', d: vert('repingS', 'repedS', SX)},
-  {a: 'repingS', b: 'retS', fn: 'toReturnedSplitPayment()', d: vert('repingS', 'retS', SX + 40)},
-  {a: 'repedS', b: 'retS', fn: 'toReturnedSplitPayment()',
-    d: `M${R('repedS')},${r(8)} H${R('repedS') + 16} V${r(6) + 8} H${R('retS')}`},
-
-  /* missing in code: drawn where the move would go */
-  {a: 'procF', b: 'retF', kind: 'ghost', fn: 'no move from PROCESSING to RETURNED yet',
-    d: `M${L('procF')},${r(3) + 10} H254 V${r(6) + 8} H${L('retF')}`},
+  {a: 'repingS', b: 'decS', fn: 'toDeclinedSplitPayment(declineCode)', note: 'the recheck fails', todo: true,
+    d: `M${L('repingS')},${r(9)} H606 V${r(11)} H${L('decS')}`},
+  {a: 'repedS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)', note: SECOND,
+    d: `M${R('repedS')},${r(10)} H${R('repedS') + 16} V${r(8) + 8} H${R('retS')}`},
 ];
 
 /* the transition functions, by source class, for the reader line */
@@ -150,17 +192,28 @@ EDGES.forEach((e) => {
   (MOVES[e.a] = MOVES[e.a] || []).push(e);
 });
 
-/* the classes at either end of a move the code does not have yet */
-const GAP_ENDS = new Set(EDGES.filter((e) => e.kind === 'ghost').flatMap((e) => [e.a, e.b]));
+/* one move in words, with its note and whether the code has it yet */
+const tagsOf = (e) => [e.note, e.todo && 'not in the code yet'].filter(Boolean);
+const titleOf = (e) => (tagsOf(e).length ? `${e.fn} (${tagsOf(e).join('; ')})` : e.fn);
+const describe = (e) => {
+  const tags = tagsOf(e);
+  return `${e.fn} to ${AT[e.b].cls}${tags.length ? ` (${tags.join('; ')})` : ''}`;
+};
+
+/* the classes at either end of the moves a light picks out */
+const endsOf = (pick) => new Set(EDGES.filter(pick).flatMap((e) => [e.a, e.b]));
+const TODO_ENDS = endsOf((e) => e.todo);
+const CORP_ENDS = endsOf((e) => AT[e.a].corp || AT[e.b].corp);
 
 /* ------------------------------------------------------------- spotlight -- */
 
 const LIGHTS = [
   {id: 'full', label: 'Full payments'},
   {id: 'split', label: 'Split legs'},
+  {id: 'corporate', label: 'Corporate'},
   {id: 'verified', label: 'Verified'},
   {id: 'represent', label: 'Representment'},
-  {id: 'gaps', label: 'Missing in code'},
+  {id: 'todo', label: 'Not in the code yet'},
 ];
 
 function litBox(b, light) {
@@ -169,12 +222,14 @@ function litBox(b, light) {
       return b.col === 'full' || b.col === 'stop';
     case 'split':
       return b.col === 'split';
+    case 'corporate':
+      return CORP_ENDS.has(b.id);
     case 'verified':
       return isVerified(b);
     case 'represent':
       return isRepresent(b);
-    case 'gaps':
-      return Boolean(b.ghost) || GAP_ENDS.has(b.id);
+    case 'todo':
+      return Boolean(b.todo) || TODO_ENDS.has(b.id);
     default:
       return true;
   }
@@ -185,15 +240,17 @@ function litEdge(e, light) {
   const b = AT[e.b];
   switch (light) {
     case 'full':
-      return a.col !== 'split' && e.kind !== 'ghost';
+      return a.col !== 'split';
     case 'split':
-      return b.col === 'split' && e.kind !== 'ghost';
+      return b.col === 'split';
+    case 'corporate':
+      return Boolean(a.corp || b.corp);
     case 'verified':
       return isVerified(a) && isVerified(b);
     case 'represent':
       return isRepresent(b);
-    case 'gaps':
-      return e.kind === 'ghost';
+    case 'todo':
+      return Boolean(e.todo);
     default:
       return true;
   }
@@ -215,7 +272,7 @@ const VALUES = [
   },
   {
     term: 'ReturnedInfo',
-    desc: 'What a return brings with it, carried from RETURNED on. Which fields are required is still to be confirmed.',
+    desc: 'What a return brings with it, carried from RETURNED on. A second return brings its own, on its own presentment. Which fields are required is still to be confirmed.',
     lines: [
       ['effectiveDate', ''],
       ['returnReason', ''],
@@ -227,11 +284,18 @@ const VALUES = [
   },
   {
     term: 'SplitSlice',
-    desc: 'What it takes to make a leg from an ACCEPTED or PROCESSING full payment.',
+    desc: 'What it takes to make a leg from an ACCEPTED or PROCESSING full payment. splitPaymentId and account are not in the code yet.',
     lines: [
       ['sequenceNumber', 'becomes the _seq of the leg ID'],
       ['splitAmount', "the leg's amount"],
+      ['splitPaymentId', "the leg's ID, {paymentId}_{seq}"],
+      ['account', 'the card account the leg pays'],
     ],
+  },
+  {
+    term: 'BankConfirmation',
+    desc: "On a PendingFullPayment as bankConfirmation, null unless the payment waits for the customer's bank. Not in the code yet.",
+    lines: [['providerReference', "the bank-confirmation provider's reference"]],
   },
 ];
 
@@ -257,16 +321,16 @@ function ClassBox({b, dim, on, onEnter, onLeave, onPick}) {
   const block = `M${b.x + RB},${b.y} A${RB},${RB} 0 0 0 ${b.x},${b.y + RB} V${b.y + BH - RB} A${RB},${RB} 0 0 0 ${b.x + RB},${b.y + BH} Z`;
   return (
     <g
-      className={clsx(styles.box, b.ghost ? styles.ghost : styles[`t_${b.tone}`], dim && styles.dim, on && styles.on)}
+      className={clsx(styles.box, styles[`t_${b.tone}`], b.todo && styles.todo, dim && styles.dim, on && styles.on)}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       onClick={onPick}>
       <rect x={b.x} y={b.y} width={b.w} height={BH} rx={RB} className={styles.boxBody} />
-      {!b.ghost && <path d={block} className={styles.boxBlock} />}
+      <path d={block} className={styles.boxBlock} />
       <text x={b.x + 18} y={b.cy - 5} className={styles.boxState}>
         {b.state}
       </text>
-      <text x={b.x + 18} y={b.cy + 13} className={b.ghost ? styles.ghostTitle : styles.boxTitle}>
+      <text x={b.x + 18} y={b.cy + 13} className={styles.boxTitle}>
         {b.cls}
       </text>
     </g>
@@ -286,7 +350,7 @@ function ToolIcon({name}) {
 }
 
 const LABEL =
-  "The payment domain model. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have every state, from PendingFullPayment to RepresentedFullPayment, plus DisallowedFullPayment, DeclinedFullPayment and CancelledFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have seven states; a leg is never made from a scheduled payment and is never cancelled. The transition functions join them: a pending payment is accepted, scheduled or declined, and an inbound one Verify doesn't accept is disallowed; a scheduled one is accepted, declined or cancelled; an accepted one moves on to processing, processed and paid; a processed or paid payment can be returned, a returned one goes to representing, a representing one to represented, or to declined when its recheck fails, and a representing or represented payment can be returned again. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. One dashed line shows the move the code does not have yet, from PROCESSING to RETURNED.";
+  "The payment domain model as agreed on 2026-10-17. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have all eleven states on the path, from PendingFullPayment through AllocatingFullPayment and AllocatedFullPayment, which only a corporate payment reaches, to RepresentedFullPayment, plus DisallowedFullPayment, CancelledFullPayment and DeclinedFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have seven states on the path, plus DeclinedSplitPayment under their column for a representment that fails its recheck; a leg is never pending, scheduled, allocating, allocated or cancelled. The transition functions join them: a pending payment is accepted, scheduled or declined, cancelled when its confirmation window closes, or, for a push payment, disallowed; a scheduled one is accepted, declined or cancelled, or for a corporate payment moves to allocating at the fetch time; an accepted one moves to processing, or for a corporate payment paid today to allocating; allocating moves to allocated, which moves to processing when it was paid today, or back to accepted or on to declined at Reverify when it was scheduled; a processing, processed or paid payment can be returned; a returned one builds its next presentment, numbered one higher, which is representing; a representing one is represented, or declined when its recheck fails, for a payment and a leg alike; and a represented one can be returned again, with that return's own details. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. Dashed lines and outlines mark what the supplied code does not have yet: the two corporate classes and their moves, PENDING to CANCELLED, PROCESSING to RETURNED for a payment and a leg, DisallowedFullPayment, DeclinedSplitPayment, and REPRESENTING to DECLINED for a payment and a leg.";
 
 /* ------------------------------------------------------------- the map --- */
 
@@ -318,23 +382,21 @@ export default function DomainModelMap() {
 
   const f = focus ? AT[focus] : null;
   let reading = 'Point at a class to see the functions that move it on. Click to keep it lit.';
-  if (f && f.ghost) {
-    reading = f.note;
-  } else if (f) {
+  if (f) {
     const traits = [f.col === 'split' ? 'a split leg' : 'a full payment'];
     traits.push(isVerified(f) ? 'verified' : 'not verified');
     if (isRepresent(f)) traits.push('carries returnedInfo');
-    const out = (MOVES[f.id] || []).filter((e) => e.kind !== 'ghost');
-    const moves = out.length
-      ? `Moves on with ${out.map((e) => `${e.fn} to ${AT[e.b].cls}`).join('; ')}.`
-      : 'No move out: it ends here.';
-    reading = `${f.cls}: ${f.state}, ${traits.join(', ')}. ${moves}`;
+    if (f.corp) traits.push('corporate only');
+    if (f.todo) traits.push('not in the code yet');
+    const out = MOVES[f.id] || [];
+    const moves = out.length ? `Moves on with ${out.map(describe).join('; ')}.` : 'No move out: it ends here.';
+    reading = `${f.cls}: ${f.state}, ${traits.join(', ')}. ${f.extra ? `${f.extra} ` : ''}${moves}`;
   }
 
   const bandTop = r(1) - 31;
-  const bandBottom = r(8) + 31;
-  const repTop = r(6) - 28;
-  const repBottom = r(8) + 27;
+  const bandBottom = r(10) + 31;
+  const repTop = r(8) - 28;
+  const repBottom = r(10) + 27;
   const bandX0 = 244;
   const bandX1 = 880;
 
@@ -357,7 +419,7 @@ export default function DomainModelMap() {
             <button
               key={l.id}
               type="button"
-              className={clsx(styles.chip, light === l.id && styles.chipOn, l.id === 'gaps' && styles.chipGap)}
+              className={clsx(styles.chip, light === l.id && styles.chipOn, l.id === 'todo' && styles.chipTodo)}
               aria-pressed={light === l.id}
               onClick={() => {
                 setPinned(null);
@@ -383,7 +445,6 @@ export default function DomainModelMap() {
           <defs>
             <Marker id="dmm-move" cls={styles.headMove} />
             <Marker id="dmm-split" cls={styles.headSplit} />
-            <Marker id="dmm-ghost" cls={styles.headGhost} />
             <marker
               id="dmm-isa"
               viewBox="0 0 12 12"
@@ -404,7 +465,7 @@ export default function DomainModelMap() {
           <text x={150} y={34} className={styles.groupNote}>
             id (a TransactionId) · account · amount
           </text>
-          <g className={clsx(styles.root, styles.rootPay, light === 'gaps' && styles.dim)}>
+          <g className={clsx(styles.root, styles.rootPay, light === 'todo' && styles.dim)}>
             <rect x={24} y={44} width={820} height={66} rx={9} className={styles.rootBody} />
             <text x={44} y={66} className={styles.rootTitle}>
               Payment
@@ -416,7 +477,7 @@ export default function DomainModelMap() {
               presentmentSequence · hasMoneyMovement · planDetailData
             </text>
           </g>
-          <g className={clsx(styles.root, styles.rootRef, light && light !== 'gaps' && styles.dim)}>
+          <g className={clsx(styles.root, styles.rootRef, light && styles.dim)}>
             <rect x={860} y={44} width={184} height={66} rx={9} className={styles.rootBody} />
             <text x={880} y={66} className={styles.rootTitle}>
               Refund
@@ -441,7 +502,7 @@ export default function DomainModelMap() {
               settles as one amount
             </text>
           </g>
-          <g className={clsx(styles.shape, light === 'full' && styles.dim)}>
+          <g className={clsx(styles.shape, (light === 'full' || light === 'corporate') && styles.dim)}>
             <rect x={628} y={136} width={224} height={44} rx={9} className={styles.shapeBody} />
             <text x={646} y={156} className={styles.shapeTitle}>
               SplitPayment
@@ -468,13 +529,13 @@ export default function DomainModelMap() {
           </g>
           <g className={clsx(light && light !== 'represent' && light !== 'verified' && styles.dimBand)}>
             <rect x={bandX0 + 8} y={repTop} width={bandX1 - bandX0 - 16} height={repBottom - repTop} rx={11} className={styles.bandRepresent} />
-            <text x={896} y={r(6) - 8} className={styles.bandTitle}>
+            <text x={896} y={r(8) - 8} className={styles.bandTitle}>
               Representment
             </text>
-            <text x={896} y={r(6) + 8} className={styles.bandTitle}>
+            <text x={896} y={r(8) + 8} className={styles.bandTitle}>
               Payment
             </text>
-            <text x={896} y={r(6) + 26} className={styles.bandLine}>
+            <text x={896} y={r(8) + 26} className={styles.bandLine}>
               returnedInfo
             </text>
           </g>
@@ -485,14 +546,9 @@ export default function DomainModelMap() {
               <path
                 key={`${e.a}-${e.b}`}
                 d={e.d}
-                className={clsx(
-                  styles.edge,
-                  e.kind === 'split' && styles.edgeSplit,
-                  e.kind === 'ghost' && styles.edgeGhost,
-                  edgeDim(e) && styles.dim,
-                )}
-                markerEnd={`url(#dmm-${e.kind === 'split' ? 'split' : e.kind === 'ghost' ? 'ghost' : 'move'})`}>
-                <title>{e.fn}</title>
+                className={clsx(styles.edge, e.kind === 'split' && styles.edgeSplit, e.todo && styles.edgeTodo, edgeDim(e) && styles.dim)}
+                markerEnd={`url(#dmm-${e.kind === 'split' ? 'split' : 'move'})`}>
+                <title>{titleOf(e)}</title>
               </path>
             ))}
           </g>
@@ -544,8 +600,8 @@ export default function DomainModelMap() {
           Makes a leg
         </span>
         <span className={styles.li}>
-          <i className={clsx(styles.swLine, styles.swGhost)} />
-          Missing in code
+          <i className={clsx(styles.swLine, styles.swTodo)} />
+          Agreed, not in the code yet
         </span>
       </div>
 

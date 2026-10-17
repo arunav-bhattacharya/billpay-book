@@ -32,7 +32,7 @@ stateDiagram-v2
   PENDING --> ACCEPTED: Verify, pay today, inbound or at confirm
   PENDING --> SCHEDULED: Verify, future date
   PENDING --> DECLINED: Verify fails
-  PENDING --> DISALLOWED: Verify, inbound not accepted
+  PENDING --> DISALLOWED: Verify, push payment not accepted
   PENDING --> CANCELLED: Cancel, never confirmed at the bank
   SCHEDULED --> ACCEPTED: Reverify, on the due date
   SCHEDULED --> DECLINED: Reverify fails
@@ -43,7 +43,7 @@ stateDiagram-v2
   PROCESSING --> RETURNED: Return
   PROCESSED --> RETURNED: Return
   PAID --> RETURNED: Return
-  RETURNED --> REPRESENTING: QueueRepresentment
+  RETURNED --> REPRESENTING: QueueRepresentment, next presentment
   REPRESENTING --> REPRESENTED: Represent
   REPRESENTING --> DECLINED: Recheck fails
   REPRESENTED --> RETURNED: Returned again
@@ -81,7 +81,7 @@ stateDiagram-v2
   PROCESSING --> PROCESSED: Completion check
   PROCESSING --> RETURNED: Return
   PROCESSED --> RETURNED: Return
-  RETURNED --> REPRESENTING: QueueRepresentment
+  RETURNED --> REPRESENTING: QueueRepresentment, next presentment
   REPRESENTING --> REPRESENTED: Represent
   REPRESENTING --> DECLINED: Recheck fails
   REPRESENTED --> RETURNED: Returned again
@@ -112,13 +112,13 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once if it was paid today, at its execution time if it was scheduled. | No |
 | `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. | No |
 | `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC and risk have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
-| `REPRESENTING` | A returned payment queued for another presentment, on the date the market's rules set. | No |
+| `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date the market's rules set. | No |
 | `PAID` | Settled with the bank and posted to Accounts Receivable. | Yes, unless a return arrives |
-| `RETURNED` | The payment did not settle; the customer's bank sent the funds back. | Yes, unless it is represented |
-| `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
+| `RETURNED` | The presentment did not settle; the customer's bank sent the funds back. | Yes. A representment is a new row |
+| `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
 | `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
 | `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed at the customer's bank before the market's confirmation window closed. | Yes |
-| `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
+| `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
 `PROCESSED` is a higher bar than it looks. A payment reaches it only after every must-succeed system has answered and the customer has been told, which is why an outage at RTF or Raven holds payments at `PROCESSING` rather than letting them through with a gap.
 
@@ -128,7 +128,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | --- | --- | --- |
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
-| `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
+| `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
 | `PENDING` (bank confirmation) | `ACCEPTED` or `DECLINED` | Verify, once the caller confirms |
 | `PENDING` (bank confirmation) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
@@ -142,11 +142,25 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
 | `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a split payment, each leg, never the parent |
 | `PROCESSING`, `PROCESSED` or `PAID` | `RETURNED` | Return |
-| `RETURNED` | `REPRESENTING` | QueueRepresentment |
+| `RETURNED` | The next presentment, a new row in `REPRESENTING`; the returned row stays `RETURNED` | QueueRepresentment |
 | `REPRESENTING` | `REPRESENTED` or `DECLINED` | Represent |
 | `REPRESENTED` | `RETURNED` | Return, when it is returned again |
 
 The [stages](./component-model/stages.md) page says what each stage calls on the way.
+
+## Presentments
+
+A payment can go to the customer's bank more than once. Each time is a presentment, numbered by `presentmentSequence` from 1, and each one is its own row in `trans_dtl`.
+
+When a return comes in, Return moves the presentment that came back to `RETURNED`, and that row stays `RETURNED`. If the payment can be presented again, QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`. On the representment date, Represent sends it to the bank and it turns `REPRESENTED`. If that one comes back too, it turns `RETURNED`, and the next presentment is number 3. If a representment fails its recheck, nothing is sent: its own row turns `DECLINED`, and the presentment before it stays `RETURNED`.
+
+| Presentment | Its row's states, for a payment returned twice |
+| --- | --- |
+| 1 | `PENDING` through `PAID`, then `RETURNED` |
+| 2 | `REPRESENTING` → `REPRESENTED` → `RETURNED` |
+| 3 | `REPRESENTING` → `REPRESENTED` |
+
+Every presentment keeps the payment's ID and its confirmation code. The diagrams above show the states in order: from `REPRESENTING` on, each one belongs to a later presentment's row.
 
 ## Guarded updates
 
@@ -159,13 +173,13 @@ UPDATE trans_dtl SET status = 'CANCELLED'
  WHERE payment_id = :id AND status = 'SCHEDULED'
 ```
 
-When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
+A payment that has been represented has a row per presentment, so Return's guard names the presentment too. When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
 A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm races the end of the confirmation window too: Verify and the expiry's Cancel are both guarded on `PENDING`, and a confirm that loses gets 409.
 
 ## Split payments
 
-A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}`, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through the same states as any payment, `PROCESSING`, `PROCESSED` and on.
+A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}` and the card account it pays, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through the same states as any payment, `PROCESSING`, `PROCESSED` and on.
 
 `PAID` is set on legs, never on the parent. The bank settles a split payment once, as a whole, while Accounts Receivable posts each leg on its own. So each leg turns `PAID` once its own posting and its parent's settlement are both in, and the parent stays `PROCESSED`. That holds for consumer and corporate splits alike.
 

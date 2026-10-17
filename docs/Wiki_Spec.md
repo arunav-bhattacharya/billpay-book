@@ -226,7 +226,7 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 | `GovernorWorkflow` | `governor`, plus its Schedule's trigger time | A Schedule that keeps it running |
 | `MarketProvisioningWorkflow` | `provision-{market}-{accountType}-v{N}` | The provisioning API |
 
-On returns and representments `{seq}` is the presentment sequence, so a payment returned again after its representment gets a new workflow ID.
+On returns and representments `{seq}` is the presentment sequence ([Presentments](#presentments)). A return's is the presentment that came back, and a representment's is the new one it sends, so a payment returned twice runs `-return-1`, `-represent-2`, `-return-2` and `-represent-3`.
 
 There are no 2,500-a-minute batches and no executors on timers: dated work waits as Work Tracker rows, work nobody waits for waits in One-Data's inbox, and dispatchers release both at the rate the governor sets.
 
@@ -247,13 +247,13 @@ Consumer and corporate payments share one set of states. A corporate payment add
 | `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once for pay today, at its execution time for a scheduled payment. | No |
 | `PROCESSING` | Being executed: clearing with the bank, the AR balance reduced, open-to-buy raised. | No |
 | `PROCESSED` | Clearing, AR, OTB, accounting, eBNC and risk have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
-| `REPRESENTING` | A returned payment queued for another presentment on the date market rules set. | No |
+| `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date market rules set. | No |
 | `PAID` | Settled and posted to Accounts Receivable. | Yes, unless a return arrives |
-| `RETURNED` | The payment did not settle; the customer's bank returned the funds. | Yes, unless it is represented |
-| `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
+| `RETURNED` | The presentment did not settle; the customer's bank returned the funds. | Yes. A representment is a new row |
+| `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
 | `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
 | `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed at the customer's bank before the market's confirmation window closed. | Yes |
-| `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
+| `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
 ### Transitions
 
@@ -261,7 +261,7 @@ Consumer and corporate payments share one set of states. A corporate payment add
 | --- | --- | --- |
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
-| `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
+| `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
 | `PENDING` (bank confirmation) | `ACCEPTED` or `DECLINED` | Verify, once the caller confirms |
 | `PENDING` (bank confirmation) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
@@ -275,15 +275,27 @@ Consumer and corporate payments share one set of states. A corporate payment add
 | `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
 | `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a split payment, each leg, never the parent |
 | `PROCESSING`, `PROCESSED` or `PAID` | `RETURNED` | Return |
-| `RETURNED` | `REPRESENTING` | QueueRepresentment |
+| `RETURNED` | The next presentment, a new row in `REPRESENTING`; the returned row stays `RETURNED` | QueueRepresentment |
 | `REPRESENTING` | `REPRESENTED` or `DECLINED` | Represent |
 | `REPRESENTED` | `RETURNED` | Return, when it is returned again |
 
 There is no path from `ACCEPTED` to `CANCELLED`. A payment that has left `SCHEDULED` can no longer be cancelled, and a corporate payment leaves it when its allocations are requested.
 
+### Presentments
+
+Each time a payment goes to the bank is a presentment, numbered by `presentmentSequence` from 1, and each presentment is its own row in `trans_dtl` (`split_trans_dtl` for a leg). A return moves the presentment that came back to `RETURNED`, and that row stays `RETURNED`. If the payment can be represented, QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, and Represent sends it to the bank. If that one comes back too, it turns `RETURNED` and the next is numbered 3. If a representment fails its recheck, its own row turns `DECLINED`, and the presentment before it stays `RETURNED`.
+
+| Presentment | Its row's states, for a payment returned twice |
+| --- | --- |
+| 1 | `PENDING` through `PAID`, then `RETURNED` |
+| 2 | `REPRESENTING` → `REPRESENTED` → `RETURNED` |
+| 3 | `REPRESENTING` → `REPRESENTED` |
+
+Every presentment keeps the payment's ID and confirmation code.
+
 ### Guarded updates
 
-Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`. A corporate payment's allocation request races a cancel the same way: both are guarded on `SCHEDULED`, so only one wins. A confirm races the end of the confirmation window the same way: Verify and the expiry's Cancel are both guarded on `PENDING`, and a confirm that loses gets 409.
+Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. A payment that has been represented has a row per presentment, so Return's guard also names the presentment. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`. A corporate payment's allocation request races a cancel the same way: both are guarded on `SCHEDULED`, so only one wins. A confirm races the end of the confirmation window the same way: Verify and the expiry's Cancel are both guarded on `PENDING`, and a confirm that loses gets 409.
 
 ### Corporate payments
 
@@ -311,7 +323,9 @@ Corporate rules:
 
 ## Payment Domain Model
 
-The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model below adds two things the lifecycle needs and that file doesn't have yet: `DisallowedFullPayment`, and the move from `RepresentingFullPayment` to `DeclinedFullPayment`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
+The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
+
+The model below is the target, agreed on 2026-10-17. It covers the whole lifecycle apart from what [Still open](#still-open) lists, and [Changes the code needs](#changes-the-code-needs) lists what the supplied file doesn't have yet.
 
 ### Root types
 
@@ -322,24 +336,26 @@ The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-
 
 ### The type is the state
 
-Twelve sealed classes, one per state except `ALLOCATING` and `ALLOCATED`, which have none yet, each fixing `status`: `PendingPayment`, `ScheduledPayment`, `AcceptedPayment`, `ProcessingPayment`, `ProcessedPayment`, `PaidPayment`, `ReturnedPayment`, `RepresentingPayment`, `RepresentedPayment`, `CancelledPayment`, `DeclinedPayment` and `DisallowedPayment`. Two traits narrow what a state must hold:
+Fourteen sealed classes, one per state, each fixing `status`: `PendingPayment`, `ScheduledPayment`, `AcceptedPayment`, `AllocatingPayment`, `AllocatedPayment`, `ProcessingPayment`, `ProcessedPayment`, `PaidPayment`, `ReturnedPayment`, `RepresentingPayment`, `RepresentedPayment`, `CancelledPayment`, `DeclinedPayment` and `DisallowedPayment`. Two traits narrow what a state must hold:
 
 | Trait | Guarantees | On |
 | --- | --- | --- |
-| `VerifiedPayment` | A `TokenizedAccount`, a non-null `amount`, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an `ExecutableTimeline` | `SCHEDULED` through `REPRESENTED` |
+| `VerifiedPayment` | A `TokenizedAccount`, a non-null `amount`, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an `ExecutableTimeline` | `SCHEDULED` through `REPRESENTED`, `ALLOCATING` and `ALLOCATED` included |
 | `RepresentmentPayment` | `returnedInfo` | `RETURNED`, `REPRESENTING` and `REPRESENTED` |
 
-`PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` are not verified. `DeclinedPayment` adds a `declineCode`, and a declined payment has no confirmation code.
+`PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` are not verified. `DeclinedPayment` adds a `declineCode`, and a declined payment has no confirmation code. A cancelled payment, like a declined one, may have no amount and only a plain `Timeline`, because a payment cancelled while `PENDING` was never verified.
 
 ### Full and split
 
-Two shapes cross the states. `FullPayment` settles as one amount. `SplitPayment` is a leg: it adds `originalPaymentId` (the parent's ID), `sequenceNumber` and a non-null `amount`. A leg's ID is its parent's plus the sequence number, `paymentId.withSplit(seq)`, which gives `{paymentId}_{seq}`.
+Two shapes cross the states. `FullPayment` settles as one amount. `SplitPayment` is a leg: it adds `originalPaymentId` (the parent's ID), `sequenceNumber` and a non-null `amount`. A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`.
 
 | State | Full | Split |
 | --- | --- | --- |
 | `PENDING` | `PendingFullPayment` | |
 | `SCHEDULED` | `ScheduledFullPayment` | |
 | `ACCEPTED` | `AcceptedFullPayment` | `AcceptedSplitPayment` |
+| `ALLOCATING` | `AllocatingFullPayment` | |
+| `ALLOCATED` | `AllocatedFullPayment` | |
 | `PROCESSING` | `ProcessingFullPayment` | `ProcessingSplitPayment` |
 | `PROCESSED` | `ProcessedFullPayment` | `ProcessedSplitPayment` |
 | `PAID` | `PaidFullPayment` | `PaidSplitPayment` |
@@ -347,47 +363,63 @@ Two shapes cross the states. `FullPayment` settles as one amount. `SplitPayment`
 | `REPRESENTING` | `RepresentingFullPayment` | `RepresentingSplitPayment` |
 | `REPRESENTED` | `RepresentedFullPayment` | `RepresentedSplitPayment` |
 | `CANCELLED` | `CancelledFullPayment` | |
-| `DECLINED` | `DeclinedFullPayment` | |
+| `DECLINED` | `DeclinedFullPayment` | `DeclinedSplitPayment` |
 | `DISALLOWED` | `DisallowedFullPayment` | |
 
-Nineteen data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice` (`sequenceNumber`, `splitAmount`), so a leg is never made from a `SCHEDULED` payment, and a leg is never cancelled or declined.
+Twenty-two data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice`: `sequenceNumber`, `splitAmount`, `splitPaymentId` (the leg's ID) and `account` (the card account the leg pays). So there is no pending, scheduled, allocating or allocated leg. A leg is never cancelled, and is declined only when its representment fails the recheck. Only a corporate payment is ever `ALLOCATING` or `ALLOCATED`, and only a push payment is ever `DISALLOWED`.
+
+### Presentments in the model
+
+`presentmentSequence` numbers a payment's presentments from 1 ([Presentments](#presentments)). A representment doesn't move the returned payment: `toRepresentingFullPayment()` builds the next presentment, a `RepresentingFullPayment` numbered one higher, and the `ReturnedFullPayment` it came from stays as it is. Every other move keeps the number.
 
 ### Value types
 
 - `ReturnedInfo`: `effectiveDate`, `returnReason`, `returnSource`, `originalPaymentId`, `originalPresentmentSequence` and `originalPaymentDate`. Which fields are required is still to be confirmed.
 - `Timeline` holds `captureTimestamp`, `transactionDate` and `transactionTimestamp`. `ExecutableTimeline` adds `clearingDate`, `executionTimestamp`, `cancelCutoffTimestamp` and `frequency` (`ONCE` or `RECURRING`). `InitialTimeline` is the plain one, set at capture; `ImmediateTimeline` is executable with `frequency` `ONCE`; `ScheduledTimeline` adds `scheduleDate`.
-- `PendingFullPayment` checks its amount when built: an amount must be present for a verified option, an other amount or an initial payment amount, and absent for every other option, whose amount is worked out later. Its defaults are `presentmentSequence` 1, `hasMoneyMovement` true and `planDetailData` null.
+- `BankConfirmation`: `providerReference`, the bank-confirmation provider's reference. `PendingFullPayment` holds it as `bankConfirmation`, null unless the payment waits for the customer's bank.
+- `PendingFullPayment` checks its amount when built: an amount must be present for a verified option, an other amount or an initial payment amount, and absent for every other option, whose amount is worked out later. Its defaults are `presentmentSequence` 1, `hasMoneyMovement` true, `planDetailData` null and `bankConfirmation` null.
 
 ### Transitions
 
-There is no `setStatus`. Each allowed move is an extension function that takes one class and returns the next, 28 in all.
+There is no `setStatus`. Each allowed move is an extension function that takes one class and returns the next, 36 in all.
 
 | From | Functions |
 | --- | --- |
-| `PendingFullPayment` | `toAcceptedFullPayment(account, amount, timeline, option, instrument)`, `toScheduledFullPayment(...)` with a `ScheduledTimeline`, `toDeclinedFullPayment(option, instrument, declineCode)`, `toDisallowedFullPayment(...)` for an inbound payment |
-| `ScheduledFullPayment` | `toAcceptedFullPayment()`, `toDeclinedFullPayment(declineCode)`, `toCancelledFullPayment()` |
-| `AcceptedFullPayment` | `toProcessingFullPayment()`, `toAcceptedSplitPayment(splitSlice)` |
-| `ProcessingFullPayment` | `toProcessedFullPayment()`, `toAcceptedSplitPayment(splitSlice)` |
+| `PendingFullPayment` | `toAcceptedFullPayment(account, amount, timeline, option, instrument)`, `toScheduledFullPayment(...)` with a `ScheduledTimeline`, `toDeclinedFullPayment(option, instrument, declineCode)`, `toDisallowedFullPayment(...)` for a push payment only, `toCancelledFullPayment()` when the confirmation window closes unconfirmed |
+| `ScheduledFullPayment` | `toAcceptedFullPayment()`, `toDeclinedFullPayment(declineCode)`, `toCancelledFullPayment()`, and for a corporate payment `toAllocatingFullPayment()` at the fetch time |
+| `AcceptedFullPayment` | `toProcessingFullPayment()`, `toAcceptedSplitPayment(splitSlice)`, and for a corporate payment paid today `toAllocatingFullPayment()` |
+| `AllocatingFullPayment` | `toAllocatedFullPayment()`, once the batches add up |
+| `AllocatedFullPayment` | `toProcessingFullPayment()` for pay today; for a scheduled payment, Reverify's `toAcceptedFullPayment()` or `toDeclinedFullPayment(declineCode)` |
+| `ProcessingFullPayment` | `toProcessedFullPayment()`, `toAcceptedSplitPayment(splitSlice)`, `toReturnedFullPayment(returnedInfo)` |
 | `ProcessedFullPayment` | `toPaidFullPayment()`, `toReturnedFullPayment(returnedInfo)` |
 | `PaidFullPayment` | `toReturnedFullPayment(returnedInfo)` |
-| `ReturnedFullPayment` | `toRepresentingFullPayment()` |
-| `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toReturnedFullPayment()`, `toDeclinedFullPayment(declineCode)` when the recheck fails |
-| `RepresentedFullPayment` | `toReturnedFullPayment()` |
-| `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same nine moves at leg level, from accepted through processing, processed and paid, returned from processed or paid, representing, represented, and back to returned |
+| `ReturnedFullPayment` | `toRepresentingFullPayment()`, which builds the next presentment, numbered one higher |
+| `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toDeclinedFullPayment(declineCode)` when the recheck fails |
+| `RepresentedFullPayment` | `toReturnedFullPayment(returnedInfo)` |
+| `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same ten moves at leg level: accepted to processing; processing to processed or returned; processed to paid or returned; paid to returned; returned to the next presentment; representing to represented, or declined when the recheck fails; represented to returned |
 
-Verify's results are the arguments of the move out of `PENDING`, and a return's `ReturnedInfo` is the argument of the move into `RETURNED`.
+Verify's results are the arguments of the move out of `PENDING`. A return's `ReturnedInfo` is the argument of every move that records a return, from `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED`, so a payment returned twice keeps both returns' details, one on each presentment.
 
-### Gaps against the lifecycle
+### Changes the code needs
 
-The code does not yet cover all of [Payment Lifecycle States](#payment-lifecycle-states):
+Agreed on 2026-10-17, and not yet in the supplied file:
 
-| Lifecycle | In code |
+1. `ProcessingFullPayment.toReturnedFullPayment(returnedInfo)` and `ProcessingSplitPayment.toReturnedSplitPayment(returnedInfo)`.
+2. `AllocatingPayment` and `AllocatedPayment`, with `AllocatingFullPayment` and `AllocatedFullPayment`, the six moves into and out of them, and the two status values.
+3. `PendingFullPayment.toCancelledFullPayment()`, with `CancelledFullPayment` taking a nullable `amount` and a plain `Timeline`.
+4. `bankConfirmation: BankConfirmation?` on `PendingFullPayment`.
+5. `DisallowedFullPayment` and `PendingFullPayment.toDisallowedFullPayment(...)`, for push payments only.
+6. `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)` and the leg's version take the new return's details. Today they keep the last return's.
+7. `ReturnedFullPayment.toRepresentingFullPayment()` and the leg's version number the next presentment one higher. Today every move copies `presentmentSequence`.
+8. A representment that fails its recheck: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`, `DeclinedSplitPayment` and `RepresentingSplitPayment.toDeclinedSplitPayment(declineCode)`. The new presentment's row turns `DECLINED`; the one before it is already `RETURNED`. The moves from `REPRESENTING` back to `RETURNED`, for a payment and a leg, go.
+9. `SplitSlice` gains `splitPaymentId` and `account`, and `toAcceptedSplitPayment(splitSlice)` takes the leg's ID and card account from it. Today it builds the ID with `paymentId.withSplit(seq)` and copies the parent's account.
+
+### Still open
+
+| Question | The model for now |
 | --- | --- |
-| `PROCESSING` → `RETURNED` | No function; a return starts from `PROCESSED` or `PAID` |
-| `ALLOCATING` and `ALLOCATED`, and the moves into and out of them | No classes or functions yet |
-| `PENDING` → `CANCELLED`, for a payment never confirmed at its bank | No function; `toCancelledFullPayment()` starts only from `ScheduledFullPayment` |
-| The bank-confirmation provider's reference on a pending payment | No field yet |
-| Credit balance refunds | `Refund` has no concrete types |
+| The next presentment's dates | Copied from the returned presentment |
+| Credit balance refunds | Skipped for now. `Refund` has no concrete types, and the refund steps are still to be defined |
 
 [^ Top](#table-of-contents)
 
@@ -440,8 +472,8 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller and writes the payment's `CONFIRM_EXPIRY` row | Nothing |
-| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; inbound → `DISALLOWED` | All four behaviors, and bank confirmation |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the provider's reference on the payment with its `CONFIRM_EXPIRY` row | Nothing |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | All four behaviors, and bank confirmation |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
@@ -449,7 +481,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | ReceiveAllocations | `ALLOCATING` → `ALLOCATED` once the batches add up, with the payment's `ALLOC_EXEC` row; earlier batches change no state | Nothing |
 | Cancel | `SCHEDULED` → `CANCELLED`; `PENDING` → `CANCELLED` for a payment never confirmed at its bank | Account type, AR posting |
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
-| QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
+| QueueRepresentment | Writes the next presentment, a new row numbered one higher, in `REPRESENTING`, with its date; the returned row stays `RETURNED` | All four |
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 `READY` inbox rows | Nothing |
 
@@ -521,7 +553,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 - **Fulfil:** `PROCESSED`. Accounting, eBNC and risk run in parallel; then the RTF event and the Raven message; then the commit. Comms go last, so the customer hears only once everything else has succeeded.
 - **Consumer split:** the parent's commit writes its split legs, and each runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
 - **Corporate:** Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step, the same way as for a scheduled corporate payment (see [Corporate Allocations](#corporate-allocations)).
-- **Bank confirmation:** when `requiresBankConfirmation` resolves to Y, **RequestConfirmation** runs after Capture in place of Verify. It asks the market's provider for the customer's redirect link and commits the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. Nothing waits in Temporal while the customer is on the provider's site: `ConfirmPaymentWorkflow` takes over when the caller confirms.
+- **Bank confirmation:** when `requiresBankConfirmation` resolves to Y, **RequestConfirmation** runs after Capture in place of Verify. It asks the market's provider for the customer's redirect link, then commits the provider's reference on the payment and its `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. Nothing waits in Temporal while the customer is on the provider's site: `ConfirmPaymentWorkflow` takes over when the caller confirms.
 
 #### 2. CreateScheduledPaymentWorkflow
 
@@ -583,21 +615,22 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 
 > `{paymentId}-return-{seq}` · Offline · started by the returns dispatcher
 
-- Checks the payment (full or split) and its current status. Eligible statuses: `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
-- **Return:** `RETURNED`.
+- Checks the payment (full or split), the presentment that came back, and its status. Eligible statuses: `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
+- **Return:** that presentment's row turns `RETURNED`, with the return's details, and stays `RETURNED`.
 - Judges whether the return can be represented, and sets the representment date from market rules: today or later.
-- **QueueRepresentment:** commits `REPRESENTING` with a `REPRESENT` Work Tracker row due on that date. Returns never hand off to a representment workflow directly.
+- **QueueRepresentment:** in one commit, writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, and its `REPRESENT` Work Tracker row due on that date. Returns never hand off to a representment workflow directly.
 
 #### 10. ProcessRepresentmentWorkflow
 
-> `{paymentId}-represent-{seq}` · Offline · started by the representment dispatcher on the representment date
+> `{paymentId}-represent-{seq}` · Offline · started by the representment dispatcher on the representment date; `{seq}` is the new presentment's
 
-- **Represent:** rechecks eligibility before anything goes to clearing, then `REPRESENTED`, or `DECLINED` if the recheck fails.
+- **Represent:** rechecks eligibility before anything goes to clearing. If the recheck passes, the new presentment goes to the bank and turns `REPRESENTED`; if it fails, nothing is sent and the presentment is `DECLINED`.
 
 #### 11. ProcessInboundPaymentWorkflow
 
 > `{paymentId}-init` · Offline · started by the inbound dispatcher
 
+- An inbound payment is a push payment: a third party sends the money in. It is the only kind Verify can disallow.
 - **Capture**, **Verify** (`ACCEPTED` or `DISALLOWED`), **Execute**, **Fulfil**.
 
 #### 12. ConfirmPaymentWorkflow
@@ -1001,14 +1034,14 @@ update bpyevnts.billpay_paid_ready
 
 | Table | Change | Why |
 | --- | --- | --- |
-| `trans_dtl` | Statuses `ALLOCATING` and `ALLOCATED`, and `legs_released_at` on corporate parents. On every payment but a split parent: `stlmt_ts` and `ar_pstd_ts`, set by Settle. Proposed: the bank-confirmation provider's reference, for a payment waiting for bank confirmation | A corporate payment's allocations are part of its lifecycle, and its legs are written once its Execute releases them. The two timestamps say when the money settled and when AR posted |
-| `split_trans_dtl` | `stlmt_ts` and `ar_pstd_ts`, set by Settle when the leg turns `PAID` | A split payment turns `PAID` leg by leg |
+| `trans_dtl` | One row per presentment ([Presentments](#presentments)). Statuses `ALLOCATING` and `ALLOCATED`, and `legs_released_at` on corporate parents. On every payment but a split parent: `stlmt_ts` and `ar_pstd_ts`, set by Settle. The bank-confirmation provider's reference, for a payment waiting for bank confirmation | A representment is a new presentment, so it gets its own row. A corporate payment's allocations are part of its lifecycle, and its legs are written once its Execute releases them. The two timestamps say when the money settled and when AR posted. The reference links the payment to the provider's record |
+| `split_trans_dtl` | One row per leg and presentment. `stlmt_ts` and `ar_pstd_ts`, set by Settle when the leg turns `PAID` | A leg is represented on its own; a split payment turns `PAID` leg by leg |
 | `trans_lfcyc_event` | One row per status per presentment. Two new columns, set on insert: the cluster that ran the step, and `batch_id` on the `PAID` rows Settle writes | Says which cluster's UI holds each step; lets a retried Settle find the payments it moved |
 | `split_trans_lfcyc_event` | The same two columns, set on insert; `batch_id` goes on the `PAID` rows Settle writes for legs | Legs run on both clusters; a retried Settle finds the legs it moved |
 | `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts, and when its legs were written | Keeps big batches out of workflow inputs; holds every batch until the parent's Execute releases its legs, and makes sure they are written once |
 | `market_config_version`, `market_config_active` (new) | Published market config: immutable versions, and the active one per market and account type | The Router reads it; only `MarketProvisioningWorkflow` writes it |
 
-Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update on the current status. Their timelines, `trans_lfcyc_event` and `split_trans_lfcyc_event`, are append-only: a step adds a row and never updates one.
+Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update on the current status. QueueRepresentment changes no status: it inserts the next presentment's row. Their timelines, `trans_lfcyc_event` and `split_trans_lfcyc_event`, are append-only: a step adds a row and never updates one.
 
 ### Control tables
 
@@ -1170,7 +1203,7 @@ A corporate payment fetches its allocations before it moves money, and no workfl
 - **Request.** The allocation-request dispatcher starts `RequestAllocationsWorkflow`. It moves the payment to `ALLOCATING` with a guarded update, asks the allocations manager, and ends; no workflow waits for the answer. The guard races a cancel the way Reverify does: one wins, and a payment cancelled first is never asked about. From here a cancel or an update gets 409.
 - **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`, a placeholder name), once or several times, with batches numbered per payment. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch and writes no legs. Once the batches add up to the payment amount, one guarded commit moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row: due at once for pay today, or at the execution time on the due date for a scheduled payment (at once, if that time has passed).
 - **Execute.** The allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow` for both kinds. A scheduled payment is reverified first (`ALLOCATED` → `ACCEPTED`, or `DECLINED`); pay today skips Reverify. Execute clears the parent once, at payment level (→ `PROCESSING`), and makes no AR or open-to-buy call: the legs do. Its commit marks the legs released. There is no Fulfil.
-- **Release.** The leg dispatcher writes the legs of every stored batch as `{paymentId}_{seq}` in `ACCEPTED`, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` row. A declined parent is never released, so its batches are never written.
+- **Release.** The leg dispatcher writes the legs of every stored batch as `{paymentId}_{seq}` in `ACCEPTED`, each with its allocation's card account, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` row. A declined parent is never released, so its batches are never written.
 - **Legs.** Each runs `ExecuteSplitPaymentWorkflow`, apart from the parent's clearing: AR balance and OTB in parallel, then accounting, eBNC and risk, then RTF and Raven. Clearing never runs per allocation.
 - **Fairness.** Legs run at priority 2 with the parent's ID as fairness key and a per-key limit. At 100 legs a second, a 100K payment takes about 17 minutes without starving other payments.
 - **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared, every batch has its legs, and every leg is `PROCESSED` or `PAID`; the check sends the parent's RTF event and Raven message first. Its legs turn `PAID` one by one through Settle, each once the parent has settled and the leg's AR posting is in; the parent stays `PROCESSED`. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
@@ -1466,9 +1499,9 @@ Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin 
 | 4 | Corporate payment, scheduled | `SCHEDULED` with an `ALLOC_REQUEST` row at the fetch time; `ALLOCATING`, after which a cancel gets 409; the callbacks and `ALLOCATED`, with an `ALLOC_EXEC` row due at the execution time; on the due date, Reverify and Execute in `ExecuteScheduledPaymentWorkflow`; then the release and the legs, as for pay today |
 | 5 | Update a scheduled payment | The guarded cancel, then child `CreateScheduledPaymentWorkflow` `{newId}-init`; 409 when late |
 | 6 | Cancel a payment | The guarded update; the payment's Work Tracker rows cancelled in the same commit; 409 outside the window, or once a corporate payment's allocations have been requested |
-| 7 | Return | One-Data stores the return; the returns dispatcher starts the workflow through the Router; Return; QueueRepresentment writes a `REPRESENT` row |
-| 8 | Representment | The representment dispatcher on the date; Represent rechecks, then `REPRESENTED` or `DECLINED` |
-| 9 | Inbound payment | One-Data stores it and replies 202; the inbound dispatcher starts it through the Router; Verify to `ACCEPTED` or `DISALLOWED` |
+| 7 | Return | One-Data stores the return; the returns dispatcher starts the workflow through the Router; Return moves the presentment that came back to `RETURNED`; QueueRepresentment writes the next presentment, numbered one higher, in `REPRESENTING`, with its `REPRESENT` row |
+| 8 | Representment | The representment dispatcher on the date; Represent rechecks, then the new presentment is `REPRESENTED` or `DECLINED` |
+| 9 | Inbound (push) payment | One-Data stores it and replies 202; the inbound dispatcher starts it through the Router; Verify to `ACCEPTED` or `DISALLOWED` |
 | 10 | Paid events | MR/M3 and GAR events recorded in One-Data's inbox, the second one setting the row `READY` (a leg's posting takes its payment's settlement); the Schedule starts `ProcessPaidEventsWorkflow`; fetch up to 500 `READY` rows; Settle in one transaction; the `PAID` events to RTF; the rows marked `DONE` or `UNMATCHED` |
 | 11 | Missing paid events | `ProcessMissingPaidEventsWorkflow` finds payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and sends any event it finds through One-Data's handler |
 | 12 | Pay & Plan | The composite on Online with its children on the same cluster |
@@ -1483,7 +1516,7 @@ stateDiagram-v2
     PENDING --> ACCEPTED: Verify, pay today, inbound or at confirm
     PENDING --> SCHEDULED: Verify, future date
     PENDING --> DECLINED: Verify fails
-    PENDING --> DISALLOWED: Verify, inbound not accepted
+    PENDING --> DISALLOWED: Verify, push payment not accepted
     SCHEDULED --> ACCEPTED: Reverify, on the due date
     SCHEDULED --> DECLINED: Reverify fails
     SCHEDULED --> CANCELLED: Cancel, inside the window
@@ -1494,7 +1527,7 @@ stateDiagram-v2
     PROCESSING --> RETURNED: Return
     PROCESSED --> RETURNED: Return
     PAID --> RETURNED: Return
-    RETURNED --> REPRESENTING: QueueRepresentment
+    RETURNED --> REPRESENTING: QueueRepresentment, the next presentment
     REPRESENTING --> REPRESENTED: Represent
     REPRESENTING --> DECLINED: Recheck fails
     REPRESENTED --> RETURNED: Returned again
@@ -1503,6 +1536,8 @@ stateDiagram-v2
     CANCELLED --> [*]
     DISALLOWED --> [*]
 ```
+
+From `REPRESENTING` on, each state belongs to a later presentment, in its own row ([Presentments](#presentments)).
 
 ### Corporate payment states
 
@@ -1523,7 +1558,7 @@ stateDiagram-v2
     PROCESSING --> PROCESSED: Completion check
     PROCESSING --> RETURNED: Return
     PROCESSED --> RETURNED: Return
-    RETURNED --> REPRESENTING: QueueRepresentment
+    RETURNED --> REPRESENTING: QueueRepresentment, the next presentment
     REPRESENTING --> REPRESENTED: Represent
     REPRESENTING --> DECLINED: Recheck fails
     REPRESENTED --> RETURNED: Returned again
@@ -1558,9 +1593,10 @@ These inputs are assumed for now. The first changes the numbers most.
 | Validation services' limits | Payment Instruments and Options take full rate | With agreed TPS they get their own queues |
 | Per-market namespaces on Offline | One namespace, market as fairness key | Separate namespaces would make the governor split each downstream's share across them by demand |
 | Open-to-buy event handler | Events stored by One-Data; nothing in Billpay reads them yet | Its details are still to be defined |
-| Balance refund steps | They follow the payment path | Detailed stages are still to be defined |
+| Balance refund steps | They follow the payment path. Skipped for now | Detailed stages are still to be defined |
 | Bank confirmation scope | Consumer payments made today only | A scheduled or corporate payment would need its own route |
-| Bank-confirmation provider contract | One provider per market, set in billpay-ui; what RequestConfirmation stores, and whether Verify asks the provider at confirm, are Proposed | Decides the provider calls and what a confirm proves |
+| Bank-confirmation provider contract | One provider per market, set in billpay-ui. RequestConfirmation stores the provider's reference on the pending payment; whether Verify asks the provider at confirm is Proposed | Decides the provider calls and what a confirm proves |
+| The next presentment's dates | Copied from the returned presentment; the representment date is on its `REPRESENT` row | Whether the new row should carry the representment date as its own |
 | Confirm function name | `ConfirmPayment.v1`, a placeholder | The One-Data contract |
 | When a channel gets PENDING | The payment is captured but not yet decided | Decides how long the API waits for the decision before replying |
 | Which changes send a Raven message | `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED` | Each adds a call, and writes, to its workflow |

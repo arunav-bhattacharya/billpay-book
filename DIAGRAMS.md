@@ -305,7 +305,7 @@ picture. So do the newer ones:
 | --- | --- | --- |
 | `RouteLedger` | Every road in one index, with one road open as a card from its trigger to the activities its stages call; picking a road greys out the others. CSS grid in em, so the board scales with its container | Design → The Complete Picture |
 | `CorporateTracks` | A corporate payment from intake to `PROCESSED`: pay today and scheduled lanes joining one shared path | Design → Corporate Allocations |
-| `DomainModelMap` | The payment classes, one row per state, with the transition functions as arrows | Design → Domain Model |
+| `DomainModelMap` | The payment classes, one row per state, with the transition functions as arrows; what the supplied code doesn't have yet is dashed | Design → Domain Model |
 | `OnboardingFlow` | A market release travelling from billpay-ui through the provisioning API to the three environments | Market Onboarding |
  For a new diagram, copy the file into a new folder, replace the arrays, and
 delete what you do not need. The structure is worth keeping; the data is not.

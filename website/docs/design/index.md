@@ -33,7 +33,7 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Domain Model',
       to: '/docs/design/domain-model',
-      desc: `How the code turns those states into types: one class per state, 28 functions between them, and the gaps the code still has.`,
+      desc: `How the code turns those states into types: one class per state, 36 functions between them, and what the supplied code still needs.`,
     },
     {
       term: 'Journeys',

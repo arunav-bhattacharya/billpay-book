@@ -961,15 +961,15 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
       name: 'Queue',
       state: 'REPRESENTING',
       mode: 'background',
-      caption: 'a row for its date',
+      caption: 'the next presentment',
     },
   ]}
   detail={[
     {text: 'Returns come in bursts, up to 100 a second and 100K a day. One-Data keeps each one in its inbox, and the returns dispatcher starts them through the Router at the governor\'s pace, at priority 5, the lowest priority level.'},
     {step: 1, text: 'Only a payment that got far enough can come back. The workflow checks the payment, whole or a leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment returned again.'},
-    {step: 2, text: 'The payment moves to `RETURNED`.'},
+    {step: 2, text: 'The presentment that came back moves to `RETURNED`, and its row stays there.'},
     {step: 3, text: 'Not every return is worth another try. Billpay judges whether this one can be represented, and sets the representment date from the market\'s rules: today or later.'},
-    {step: 4, text: 'QueueRepresentment commits `REPRESENTING` with a `REPRESENT` Work Tracker row due on that date. A return never starts the representment itself; the date does.'},
+    {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with a `REPRESENT` Work Tracker row due on that date. A return never starts the representment itself; the date does.'},
     {text: 'What happens on that date is [A payment is represented](#a-payment-is-represented).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#7-return', label: 'Sequence diagram'}}
@@ -1018,11 +1018,11 @@ The second attempt queued by a return, run on the day it falls due. Billpay chec
     },
   ]}
   detail={[
-    {text: 'A representment is another presentment of the same payment, not a new payment. [A payment is returned](#a-payment-is-returned) queued it, and it has been a Work Tracker row since.'},
+    {text: 'A representment is the next presentment of the same payment: a new row with the same payment ID, numbered one higher. [A payment is returned](#a-payment-is-returned) queued it, and it has waited as a Work Tracker row since.'},
     {step: 1, text: 'Each market\'s representment dispatcher runs every few minutes, claims the `REPRESENT` rows that are due and starts `ProcessRepresentmentWorkflow` through the Router.'},
     {step: 2, text: 'Eligibility is checked again before anything goes to clearing. Days may have passed since the return, and the account may have changed.'},
-    {step: 3, text: 'The payment goes to clearing again and lands at `REPRESENTED`. A failed recheck ends at `DECLINED`.'},
-    {text: 'If the payment comes back again, it starts over as a new return, with a new presentment sequence and its own workflow ID.'},
+    {step: 3, text: 'The new presentment goes to clearing and lands at `REPRESENTED`. A failed recheck ends it at `DECLINED`, and nothing is sent.'},
+    {text: 'If this presentment comes back too, that is a new return, with its own workflow ID, and the next presentment is number 3.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#8-representment', label: 'Sequence diagram'}}
 />

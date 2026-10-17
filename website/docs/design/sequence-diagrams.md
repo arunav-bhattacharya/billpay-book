@@ -474,7 +474,7 @@ sequenceDiagram
 
 ## 7. Return
 
-Returns come in bursts, so none is started straight from its event. One-Data stores each return in its inbox and acknowledges it once that commit is done. The returns dispatcher pulls the oldest at the governor's rate and starts each one through the Router at priority 5. Return commits `RETURNED`, and if the payment can be represented, QueueRepresentment commits `REPRESENTING` with a `REPRESENT` row due on the representment date.
+Returns come in bursts, so none is started straight from its event. One-Data stores each return in its inbox and acknowledges it once that commit is done. The returns dispatcher pulls the oldest at the governor's rate and starts each one through the Router at priority 5. Return commits `RETURNED` on the presentment that came back. If the payment can be represented, QueueRepresentment writes the next [presentment](./payment-state-model.md#presentments) as a new row, numbered one higher, in `REPRESENTING`, with a `REPRESENT` row due on the representment date.
 
 ```mermaid
 ---
@@ -517,10 +517,10 @@ sequenceDiagram
     Note over R: admit, pin plan key, place on Offline: priority 5
     R->>WF: dispatcher start,<br/>{paymentId}-return-{seq}
     RD->>IN: UpdateStartRequests.v1:<br/>DONE
-    Note over WF,QR: checks the payment, full or split, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED if returned again
+    Note over WF,QR: checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED if returned again
     WF->>RET: run
     rect rgba(102,169,226,0.40)
-      RET->>PS: state → RETURNED
+      RET->>PS: this presentment's<br/>state → RETURNED
     end
     WF->>RTF: RETURNED event
     WF->>RAV: RETURNED message
@@ -528,7 +528,7 @@ sequenceDiagram
       Note over WF,RET: date from market rules, today or later
       WF->>QR: run
       rect rgba(102,169,226,0.40)
-        QR->>PS: state → REPRESENTING,<br/>with a REPRESENT row<br/>due on that date
+        QR->>PS: insert the next presentment<br/>(seq + 1) in REPRESENTING,<br/>with a REPRESENT row<br/>due on that date
       end
       WF->>RTF: REPRESENTING event
     end
@@ -541,7 +541,7 @@ sequenceDiagram
 
 ## 8. Representment
 
-On the representment date, the market's representment dispatcher claims the row and starts the workflow at priority 4. Represent rechecks eligibility before anything goes to clearing. If the recheck passes, the payment is presented again and becomes `REPRESENTED`; if it fails, the payment is `DECLINED` and the customer is told.
+On the representment date, the market's representment dispatcher claims the row and starts the workflow at priority 4. Represent rechecks eligibility before anything goes to clearing. The workflow ID carries the new presentment's number. If the recheck passes, that presentment goes to the bank and becomes `REPRESENTED`; if it fails, nothing is sent, the presentment is `DECLINED` and the customer is told.
 
 ```mermaid
 ---
@@ -577,7 +577,7 @@ sequenceDiagram
     WF->>REP: run
     Note over REP: rechecks eligibility before anything goes to clearing
     alt the recheck passes
-      Note over REP: presents it again through clearing
+      Note over REP: sends the new presentment through clearing
       rect rgba(102,169,226,0.40)
         REP->>PS: state → REPRESENTED,<br/>row DONE
       end
@@ -594,7 +594,7 @@ sequenceDiagram
 
 ## 9. Inbound payment
 
-Inbound payments come from third parties. One-Data stores each one and replies 202, so the sender never waits on Billpay. The inbound dispatcher starts it on Offline at priority 3, and Verify either accepts it or marks it `DISALLOWED`.
+Inbound payments are push payments: a third party sends the money in. One-Data stores each one and replies 202, so the sender never waits on Billpay. The inbound dispatcher starts it on Offline at priority 3, and Verify either accepts it or marks it `DISALLOWED`.
 
 ```mermaid
 ---

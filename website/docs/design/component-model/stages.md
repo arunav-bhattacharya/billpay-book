@@ -31,16 +31,16 @@ The changes that send a Raven message are assumed, for now, to be `SCHEDULED`, `
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller and writes the payment's `CONFIRM_EXPIRY` row | Nothing |
-| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; inbound → `DISALLOWED` | All four behaviors, and bank confirmation |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the provider's reference on the payment with its `CONFIRM_EXPIRY` row | Nothing |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | All four behaviors, and bank confirmation |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | `SCHEDULED`, or `ACCEPTED` for pay today, → `ALLOCATING` | Nothing |
 | ReceiveAllocations | `ALLOCATING` → `ALLOCATED` once the batches add up, with the payment's `ALLOC_EXEC` row; earlier batches change no state | Nothing |
 | Cancel | `SCHEDULED` → `CANCELLED`; `PENDING` → `CANCELLED` for a payment never confirmed at its bank | Account type, AR posting |
-| Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
-| QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
+| Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED`, on the presentment that came back | Account type |
+| QueueRepresentment | Writes the next presentment, a new row numbered one higher, in `REPRESENTING`, with its date; the returned row stays `RETURNED` | All four |
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
 
@@ -81,7 +81,7 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A business failure, such as a closed account or insufficient funds, is not retried. The payment goes to `DECLINED`.
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
-- An inbound payment Amex won't take commits `DISALLOWED`.
+- A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. Proposed: Verify also asks the provider whether the customer confirmed.
 
 Verify varies by all four behaviors and by bank confirmation. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
@@ -118,15 +118,15 @@ Cancel also ends a payment the customer never confirmed at their bank. When its 
 
 ## Return
 
-Moves a payment the bank sent back to `RETURNED`, from `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` when it is returned again. The return's details (when it took effect, why, where it came from and what it returned) travel with the payment from here on.
+Moves the [presentment](../payment-state-model.md#presentments) the bank sent back to `RETURNED`, from `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` when a later presentment is returned. The return's details (when it took effect, why, where it came from and what it returned) go on that presentment's row, which stays `RETURNED`. A payment returned twice keeps both returns' details, one on each presentment.
 
 ## QueueRepresentment
 
-Commits `REPRESENTING` together with a `REPRESENT` Work Tracker row, due on the date the market's rules set. The return never starts the representment itself; the representment dispatcher does, when the date comes.
+Writes the next presentment as a new row, with the same payment ID and a `presentmentSequence` one higher, in `REPRESENTING`. The same commit writes its `REPRESENT` Work Tracker row, due on the date the market's rules set. The return never starts the representment itself; the representment dispatcher does, when the date comes.
 
 ## Represent
 
-Rechecks eligibility with Payment Instruments and Payment Options before anything goes to clearing, then sends the payment for clearing again and commits `REPRESENTED`. A failed recheck commits `DECLINED`.
+Rechecks eligibility with Payment Instruments and Payment Options before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. A failed recheck commits `DECLINED`, and nothing is sent.
 
 ## Settle
 

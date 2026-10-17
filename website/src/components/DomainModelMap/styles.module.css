@@ -1,6 +1,8 @@
 /* DomainModelMap: the payment classes on a grid of state by shape. Blue Box
    rules: tinted fields and filled boxes, no outlines, except the dashed
-   ghost, which is an outline on purpose because it is what is missing.
+   outline on a class the supplied code does not have yet, which is an
+   outline on purpose: it matches the dashed moves and marks what is still to
+   build.
 
    Depth follows the hierarchy. The two root types are the deepest fills,
    colour-coded: Payment in Deep Blue, Refund in a deep Bright Blue. The two
@@ -82,7 +84,7 @@
 .chip:hover {
   background: color-mix(in srgb, var(--chip) 20%, var(--amex-panel));
 }
-.chipGap {
+.chipTodo {
   --chip: var(--amex-mut);
 }
 .chipOn {
@@ -135,7 +137,7 @@
 }
 
 .expanded .svg {
-  max-width: min(100%, calc((100vh - 230px) * 1056 / 766));
+  max-width: min(100%, calc((100vh - 230px) * 1056 / 952));
   margin: 0 auto;
 }
 
@@ -270,20 +272,12 @@
   fill: var(--amex-txt-strong);
 }
 
-/* a missing class, should one be drawn again: an outline, no fill */
-.ghost .boxBody {
-  fill: transparent;
-  stroke: var(--amex-mut);
-  stroke-width: 1.2;
+/* a class the supplied code does not have yet: the same fill, and a dashed
+   outline in its own tone */
+.todo .boxBody {
+  stroke: var(--tone);
+  stroke-width: 1.3;
   stroke-dasharray: 4 3;
-}
-.ghost .boxState {
-  fill: var(--amex-mut);
-}
-.ghostTitle {
-  font-size: 12px;
-  font-style: italic;
-  fill: var(--amex-mut);
 }
 
 /* ---- the moves ---- */
@@ -297,18 +291,14 @@
   stroke: var(--dm-accent);
   stroke-width: 1.9;
 }
-.edgeGhost {
-  stroke-dasharray: 4 3;
-  stroke-width: 1.2;
+.edgeTodo {
+  stroke-dasharray: 5 3;
 }
 .headMove {
   fill: var(--amex-mut);
 }
 .headSplit {
   fill: var(--dm-accent);
-}
-.headGhost {
-  fill: var(--amex-mut);
 }
 
 .dim {
@@ -351,14 +341,14 @@
 .swSplit {
   border-top: 2px solid var(--dm-accent);
 }
-.swGhost {
-  border-top: 1.4px dashed var(--amex-mut);
+.swTodo {
+  border-top: 1.6px dashed var(--amex-mut);
 }
 
 /* ---- the value types ---- */
 .values {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
 }
 
