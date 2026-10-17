@@ -81,25 +81,27 @@
   font-family: var(--amex-font-sans);
 }
 
+/* One look per method, in blues and greys: POST is solid, PUT an outline,
+   GET a tint and DELETE grey. The name is on the badge, so colour only helps. */
 .post {
-  color: #0159ad;
-  background: color-mix(in srgb, #0159ad 12%, transparent);
-  border: 1px solid color-mix(in srgb, #0159ad 30%, transparent);
+  color: var(--amex-white);
+  background: var(--amex-blue);
+  border: 1px solid var(--amex-blue);
 }
 .put {
-  color: #97600c;
-  background: color-mix(in srgb, #97600c 12%, transparent);
-  border: 1px solid color-mix(in srgb, #97600c 30%, transparent);
+  color: var(--amex-midnight);
+  background: transparent;
+  border: 1px solid var(--amex-midnight);
 }
 .del {
-  color: #5f6f86;
-  background: color-mix(in srgb, #5f6f86 14%, transparent);
-  border: 1px solid color-mix(in srgb, #5f6f86 32%, transparent);
+  color: var(--amex-grey-700);
+  background: color-mix(in srgb, var(--amex-grey-600) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-grey-600) 32%, transparent);
 }
 .get {
-  color: #2f7d54;
-  background: color-mix(in srgb, #2f7d54 12%, transparent);
-  border: 1px solid color-mix(in srgb, #2f7d54 30%, transparent);
+  color: var(--amex-blue);
+  background: color-mix(in srgb, var(--amex-blue) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 30%, transparent);
 }
 
 /* No core API: the function stores its request in One-Data's inbox. */
@@ -125,7 +127,7 @@
   color: var(--amex-blue-bright);
 }
 :global([data-theme='dark']) .fn:hover {
-  color: #7fd1f5;
+  color: var(--amex-blue-300);
 }
 :global([data-theme='dark']) .path {
   background: none;
@@ -133,28 +135,22 @@
   color: var(--amex-txt);
 }
 :global([data-theme='dark']) .post {
-  color: #6ba6e6;
-  background: color-mix(in srgb, #6ba6e6 15%, transparent);
-  border-color: color-mix(in srgb, #6ba6e6 34%, transparent);
+  color: var(--amex-midnight);
+  background: var(--amex-blue-bright);
+  border-color: var(--amex-blue-bright);
 }
 :global([data-theme='dark']) .put {
-  color: #e0b34e;
-  background: color-mix(in srgb, #e0b34e 15%, transparent);
-  border-color: color-mix(in srgb, #e0b34e 34%, transparent);
+  color: var(--amex-deep-200);
+  background: transparent;
+  border-color: var(--amex-deep-200);
 }
 :global([data-theme='dark']) .del {
-  color: #93a3bb;
-  background: color-mix(in srgb, #93a3bb 15%, transparent);
-  border-color: color-mix(in srgb, #93a3bb 32%, transparent);
+  color: var(--amex-grey-400);
+  background: color-mix(in srgb, var(--amex-grey-400) 15%, transparent);
+  border-color: color-mix(in srgb, var(--amex-grey-400) 32%, transparent);
 }
 :global([data-theme='dark']) .get {
-  color: #57b483;
-  background: color-mix(in srgb, #57b483 15%, transparent);
-  border-color: color-mix(in srgb, #57b483 32%, transparent);
-}
-
-@media (max-width: 700px) {
-  .whatCell {
-    min-width: 220px;
-  }
+  color: var(--amex-blue-bright);
+  background: color-mix(in srgb, var(--amex-blue-bright) 15%, transparent);
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 34%, transparent);
 }

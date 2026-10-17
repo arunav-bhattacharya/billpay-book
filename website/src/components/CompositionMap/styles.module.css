@@ -43,7 +43,7 @@
   margin-top: 1px;
   border-radius: var(--amex-badge-radius);
   background: var(--amex-blue);
-  color: #ffffff;
+  color: var(--amex-white);
   font-size: 0.74rem;
   font-weight: 700;
 }

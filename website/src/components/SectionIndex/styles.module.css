@@ -66,7 +66,7 @@
 .row:hover .num,
 .row:focus-visible .num {
   background: var(--amex-blue);
-  color: #ffffff;
+  color: var(--amex-white);
 }
 
 /* The title is the link, and it is coloured like every other link on the site

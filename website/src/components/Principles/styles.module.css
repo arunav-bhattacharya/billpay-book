@@ -57,7 +57,7 @@
 }
 .row:hover .numeral {
   background: var(--amex-blue);
-  color: #ffffff;
+  color: var(--amex-white);
 }
 
 .title {

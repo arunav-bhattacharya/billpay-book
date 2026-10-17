@@ -46,6 +46,43 @@
 
   --amex-blue-100: #edf7ff;      /* Bright Blue 100 */
 
+  /* White is the type on every blue fill. Black appears only as shadow,
+     mixed toward transparent. */
+  --amex-white: #ffffff;
+  --amex-black: #000000;
+
+  /* DLS steps a component asks for by name. The dark theme redefines
+     --amex-platinum, --amex-indigo and --amex-temporal above; none of these
+     changes with the theme. */
+  --amex-blue-200: #b5d7f4;      /* Bright Blue 200 */
+  --amex-blue-300: #83baeb;      /* Bright Blue 300 */
+  --amex-blue-800: #003a6e;      /* Bright Blue 800 */
+  --amex-deep-100: #e0e4f1;      /* Deep Blue 100 */
+  --amex-deep-200: #a7b3d9;      /* Deep Blue 200 */
+  --amex-deep-300: #7789bf;      /* Deep Blue 300 */
+  --amex-deep-400: #4c63a6;      /* Deep Blue 400 */
+  --amex-deep-600: #112a73;      /* Deep Blue 600 */
+  --amex-grey-300: #e0e0e0;      /* Grey 300 */
+  --amex-grey-400: #bdbdbd;      /* Grey 400 */
+  --amex-grey-600: #737373;      /* Grey 600 */
+  --amex-grey-700: #595959;      /* Grey 700 */
+  --amex-grey-800: #3d3d3d;      /* Grey 800 */
+  --amex-grey-900: #262626;      /* Grey 900 */
+
+  /* Depths: the deep navies that gradients and dark-mode washes mix toward,
+     darkest first. They sit below the Deep Blue scale and are never used as
+     a colour on their own. Depth 4 is the floor every filled badge and icon
+     deepens to. */
+  --amex-depth-1: #02050e;
+  --amex-depth-2: #020c17;
+  --amex-depth-3: #041324;
+  --amex-depth-4: #05132b;
+  --amex-depth-5: #00133d;
+  --amex-depth-6: #0a1f3d;
+  --amex-depth-7: #0b2246;
+  --amex-depth-8: #1c355f;
+  --amex-depth-9: #12356a;
+
   /* Every numbered badge on the site, whatever its size, shares this corner:
      very slightly rounded, so the box still reads as the logo's square. */
   --amex-badge-radius: 4px;

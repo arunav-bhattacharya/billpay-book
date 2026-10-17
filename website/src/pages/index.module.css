@@ -6,7 +6,7 @@
   position: relative;
   overflow: hidden;
   padding: 4.6rem 0 4.8rem;
-  color: #ffffff;
+  color: var(--amex-white);
   background:
     radial-gradient(48% 85% at 80% 45%, var(--amex-hero-glow) 0%, transparent 70%),
     radial-gradient(40% 70% at -5% 105%, var(--amex-hero-glow-soft) 0%, transparent 70%),
@@ -48,7 +48,7 @@
   line-height: 1.02;
   font-weight: 600;
   letter-spacing: -0.015em;
-  color: #ffffff;
+  color: var(--amex-white);
 }
 /* Light Blue, the one place it is allowed a whole word. */
 .heroTitleAccent {
@@ -73,7 +73,7 @@
    Weight 450 lands in the Regular bucket of the two Benton cuts, so neither
    button sits a step above body copy. */
 .heroPrimary {
-  background: #ffffff;
+  background: var(--amex-white);
   border: none;
   border-radius: 6px;
   color: var(--amex-midnight);
@@ -87,15 +87,15 @@
 
 .heroGhost {
   background: transparent;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  border: 1.5px solid color-mix(in srgb, var(--amex-white) 50%, transparent);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--amex-white);
   font-weight: 450;
   transition: border-color 0.16s ease;
 }
 .heroGhost:hover {
-  border-color: #ffffff;
-  color: #ffffff;
+  border-color: var(--amex-white);
+  color: var(--amex-white);
 }
 
 /* ---- The section board ----
@@ -143,7 +143,7 @@
   height: 34px;
   border-radius: var(--amex-badge-radius);
   background: var(--amex-blue);
-  color: #ffffff;
+  color: var(--amex-white);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -153,7 +153,7 @@
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.25;
-  color: #ffffff;
+  color: var(--amex-white);
 }
 
 .tileBlurb {

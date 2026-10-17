@@ -34,7 +34,7 @@
 .iconButton:hover {
   background: var(--amex-blue);
   border-color: var(--amex-blue);
-  color: #ffffff;
+  color: var(--amex-white);
 }
 :global([data-theme='dark']) .iconButton {
   border-color: color-mix(in srgb, var(--amex-blue-bright) 28%, transparent);
@@ -43,7 +43,7 @@
 :global([data-theme='dark']) .iconButton:hover {
   background: var(--amex-blue-bright);
   border-color: var(--amex-blue-bright);
-  color: #001327;
+  color: var(--amex-navy);
 }
 
 .icon {
@@ -77,7 +77,7 @@
 }
 :global([data-theme='dark']) .expandButton:hover {
   background: var(--amex-blue-bright);
-  color: #001327;
+  color: var(--amex-navy);
 }
 
 /* --- Expanded layer ---------------------------------------------------- */

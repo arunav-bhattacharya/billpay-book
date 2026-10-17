@@ -1,39 +1,39 @@
-/* LegacyEstateMap — the estate as it actually runs, at full size.
+/* LegacyEstateMap: the estate as it actually runs, at full size.
    Every node sets --kind and every edge sets --ec, so the box fill, the stroke,
-   the arrowhead and the legend swatch all mix off one hue and the legend cannot
-   drift from the drawing. Purple is reserved for what was added on top of the
-   legacy estate: it appears nowhere else in the palette, so it cannot be read
-   as one more system. */
+   the arrowhead and the legend swatch all mix off one colour and the legend
+   cannot drift from the drawing. What was added on top of the legacy estate
+   takes Light Blue, as a ring and a tinted panel. */
 
 .wrap {
   composes: panel from '../../css/recipes.module.css';
 
-  /* One local ramp for the whole map. Every hue is far enough from its
-     neighbours to survive being drawn as a 1.6px line on a dark background. */
-  --lem-chan: var(--amex-blue);   /* channels: the signature blue the journey banners use */
-  --lem-iface: #0aa2c0;  /* interfaces: bright cyan */
-  --lem-key: #10893f;    /* payments domain systems: bright green */
-  --lem-ext: #5b6b7f;    /* outside the payments domain: cool stone */
-  --lem-tp: #a07a12;     /* third parties: gold */
-  --lem-db: #e2620b;     /* databases and database access: bright orange */
-  --lem-repl: #64748b;   /* replication: slate */
-  --lem-fail: #c0392b;   /* fallback and traceability: red */
-  --lem-bank: #a21caf;   /* the bank: fuchsia, its own colour */
-  --lem-new: #6d4aca;    /* added on top: violet, used nowhere else */
+  /* One local ramp for the whole map, in DLS blues and greys only. Kinds in
+     the same family are also told apart by shape and line: interfaces are
+     hollow capsules, stores are an icon and a name, and file transfers,
+     replication and fallback are dashed or dotted. */
+  --lem-chan: var(--amex-blue);         /* channels */
+  --lem-iface: var(--amex-blue-bright); /* interfaces */
+  --lem-key: var(--amex-midnight);      /* payments domain systems */
+  --lem-ext: var(--amex-grey-600);      /* outside the payments domain */
+  --lem-tp: var(--amex-deep-400);       /* third parties */
+  --lem-db: var(--amex-grey-800);       /* databases and database access */
+  --lem-repl: var(--amex-grey-600);     /* replication */
+  --lem-fail: var(--amex-grey-900);     /* fallback and traceability */
+  --lem-bank: var(--amex-blue-800);     /* the bank */
+  --lem-new: var(--amex-sky);           /* added on top of the legacy estate */
   margin: 1.5rem 0 2.4rem;
   padding: 0.9rem 0.9rem 1.1rem;
   /* The house card, from the recipe in css/recipes.module.css. */
 }
 :global([data-theme='dark']) .wrap {
-  --lem-iface: #22d3ee;
-  --lem-key: #34d97a;
-  --lem-ext: #9fb3c8;
-  --lem-tp: #d8c45f;
-  --lem-db: #fb923c;
-  --lem-repl: #94a3b8;
-  --lem-fail: #e2685c;
-  --lem-bank: #e879f9;
-  --lem-new: #a78bfa;
+  /* Lighter steps of the same families. Channels, outside systems,
+     replication and what was added on top keep their light-theme colours. */
+  --lem-iface: var(--amex-blue-300);
+  --lem-key: var(--amex-deep-100);
+  --lem-tp: var(--amex-deep-300);
+  --lem-db: var(--amex-grey-400);
+  --lem-fail: var(--amex-grey-300);
+  --lem-bank: var(--amex-blue-200);
 }
 
 .expanded {
@@ -80,8 +80,9 @@
   border-color: color-mix(in srgb, var(--chip) 75%, transparent);
   background: color-mix(in srgb, var(--chip) 20%, var(--amex-panel));
 }
-.chipOn {
-  color: #fff;
+.chipOn,
+.chipOn:hover {
+  color: var(--chip-ink, var(--amex-white));
   border-color: transparent;
   background: var(--chip);
 }
@@ -92,6 +93,13 @@
 .c_processing { --chip: var(--lem-iface); }
 .c_files { --chip: var(--lem-tp); }
 .c_mainframe { --chip: var(--lem-repl); }
+/* Type on an active chip: white on a dark fill, navy on a light one. In dark
+   mode most fills are light, so navy is the default there. */
+.c_facade,
+.c_processing { --chip-ink: var(--amex-navy); }
+:global([data-theme='dark']) .chip { --chip-ink: var(--amex-navy); }
+:global([data-theme='dark']) .c_channel,
+:global([data-theme='dark']) .c_mainframe { --chip-ink: var(--amex-white); }
 
 .tools {
   display: flex;

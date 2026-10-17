@@ -96,7 +96,7 @@
   background: var(--ifm-background-surface-color, var(--ifm-background-color));
   color: var(--ifm-color-emphasis-700);
   cursor: pointer;
-  box-shadow: -2px 2px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: -2px 2px 12px color-mix(in srgb, var(--amex-black) 12%, transparent);
   transition: color 0.16s ease, background 0.16s ease, transform 0.16s ease;
 }
 

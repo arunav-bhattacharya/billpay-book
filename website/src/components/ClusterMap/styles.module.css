@@ -183,12 +183,12 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #ffffff;
+  color: var(--amex-white);
 }
 .clusterShards {
   font-size: 0.74rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
+  color: color-mix(in srgb, var(--amex-white) 78%, transparent);
 }
 .clusterBody {
   display: flex;
@@ -323,7 +323,7 @@
   height: 20px;
   border-radius: var(--amex-badge-radius);
   background: var(--amex-blue);
-  color: #ffffff;
+  color: var(--amex-white);
   font-size: 0.7rem;
   font-weight: 700;
 }

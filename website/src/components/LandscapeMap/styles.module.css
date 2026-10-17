@@ -195,7 +195,7 @@
    with white type rather than a tint that would sink into the panel. Only the
    group title has to be lifted, having nothing but the panel behind it. */
 :global([data-theme='dark']) .groupChannels .groupTitle {
-  color: color-mix(in srgb, #ffffff 62%, var(--tier));
+  color: color-mix(in srgb, var(--amex-white) 62%, var(--tier));
 }
 .groupSupport {
   --tier: var(--amex-cat-build);
@@ -306,9 +306,9 @@
   line-height: 1.3;
   padding: 0.28rem 0.5rem 0.28rem 0.44rem;
   border-radius: 8px;
-  color: #fff;
+  color: var(--amex-white);
   background: var(--tier);
-  border: 1px solid color-mix(in srgb, #ffffff 24%, var(--tier));
+  border: 1px solid color-mix(in srgb, var(--amex-white) 24%, var(--tier));
 }
 
 /* only ever drawn inside a channel pill, so it is set against the navy */
@@ -442,39 +442,39 @@
    type, a light lift. Nothing else on the map is treated this way. */
 .hero {
   border: none;
-  border-top: 3px solid rgba(255, 255, 255, 0.8);
+  border-top: 3px solid color-mix(in srgb, var(--amex-white) 80%, transparent);
   border-radius: 14px;
   padding: 0.72rem 0.7rem 0.75rem;
   background: var(--amex-grad-btn);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--amex-blue-bright) 22%, transparent);
 }
 .card.hero .title {
-  color: #fff;
+  color: var(--amex-white);
   font-size: 1.02rem;
   font-weight: 550;
 }
 .hero .num {
   color: var(--amex-blue-deep);
-  background: #fff;
+  background: var(--amex-white);
 }
 /* 450, not the 550 this used to carry: 400 to 500 is the Regular bucket of the
    two Benton cuts and 501 up is Medium, so these chips now set in the same
    face as every other cap chip in the map. Bill Pay Core is already marked out
    by the blue field it sits on. */
 .hero .cap {
-  color: #fff;
+  color: var(--amex-white);
   font-weight: 450;
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.42);
+  background: color-mix(in srgb, var(--amex-white) 18%, transparent);
+  border-color: color-mix(in srgb, var(--amex-white) 42%, transparent);
 }
 .hero .store {
-  color: rgba(255, 255, 255, 0.88);
+  color: color-mix(in srgb, var(--amex-white) 88%, transparent);
 }
 .hero .storeGlyph {
-  stroke: rgba(255, 255, 255, 0.8);
+  stroke: color-mix(in srgb, var(--amex-white) 80%, transparent);
 }
 .hero .storeGlyph ellipse {
-  fill: rgba(255, 255, 255, 0.2);
+  fill: color-mix(in srgb, var(--amex-white) 20%, transparent);
 }
 
 /* ---- card head ---- */
@@ -504,11 +504,11 @@
   border-radius: 50%;
   font-size: 0.65rem;
   font-weight: 750;
-  color: #fff;
+  color: var(--amex-white);
   background: linear-gradient(
     140deg,
     var(--tier),
-    color-mix(in srgb, var(--tier) 55%, #05132b)
+    color-mix(in srgb, var(--tier) 55%, var(--amex-depth-4))
   );
 }
 
@@ -550,15 +550,15 @@
   padding: 0.16rem 0.42rem;
   border-radius: 7px;
   color: var(--amex-txt);
-  background: color-mix(in srgb, var(--tier) 11%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--tier) 30%, #d7deea);
+  background: color-mix(in srgb, var(--tier) 11%, var(--amex-white));
+  border: 1px solid color-mix(in srgb, var(--tier) 30%, var(--amex-deep-100));
 }
 .cap:last-child:nth-child(odd) {
   grid-column: 1 / -1;
 }
 :global([data-theme='dark']) .cap {
-  background: color-mix(in srgb, var(--tier) 26%, #0b2246);
-  border-color: color-mix(in srgb, var(--tier) 42%, #1c355f);
+  background: color-mix(in srgb, var(--tier) 26%, var(--amex-depth-7));
+  border-color: color-mix(in srgb, var(--tier) 42%, var(--amex-depth-8));
 }
 
 /* ---- data store glyph ---- */
@@ -660,7 +660,7 @@
 /* solid, like the pills it stands for, rather than the tint the others take */
 .swatch.channels {
   background: var(--tier);
-  border-color: color-mix(in srgb, #ffffff 24%, var(--tier));
+  border-color: color-mix(in srgb, var(--amex-white) 24%, var(--tier));
 }
 
 .heroSwatch {

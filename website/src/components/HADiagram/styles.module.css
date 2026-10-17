@@ -184,13 +184,13 @@
   fill: var(--amex-blue);
 }
 .pActive text {
-  fill: #ffffff;
+  fill: var(--amex-white);
 }
 .pPrimary rect {
   fill: var(--amex-midnight);
 }
 .pPrimary text {
-  fill: #ffffff;
+  fill: var(--amex-white);
 }
 :global([data-theme='dark']) .pPrimary rect {
   fill: var(--amex-banner-block);

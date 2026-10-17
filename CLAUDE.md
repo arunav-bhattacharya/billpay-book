@@ -50,7 +50,7 @@ Reuse before building. Take colour from the `--amex-*` tokens so both themes wor
 
 **Shared behaviour lives in `website/src/lib/`** as flat files: `useOverlay` (Escape, scroll lock, focus return), `inlineMarkup` (`**bold**` and `` `code` `` in row data), `ordinal`, `sections`. It is deliberately not under `src/components/`, where every folder is a public MDX import surface.
 
-**Colour comes from tokens, always.** Worker tone is `--amex-worker-online` / `--amex-worker-offline`, applied through `WorkerChip`. The nine `--amex-cat-*` section accents are one set, read by literal name in components; deployment, operations and onboarding have no reader today but stay so the set is complete. Section numbering itself is the Bright Blue badge, not a per-section hue.
+**Colour comes from tokens, always.** No component holds a hex or rgba value. A component that needs a specific step names it from the palette block: `--amex-white`, `--amex-black` (shadow only), the DLS steps such as `--amex-blue-300`, `--amex-deep-400` and `--amex-grey-700`, and the `--amex-depth-*` navies that gradients mix toward. Worker tone is `--amex-worker-online` / `--amex-worker-offline`, applied through `WorkerChip`. The nine `--amex-cat-*` section accents are one set, read by literal name in components; deployment, operations and onboarding have no reader today but stay so the set is complete. Section numbering itself is the Bright Blue badge, not a per-section hue.
 
 **Prop names.** `term` and `desc` for a heading and the line under it, in every component that renders that pair. `rows` for a table's data. Keep a domain name where the concept really is different: a worker split has `workers`, a journey has `steps`.
 

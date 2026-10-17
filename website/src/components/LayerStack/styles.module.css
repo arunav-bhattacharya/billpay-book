@@ -7,16 +7,15 @@
   display: flex;
   flex-direction: column;
 
-  --ly-surface: #ffffff;
+  --ly-surface: var(--amex-panel);
   /* Chips are plain white on the tinted block, so they read without an outline. */
-  --ly-chip: #ffffff;
+  --ly-chip: var(--amex-white);
   --ly-chip-mix: 0%;
   --ly-lo: 5;
   --ly-hi: 11;
 }
 :global([data-theme='dark']) .map {
-  --ly-surface: #0c173a;
-  --ly-chip: #1a2b5e;
+  --ly-chip: var(--amex-badge-quiet);
   --ly-chip-mix: 10%;
   --ly-lo: 12;
   --ly-hi: 27;
@@ -57,11 +56,11 @@
   align-items: center;
   justify-content: center;
   border-radius: 15px 0 0 15px;
-  color: #fff;
+  color: var(--amex-white);
   background: linear-gradient(
     180deg,
     var(--ly-accent) 0%,
-    color-mix(in srgb, var(--ly-accent) 74%, #00133d) 100%
+    color-mix(in srgb, var(--ly-accent) 74%, var(--amex-depth-5)) 100%
   );
   box-shadow: var(--card-sh);
 }
@@ -70,8 +69,8 @@
 :global([data-theme='dark']) .group > .groupLabel {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ly-accent) 86%, #02050e) 0%,
-    color-mix(in srgb, var(--ly-accent) 54%, #02050e) 100%
+    color-mix(in srgb, var(--ly-accent) 86%, var(--amex-depth-1)) 0%,
+    color-mix(in srgb, var(--ly-accent) 54%, var(--amex-depth-1)) 100%
   );
 }
 .group > .groupLabel span {
@@ -150,11 +149,11 @@
   width: 46px;
   height: 46px;
   border-radius: 13px;
-  color: #fff;
+  color: var(--amex-white);
   background: linear-gradient(
     140deg,
     var(--ly-accent),
-    color-mix(in srgb, var(--ly-accent) 55%, #05132b)
+    color-mix(in srgb, var(--ly-accent) 55%, var(--amex-depth-4))
   );
   box-shadow: 0 4px 13px color-mix(in srgb, var(--ly-accent) 42%, transparent);
 }
@@ -204,9 +203,6 @@
   background: color-mix(in srgb, var(--ly-accent) var(--ly-chip-mix), var(--ly-chip));
   border: none;
   white-space: nowrap;
-}
-:global([data-theme='dark']) .chip {
-  color: #e8f0fb;
 }
 
 .code {
@@ -262,7 +258,7 @@
   line-height: 1;
 }
 :global([data-theme='dark']) .loopConnector {
-  color: color-mix(in srgb, var(--ly-accent) 45%, #ffffff);
+  color: color-mix(in srgb, var(--ly-accent) 45%, var(--amex-white));
 }
 
 /* the async band reads as an aside: dashed, and outside every group */

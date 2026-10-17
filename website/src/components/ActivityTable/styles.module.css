@@ -52,13 +52,13 @@
 }
 
 .chipOn {
-  color: #ffffff;
+  color: var(--amex-white);
   background: var(--amex-blue);
   border-color: var(--amex-blue);
 }
 
 :global([data-theme='dark']) .chipOn {
-  color: #001327;
+  color: var(--amex-navy);
   background: var(--amex-blue-bright);
   border-color: var(--amex-blue-bright);
 }

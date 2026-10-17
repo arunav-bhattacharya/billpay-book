@@ -224,12 +224,14 @@ sub-labels: the 5-minute cache TTL, "max of GAR and CAS", the routing keys
 every trunk hand-placed into a numbered lane so parallel runs never overlap; connected
 boxes share centrelines so the busiest edges are dead straight. Verified in-browser with
 a geometry checker: **0** edges through boxes, **0** node overlaps, **0** label
-collisions. Local `--lem-*` colour ramp (channels Amex blue, interfaces cyan, key
-systems green, third parties amber, databases pink, replication slate, SDK teal,
-fallback red, "added on top" violet); line glyphs for database / file / message /
-batch / SFT. Layer-spotlight chips, zoom, pan and a full-screen mode; nothing is ever
-removed from the canvas, only dimmed. `showIncremental` prop (default `true`) toggles
-the violet "added on top of the legacy estate" treatment.
+collisions. Local `--lem-*` colour ramp in DLS blues and greys only (2026-10-17):
+channels Bright Blue, interfaces Bright Blue 400, payments domain systems Deep Blue,
+third parties Deep Blue 400, the bank Bright Blue 800, outside systems, databases,
+replication and fallback in greys, and "added on top" Light Blue, with lighter steps
+in dark mode; line glyphs for database / file / message / batch / SFT. Layer-spotlight
+chips, zoom, pan and a full-screen mode; nothing is ever removed from the canvas, only
+dimmed. `showIncremental` prop (default `true`) toggles the Light Blue "added on top of
+the legacy estate" treatment.
 
 `## Legacy vs modern` rewritten as a three-column table with a named **What changed**
 aspect column, styled by `.compareTable` (section 14 of `src/css/custom.css`).

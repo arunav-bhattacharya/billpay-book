@@ -23,12 +23,12 @@
      rather than a status colour. */
   --jm-num: var(--amex-midnight);
   /* Worker pills name infrastructure, so they get neutral DLS hues. */
-  --jm-online: #4c63a6;
-  --jm-offline: #737373;
+  --jm-online: var(--amex-deep-400);
+  --jm-offline: var(--amex-grey-600);
   /* The orchestrating workflow shares the step-number navy on purpose: the
      workflow is the thing that owns those numbered steps. */
-  --jm-wf: #112a73;
-  --jm-wf-ink: #ffffff;
+  --jm-wf: var(--amex-deep-600);
+  --jm-wf-ink: var(--amex-white);
   /* Both layer boxes are Amex blue. They stay apart by weight, not hue: the
      outer band is dashed on a light wash, the core is solid on a deep one. */
   --jm-outer: var(--amex-blue);
@@ -42,14 +42,14 @@
 :global([data-theme='dark']) .wrap {
   background: var(--amex-panel);
   /* Bright Blue lifted enough to hold its own on the dark panel. */
-  --jm-accent: #56a1e3;
-  --jm-num: #a7b3d9;
-  --jm-online: #a7b3d9;
-  --jm-offline: #bdbdbd;
+  --jm-accent: var(--amex-blue-bright);
+  --jm-num: var(--amex-deep-200);
+  --jm-online: var(--amex-deep-200);
+  --jm-offline: var(--amex-grey-400);
   /* The lifted navy needs dark ink rather than white. */
-  --jm-wf: #a7b3d9;
-  --jm-wf-ink: #00081f;
-  --jm-outer: #56a1e3;
+  --jm-wf: var(--amex-deep-200);
+  --jm-wf-ink: var(--amex-navy);
+  --jm-outer: var(--amex-blue-bright);
 }
 
 /* ==================================================================== *
@@ -82,12 +82,12 @@
   gap: 0.42rem;
   padding: 0.26rem 0.62rem 0.28rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid color-mix(in srgb, var(--amex-white) 28%, transparent);
+  background: color-mix(in srgb, var(--amex-white) 14%, transparent);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.94);
+  color: color-mix(in srgb, var(--amex-white) 94%, transparent);
   white-space: nowrap;
 }
 
@@ -95,12 +95,12 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--amex-white);
 }
 
 .kind[data-kind='system'] .kindDot {
   background: transparent;
-  border: 2px solid #ffbd85;
+  border: 2px solid var(--amex-sky);
 }
 
 @media (max-width: 560px) {
@@ -117,7 +117,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.11em;
-  color: rgba(255, 255, 255, 0.72);
+  color: color-mix(in srgb, var(--amex-white) 72%, transparent);
 }
 
 .title {
@@ -125,7 +125,7 @@
   font-size: 1.28rem;
   font-weight: 650;
   letter-spacing: -0.004em;
-  color: #ffffff;
+  color: var(--amex-white);
 }
 
 /* ==================================================================== *
@@ -167,16 +167,16 @@
     color-mix(in srgb, var(--jm-outer) 5%, var(--amex-panel)) 100%
   );
 }
-/* Near-white in light mode. A blue wash here turned the amber async band a muddy
-   grey-green, and it left nothing for the step cards to rise from. The colour
-   moves onto the cards instead, and the solid border still bounds the box. */
+/* Near-white in light mode. A blue wash here muddied the async band and left
+   nothing for the step cards to rise from. The colour moves onto the cards
+   instead, and the solid border still bounds the box. */
 .layerCore {
   --layer-tone: color-mix(in srgb, var(--jm-accent) 55%, transparent);
   border: 1.5px solid var(--layer-tone);
   background: linear-gradient(
     158deg,
-    color-mix(in srgb, var(--jm-accent) 6%, #ffffff) 0%,
-    color-mix(in srgb, var(--jm-accent) 2%, #ffffff) 100%
+    color-mix(in srgb, var(--jm-accent) 6%, var(--amex-white)) 0%,
+    color-mix(in srgb, var(--jm-accent) 2%, var(--amex-white)) 100%
   );
   box-shadow: var(--amex-sh-sm);
 }
@@ -186,8 +186,8 @@
 :global([data-theme='dark']) .layerCore {
   background: linear-gradient(
     158deg,
-    color-mix(in srgb, var(--jm-accent) 11%, #041324) 0%,
-    color-mix(in srgb, var(--jm-accent) 5%, #020c17) 100%
+    color-mix(in srgb, var(--jm-accent) 11%, var(--amex-depth-3)) 0%,
+    color-mix(in srgb, var(--jm-accent) 5%, var(--amex-depth-2)) 100%
   );
 }
 
@@ -236,11 +236,11 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  color: #fff;
+  color: var(--amex-white);
   background: linear-gradient(
     140deg,
     var(--amex-cat-vision),
-    color-mix(in srgb, var(--amex-cat-vision) 55%, #05132b)
+    color-mix(in srgb, var(--amex-cat-vision) 55%, var(--amex-depth-4))
   );
 }
 .actorIcon .icon {
@@ -271,7 +271,7 @@
   background: var(--ifm-background-color);
 }
 :global([data-theme='dark']) .channels {
-  background: color-mix(in srgb, #ffffff 4%, transparent);
+  background: color-mix(in srgb, var(--amex-white) 4%, transparent);
 }
 .channelsLabel {
   position: absolute;
@@ -359,7 +359,7 @@
   border: 1px solid color-mix(in srgb, var(--jm-accent) 32%, transparent);
 }
 :global([data-theme='dark']) .arrowLabel {
-  color: color-mix(in srgb, var(--jm-accent) 45%, #ffffff);
+  color: color-mix(in srgb, var(--jm-accent) 45%, var(--amex-white));
   background: color-mix(in srgb, var(--jm-accent) 22%, var(--amex-panel));
 }
 
@@ -428,7 +428,7 @@
   background: var(--amex-panel);
 }
 :global([data-theme='dark']) .hop {
-  background: color-mix(in srgb, #ffffff 5%, transparent);
+  background: color-mix(in srgb, var(--amex-white) 5%, transparent);
 }
 
 /* The One-Data function is a named contract, not a path, so it gets the text
@@ -443,7 +443,7 @@
 }
 :global([data-theme='dark']) .kFunction {
   background: color-mix(in srgb, var(--jm-accent) 22%, transparent);
-  color: color-mix(in srgb, var(--jm-accent) 45%, #ffffff);
+  color: color-mix(in srgb, var(--jm-accent) 45%, var(--amex-white));
 }
 
 /* Same face and size as the function chip it follows. The lighter tint and the
@@ -526,7 +526,7 @@
   background: linear-gradient(
     140deg,
     var(--jm-wf),
-    color-mix(in srgb, var(--jm-wf) 62%, #05132b)
+    color-mix(in srgb, var(--jm-wf) 62%, var(--amex-depth-4))
   );
   box-shadow: 0 3px 12px color-mix(in srgb, var(--jm-wf) 45%, transparent);
 }
@@ -534,7 +534,7 @@
   background: linear-gradient(
     140deg,
     var(--jm-wf),
-    color-mix(in srgb, var(--jm-wf) 72%, #ffffff)
+    color-mix(in srgb, var(--jm-wf) 72%, var(--amex-white))
   );
 }
 .orchestrator .icon {
@@ -670,16 +670,16 @@
   font-weight: 700;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  color: #ffffff;
+  color: var(--amex-white);
   background: linear-gradient(
     135deg,
     var(--jm-async) 0%,
-    color-mix(in srgb, var(--jm-async) 72%, #7a2d00) 100%
+    color-mix(in srgb, var(--jm-async) 72%, var(--amex-navy)) 100%
   );
   border: 1px solid color-mix(in srgb, var(--jm-async) 70%, transparent);
 }
 :global([data-theme='dark']) .bandLabel {
-  color: #2a1300;
+  color: var(--amex-navy);
 }
 
 /* ---- a step node ---- */
@@ -695,8 +695,8 @@
   border-radius: 14px;
   background: linear-gradient(
     158deg,
-    color-mix(in srgb, var(--jm-accent) 9%, #ffffff) 0%,
-    color-mix(in srgb, var(--jm-accent) 20%, #ffffff) 100%
+    color-mix(in srgb, var(--jm-accent) 9%, var(--amex-white)) 0%,
+    color-mix(in srgb, var(--jm-accent) 20%, var(--amex-white)) 100%
   );
   box-shadow:
     0 5px 16px color-mix(in srgb, var(--amex-midnight) 14%, transparent),
@@ -706,13 +706,13 @@
 :global([data-theme='dark']) .node {
   background: linear-gradient(
     158deg,
-    color-mix(in srgb, var(--jm-accent) 30%, #12356a) 0%,
-    color-mix(in srgb, var(--jm-accent) 15%, #0a1f3d) 100%
+    color-mix(in srgb, var(--jm-accent) 30%, var(--amex-depth-9)) 0%,
+    color-mix(in srgb, var(--jm-accent) 15%, var(--amex-depth-6)) 100%
   );
   border-color: color-mix(in srgb, var(--jm-accent) 62%, transparent);
   box-shadow:
-    0 7px 20px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(150, 195, 240, 0.16);
+    0 7px 20px color-mix(in srgb, var(--amex-black) 50%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--amex-blue-300) 16%, transparent);
 }
 
 .linked .node::after {
@@ -762,7 +762,7 @@
   border: 1px solid color-mix(in srgb, var(--jm-accent) 40%, transparent);
 }
 :global([data-theme='dark']) .forkLabel {
-  color: color-mix(in srgb, var(--jm-accent) 45%, #ffffff);
+  color: color-mix(in srgb, var(--jm-accent) 45%, var(--amex-white));
   background: var(--amex-panel);
 }
 
@@ -863,12 +863,12 @@
   border-radius: 8px;
   font-size: 0.7rem;
   font-weight: 750;
-  color: #fff;
+  color: var(--amex-white);
   background: var(--jm-num);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--jm-num) 45%, transparent);
 }
 :global([data-theme='dark']) .nodeNum {
-  color: #17123a;
+  color: var(--amex-navy);
 }
 
 .nodeIcon {
@@ -877,11 +877,11 @@
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  color: #fff;
+  color: var(--amex-white);
   background: linear-gradient(
     140deg,
     var(--jm-accent),
-    color-mix(in srgb, var(--jm-accent) 55%, #05132b)
+    color-mix(in srgb, var(--jm-accent) 55%, var(--amex-depth-4))
   );
   box-shadow: 0 3px 11px color-mix(in srgb, var(--jm-accent) 38%, transparent);
 }
@@ -993,8 +993,8 @@
 }
 :global([data-theme='dark']) .persistChip {
   background: color-mix(in srgb, var(--jm-accent) 26%, var(--amex-panel));
-  color: color-mix(in srgb, var(--jm-accent) 40%, #ffffff);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+  color: color-mix(in srgb, var(--jm-accent) 40%, var(--amex-white));
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--amex-black) 45%, transparent);
 }
 .persistChip .icon {
   width: 15px;
@@ -1423,12 +1423,12 @@
   border-radius: 7px;
   font-size: 0.66rem;
   font-weight: 750;
-  color: #fff;
+  color: var(--amex-white);
   background: var(--jm-num);
   transform: translateY(2px);
 }
 :global([data-theme='dark']) .detailNum {
-  color: #17123a;
+  color: var(--amex-navy);
 }
 .detailDot {
   width: 7px;
