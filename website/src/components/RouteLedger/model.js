@@ -46,10 +46,19 @@ export const MOVE = {
    `rail` marks the two every stage calls. */
 export const IFACES = [
   {name: 'PaymentStore', system: 'Oracle', queue: 'local activity', rail: true, note: 'every stage commits here'},
-  {name: 'LifecycleEventActivities', system: 'RTF', queue: "the workflow's queue", rail: true, note: 'every state change'},
+  {
+    name: 'LifecycleEventActivities',
+    system: 'RTF',
+    queue: "the workflow's queue",
+    rail: true,
+    fails: 'hold',
+    note: 'every state change',
+  },
   {
     name: 'CommunicationActivities',
     system: 'Raven',
+    long: 'Raven, for customer messages',
+    fails: 'hold',
     queue: 'ds-comms',
     at: ['Verify', 'Reverify', 'Fulfil', 'Cancel', 'Return', 'Represent'],
     note: 'where the customer is told',
@@ -57,6 +66,7 @@ export const IFACES = [
   {
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
+    fails: 'decline',
     queue: "the workflow's queue",
     at: ['Verify', 'Reverify', 'Represent'],
     note: 'its own queue once it has an agreed limit',
@@ -64,6 +74,7 @@ export const IFACES = [
   {
     name: 'OptionsActivities',
     system: 'Payment Options',
+    fails: 'decline',
     queue: "the workflow's queue",
     at: ['Verify', 'Reverify', 'Represent'],
     note: 'its own queue once it has an agreed limit',
@@ -71,6 +82,8 @@ export const IFACES = [
   {
     name: 'ClearingActivities',
     system: 'MR/M3',
+    long: 'MR/M3, for clearing',
+    fails: 'must',
     queue: 'ds-clearing',
     at: ['Execute', 'Represent'],
     note: 'a corporate leg never clears',
@@ -78,6 +91,8 @@ export const IFACES = [
   {
     name: 'ReceivablesActivities',
     system: 'GAR',
+    long: 'GAR, Accounts Receivable',
+    fails: 'must',
     queue: 'ds-receivables',
     at: ['Execute'],
     note: 'a corporate parent leaves it to its legs',
@@ -85,17 +100,27 @@ export const IFACES = [
   {
     name: 'AuthorizationActivities',
     system: 'AMP',
+    long: 'AMP, for open-to-buy',
+    fails: 'must',
     queue: 'ds-authorization',
     at: ['Execute'],
     note: 'a corporate parent leaves it to its legs',
   },
-  {name: 'AccountingActivities', system: 'Accounting', queue: 'ds-accounting', at: ['Fulfil']},
-  {name: 'BalanceControlActivities', system: 'eBNC', queue: 'ds-ebnc', at: ['Fulfil']},
-  {name: 'RiskActivities', system: 'Risk', queue: 'ds-risk', at: ['Fulfil']},
+  {name: 'AccountingActivities', system: 'Accounting', fails: 'must', queue: 'ds-accounting', at: ['Fulfil']},
+  {
+    name: 'BalanceControlActivities',
+    system: 'eBNC',
+    long: 'eBNC, Balance & Control',
+    fails: 'must',
+    queue: 'ds-ebnc',
+    at: ['Fulfil'],
+  },
+  {name: 'RiskActivities', system: 'Risk', fails: 'must', queue: 'ds-risk', at: ['Fulfil']},
   {name: 'AllocationActivities', system: 'Allocations manager', queue: 'ds-allocations', at: ['RequestAllocations']},
   {
     name: 'BankConfirmationActivities',
     system: 'Bank-confirmation provider',
+    long: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK,",
     queue: "the workflow's queue",
     at: ['RequestConfirmation', 'Verify'],
     note: 'a Proposed name. Only the Online cluster calls it',
@@ -160,6 +185,7 @@ export const BANDS = [
             lead: 'Pay today, with several instructions.',
             stages: CVEF,
             child: CVEF,
+            childWf: 'CreateImmediatePayment',
             journey: 'Create payment, today, several instructions',
             wfId: '{paymentId}-init',
             chips: five('CONSUMER', 'Y', 'N'),
@@ -225,6 +251,7 @@ export const BANDS = [
             own: ['Cancel'],
             stages: CV,
             child: CV,
+            childWf: 'CreateScheduledPayment',
             journey: 'Update payment, SCHEDULED, inside the cancellation window',
             wfId: '{paymentId}-update',
             answer: "with the new payment's result",
@@ -311,6 +338,7 @@ export const BANDS = [
             lead: 'Pay today, and create a plan of future installments.',
             stages: CVEF,
             child: CVEF,
+            childWf: 'CreateImmediatePayment',
             journey: 'Pay & Plan',
             wfId: '{paymentId}-init',
             chips: five('CONSUMER', 'Y', 'N'),
@@ -911,6 +939,76 @@ export function inboxUse(j) {
 export function uses(j, f) {
   if (f.name === 'InboxActivities') return Boolean(inboxUse(j));
   return Object.values(calls(j, f)).some((c) => c.kind !== 'skip');
+}
+
+/* ------------------------------------------- an activity, opened in a card -- */
+
+/* a, b and c */
+export function list(items) {
+  if (items.length < 2) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+const FAILS = {
+  must: 'It must succeed: a 429 waits out Retry-After, and other errors retry from 1 second, doubling up to 60.',
+  hold: 'It must succeed, so it gets a long timeout: an outage holds the payment where it is instead of failing it.',
+  decline: 'A business failure found here, such as a closed account, declines the payment and is never retried.',
+};
+
+/* where a call runs, on road j's cluster */
+function runsOn(j, f) {
+  if (f.name === 'PaymentStore') {
+    return 'Oracle, through a local activity, so there is no task round trip. If Oracle is down, the payment pauses and carries on when it is back.';
+  }
+  if (f.name === 'LifecycleEventActivities') {
+    return "RTF, on the workflow's own queue, since RTF has no rate limit. The workflow sends one state change at a time, so the payment's events reach RTF in order.";
+  }
+  if (f.name === 'InboxActivities') {
+    return "One-Data's inbox functions, on the workflow's own queue, since nobody throttles them.";
+  }
+  const sys = f.long || f.system;
+  if (j.cluster === 'Online') return `${sys}, on online-wf, the Online cluster's one task queue. Online traffic is never throttled.`;
+  if (f.queue.startsWith('ds-')) {
+    return `${sys}, on ${f.queue}. The governor sets that queue's rate limit, so it is the one choke point for ${f.system}.`;
+  }
+  return `${sys}, on the workflow's own queue until it has an agreed limit, then on a queue of its own.`;
+}
+
+/* what other roads do with f, as a count */
+export function otherRoads(j, f) {
+  return ROADS.filter((r) => r.id !== j.id && uses(r, f)).length;
+}
+
+/* The lines an activity shows when it is opened in road j's card, at stage
+   s with call c. With no stage, it is one of the calls every stage makes. */
+export function callDetail(j, f, s, c) {
+  const out = [runsOn(j, f)];
+  if (!s) {
+    if (f.name === 'PaymentStore') {
+      out.push('Every stage on this road commits here: its new state, a timeline entry and any Work Tracker rows, in one guarded transaction.');
+    } else if (f.name === 'LifecycleEventActivities') {
+      out.push('Every state change on this road goes out as an event.');
+      const cl = calls(j, f);
+      seq(j).forEach((t) => {
+        if (!cl[t]) out.push(`${t} changes no state, so it sends none.`);
+        else if (cl[t].note) out.push(`At ${t}: ${cl[t].note}.`);
+      });
+    } else {
+      out.push(`On this road, ${inboxUse(j)}.`);
+    }
+  } else if (c.kind === 'skip') {
+    out.push(`This road never makes this call: ${c.note}.`);
+  } else if (c.kind === 'child' && j.childWf) {
+    /* the call's own note is already on its line, so it is not repeated */
+    out.push(`The child ${j.childWf} makes this call.`);
+  }
+  if (f.fails && !(s && c.kind === 'skip')) out.push(FAILS[f.fails]);
+  if (s) {
+    const cl = calls(j, f);
+    const also = Object.keys(cl).filter((t) => t !== s && cl[t].kind !== 'skip');
+    if (also.length) out.push(`This road also calls it at ${list(also)}.`);
+  }
+  return out;
 }
 
 function fairness(key) {

@@ -19,10 +19,10 @@ Each of the other Design pages covers one stretch of that road. [Routing](./rout
 ## How it works
 
 1. Pick a road. The index lists all 21, grouped by how the work arrives. Each row shows the trigger, where it lands, the Router's choice of cluster and start, and the stages the road runs. With nothing picked, every road looks the same. Pick one and the rest grey out.
-2. Read its card. The card opens beside the road and follows it from the trigger, through the Router's six steps, to every activity its stages call and the system behind each one. On pay today and on a scheduled payment, switch the account type to CORPORATE to follow a corporate payment through every later step.
+2. Read its card. The card opens beside the road and follows it from the trigger, through the Router's six steps, to every activity its stages call and the system behind each one. Click an activity to open it in place: where it runs, what this call does on this road, and what happens when it fails. Expand all, at the top of the card, opens every one. On pay today and on a scheduled payment, switch the account type to CORPORATE to follow a corporate payment through every later step.
 3. See every call. Under the index, the activities show each interface with its system, its task queue and the stages that call it, and a picked road's calls are lit. Pick an activity instead, and the roads that call it stay lit while its card lists them by stage.
 
-Pick the road again, press Esc or use Show all to bring every road back. Inside a card, a call opens its activity and the road that comes next is one click away.
+Pick the road again, press Esc or use Show all to bring every road back. Inside a card, the road that comes next is one click away, and an opened activity links to every road that calls it.
 
 ## How to read the index
 

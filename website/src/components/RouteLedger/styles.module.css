@@ -763,6 +763,37 @@
   color: var(--amex-banner-ink);
 }
 
+/* the account type switch and expand all, at the top right of a card */
+.cardTools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em 0.8em;
+}
+
+.expandAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin: 0;
+  padding: 0.3em 0.65em;
+  border: 0;
+  border-radius: 0.45em;
+  background: var(--amex-tint);
+  color: var(--rl-link);
+  font: inherit;
+  font-size: 0.84em;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.expandAll:hover {
+  background: var(--amex-pill);
+}
+.expandAllOn .icon {
+  transform: rotate(180deg);
+}
+
 .switch {
   display: inline-flex;
   align-items: center;
@@ -1214,6 +1245,75 @@
 .callBtn.skip .callNote {
   font-weight: 600;
   color: var(--amex-txt-strong);
+}
+
+/* an activity opened in place: the line and its panel share one tinted
+   fill, and the chevron turns */
+.chev {
+  flex: none;
+  align-self: center;
+  display: inline-grid;
+  place-items: center;
+  margin-left: auto;
+  padding-left: 0.4em;
+  color: var(--amex-mut);
+}
+.chev .icon {
+  width: 0.9em;
+  height: 0.9em;
+  transition: transform 0.15s ease;
+}
+
+.callOpen,
+.callOpen:hover {
+  border-radius: 0.35em 0.35em 0 0;
+  background: var(--amex-tint);
+}
+.callOpen .chev {
+  color: var(--rl-link);
+}
+.callOpen .chev .icon {
+  transform: rotate(180deg);
+}
+
+/* same em as the line above it, so the text lines up under the name */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  margin: 0 0 0.4em -0.35em;
+  padding: 0.15em 0.8em 0.7em 1.48em;
+  border-radius: 0 0 0.5em 0.5em;
+  background: var(--amex-tint);
+  font-size: 0.92em;
+  line-height: 1.45;
+}
+.detail[hidden] {
+  display: none;
+}
+
+.detailLine {
+  margin: 0;
+  color: var(--amex-txt);
+}
+
+.textLink {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rl-link);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--rl-link) 35%, transparent);
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+.textLink:hover {
+  text-decoration-color: currentColor;
 }
 
 /* where a workflow stops: a bar across the spine */
@@ -1851,7 +1951,8 @@
 @media (prefers-reduced-motion: reduce) {
   .road,
   .reqHead,
-  .bandHead {
+  .bandHead,
+  .chev .icon {
     transition: none;
   }
 }

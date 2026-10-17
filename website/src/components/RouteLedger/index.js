@@ -12,8 +12,10 @@ import {
   ROAD,
   ROADS,
   STAGES,
+  callDetail,
   calls,
   inboxUse,
+  otherRoads,
   moveOf,
   router,
   routerLine,
@@ -105,7 +107,10 @@ function useLayout(scrollerRef, indexRef) {
     const scroller = scrollerRef.current;
     if (!scroller || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(() => {
-      setLayout((l) => ({width: scroller.getBoundingClientRect().width, tick: l.tick + 1}));
+      /* a width of 0 means the page is not laid out just now (a hidden tab,
+         a print or capture pass): keep the last real layout */
+      const width = scroller.getBoundingClientRect().width;
+      if (width > 0) setLayout((l) => ({width, tick: l.tick + 1}));
     });
     ro.observe(scroller);
     if (indexRef.current) ro.observe(indexRef.current);
@@ -589,15 +594,42 @@ function RouterStep({j, n, corp, folded, onToggle}) {
   );
 }
 
-function CallLine({f, c, offline, pickAct}) {
-  const showQueue = offline && f.queue.startsWith('ds-');
+/* the key an open activity is kept under: its stage, or "rail" for the
+   calls every stage makes */
+const callKey = (s, f) => `${s || 'rail'}|${f.name}`;
+
+/* An activity opened in place: where it runs, what this call does here,
+   and the way out to every road that calls it. */
+function CallDetail({id, open, j, f, s, c, pickAct}) {
+  const n = otherRoads(j, f);
+  return (
+    <div id={id} className={styles.detail} hidden={!open}>
+      {callDetail(j, f, s, c).map((t) => (
+        <p key={t} className={styles.detailLine}>
+          {t}
+        </p>
+      ))}
+      <p className={styles.detailLine}>
+        {n ? `${n} other ${n === 1 ? 'road calls' : 'roads call'} it. ` : 'No other road calls it. '}
+        <button type="button" className={styles.textLink} onClick={() => pickAct(f.name)}>
+          See every road that calls it
+        </button>
+      </p>
+    </div>
+  );
+}
+
+function CallLine({j, f, s, c, open, onToggle, pickAct}) {
+  const showQueue = j.cluster === 'Offline' && f.queue.startsWith('ds-');
+  const id = `rl-${j.id}-${s}-${f.name}`;
   return (
     <li>
       <button
         type="button"
-        className={clsx(styles.callBtn, styles[c.kind])}
-        onClick={() => pickAct(f.name)}
-        title={`See every road that calls ${f.name}`}>
+        className={clsx(styles.callBtn, styles[c.kind], open && styles.callOpen)}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => onToggle(callKey(s, f))}>
         <i className={styles.callSq} aria-hidden="true" />
         <span className={styles.callName}>{f.name}</span>
         <span className={styles.sys}>{f.system}</span>
@@ -605,15 +637,60 @@ function CallLine({f, c, offline, pickAct}) {
         {c.kind === 'skip' && <span className={styles.srOnly}>, never called here:</span>}
         {c.kind === 'child' && <span className={styles.srOnly}>, in a child workflow</span>}
         {c.note && <span className={styles.callNote}>{c.note}</span>}
+        <span className={styles.chev}>
+          <Icon name="chevron" />
+        </span>
       </button>
+      <CallDetail id={id} open={open} j={j} f={f} s={s} c={c} pickAct={pickAct} />
     </li>
   );
 }
 
+/* one of the calls every stage makes */
+function RailLine({j, f, note, open, onToggle, pickAct}) {
+  const id = `rl-${j.id}-rail-${f.name}`;
+  return (
+    <li>
+      <button
+        type="button"
+        className={clsx(styles.railLine, open && styles.callOpen)}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => onToggle(callKey(null, f))}>
+        <i className={styles.railSq} aria-hidden="true" />
+        <span className={styles.callName}>{f.name}</span>
+        <b className={styles.railSys}>{f.system}</b>
+        <span className={styles.sys}>{note}</span>
+        <span className={styles.chev}>
+          <Icon name="chevron" />
+        </span>
+      </button>
+      <CallDetail id={id} open={open} j={j} f={f} s={null} c={null} pickAct={pickAct} />
+    </li>
+  );
+}
+
+/* the calls every stage of road j makes: PaymentStore and RTF, and One-Data's
+   inbox where the road reads it */
+function railsOf(j) {
+  return [IFACE.PaymentStore, IFACE.LifecycleEventActivities, ...(inboxUse(j) ? [IFACE.InboxActivities] : [])];
+}
+
+/* every activity a card can open, as keys */
+function cardKeys(j, stages, corp) {
+  const keys = [];
+  stages.forEach((s) =>
+    CALL_ORDER.forEach((f) => {
+      if (calls(j, f)[s]) keys.push(callKey(s, f));
+    }),
+  );
+  if (!corp) railsOf(j).forEach((f) => keys.push(callKey(null, f)));
+  return keys;
+}
+
 /* 4: the workflow, its stages, and every call they make */
-function StagesStep({j, n, stages, corp, corpRow, pickAct}) {
+function StagesStep({j, n, stages, corp, corpRow, open, onToggle, pickAct}) {
   const offline = j.cluster === 'Offline';
-  const inbox = inboxUse(j);
   return (
     <li className={clsx(styles.step, styles.segTone)}>
       <Badge n={n} />
@@ -646,7 +723,16 @@ function StagesStep({j, n, stages, corp, corpRow, pickAct}) {
               {list.length ? (
                 <ul className={styles.calls}>
                   {list.map(([f, c]) => (
-                    <CallLine key={f.name} f={f} c={c} offline={offline} pickAct={pickAct} />
+                    <CallLine
+                      key={f.name}
+                      j={j}
+                      f={f}
+                      s={s}
+                      c={c}
+                      open={open.has(callKey(s, f))}
+                      onToggle={onToggle}
+                      pickAct={pickAct}
+                    />
                   ))}
                 </ul>
               ) : (
@@ -672,26 +758,17 @@ function StagesStep({j, n, stages, corp, corpRow, pickAct}) {
       )}
       {!corp && (
         <ul className={styles.rails}>
-          {['PaymentStore', 'LifecycleEventActivities'].map((name) => (
-            <li key={name}>
-              <button type="button" className={styles.railLine} onClick={() => pickAct(name)}>
-                <i className={styles.railSq} aria-hidden="true" />
-                <span className={styles.callName}>{name}</span>
-                <b className={styles.railSys}>{IFACE[name].system}</b>
-                <span className={styles.sys}>{IFACE[name].note}</span>
-              </button>
-            </li>
+          {railsOf(j).map((f) => (
+            <RailLine
+              key={f.name}
+              j={j}
+              f={f}
+              note={f.name === 'InboxActivities' ? inboxUse(j) : f.note}
+              open={open.has(callKey(null, f))}
+              onToggle={onToggle}
+              pickAct={pickAct}
+            />
           ))}
-          {inbox && (
-            <li>
-              <button type="button" className={styles.railLine} onClick={() => pickAct('InboxActivities')}>
-                <i className={styles.railSq} aria-hidden="true" />
-                <span className={styles.callName}>InboxActivities</span>
-                <b className={styles.railSys}>One-Data</b>
-                <span className={styles.sys}>{inbox}</span>
-              </button>
-            </li>
-          )}
         </ul>
       )}
     </li>
@@ -773,17 +850,31 @@ function CorpNext({j, mode, go}) {
   );
 }
 
-function RoadCard({j, corp, setCorp, go, pickAct, onClear, wide}) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [j.id]);
+/* open: the activities opened in this card. The lens keeps it, so the card
+   can move between the side and the row without closing them. */
+function RoadCard({j, corp, setCorp, open, setOpen, go, pickAct, onClear, wide}) {
+  const [routerOpen, setRouterOpen] = useState(false);
+  useEffect(() => setRouterOpen(false), [j.id]);
   const mode = corp && j.corp ? CORP[j.corp] : null;
   const stages = mode ? CORP_STAGES : seq(j);
+  const keys = cardKeys(j, stages, Boolean(mode));
+  const allOpen = keys.length > 0 && keys.every((k) => open.has(k));
+  const toggle = useCallback(
+    (key) =>
+      setOpen((prev) => {
+        const nextOpen = new Set(prev);
+        if (nextOpen.has(key)) nextOpen.delete(key);
+        else nextOpen.add(key);
+        return nextOpen;
+      }),
+    [setOpen],
+  );
   let n = 0;
   const next = () => {
     n += 1;
     return n;
   };
-  const folded = wide ? null : !open;
+  const folded = wide ? null : !routerOpen;
   return (
     <article className={clsx(styles.card, styles[j.cluster])} aria-label={`Card for ${j.name}${j.tag ? `, ${j.tag}` : ''}`}>
       <CardTop
@@ -801,13 +892,29 @@ function RoadCard({j, corp, setCorp, go, pickAct, onClear, wide}) {
       </p>
       <div className={styles.leadRow}>
         <p className={styles.cardLead}>{mode ? mode.lead : j.lead}</p>
-        {j.corp && <AccountSwitch corp={corp} setCorp={setCorp} />}
+        <span className={styles.cardTools}>
+          {j.corp && <AccountSwitch corp={corp} setCorp={setCorp} />}
+          <button
+            type="button"
+            className={clsx(styles.expandAll, allOpen && styles.expandAllOn)}
+            aria-label={allOpen ? 'Collapse all activities' : 'Expand all activities'}
+            onClick={() => setOpen(allOpen ? new Set() : new Set(keys))}>
+            <Icon name="chevron" />
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+        </span>
       </div>
       <ol className={styles.steps}>
         <Trigger j={j} n={next()} brief={Boolean(mode)} go={go} />
         <Lands j={j} n={next()} brief={Boolean(mode)} />
         {!j.band.drain && (
-          <RouterStep j={j} n={next()} corp={Boolean(mode)} folded={folded} onToggle={() => setOpen((v) => !v)} />
+          <RouterStep
+            j={j}
+            n={next()}
+            corp={Boolean(mode)}
+            folded={folded}
+            onToggle={() => setRouterOpen((v) => !v)}
+          />
         )}
         <StagesStep
           j={j}
@@ -815,6 +922,8 @@ function RoadCard({j, corp, setCorp, go, pickAct, onClear, wide}) {
           stages={stages}
           corp={Boolean(mode)}
           corpRow={mode && mode.row}
+          open={open}
+          onToggle={toggle}
           pickAct={pickAct}
         />
         {mode ? <CorpStop /> : <Tail j={j} go={go} />}
@@ -1191,6 +1300,8 @@ export default function RouteLedger() {
   /* the road whose row the card lines up with; null puts it at the top */
   const [anchor, setAnchor] = useState(null);
   const [cardTop, setCardTop] = useState(0);
+  /* the activities opened in the picked road's card */
+  const [openCalls, setOpenCalls] = useState(() => new Set());
   const scrollerRef = useRef(null);
   const lensRef = useRef(null);
   const boardRef = useRef(null);
@@ -1233,6 +1344,7 @@ export default function RouteLedger() {
   const clear = useCallback(() => {
     setPick(null);
     setCorp(false);
+    setOpenCalls(new Set());
     setAnchor(null);
     setSaid('Showing every road.');
   }, []);
@@ -1246,6 +1358,7 @@ export default function RouteLedger() {
       }
       const r = ROAD[id];
       setCorp(false);
+      setOpenCalls(new Set());
       setPick({type: 'road', id});
       setAnchor(id);
       setSaid(`${r.name}${r.tag ? `, ${r.tag},` : ''} picked. Its card is open, and the other roads are greyed out.`);
@@ -1303,7 +1416,17 @@ export default function RouteLedger() {
   };
 
   const roadCard = j && (
-    <RoadCard j={j} corp={corp} setCorp={setCorp} go={go} pickAct={actFromCard} onClear={clear} wide={wide} />
+    <RoadCard
+      j={j}
+      corp={corp}
+      setCorp={setCorp}
+      open={openCalls}
+      setOpen={setOpenCalls}
+      go={go}
+      pickAct={actFromCard}
+      onClear={clear}
+      wide={wide}
+    />
   );
   const actCard = (f) => <ActCard f={f} go={go} onClear={clear} />;
 
