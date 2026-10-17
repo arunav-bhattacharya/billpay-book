@@ -1,0 +1,44 @@
+---
+title: Market Profile
+description: 'A market profile is one market and one account type: the APIs it takes, and four answers about how its payments behave.'
+sidebar_label: Market Profile
+---
+
+import Lead from '@site/src/components/Lead';
+
+# Market Profile
+
+<Lead>A market profile is one market and one account type: the APIs it takes, and four answers about how its payments behave. Those answers decide which stage implementations its payments run, so the same workflow code serves every market.</Lead>
+
+Consumer accounts and corporate accounts in the same market are two profiles, because they behave differently: a corporate payment's legs come from allocations that arrive later by callback, while a consumer split writes its legs with the payment itself. Each profile is authored, released and switched on separately.
+
+## The APIs it takes
+
+Onboarding picks which Billpay APIs the profile accepts: paying today, scheduling, updates and cancels, refunds and so on. A request for an API, or a combination of behaviors, that the market hasn't onboarded is turned away with 422 by the Router's admit step, before any workflow starts. Senders don't retry a 422.
+
+## The four behaviors
+
+These are the payment dimensions. Every stage that varies between markets varies by one or more of them.
+
+| Behavior | Values | What it decides |
+| --- | --- | --- |
+| `accountType` | `CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL` | Who is paying, which shapes everything from splits to allocations |
+| `requiresArPosting` | Y, N or BOTH | Whether the processed payment is posted to Accounts Receivable |
+| `requiresRealtimeClearing` | Y, N or BOTH | Whether clearing is realtime or batch |
+| `requiresMandateAuthorization` | Y, N or BOTH | Whether a mandate is verified before processing |
+
+## BOTH, resolved per journey
+
+BOTH means a behavior applies to some journeys and not others. Onboarding stores which journeys get Y, and the Router turns BOTH into Y or N for each request, before it pins the plan key. A running payment never sees BOTH; it sees the answer for its own journey.
+
+Realtime clearing shows how this works. Only a pay-today payment from a channel gets Y. Every future-dated payment clears in batch, whether it came from a channel or from Accounts Receivable.
+
+## What the build can run
+
+Each combination of behaviors needs stage implementations, and every combination the build supports has a default one. The build lists them in its **capability manifest**, which the provisioning API returns from `GET /provisioning/capabilities`. The manifest comes from the same compile-time index the workflows use to look up their stages, so the two can't disagree.
+
+- A profile built only from combinations in the manifest goes live with config alone, no deploy needed.
+- A new combination is flagged as needing a build while it is being authored, so the gap shows up early.
+- If a release still reaches an environment without the build it needs, provisioning stops at its first step, the check against the manifest, until that build is deployed.
+
+A representable-return behavior is set in billpay-ui today but isn't yet one of these behaviors. Whether QueueRepresentment should vary by it is still open.

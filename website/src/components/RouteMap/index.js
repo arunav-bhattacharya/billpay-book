@@ -4,11 +4,11 @@ import DataTable from '../DataTable';
 import WorkerChip from '../WorkerChip';
 import styles from './styles.module.css';
 
-function WfChip({name, worker}) {
+function WfChip({name, cluster}) {
   return (
     <span className={styles.wf}>
       <code className={styles.wfName}>{name}</code>
-      <WorkerChip worker={worker || 'Online'} className={styles.worker} />
+      <WorkerChip cluster={cluster || 'Online'} className={styles.worker} />
     </span>
   );
 }
@@ -33,7 +33,7 @@ function Pipeline({workflows}) {
               →
             </span>
           )}
-          <WfChip name={w.name} worker={w.worker} />
+          <WfChip name={w.name} cluster={w.cluster ?? w.worker} />
         </React.Fragment>
       ))}
     </div>
@@ -63,9 +63,10 @@ function toRows(routes) {
         trigger: r.trigger,
         label: r.condition,
         workflows: r.workflows,
+        start: r.start,
       });
     } else {
-      rows.push({kind: 'main', label: r.condition, workflows: r.workflows});
+      rows.push({kind: 'main', label: r.condition, workflows: r.workflows, start: r.start});
     }
     (r.children || []).forEach((ch) =>
       rows.push({
@@ -73,6 +74,7 @@ function toRows(routes) {
         label: ch.when,
         account: ch.account,
         workflows: ch.workflows,
+        start: ch.start,
       }),
     );
   });
@@ -125,20 +127,28 @@ const COLUMNS = [
     header: 'Routes to',
     render: (r) => <Pipeline workflows={r.workflows} />,
   },
+  {
+    key: 'start',
+    header: 'Started by',
+    headerClassName: styles.thStart,
+    className: styles.startCell,
+    render: (r) => r.start,
+  },
 ];
 
 /**
  * RouteMap: how the Billpay Router turns a request into workflow(s), as a
  * grouped table. Consecutive routes that share a `trigger` collapse into one
  * trigger cell (rowspan); each route's `condition` is a row, and any
- * conditional `children` (splits / corporate allocations) render as indented
+ * conditional `children` (consumer splits, corporate legs) render as indented
  * sub-rows beneath their parent condition, tagged with the account type that
- * selects them.
+ * selects them. The chip beside each workflow is the Temporal cluster it runs
+ * on, and the last column says what starts it.
  *
  * rows: [{
- *   trigger, condition,
- *   workflows: [{name, worker: 'Online'|'Offline'}],
- *   children?: [{when, account?: 'Consumer'|'Corporate'|'Business Travel', workflows: [...]}]
+ *   trigger, condition, start,
+ *   workflows: [{name, cluster: 'Online'|'Offline'}],
+ *   children?: [{when, account?: 'Consumer'|'Corporate'|'Business Travel', start?, workflows: [...]}]
  * }]
  */
 export default function RouteMap({rows = []}) {

@@ -3,34 +3,41 @@ import DataTable from '../DataTable';
 import styles from './styles.module.css';
 
 /**
- * ScheduleTable: the Temporal Schedules and the workflow each one fires.
+ * ScheduleTable: the Temporal Schedules and the workflow each one starts.
  *
- * Every one of these runs on the Offline worker, so the workflow names carry
- * the same gold the Offline card uses rather than the global code blue.
+ * Every Schedule lives on the Offline cluster, so the workflow names carry the
+ * same tone the Offline card uses rather than the global code blue. A name that
+ * is a workflow class renders as code; a description, such as "the leg
+ * dispatcher", stays as text. The `runs` column appears when any row has one.
  *
- * rows: [{schedule, workflow}]
+ * rows: [{schedule, workflow, runs?}]
  */
-const COLUMNS = [
+const isClass = (name) => /^[A-Z][A-Za-z]+Workflow$/.test(String(name));
+
+const BASE = [
   {
     key: 'schedule',
     header: 'Schedule',
-    width: '46%',
+    width: '30%',
     rowHeader: true,
     className: styles.scheduleCell,
   },
   {
     key: 'workflow',
-    header: 'Workflow it fires',
+    header: 'Workflow it starts',
     className: styles.wfCell,
-    render: (r) => <code className={styles.wf}>{r.workflow}</code>,
+    render: (r) => (isClass(r.workflow) ? <code className={styles.wf}>{r.workflow}</code> : r.workflow),
   },
 ];
 
+const RUNS = {key: 'runs', header: 'Runs', className: styles.runsCell};
+
 export default function ScheduleTable({rows = []}) {
+  const columns = rows.some((r) => r.runs) ? [...BASE, RUNS] : BASE;
   return (
     <DataTable
       className={styles.table}
-      columns={COLUMNS}
+      columns={columns}
       rows={rows}
       rowKey={(r) => r.schedule}
     />

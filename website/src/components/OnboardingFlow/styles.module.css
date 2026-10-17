@@ -1,0 +1,158 @@
+/* OnboardingFlow: the control plane across the top, three environments below.
+   Blue Box rules: tinted fields and filled boxes, no outlines. Production gets
+   a deeper field so it reads as the one that needs an RFC. Every colour is a
+   token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --of-accent: var(--amex-blue);
+  --of-deep: var(--amex-indigo);
+  --of-card: var(--amex-panel);
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 0.9rem 0.9rem 0.8rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --of-accent: var(--amex-blue-bright);
+  --of-card: var(--amex-card);
+}
+
+.frame {
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 700px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+/* ---- control plane ---- */
+.cp {
+  fill: color-mix(in srgb, var(--of-deep) 9%, transparent);
+}
+.cpTitle {
+  font-size: 17px;
+  font-weight: 700;
+  fill: var(--amex-txt-strong);
+}
+.cpSub {
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: var(--amex-txt);
+}
+.cpNote {
+  font-size: 11.5px;
+  fill: var(--amex-mut);
+}
+
+.chip {
+  fill: var(--of-card);
+}
+.chipTitle {
+  font-size: 13px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.chipSub {
+  font-size: 11px;
+  fill: var(--amex-mut);
+}
+
+.step {
+  fill: none;
+  stroke: var(--amex-mut);
+  stroke-width: 1.4;
+}
+.head {
+  fill: var(--amex-mut);
+}
+
+/* ---- the one door ---- */
+.link {
+  fill: none;
+  stroke: var(--of-accent);
+  stroke-width: 1.8;
+}
+.headLink {
+  fill: var(--of-accent);
+}
+.linkLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  fill: var(--of-accent);
+}
+
+/* ---- environments ---- */
+.env {
+  fill: color-mix(in srgb, var(--of-accent) 6%, transparent);
+}
+.envProd {
+  fill: color-mix(in srgb, var(--of-deep) 12%, transparent);
+}
+.envTitle {
+  font-size: 16px;
+  font-weight: 700;
+  fill: var(--amex-txt-strong);
+}
+.envTag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--amex-mut);
+}
+
+.api {
+  fill: color-mix(in srgb, var(--of-accent) 14%, var(--of-card));
+}
+.apiText {
+  font-family: var(--amex-font-mono);
+  font-size: 11.5px;
+  fill: var(--amex-txt-strong);
+}
+
+.wf {
+  fill: var(--of-card);
+}
+.wfTitle {
+  font-family: var(--amex-font-mono);
+  font-size: 12px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+
+/* The house number badge: white digits on Bright Blue in both themes, which
+   keeps the digits legible on the dark surface too. */
+.num {
+  fill: var(--amex-blue);
+}
+.numText {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--amex-banner-block-ink);
+}
+.stepText {
+  font-size: 12px;
+  fill: var(--amex-txt);
+}
+
+.cfg {
+  fill: color-mix(in srgb, var(--amex-state-success) 12%, var(--of-card));
+}
+.cfgText {
+  font-family: var(--amex-font-mono);
+  font-size: 11px;
+  fill: var(--amex-txt-strong);
+}
+
+.caption {
+  margin: 0.6rem 0.2rem 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--amex-mut);
+}

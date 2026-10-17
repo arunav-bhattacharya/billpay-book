@@ -2,6 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import {links} from '../../lib/inlineMarkup';
 import styles from './styles.module.css';
 
 /**
@@ -50,7 +51,7 @@ const SYSTEMS = {
   AMP: 'Authorizations (AMP), which holds available credit',
   'MR/M3': 'MultiRail / M3, which clears the payment with the bank',
   Raven: 'Raven, customer communications',
-  Lumi: 'Lumi, the analytics platform, fed via RTF',
+  RTF: 'RTF, which carries lifecycle events to the systems that consume them',
   eBNC: 'Balance and Control (eBNC), which audits that no payment is missed',
   Accounting: 'Accounting, which matches the payment across Amex platforms',
   Risk: 'Risk platform, kept current with payment activity',
@@ -67,6 +68,8 @@ const ROUTE_KIND = {
   workflow: {cls: 'kWorkflow', label: 'Temporal workflow'},
   schedule: {cls: 'kSchedule', label: 'Temporal Schedule'},
   event: {cls: 'kEvent', label: 'Inbound event'},
+  inbox: {cls: 'kEvent', label: "Held in One-Data's inbox until Billpay pulls it"},
+  dispatcher: {cls: 'kSchedule', label: 'A dispatcher, which starts work at the rate the governor sets'},
 };
 
 const STATUS_KIND = {
@@ -567,7 +570,7 @@ export default function JourneyMap({
                     ) : (
                       <span className={clsx(styles.detailNum, styles.detailDot)} aria-hidden="true" />
                     )}
-                    <span>{d.text}</span>
+                    <span>{links(d.text)}</span>
                   </li>
                 ))}
               </ul>

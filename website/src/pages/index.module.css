@@ -107,6 +107,12 @@
   gap: 0.65rem;
 }
 
+/* Nine sections in two columns leaves one over. It takes the full row, so the
+   board ends square instead of on a gap. */
+.board > .tile:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .tile {
   display: grid;
   grid-template-columns: 34px 1fr;

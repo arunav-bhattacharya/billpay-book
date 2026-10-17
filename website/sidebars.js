@@ -39,6 +39,7 @@ const sidebars = {
       items: [
         'design/principles',
         'design/payment-state-model',
+        'design/domain-model',
         'design/journeys/index',
         'design/routing',
         {
@@ -62,7 +63,23 @@ const sidebars = {
             'design/component-model/activities',
           ],
         },
+        'design/pacing',
+        'design/throttling',
+        'design/corporate-allocations',
         'design/sequence-diagrams',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Market Onboarding',
+      className: 'sidebar-sec sidebar-sec--onboarding',
+      collapsed: true,
+      link: {type: 'doc', id: 'onboarding/index'},
+      items: [
+        'onboarding/market-profile',
+        'onboarding/operations-settings',
+        'onboarding/releases',
+        'onboarding/provisioning',
       ],
     },
     {

@@ -1,24 +1,19 @@
 ---
 title: Payment State Model
-description: 'Every payment moves through one canonical set of states, whatever its market or account type.'
+description: 'Every payment, consumer or corporate, moves through one set of states, and a status changes only through a guarded update in Oracle.'
 sidebar_label: State Model
 ---
 
 import Lead from '@site/src/components/Lead';
 import StateLegend from '@site/src/components/StateLegend';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 # Payment State Model
 
-<Lead>Every payment moves through one canonical set of states, whatever its market or account type. Each transition is persisted and published as a lifecycle event, so a payment's history is fully auditable.</Lead>
+<Lead>Every payment, consumer or corporate, moves through one set of states, and a status changes only through a guarded update in Oracle. Each state means the same thing in every market, so reporting, operations and downstream systems can read any payment the same way.</Lead>
 
 ## The lifecycle
 
-Consumer and corporate payments share the lifecycle. The one difference: corporate inserts an allocations side-loop between validation and execution, so its splits can be worked out before the money moves.
-
-<Tabs groupId="payment-type">
-<TabItem value="consumer" label="Consumer" default>
+Each arrow is a move one stage makes, and the label names the stage. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal.
 
 ```mermaid
 ---
@@ -28,27 +23,26 @@ config:
 ---
 stateDiagram-v2
   direction TB
-  [*] --> PENDING
-  PENDING --> ACCEPTED: validate (immediate)  
-  PENDING --> SCHEDULED: validate (schedule)
-  SCHEDULED --> ACCEPTED: valid
-  ACCEPTED --> PROCESSING: clearing / posting
-  PROCESSING --> PROCESSED: fulfillment
-  PROCESSED --> PAID: AR posted + settled
-  PROCESSING --> RETURNED
-  PROCESSED --> RETURNED
+  [*] --> PENDING: Capture
+  PENDING --> ACCEPTED: Verify, pay today or inbound
+  PENDING --> SCHEDULED: Verify, future date
+  PENDING --> DECLINED: Verify fails
+  PENDING --> DISALLOWED: Verify, inbound not accepted
+  SCHEDULED --> ACCEPTED: Reverify, on the due date
+  SCHEDULED --> DECLINED: Reverify fails
+  SCHEDULED --> CANCELLED: Cancel, inside the window
+  ACCEPTED --> PROCESSING: Execute
+  PROCESSING --> PROCESSED: Fulfil
+  PROCESSED --> PAID: Settle
+  PROCESSING --> RETURNED: Return
+  PROCESSED --> RETURNED: Return
+  PAID --> RETURNED: Return
+  RETURNED --> REPRESENTING: QueueRepresentment
+  REPRESENTING --> REPRESENTED: Represent
+  REPRESENTING --> DECLINED: Recheck fails
+  REPRESENTED --> RETURNED: Returned again
   PAID --> [*]
-  PAID --> RETURNED
   RETURNED --> [*]
-  RETURNED --> REPRESENTING: eligible (create representment)
-  REPRESENTING --> REPRESENTED: valid
-  REPRESENTING --> DECLINED: invalid
-  REPRESENTED --> RETURNED: returned again
-  PENDING --> DECLINED: validation failed
-  PENDING --> DISALLOWED: inbound declined
-  SCHEDULED --> CANCELLED: cancel request
-  SCHEDULED --> DECLINED: invalid  
-  ACCEPTED --> CANCELLED
   REPRESENTED --> [*]
   DECLINED --> [*]
   CANCELLED --> [*]
@@ -57,79 +51,93 @@ stateDiagram-v2
 
 <StateLegend />
 
-</TabItem>
-<TabItem value="corporate" label="Corporate">
+There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDULED` it can no longer be cancelled.
 
-```mermaid
----
-config:
-  nodeSpacing: 40
-  rankSpacing: 34
----
-stateDiagram-v2
-  direction TB
-  [*] --> PENDING
-  PENDING --> SCHEDULED: validate (schedule)
-  PENDING --> ACCEPTED: validate (immediate)
-  SCHEDULED --> ALLOCATING: request (scheduled)
-  ACCEPTED --> ALLOCATING: request (immediate)
-  ALLOCATING --> ALLOCATED
-  ALLOCATED --> PROCESSING: continue (immediate only)
-  ALLOCATED --> DECLINED: invalid (scheduled only)
-  ALLOCATED --> ACCEPTED: validate (scheduled only)
-  ACCEPTED --> PROCESSING: clearing / posting
-  PROCESSING --> PROCESSED: fulfillment
-  PROCESSED --> PAID: AR posted + settled
-  PROCESSING --> RETURNED
-  PROCESSED --> RETURNED
-  PAID --> [*]  
-  PAID --> RETURNED
-  RETURNED --> REPRESENTING: representable
-  REPRESENTING --> REPRESENTED: valid
-  REPRESENTING --> DECLINED: invalid
-  REPRESENTED --> RETURNED: returned again
-  PENDING --> DECLINED: validation failed
-  SCHEDULED --> CANCELLED: cancel request
-  ACCEPTED --> CANCELLED
-  RETURNED --> [*]
-  REPRESENTED --> [*]
-  DECLINED --> [*]
-  CANCELLED --> [*]
+## What each state means
+
+| State | Meaning | Terminal? |
+| --- | --- | --- |
+| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation. | No |
+| `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
+| `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. | No |
+| `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. | No |
+| `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC and risk have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
+| `REPRESENTING` | A returned payment queued for another presentment, on the date the market's rules set. | No |
+| `PAID` | Settled with the bank and posted to Accounts Receivable. | Yes, unless a return arrives |
+| `RETURNED` | The payment did not settle; the customer's bank sent the funds back. | Yes, unless it is represented |
+| `REPRESENTED` | A returned payment that was presented again. | Yes, unless it is returned again |
+| `DECLINED` | Failed validation, or a representment failed its recheck. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window. | Yes |
+| `DISALLOWED` | A third-party inbound payment that American Express did not accept. | Yes |
+
+`PROCESSED` is a higher bar than it looks. A payment reaches it only after every must-succeed system has answered and the customer has been told, which is why an outage at RTF or Raven holds payments at `PROCESSING` rather than letting them through with a gap.
+
+## Which stage makes each move
+
+| From | To | By |
+| --- | --- | --- |
+| Input | `PENDING` | Capture |
+| `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
+| `PENDING` (inbound) | `ACCEPTED` or `DISALLOWED` | Verify |
+| `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date |
+| `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
+| `ACCEPTED` | `PROCESSING` | Execute |
+| `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check |
+| `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a split payment, each leg, never the parent |
+| `PROCESSING`, `PROCESSED` or `PAID` | `RETURNED` | Return |
+| `RETURNED` | `REPRESENTING` | QueueRepresentment |
+| `REPRESENTING` | `REPRESENTED` or `DECLINED` | Represent |
+| `REPRESENTED` | `RETURNED` | Return, when it is returned again |
+
+The [stages](./component-model/stages.md) page says what each stage calls on the way.
+
+## Guarded updates
+
+Two things can try to move the same payment at once, such as a customer's cancel and the payment's execution, right at the edge of the cancellation window. Billpay settles that race in Oracle instead of in code.
+
+Every status change is a conditional update on the current status:
+
+```sql
+UPDATE trans_dtl SET status = 'CANCELLED'
+ WHERE payment_id = :id AND status = 'SCHEDULED'
 ```
 
-<StateLegend />
+When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-:::info[Scheduled vs. immediate]
-After `ALLOCATED`, an immediate corporate payment continues straight to `PROCESSING`. A scheduled one is re-validated on its execution date instead. It moves to `ACCEPTED` if it is still valid, and `DECLINED` if it is not.
-:::
+## Split payments
 
-</TabItem>
-</Tabs>
+A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}`, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through the same states as any payment, `PROCESSING`, `PROCESSED` and on.
 
-A split payment fans out at `ACCEPTED`. Each leg is created as its own `ACCEPTED` record and runs the same `PROCESSING` and `PROCESSED` path through Execute Split Payment, so the states above describe a leg as accurately as they describe a whole payment.
+`PAID` is set on legs, never on the parent. The bank settles a split payment once, as a whole, while Accounts Receivable posts each leg on its own. So each leg turns `PAID` once its own posting and its parent's settlement are both in, and the parent stays `PROCESSED`. That holds for consumer and corporate splits alike.
 
-## The states
+The [Domain Model](./domain-model.md) shows how the code models a leg as its own set of classes.
 
-| State | Meaning | Terminal? |
-| --- | --- | --- |
-| `PENDING` | Received in Billpay, awaiting initial validation. | No |
-| `SCHEDULED` | Validated and set to run at a future date. | No |
-| `ACCEPTED` | Validated and ready to process. | No |
-| `PROCESSING` | Executing: debiting the funding account at the bank and crediting the Amex systems (Accounts Receivable, Authorization). | No |
-| `PROCESSED` | Executed and fulfilled. Accounting, audit, risk, and communications have been told. | No |
-| `REPRESENTING` | A returned payment being re-attempted. | No |
-| `PAID` | Settled and posted in Accounts Receivable. | Yes |
-| `RETURNED` | Did not settle; funds were returned from the customer's bank. | Yes |
-| `REPRESENTED` | A re-attempted payment that settled. | Yes |
-| `DECLINED` | Failed validation. | Yes |
-| `CANCELLED` | Withdrawn by the customer or the system before processing. | Yes |
-| `DISALLOWED` | An inbound (third-party) payment that Amex did not accept. | Yes |
+## Corporate payments
 
-Corporate payments add two states while their allocation breakdown is fetched:
+A corporate payment uses the same states. What it adds is an **allocation status**, a separate field on the parent that tracks the breakdown into allocations that the allocations manager sends. It sits beside the payment's state and never blocks its clearing.
 
-| State | Meaning | Terminal? |
-| --- | --- | --- |
-| `ALLOCATING` | Allocations requested from the allocation-processing system, and awaited. | No |
-| `ALLOCATED` | All allocations for the payment received. | No |
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> NONE: Corporate payment captured
+  NONE --> ALLOCATING: RequestAllocations
+  ALLOCATING --> ALLOCATED: ReceiveAllocations, legs add up to the amount
+  ALLOCATED --> [*]
+```
 
-For how a single workflow drives these states, see [Core Workflows](./component-model/workflows/core.md), which lists each workflow's steps and the transition each step makes. The [sequence diagrams](./sequence-diagrams.md) trace the same flows across the participants that do the work.
+| `allocation_status` | Meaning |
+| --- | --- |
+| `NONE` | No allocations requested yet |
+| `ALLOCATING` | Requested from the allocations manager; batches may be arriving |
+| `ALLOCATED` | The legs received add up to the payment amount |
+
+The parent and its legs follow these rules:
+
+- The parent clears once, at payment level, on its due date. It does not wait for its allocations.
+- The parent turns `PROCESSED`, by a guarded update, once it has cleared and every leg is `PROCESSED` or `PAID`, and its own RTF event and Raven message have gone out. The leg dispatcher checks this every 60 seconds; there is no Fulfil for a corporate parent.
+- Legs turn `PAID` one by one, each once the parent has settled and the leg's own AR posting is in. The parent stays `PROCESSED`.
+- If allocations are late, the parent stays `PROCESSING` with allocation status `ALLOCATING`, and an alert fires at the market's alert point.
+- A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
+- A declined or cancelled parent cancels its legs.
+
+[Corporate Allocations](./corporate-allocations.md) follows the two tracks in detail. [Core Workflows](./component-model/workflows/core.md) lists which workflow drives each move, and the [sequence diagrams](./sequence-diagrams.md) trace the same flows call by call.

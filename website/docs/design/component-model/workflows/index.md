@@ -1,44 +1,54 @@
 ---
 title: Workflows
-description: 'A workflow orchestrates one payment journey end to end.'
+description: 'A workflow runs one journey end to end, on one of two Temporal clusters: Online when someone is waiting for the answer, Offline when the work can be paced.'
 ---
 
 import Lead from '@site/src/components/Lead';
 import SectionIndex from '@site/src/components/SectionIndex';
 import WorkerSplit from '@site/src/components/WorkerSplit';
 
-export const WORKERS = [
+export const CLUSTERS = [
   {
-    term: 'Online worker',
+    term: 'Online cluster',
     tone: 'Online',
     waiting: 'someone is waiting',
-    desc: `Request-path workflows, where an end user is waiting for the answer.`,
+    desc: `Journeys where a caller waits for the answer, started with Update-With-Start. Peak 100 TPS.`,
     items: [
       'Create Immediate Payment',
+      'Create Scheduled Payment, from channels',
       'Update Payment',
       'Cancel Payment',
       'Create Payment Intent',
+      'Create Balance Refund, from channels',
+      'Composites',
+      'Execute Split Payment, consumer legs',
     ],
   },
   {
-    term: 'Offline worker',
+    term: 'Offline cluster',
     tone: 'Offline',
     waiting: 'nobody is blocked',
-    desc: `Everything triggered asynchronously, by events, by async systems such as RTF, or by a scheduler.`,
+    desc: `Work that can be paced, released by dispatchers at the rate the governor sets.`,
     items: [
+      'Create Scheduled Payment, from AR',
       'Execute Scheduled Payment',
-      'Process Inbound Payment',
+      'Execute Split Payment: corporate legs, and consumer legs of an Offline parent',
+      'Request Allocations',
+      'Receive Allocations',
       'Process Returned Payment',
       'Process Representment',
-      'Get Corporate Payment Allocations',
-      'Periodic sweeps',
+      'Process Inbound Payment',
+      'Create Balance Refund, from AR',
+      'Periodic jobs',
+      'Dispatchers and the governor',
+      'Market provisioning',
     ],
   },
 ];
 
 # Workflows
 
-<Lead>A workflow orchestrates one payment journey end to end. Every workflow runs on Temporal, falls into one of three kinds, and executes on the Online or Offline worker depending on whether an end user is waiting for it.</Lead>
+<Lead>A workflow runs one journey end to end, on one of two Temporal clusters: Online when someone is waiting for the answer, Offline when the work can be paced.</Lead>
 
 ## In this section
 
@@ -47,31 +57,36 @@ export const WORKERS = [
     {
       term: 'Core',
       to: '/docs/design/component-model/workflows/core',
-      desc: `Triggered per request: create, update, cancel, execute, return, represent, allocate. Each one carries the worker it runs on and the behaviors it varies by.`,
+      desc: `One business journey each: pay today, schedule, execute, split, allocate, update, cancel, return, represent, inbound, intent and refund.`,
     },
     {
       term: 'Composite',
       to: '/docs/design/component-model/workflows/composite',
-      desc: `Wrap one or more core workflows and add logic that spans domains, such as installments or a payment carrying multiple instructions.`,
+      desc: `A parent that runs core workflows as children, such as Pay & Plan or a payment with several instructions.`,
     },
     {
-      term: 'Periodic',
+      term: 'Periodic and control',
       to: '/docs/design/component-model/workflows/periodic',
-      desc: `Scheduler driven and run in waves: executing scheduled payments, processing allocations and representments, closing out paid events, and purging old data.`,
+      desc: `The jobs Temporal Schedules start, such as marking payments PAID, and the dispatchers and governor that pace everything offline.`,
     },
   ]}
 />
 
-## Workers
+## Two clusters
 
-Workflows run on two Temporal worker pools, divided by whether someone is waiting for the answer.
+<WorkerSplit workers={CLUSTERS} />
 
-<WorkerSplit workers={WORKERS} />
+Each cluster has its own Aurora PostgreSQL database and its own OpenSearch, so a burst of offline work can never slow the customer-facing path inside Temporal. Nothing calls across the two. A payment scheduled on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as its `SCHEDULED` state, and no child workflow ever starts on the other cluster.
 
-:::info[Either worker]
-Three workflows run on both, depending on where in the journey they are invoked: **Create Schedule Payment**, **Execute Split Payment**, and **Create Balance Refund**.
-:::
+Three workflows appear on both sides, and what starts them decides where they run. `CreateScheduledPaymentWorkflow` and `CreateBalanceRefundWorkflow` run on the Online cluster when a channel calls, and on the Offline cluster when Accounts Receivable raises them. `ExecuteSplitPaymentWorkflow` runs consumer legs as children on their parent's cluster, and corporate legs only on the Offline cluster, where the leg dispatcher starts them.
 
-Keeping synchronous and asynchronous work on separate pools means a burst of async work, say a settlement sweep draining a backlog, cannot hold up the customer-facing path. Each pool polls its own task queues with its own tuning. Both ship together in a single JVM, the [Worker App](../../../deployment/deployables/worker-app.md), so the isolation is logical rather than deployment-level.
+The clusters are separate, but the app isn't. One app, billpay-core, runs the workers for both, with a Temporal client for each. Offline work has its own Oracle connection pool and its own cap on how many tasks run at once, so it can never take a whole pod, and the governor cuts offline rates as soon as online response times climb. If the app itself ever becomes the bottleneck, its online and offline parts deploy separately from the same build. The [app's deployable page](../../../deployment/deployables/worker-app.md) has the detail.
 
-Each workflow on the pages in this section carries the worker it runs on, alongside the behaviors that select its implementations.
+## Four kinds of workflow
+
+- Core workflows run one business journey each, such as paying today, executing a scheduled payment or processing a return.
+- Composite workflows are a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), and payments with several instructions. They run on the Online cluster, with their children on the same cluster.
+- Periodic workflows are jobs that Temporal Schedules start on the Offline cluster.
+- Control workflows are the dispatchers, the governor and market provisioning. They pace and configure payment work; they aren't payment journeys themselves.
+
+Each workflow on the pages that follow shows its cluster, its workflow ID and what starts it.

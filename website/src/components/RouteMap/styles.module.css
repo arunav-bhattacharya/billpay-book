@@ -13,7 +13,7 @@
 
 .table {
   --rm-accent: var(--amex-cat-architecture);
-  --dt-min-width: 660px;
+  --dt-min-width: 820px;
   --dt-pad: 0.6rem 0.95rem;
   --dt-th-pad: 0.72rem 0.95rem;
   /* Chips (the Online/Offline worker pill, the account tag) sit a step below
@@ -23,7 +23,14 @@
 }
 
 .thTrigger { width: 1%; }
-.thCond { width: 24%; }
+.thCond { width: 22%; }
+.thStart { width: 20%; }
+
+/* What starts the workflow: a start mode or a dispatcher, in the muted ink so
+   the workflow chips stay the thing the eye lands on. */
+.startCell {
+  --dt-cell-color: var(--amex-mut);
+}
 
 /* Trigger group cell — spans its rows, accented left rail, subtle tint. */
 .triggerCell {

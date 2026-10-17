@@ -1,168 +1,124 @@
 ---
 title: Stages
-description: 'A stage is one state-transition decision point: a Kotlin class with a single function that does the validation, persistence, and event publication for that transition.'
+description: 'A stage is one business step, named for the journey step it performs. It makes its calls, commits the result in one guarded Oracle transaction, and returns its outcome.'
 ---
 
 import Lead from '@site/src/components/Lead';
 
 # Stages
 
-<Lead>A stage is one state-transition decision point: a Kotlin class with a single function that does the validation, persistence, and event publication for that transition. It consumes one payment state and emits the next. Workflows call stages, and a stage never calls a workflow or an external system directly.</Lead>
+<Lead>A stage is one business step, named for the journey step it performs: Verify, Execute, Settle. It makes its calls, in parallel where they don't depend on each other, commits the result in one guarded Oracle transaction, and returns its outcome.</Lead>
 
-Sixteen stages cover every workflow. Most are shared, so the same stage runs in several workflows and behaves the same way in each. Which implementation runs is chosen from the market's behaviors.
+Stages are the only layer that changes between markets. Verify in a market that checks a mandate is a different implementation from Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its plan key, and the most specific match wins. Twelve stages cover every journey.
 
-Every stage writes its new state to the transaction-detail table, adds a row to the transaction-lifecycle-event table, and publishes a lifecycle event to Lumi (the analytics platform) via RTF (the Reliable Transaction Framework). The sections below note only what each stage does on top of that.
+## What every stage does
+
+Every stage follows the same three beats.
+
+1. It calls its activities, in parallel where the calls don't depend on each other.
+2. It commits in one guarded `PaymentStore` transaction: the new state, a timeline entry that names the cluster, and any Work Tracker rows the step creates, releases or closes.
+3. After the commit, the workflow calls the stage's announcement: an RTF lifecycle event for every state change, plus a Raven message where the customer is told. The workflow waits for it before the next stage, so each payment's events reach RTF in order.
+
+Two stages bend that order, for good reasons:
+
+- On the Online cluster, Capture and Verify commit back to back so the caller's answer isn't held up. Both announcements follow the reply, in order.
+- Fulfil sends its event and message before its commit, because `PROCESSED` means they have gone out. Comms go last, after accounting, eBNC and risk, so the customer hears only once everything else has worked.
+
+The changes that send a Raven message are assumed, for now, to be `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED`.
+
+## The twelve stages
+
+| Stage | Moves | Varies by |
+| --- | --- | --- |
+| Capture | Input → `PENDING`, with the idempotency check | Nothing |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; inbound → `DISALLOWED` | All four behaviors |
+| Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED` | All four |
+| Execute | `ACCEPTED` → `PROCESSING` | Account type, AR posting, realtime clearing |
+| Fulfil | `PROCESSING` → `PROCESSED` | Account type |
+| RequestAllocations | Allocation status → `ALLOCATING` | Nothing |
+| ReceiveAllocations | Legs written; allocation status → `ALLOCATED` | Nothing |
+| Cancel | `SCHEDULED` → `CANCELLED` | Account type, AR posting |
+| Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED` | Account type |
+| QueueRepresentment | `RETURNED` → `REPRESENTING`, with its date | All four |
+| Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
+| Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
+
+"All four" means account type, AR posting, realtime clearing and mandate authorization.
 
 ## Which workflow runs which stages
 
-| Workflow | Stages, in the order the workflow calls them |
+| Workflow | Stages, in order |
 | --- | --- |
-| Create Immediate Payment | `InitiatedToPendingStage`, `PendingToAcceptedStage`, `AcceptedToProcessingStage`, `ProcessingToProcessedStage`. On invalid: `PendingToDeclinedStage` |
-| Create Schedule Payment | `InitiatedToPendingStage`, `PendingToScheduledStage`. On invalid: `PendingToDeclinedStage` |
-| Execute Scheduled Payment | `ScheduledToAcceptedStage`, `AcceptedToProcessingStage`, `ProcessingToProcessedStage`. On invalid: `PendingToDeclinedStage` |
-| Execute Split Payment | `AcceptedToProcessingStage`, `ProcessingToProcessedStage` |
-| Cancel Payment | `ScheduledToCancelledStage` or `AcceptedToCancelledStage` |
-| Update Payment | `ScheduledToCancelledStage`, `PendingToScheduledStage`. On invalid: `PendingToDeclinedStage` |
-| Process Returned Payment | `ToReturnedStage`, `ReturnedToRepresentingStage` |
-| Process Representment | `RepresentingToRepresentedStage` or `RepresentingToDeclinedStage` |
-| Get Corporate Payment Allocations | `ToAllocatingStage`, `AllocatingToAllocatedStage` |
-| Process Inbound Payment | `InitiatedToPendingStage`, `PendingToAcceptedStage`, `AcceptedToProcessingStage`, `ProcessingToProcessedStage`. On invalid: `PendingToDisallowedStage` |
+| Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate parent has no Fulfil |
+| Create Scheduled Payment | Capture, Verify |
+| Execute Scheduled Payment | Reverify, Execute, Fulfil. A corporate parent has no Fulfil |
+| Execute Split Payment | Execute, Fulfil |
+| Request Allocations | RequestAllocations |
+| Receive Allocations | ReceiveAllocations |
+| Update Payment | Cancel, then the child runs Capture and Verify |
+| Cancel Payment | Cancel |
+| Process Returned Payment | Return, QueueRepresentment |
+| Process Representment | Represent |
+| Process Inbound Payment | Capture, Verify, Execute, Fulfil |
+| Process Paid Events | Settle, once per batch |
 
-## InitiatedToPendingStage
+Create Payment Intent and Create Balance Refund follow the payment path; their detailed stages are still being defined.
 
-Run by Create Immediate Payment, Create Schedule Payment and Process Inbound Payment.
+## Capture
 
-- Persists the payment in the transaction-detail, transaction-lifecycle-event, and idempotency tables.
-- If the insert fails on a duplicate index the request is a repeat rather than a new payment, and the workflow returns the existing payment.
-- On success the payment is stored as `PENDING`.
+Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent. A duplicate means the request was seen before, and the caller gets the existing payment. On the Online cluster Capture gets a short deadline, so a caller facing an Oracle problem gets a quick error instead of a long wait.
 
-## PendingToAcceptedStage
+## Verify
 
-Run by Create Immediate Payment and Process Inbound Payment.
+Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and Payment Options, to confirm the amount.
 
-- Moves the payment from `PENDING` to `ACCEPTED`, enriching the attributes an accepted payment needs.
-- Publishes the `ACCEPTED` event with the enriched data.
-- In Process Inbound Payment it runs once `PaymentValidationActivityGroup` confirms Amex accepts the third-party payment.
+- A business failure, such as a closed account or insufficient funds, is not retried. The payment goes to `DECLINED`.
+- A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row, plus an `ALLOC_REQUEST` row for a corporate payment.
+- A corporate pay-today payment commits `ACCEPTED` together with its `ALLOC_REQUEST` row, and sets `legs_released_at` so its legs can run as soon as they arrive.
+- An inbound payment Amex won't take commits `DISALLOWED`.
 
-## PendingToScheduledStage
+Verify varies by all four behaviors. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
 
-Run by Create Schedule Payment and Update Payment.
+## Reverify
 
-- Books the payment for a future run date. `PaymentValidationActivityGroup` has already confirmed the payment is valid before this stage runs.
-- Notifies the systems that need to know a payment is booked, via `PaymentScheduledNotificationActivityGroup`.
-- In Update Payment the replacement carries a new payment id, the same confirmation number, and the updated details.
+Checks a scheduled payment again on its due date, with the same calls as Verify, and commits `ACCEPTED` or `DECLINED`. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. For a corporate parent, the `ACCEPTED` commit sets `legs_released_at`, which tells the leg dispatcher to release the held legs.
 
-## PendingToDeclinedStage
+## Execute
 
-Run by Create Immediate Payment, Create Schedule Payment, Execute Scheduled Payment and Update Payment.
+Moves the money and commits `PROCESSING`. Three calls go out in parallel, each on its own rate-limited queue: clearing (MR/M3), the AR balance (GAR) and open-to-buy (AMP).
 
-- Records a payment that failed validation, so nothing downstream runs.
-- Account-type-specific implementations may add a notification to AR or other systems, via `PaymentDeclinedNotificationActivityGroup`.
-- In Create Schedule Payment the payment is never scheduled. In Execute Scheduled Payment the run-date re-validation did not pass. In Update Payment the replacement was invalid, and the original stays cancelled.
+- A corporate parent clears once, at payment level.
+- A corporate leg updates the AR balance and open-to-buy only. It never clears.
+- A consumer leg also clears.
 
-## PendingToDisallowedStage
+## Fulfil
 
-Run by Process Inbound Payment.
+Tells everyone who needs to know, then commits `PROCESSED`. Accounting, eBNC and risk run in parallel. Then the RTF event and the Raven message go out, and only then does the commit happen. For a scheduled payment, the same commit marks its `SCHED_EXEC` row `DONE`. A corporate parent has no Fulfil: the leg dispatcher's completion check moves it to `PROCESSED` once every leg is done.
 
-- Records an inbound, third-party-initiated payment that American Express does not accept. `DISALLOWED` is the terminal state specific to inbound payments.
-- Runs when `PaymentValidationActivityGroup` finds the inbound payment invalid.
+## RequestAllocations
 
-## ScheduledToAcceptedStage
+Asks the allocations manager for a corporate payment's breakdown and sets the allocation status to `ALLOCATING`. Nothing waits for the answer; the allocations manager calls back.
 
-Run by Execute Scheduled Payment.
+## ReceiveAllocations
 
-- Runs on the payment's scheduled date. Before it, `PaymentValidationOnExecutionActivityGroup` re-validates the payment, fetching the current information it needs from external systems, sometimes one call after another, to confirm the scheduled payment is still valid.
-- Moves the payment from `SCHEDULED` to `ACCEPTED`, enriching the attributes an accepted payment needs.
-- Publishes the `ACCEPTED` event with the enriched data.
+Checks one stored callback batch, then writes each allocation as a leg in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` Work Tracker row. The rows are `HELD` while the parent is not yet `ACCEPTED`, and `SCHEDULED` once it has been released. The allocation status turns `ALLOCATED` once the legs add up to the payment amount.
 
-## AcceptedToProcessingStage
+## Cancel
 
-Run by Create Immediate Payment, Execute Scheduled Payment, Execute Split Payment and Process Inbound Payment.
+Moves a `SCHEDULED` payment to `CANCELLED` with one guarded update, inside the market's cancellation window only. The same commit cancels the payment's Work Tracker rows, so no dispatcher will ever start it. If the update changes nothing, the payment has already moved on.
 
-- Sends the payment for clearing to the bank (via MR/M3).
-- Sends it to Accounts Receivable (AR) to reduce the statement balance.
-- Sends it to Authorizations (AMP) to increase Open-To-Buy.
-- In the generic case these three run in parallel, but this varies by `accountType` and `requiresRealtimeClearing`. The logic can also differ for RTP versus non-RTP payments.
-- For corporate payments AR and AMP are **not** notified here. That happens per allocation in Execute Split Payment.
+## Return
 
-In Execute Split Payment the stage runs at the split level, on one allocation rather than the whole payment:
+Moves a payment the bank sent back to `RETURNED`, from `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` when it is returned again. The return's details (when it took effect, why, where it came from and what it returned) travel with the payment from here on.
 
-- A corporate leg updates the AR statement balance and increases Open-To-Buy in AMP only. The corporate parent was already sent for clearing in the workflow that spawned the splits, so the allocation does not clear again.
-- A consumer leg also sends the allocation for clearing to the bank, on top of updating the balance and Open-To-Buy.
-- The split's state and event go to the split transaction-detail and split transaction-lifecycle-event tables.
+## QueueRepresentment
 
-## ProcessingToProcessedStage
+Commits `REPRESENTING` together with a `REPRESENT` Work Tracker row, due on the date the market's rules set. The return never starts the representment itself; the representment dispatcher does, when the date comes.
 
-Run by Create Immediate Payment, Execute Scheduled Payment, Execute Split Payment and Process Inbound Payment.
+## Represent
 
-- Sends the payment to the downstream systems that fulfill it: accounting, audit (Balance & Control, or eBNC), risk, and communications (Raven).
-- Communications comes last. The other notifications can run in parallel, and once they all complete the customer communication is triggered.
-- Audit makes sure every payment is processed and none is missed. Accounting makes sure the payment is matched across Amex's payment-processing platforms. Risk keeps the customer's risk rules updated with every payment.
-- Account-type-specific implementations may notify a different set of systems.
-- In Execute Split Payment it fulfills one allocation and writes to the split tables.
+Rechecks eligibility with Payment Instruments and Payment Options before anything goes to clearing, then sends the payment for clearing again and commits `REPRESENTED`. A failed recheck commits `DECLINED`.
 
-## ScheduledToCancelledStage
+## Settle
 
-Run by Cancel Payment and Update Payment.
-
-- Cancels a payment that was booked for a future date, before it runs.
-- Beforehand the workflow confirms the request is unique (`IdempotencyCheckActivity`) and that the payment is eligible to cancel (`PaymentCancelValidationActivityGroup`).
-- Notifies the systems that need to know the payment is cancelled, via `PaymentCancellationActivityGroup`.
-- In Update Payment it clears the way for the replacement, and the workflow can reuse Cancel Payment's logic to do it.
-
-## AcceptedToCancelledStage
-
-Run by Cancel Payment.
-
-- The same as `ScheduledToCancelledStage`, for a payment that has already been accepted (validated and ready to process) rather than merely scheduled.
-
-## ToReturnedStage
-
-Run by Process Returned Payment.
-
-- Records that a payment the bank had taken on has come back, meaning the funds did not settle.
-- The payment's current state selects the concrete stage: `PaidToReturnedStage`, `ProcessingToReturnedStage`, or `ProcessedToReturnedStage`.
-- Beforehand the workflow confirms the request is unique (`IdempotencyCheckActivity`) and looks up the payment, full or split, along with its current state (`PaymentReturnValidationActivity`). Only `PAID`, `PROCESSING`, and `PROCESSED` payments can be returned.
-- Notifies the downstream systems that the payment was returned, via `PaymentReturnExecutionActivityGroup`.
-
-## ReturnedToRepresentingStage
-
-Run by Process Returned Payment.
-
-- Runs only when the return can be re-attempted. `PaymentRepresentmentEligibilityActivityGroup` checks that in the workflow before this stage.
-- Enriches the representment details, such as the next date the payment can be re-presented.
-- Creates a new `REPRESENTING` transaction for the re-attempt, via `PaymentRepresentmentCreationActivityGroup`: a fresh transaction-detail and transaction-lifecycle-event entry for the next presentment attempt.
-
-## RepresentingToRepresentedStage
-
-Run by Process Representment.
-
-- Runs on the day the representment is processed. Before it, `PaymentRepresentmentValidationActivityGroup` re-checks that the representment is still valid to execute.
-- Sends the re-attempted payment for clearing and, in parallel, notifies the downstream systems once it is re-presented, via `PaymentRepresentmentExecutionActivityGroup`.
-
-## RepresentingToDeclinedStage
-
-Run by Process Representment.
-
-- Declines a representment that fails the processing-day re-validation.
-
-## ToAllocatingStage
-
-Run by Get Corporate Payment Allocations.
-
-- Asks the allocations manager for the payment's breakdown into allocations, via `PaymentAllocatingActivityGroup`.
-- Marks the parent payment `ALLOCATING`.
-- The workflow then waits for the allocations signal before moving to the next stage.
-
-## AllocatingToAllocatedStage
-
-Run by Get Corporate Payment Allocations.
-
-- Records the allocations received back from the allocations manager, via `PaymentAllocatedActivityGroup`.
-- Marks the parent payment `ALLOCATED`.
-- Creates the split legs in the `ACCEPTED` state in the split transaction-detail and split transaction-lifecycle-event tables, via `PaymentSplitsCreationActivity`, publishing each split's lifecycle event.
-- The workflow then triggers Execute Split Payment for each split leg.
-
----
-
-See the [design principles](../principles.md) for the rules that govern how stages sit between workflows and activity groups, and the [state model](../payment-state-model.md) for the states themselves.
+Moves the payments and legs of a batch of up to 500 `READY` inbox rows to `PAID`, in one `PaymentStore` transaction sent as JDBC batches. Each row is a guarded update from `PROCESSED` to `PAID`, setting `stlmt_ts` and `ar_pstd_ts`: on `trans_dtl` for a payment, or on `split_trans_dtl` for a leg. Wherever the update changes a row, a `PAID` timeline row tagged with the batch ID goes in with it. Settle then reads back every payment and leg carrying that batch ID, which is how a retried Settle knows exactly what it moved the first time.

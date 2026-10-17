@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from '@docusaurus/Link';
 
 /**
  * The two bits of markdown that table data still needs.
@@ -38,4 +39,30 @@ export function ticks(text) {
     return text;
   }
   return wrapOdd(text.split(/`([^`]+)`/), (part, i) => <code key={i}>{part}</code>);
+}
+
+/**
+ * `[label](target)` becomes a link, and `` `phrase` `` inside or around it
+ * becomes code. Notes under a diagram are written as plain strings, so this is
+ * how they point at the next page or the journey above.
+ */
+export function links(text) {
+  if (typeof text !== 'string') {
+    return text;
+  }
+  const parts = text.split(/\[([^\]]+)\]\(([^)\s]+)\)/);
+  const out = [];
+  for (let i = 0; i < parts.length; i += 3) {
+    if (parts[i]) {
+      out.push(<React.Fragment key={`t${i}`}>{ticks(parts[i])}</React.Fragment>);
+    }
+    if (i + 1 < parts.length) {
+      out.push(
+        <Link key={`l${i}`} to={parts[i + 2]}>
+          {ticks(parts[i + 1])}
+        </Link>,
+      );
+    }
+  }
+  return out;
 }

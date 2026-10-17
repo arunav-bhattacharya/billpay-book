@@ -1,0 +1,393 @@
+/* DomainModelMap: the payment classes on a grid of state by shape. Blue Box
+   rules: tinted fields and filled boxes, no outlines, except the dashed
+   ghosts, which are outlines on purpose because they are what is missing.
+   Box tones are the lifecycle tokens the Mermaid state diagrams read, so a
+   state looks the same here as on the Payment State Model page. Every colour
+   is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --dm-mid: var(--amex-state-intermediate);
+  --dm-ok: var(--amex-state-success);
+  --dm-stop: var(--amex-state-failure);
+  --dm-accent: var(--amex-blue);
+  --dm-field: color-mix(in srgb, var(--amex-blue) 5%, var(--amex-rail));
+  --dm-card: var(--amex-panel);
+  --dm-band: color-mix(in srgb, var(--dm-accent) 6%, transparent);
+  --dm-band-deep: color-mix(in srgb, var(--dm-accent) 8%, transparent);
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 0.9rem 0.9rem 1.1rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --dm-accent: var(--amex-blue-bright);
+  --dm-field: color-mix(in srgb, var(--amex-blue-bright) 6%, var(--amex-rail));
+  --dm-card: var(--amex-card);
+  --dm-band: color-mix(in srgb, var(--dm-accent) 7%, transparent);
+  --dm-band-deep: color-mix(in srgb, var(--dm-accent) 10%, transparent);
+}
+
+.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  overflow-y: auto;
+  background: var(--amex-bg);
+}
+
+/* ---- toolbar ---- */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+}
+
+.chip {
+  --chip: var(--dm-accent);
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--chip) 10%, var(--amex-panel));
+  color: var(--amex-txt);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.chip:hover {
+  background: color-mix(in srgb, var(--chip) 20%, var(--amex-panel));
+}
+.chipGap {
+  --chip: var(--amex-mut);
+}
+.chipOn {
+  color: var(--amex-banner-block-ink);
+  background: var(--chip);
+}
+.chipOn:hover {
+  background: var(--chip);
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--amex-line-strong);
+  background: transparent;
+  color: var(--amex-mut);
+  cursor: pointer;
+}
+.tool:hover {
+  color: var(--amex-txt-strong);
+  border-color: var(--amex-mut);
+}
+
+.toolIcon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- canvas ---- */
+.frame {
+  margin-top: 0.7rem;
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 680px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+.expanded .svg {
+  max-width: min(100%, calc((100vh - 230px) * 1056 / 766));
+  margin: 0 auto;
+}
+
+/* ---- the root types and the shapes ---- */
+.frameTx {
+  fill: var(--dm-field);
+}
+.groupLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  fill: var(--amex-txt-strong);
+}
+.groupNote {
+  font-size: 12px;
+  fill: var(--amex-mut);
+}
+
+.root,
+.shape,
+.box {
+  transition: opacity 0.15s ease;
+}
+.rootBody {
+  fill: var(--dm-card);
+}
+.rootGhost .rootBody {
+  fill: transparent;
+  stroke: var(--amex-mut);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+.rootTitle {
+  font-size: 14px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.rootFields {
+  font-family: var(--amex-font-mono);
+  font-size: 10.5px;
+  fill: var(--amex-mut);
+}
+
+.shapeBody {
+  fill: var(--amex-table-head-bg);
+}
+.shapeTitle {
+  font-family: var(--amex-font-mono);
+  font-size: 13px;
+  font-weight: 650;
+  fill: var(--amex-table-head-fg);
+}
+.shapeNote {
+  font-size: 11px;
+  fill: color-mix(in srgb, var(--amex-table-head-fg) 78%, transparent);
+}
+
+.isa {
+  fill: none;
+  stroke: var(--amex-mut);
+  stroke-width: 1.3;
+}
+.headIsa {
+  fill: var(--dm-card);
+  stroke: var(--amex-mut);
+  stroke-width: 1.3;
+}
+
+.laneNote {
+  font-size: 11.5px;
+  font-style: italic;
+  fill: var(--amex-mut);
+}
+
+/* ---- the traits ---- */
+.bandVerified {
+  fill: var(--dm-band);
+}
+.bandRepresent {
+  fill: var(--dm-band-deep);
+}
+.bandTitle {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--dm-accent);
+}
+.bandLine {
+  font-family: var(--amex-font-mono);
+  font-size: 10.5px;
+  fill: var(--amex-mut);
+}
+.dimBand {
+  opacity: 0.25;
+  transition: opacity 0.15s ease;
+}
+
+/* ---- the classes ---- */
+.box {
+  cursor: pointer;
+}
+.t_mid {
+  --tone: var(--dm-mid);
+}
+.t_ok {
+  --tone: var(--dm-ok);
+}
+.t_stop {
+  --tone: var(--dm-stop);
+}
+
+.boxBody {
+  fill: color-mix(in srgb, var(--tone) 11%, var(--dm-card));
+  transition: fill 0.15s ease;
+}
+.box:hover .boxBody,
+.on .boxBody {
+  fill: color-mix(in srgb, var(--tone) 20%, var(--dm-card));
+}
+.boxBlock {
+  fill: var(--tone);
+}
+.boxState {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  fill: var(--tone);
+}
+.boxTitle {
+  font-family: var(--amex-font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  fill: var(--amex-txt-strong);
+}
+
+.ghost .boxBody {
+  fill: transparent;
+  stroke: var(--amex-mut);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+.ghost .boxState {
+  fill: var(--amex-mut);
+}
+.ghostTitle {
+  font-size: 12px;
+  font-style: italic;
+  fill: var(--amex-mut);
+}
+
+/* ---- the moves ---- */
+.edge {
+  fill: none;
+  stroke: var(--amex-mut);
+  stroke-width: 1.4;
+  transition: opacity 0.15s ease;
+}
+.edgeSplit {
+  stroke: var(--dm-accent);
+  stroke-width: 1.9;
+}
+.edgeGhost {
+  stroke-dasharray: 4 3;
+  stroke-width: 1.2;
+}
+.headMove {
+  fill: var(--amex-mut);
+}
+.headSplit {
+  fill: var(--dm-accent);
+}
+.headGhost {
+  fill: var(--amex-mut);
+}
+
+.dim {
+  opacity: 0.16;
+}
+
+/* ---- the reader line and the legend ---- */
+.reading {
+  min-height: 2.6em;
+  margin: 0.55rem 0 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--amex-txt);
+}
+
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  margin: 0.2rem 0 0.9rem;
+}
+
+.li {
+  composes: legendItem from '../../css/recipes.module.css';
+}
+
+.sw {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--amex-badge-radius);
+  background: color-mix(in srgb, var(--tone) 18%, var(--dm-card));
+  box-shadow: inset 4px 0 0 var(--tone);
+}
+
+.swLine {
+  display: inline-block;
+  width: 26px;
+  height: 0;
+  border-top: 1.6px solid var(--amex-mut);
+}
+.swSplit {
+  border-top: 2px solid var(--dm-accent);
+}
+.swGhost {
+  border-top: 1.4px dashed var(--amex-mut);
+}
+
+/* ---- the value types ---- */
+.values {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 0.8rem;
+}
+
+.value {
+  padding: 0.8rem 0.95rem 0.7rem;
+  border-radius: 10px;
+  background: var(--dm-field);
+}
+
+.valueTerm {
+  margin: 0 0 0.25rem;
+  font-family: var(--amex-font-mono);
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--amex-txt-strong);
+}
+
+.valueDesc {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--amex-mut);
+}
+
+.valueList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.valueList code {
+  font-size: 0.74rem;
+}
+.valueWhat {
+  color: var(--amex-txt);
+}
+
+@media (max-width: 900px) {
+  .values {
+    grid-template-columns: 1fr;
+  }
+}

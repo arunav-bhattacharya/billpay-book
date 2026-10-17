@@ -1034,11 +1034,12 @@ details.alert > summary {
 .sidebar-sec--vision > .menu__list-item-collapsible > .menu__link::before { content: '01'; }
 .sidebar-sec--architecture > .menu__list-item-collapsible > .menu__link::before { content: '02'; }
 .sidebar-sec--design > .menu__list-item-collapsible > .menu__link::before { content: '03'; }
-.sidebar-sec--build > .menu__list-item-collapsible > .menu__link::before { content: '04'; }
-.sidebar-sec--testing > .menu__list-item-collapsible > .menu__link::before { content: '05'; }
-.sidebar-sec--deployment > .menu__list-item-collapsible > .menu__link::before { content: '06'; }
-.sidebar-sec--observability > .menu__list-item-collapsible > .menu__link::before { content: '07'; }
-.sidebar-sec--operations > .menu__list-item-collapsible > .menu__link::before { content: '08'; }
+.sidebar-sec--onboarding > .menu__list-item-collapsible > .menu__link::before { content: '04'; }
+.sidebar-sec--build > .menu__list-item-collapsible > .menu__link::before { content: '05'; }
+.sidebar-sec--testing > .menu__list-item-collapsible > .menu__link::before { content: '06'; }
+.sidebar-sec--deployment > .menu__list-item-collapsible > .menu__link::before { content: '07'; }
+.sidebar-sec--observability > .menu__list-item-collapsible > .menu__link::before { content: '08'; }
+.sidebar-sec--operations > .menu__list-item-collapsible > .menu__link::before { content: '09'; }
 
 /* ==================================================================== *
  * 11. Footer: Deep Blue, signed off with the logo

@@ -3,14 +3,16 @@ import clsx from 'clsx';
 import styles from './styles.module.css';
 
 /**
- * WorkerSplit: the two Temporal workers side by side, split by whether anyone
- * is waiting for the answer, with the workflows each one carries.
+ * WorkerSplit: the two Temporal clusters side by side, split by whether anyone
+ * is waiting for the answer, with the workflows each one runs.
  *
  * Anything that belongs to neither side, such as the workflows that run on
- * either worker, goes in an admonition after the component rather than in here.
- * A third band inside the card grid read as a third worker.
+ * both clusters depending on what starts them, goes in the prose after the
+ * component rather than in here. A third band inside the card grid read as a
+ * third cluster.
  *
  * workers: [{term, tone: 'Online' | 'Offline', waiting, desc, items: string[]}]
+ *   The prop keeps its first name; each entry is a cluster.
  */
 export default function WorkerSplit({workers = []}) {
   return (

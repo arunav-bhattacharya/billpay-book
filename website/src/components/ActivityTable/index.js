@@ -5,104 +5,85 @@ import {ticks} from '../../lib/inlineMarkup';
 import styles from './styles.module.css';
 
 /**
- * ActivityTable: the activity and activity-group catalogue, filtered by the
- * behaviors a row varies by.
+ * ActivityTable: the activity catalogue, one row per system, with the task
+ * queue each one runs on.
  *
- * The catalogue is 22 rows and the useful question is almost always "which of
- * these change when a market answers X differently". Filtering on the
- * behavior column answers that directly. Generic is a filter value of its own,
- * since "runs the same way everywhere" is the thing most readers want to
- * separate out first.
+ * Activities are shared across markets and none of them vary by behavior, so
+ * the useful question is no longer "which of these change per market" but
+ * "which of these are throttled". The filter answers that: every row is one of
+ * three kinds of queue, worked out from its queue unless the row says so.
  *
- * One behavior at a time, not a multi-select. Rows carry two to four
- * behaviors each, so an AND of two filters is nearly always the same answer as
- * one of them alone, and an OR is not a question anyone asks.
+ *   local     a local activity, in the workflow task itself (PaymentStore)
+ *   limited   a rate-limited `ds-*` queue, one per downstream
+ *   workflow  the workflow's own queue, for calls nobody throttles
  *
- * The filter stays here rather than moving into DataTable. Every part of it is
- * particular to this catalogue: Generic is a made-up value meaning an empty
- * list, the chips are ordered by first appearance, a row's own chip lights up
- * when it is the one being filtered on, and the footer is a three-way
- * sentence. As a general prop it would need four callbacks to say all that.
- *
- * rows: [{name, behaviors: string[], transition, does: string[]}]
- *       behaviors: [] means generic. Backticks in transition and does render as code.
+ * rows: [{name, system, queue, kind?, calledBy}]
+ *       Backticks in system, queue and calledBy render as code.
  */
 
-const GENERIC = 'Generic';
-const ALL = 'All';
+const KINDS = {
+  local: 'Local',
+  limited: 'Rate-limited queue',
+  workflow: "Workflow's own queue",
+};
+const ALL = 'all';
+
+const kindOf = (r) =>
+  r.kind ||
+  (/^ds-/.test(r.queue) ? 'limited' : /local/i.test(r.queue) ? 'local' : 'workflow');
 
 export default function ActivityTable({rows = []}) {
   const [active, setActive] = useState(ALL);
 
-  const matches = (r, key) =>
-    key === ALL ? true : key === GENERIC ? !(r.behaviors || []).length : (r.behaviors || []).includes(key);
-
-  // Behaviors in the order they first appear, so the chips read in the same
-  // order as the prose that introduces them rather than alphabetically.
   const filters = useMemo(() => {
-    const seen = [];
-    const counts = new Map([
-      [ALL, rows.length],
-      [GENERIC, 0],
-    ]);
+    const counts = new Map([[ALL, rows.length]]);
     rows.forEach((r) => {
-      const behaviors = r.behaviors || [];
-      if (!behaviors.length) {
-        counts.set(GENERIC, counts.get(GENERIC) + 1);
-      }
-      behaviors.forEach((d) => {
-        if (!seen.includes(d)) {
-          seen.push(d);
-        }
-        counts.set(d, (counts.get(d) || 0) + 1);
-      });
+      const k = kindOf(r);
+      counts.set(k, (counts.get(k) || 0) + 1);
     });
-    return [ALL, GENERIC, ...seen].map((key) => ({key, count: counts.get(key) || 0}));
+    return [ALL, ...Object.keys(KINDS).filter((k) => counts.has(k))].map((key) => ({
+      key,
+      label: key === ALL ? 'All' : KINDS[key],
+      count: counts.get(key) || 0,
+    }));
   }, [rows]);
 
-  const shown = useMemo(() => rows.filter((r) => matches(r, active)), [rows, active]);
+  const shown = useMemo(
+    () => rows.filter((r) => active === ALL || kindOf(r) === active),
+    [rows, active],
+  );
 
   const columns = [
     {
       key: 'name',
-      header: 'Activity / ActivityGroup',
+      header: 'Activity interface',
       headerClassName: styles.thName,
       rowHeader: true,
       className: styles.nameCell,
+      render: (r) => <code>{r.name}</code>,
     },
     {
-      key: 'behaviors',
-      header: 'Generic / Behaviors',
-      headerClassName: styles.thBehaviors,
-      className: styles.behaviorsCell,
+      key: 'system',
+      header: 'System',
+      headerClassName: styles.thSystem,
+      render: (r) => ticks(r.system),
+    },
+    {
+      key: 'queue',
+      header: 'Task queue',
+      headerClassName: styles.thQueue,
+      className: styles.queueCell,
       render: (r) =>
-        (r.behaviors || []).length ? (
-          r.behaviors.map((d) => (
-            <span key={d} className={clsx(styles.behavior, active === d && styles.behaviorOn)}>
-              {d}
-            </span>
-          ))
+        /^ds-/.test(r.queue) ? (
+          <span className={clsx(styles.queue, styles.queueLimited)}>{r.queue}</span>
         ) : (
-          <span className={styles.generic}>{GENERIC}</span>
+          <span className={styles.queueText}>{ticks(r.queue)}</span>
         ),
     },
     {
-      key: 'transition',
-      header: 'State transition',
-      headerClassName: styles.thState,
-      className: styles.stateCell,
-      render: (r) => ticks(r.transition),
-    },
-    {
-      key: 'does',
-      header: 'What it does',
-      render: (r) => (
-        <ul className={styles.does}>
-          {(r.does || []).map((d, i) => (
-            <li key={i}>{ticks(d)}</li>
-          ))}
-        </ul>
-      ),
+      key: 'calledBy',
+      header: 'Called by',
+      render: (r) => ticks(r.calledBy),
     },
   ];
 
@@ -114,16 +95,16 @@ export default function ActivityTable({rows = []}) {
       rowKey={(r) => r.name}
       separator="both"
       toolbar={
-        <div className={styles.bar} role="group" aria-label="Filter by behavior">
-          <span className={styles.barLabel}>Varies by</span>
-          {filters.map(({key, count}) => (
+        <div className={styles.bar} role="group" aria-label="Filter by queue">
+          <span className={styles.barLabel}>Runs on</span>
+          {filters.map(({key, label, count}) => (
             <button
               key={key}
               type="button"
               className={clsx(styles.chip, active === key && styles.chipOn)}
               aria-pressed={active === key}
               onClick={() => setActive(key)}>
-              {key}
+              {label}
               <span className={styles.count}>{count}</span>
             </button>
           ))}
@@ -132,9 +113,13 @@ export default function ActivityTable({rows = []}) {
       footer={
         <p className={styles.foot}>
           {active === ALL
-            ? `All ${shown.length} activities and activity groups.`
-            : `${shown.length} of ${rows.length} ${
-                active === GENERIC ? 'run the same way in every market.' : `vary by ${active}.`
+            ? `All ${shown.length} activity interfaces.`
+            : `${shown.length} of ${rows.length} run ${
+                active === 'local'
+                  ? 'as local activities, inside the workflow task.'
+                  : active === 'limited'
+                    ? 'on a rate-limited queue of their own.'
+                    : "on the workflow's own queue, because nobody throttles them."
               }`}
         </p>
       }

@@ -1,7 +1,7 @@
 ---
-title: ActivityGroups & Activities
-description: 'An activity is one retryable action: publish an event, persist a record, update a downstream balance.'
-sidebar_label: ActivityGroups & Activities
+title: Activities
+description: "An activity makes the calls to one system, on that system's task queue. There is one activity interface per system, shared by every market."
+sidebar_label: Activities
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -9,233 +9,136 @@ import ActivityTable from '@site/src/components/ActivityTable';
 
 export const ACTIVITIES = [
   {
-    name: 'PersistPendingPaymentActivity',
-    behaviors: [],
-    transition: 'input → `PENDING`',
-    does: [
-      'Inserts the payment into the `idempotency_checker`, `trans_dtl` (transaction detail), and `trans_lfcyc_event` (transaction lifecycle event) tables.',
-      'If a row is already present the request is a duplicate; otherwise it is a genuine first-time (idempotent) request.',
-      'On success, publishes a `PENDING` lifecycle event.',
-      'Invoked from `InitiatedToPendingStage`.',
-    ],
+    name: 'PaymentStore',
+    system: 'Oracle',
+    queue: 'Local activity',
+    calledBy: "Every stage's commit; Capture's insert-if-absent; the leg writes in ReceiveAllocations; the guarded cancel; the ID map in Update",
   },
   {
-    name: 'IdempotencyCheckActivity',
-    behaviors: [],
-    transition: 'None',
-    does: [
-      'Attempts to insert a row into the `idempotency_checker` table for the API being called.',
-      'If the row already exists the request is a duplicate; if not, this is the first time the request has been seen.',
-      'Invoked from any workflow that needs an idempotency check.',
-    ],
+    name: 'InstrumentActivities',
+    system: 'Payment Instruments',
+    queue: "The workflow's queue; its own queue once it has an agreed limit",
+    calledBy: 'Verify, Reverify, Represent',
   },
   {
-    name: 'PaymentValidationActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
-    transition: '`PENDING` → `ACCEPTED` / `SCHEDULED` / `DECLINED`',
-    does: [
-      'Makes external calls where needed and evaluates the data to decide whether the payment is valid.',
-      'A valid immediate payment becomes `ACCEPTED`; a valid future-dated payment becomes `SCHEDULED`; an invalid one becomes `DECLINED`.',
-      'Invoked from the `CreateImmediatePaymentWF` and `CreateSchedulePaymentWF` workflows.',
-    ],
+    name: 'OptionsActivities',
+    system: 'Payment Options',
+    queue: "The workflow's queue; its own queue once it has an agreed limit",
+    calledBy: 'Verify, Reverify, Represent',
   },
   {
-    name: 'PaymentValidationOnExecutionActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
-    transition: '`SCHEDULED` / `ALLOCATED` → `ACCEPTED` / `DECLINED`',
-    does: [
-      'Runs when a scheduled payment is due to execute.',
-      'Calls the systems needed to gather information that may have changed since scheduling. Some of those calls can only be made after data has come back from another system first.',
-      'Checks whether the scheduled payment is still valid: still-valid becomes `ACCEPTED`, otherwise `DECLINED`.',
-      'Invoked from `ExecuteScheduledPaymentWF`.',
-    ],
+    name: 'ClearingActivities',
+    system: 'MR/M3',
+    queue: 'ds-clearing',
+    calledBy: "Execute (at payment level, and for consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
   },
   {
-    name: 'PaymentStateTransitionActivity',
-    behaviors: [],
-    transition: 'Various (payment level)',
-    does: [
-      'Given a payment id with its current and previous states, updates the `trans_dtl` table to the new status.',
-      'Adds a new row to the `trans_lfcyc_event` table for that state.',
-      'Publishes the matching lifecycle event.',
-      'Invoked inside every stage that moves a payment between states at the payment level.',
-    ],
+    name: 'ReceivablesActivities',
+    system: 'Accounts Receivable (GAR)',
+    queue: 'ds-receivables',
+    calledBy: "Execute, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
   },
   {
-    name: 'PaymentSplitStateTransitionActivity',
-    behaviors: [],
-    transition: 'Various (split level)',
-    does: [
-      'The split-level counterpart: updates the `split_trans_dtl` table to the new status for a split-payment id.',
-      'Adds a row to the `split_trans_lfcyc_event` table.',
-      'Publishes the split-level lifecycle event.',
-      'Invoked inside every stage that handles split payments.',
-    ],
+    name: 'AuthorizationActivities',
+    system: 'Authorizations (AMP), open-to-buy',
+    queue: 'ds-authorization',
+    calledBy: 'Execute, and every leg',
   },
   {
-    name: 'PaymentScheduledNotificationActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting'],
-    transition: 'None',
-    does: [
-      'Notifies the relevant downstream systems once a payment has been scheduled.',
-      'Invoked from `PendingToScheduledStage`.',
-    ],
+    name: 'AccountingActivities',
+    system: 'Accounting',
+    queue: 'ds-accounting',
+    calledBy: 'Fulfil, and every leg',
   },
   {
-    name: 'PaymentDeclinedNotificationActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting'],
-    transition: 'None',
-    does: [
-      'Notifies the relevant downstream systems when a payment is declined, whether that happened during an immediate payment or while it was being scheduled.',
-      'Invoked from `PendingToDeclinedStage`.',
-    ],
+    name: 'BalanceControlActivities',
+    system: 'eBNC (Balance & Control)',
+    queue: 'ds-ebnc',
+    calledBy: 'Fulfil, and every leg',
   },
   {
-    name: 'PaymentAllocatingActivityGroup',
-    behaviors: [],
-    transition: '`PENDING` / `SCHEDULED` → `ALLOCATING`',
-    does: [
-      'Requests the allocations for a corporate payment.',
-      'For a corporate immediate payment, the payment reaches `ACCEPTED` (by way of `ALLOCATING` and `ALLOCATED`) only once its allocations are fetched; if they cannot be fetched, it is `DECLINED`.',
-      'For a corporate scheduled payment, it moves to `ALLOCATING` on the scheduled date, or a set number of days before it.',
-      'Invoked from `ToAllocatingStage`.',
-    ],
+    name: 'RiskActivities',
+    system: 'Risk',
+    queue: 'ds-risk',
+    calledBy: 'Fulfil, and every leg',
   },
   {
-    name: 'PaymentAllocatedActivityGroup',
-    behaviors: [],
-    transition: '`ALLOCATING` → `ALLOCATED`',
-    does: [
-      'Receives the allocations back from GPA (Get Corporate Payment Allocations).',
-      'The validation Billpay performs on the received allocations is still to be defined.',
-      'Invoked from `AllocatingToAllocatedStage`.',
-    ],
+    name: 'AllocationActivities',
+    system: 'Allocations manager',
+    queue: 'ds-allocations',
+    calledBy: 'RequestAllocations',
   },
   {
-    name: 'PaymentExecutionActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing'],
-    transition: '`ACCEPTED` → `PROCESSING`',
-    does: [
-      'Runs three actions in parallel, recording each in the notification tracker table: sends the payment to the clearing system, decreases the Accounts Receivable balance, and increases Open-To-Buy in Authorization.',
-      'These steps can vary depending on the payment\'s behaviors.',
-      'Invoked from `AcceptedToProcessingStage`.',
-    ],
+    name: 'InboxActivities',
+    system: "One-Data's inbox functions and event handlers",
+    queue: "The workflow's own queue",
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests',
   },
   {
-    name: 'PaymentFulfillmentActivityGroup',
-    behaviors: ['accountType'],
-    transition: '`PROCESSING` → `PROCESSED`',
-    does: [
-      'In parallel, notifies Accounting and Balance & Control, recording each in the notification tracker table.',
-      'Then notifies Communications, also recorded in the notification tracker table.',
-      'Invoked from `ProcessingToProcessedStage`.',
-    ],
+    name: 'LifecycleEventActivities',
+    system: 'RTF, the lifecycle events other systems consume',
+    queue: "The workflow's own queue",
+    calledBy: "Every stage's announcement; Fulfil and the corporate completion check, before their commit; the PAID events after Settle",
   },
   {
-    name: 'PaymentSplitsCreationActivity',
-    behaviors: [],
-    transition: '`ACCEPTED` (full) → `ACCEPTED` (split)',
-    does: [
-      'For each split, creates a row in the split transaction-detail and `split_trans_lfcyc_event` tables in the `ACCEPTED` state.',
-      'Publishes the split-level lifecycle event for that transition.',
-      'Invoked from the `CreateImmediatePaymentWF`, `ExecuteScheduledPaymentWF`, `GetCorporatePaymentAllocationsWF`, and `ProcessInboundPaymentWF` workflows.',
-    ],
-  },
-  {
-    name: 'PaymentCancelValidationActivityGroup',
-    behaviors: ['accountType'],
-    transition: 'None',
-    does: [
-      'Checks the payment\'s current state in the database.',
-      'If it is eligible, makes the external calls needed to confirm the cancellation is allowed, returning true when it is.',
-      'Invoked from `CancelPaymentWF`.',
-    ],
-  },
-  {
-    name: 'PaymentCancellationActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting'],
-    transition: '`SCHEDULED` / `ACCEPTED` → `CANCELLED`',
-    does: [
-      'Notifies the various downstream systems once a payment has been cancelled.',
-      'Invoked from `CancelPaymentWF`.',
-    ],
-  },
-  {
-    name: 'PaymentReturnValidationActivity',
-    behaviors: [],
-    transition: 'None',
-    does: [
-      'Checks the returned payment\'s current state in the database, continuing only if it is valid.',
-      'Invoked from `ProcessReturnedPaymentWF`.',
-    ],
-  },
-  {
-    name: 'PaymentReturnExecutionActivityGroup',
-    behaviors: ['accountType'],
-    transition: '`PROCESSING` / `PROCESSED` / `PAID` → `RETURNED`',
-    does: [
-      'Notifies the various downstream systems once a payment has been marked `RETURNED` in the database.',
-      'Invoked from `ToReturnedStage`.',
-    ],
-  },
-  {
-    name: 'PaymentRepresentmentEligibilityActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
-    transition: 'None',
-    does: [
-      'Makes the external calls needed to decide whether a returned payment can be re-presented (retried for settlement).',
-      'Returns true if it is eligible, false otherwise.',
-      'Invoked from `ProcessReturnedPaymentWF`.',
-    ],
-  },
-  {
-    name: 'PaymentRepresentmentCreationActivityGroup',
-    behaviors: [],
-    transition: '`RETURNED` (presentment seq 1) → `REPRESENTING` (presentment seq 2)',
-    does: [
-      'Creates a new row in the `trans_dtl` and `trans_lfcyc_event` tables in the `REPRESENTING` status and publishes a lifecycle event.',
-      'Takes the return from presentment sequence 1 (`RETURNED`) to sequence 2 (`REPRESENTING`).',
-      'Invoked from `ReturnedToRepresentingStage`.',
-    ],
-  },
-  {
-    name: 'PaymentRepresentmentValidationActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
-    transition: 'None',
-    does: [
-      'Makes the external calls needed to confirm, on the day the representment is due to run, that it is still valid to execute.',
-      'Returns true if so, false otherwise.',
-      'Invoked from `ProcessRepresentmentWF`.',
-    ],
-  },
-  {
-    name: 'PaymentRepresentmentExecutionActivityGroup',
-    behaviors: ['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization'],
-    transition: '`REPRESENTING` → `REPRESENTED`',
-    does: [
-      'Sends the payment to the clearing system.',
-      'Then notifies the various downstream systems in parallel once it has been re-presented (`REPRESENTED`).',
-      'Invoked from `RepresentingToRepresentedStage`.',
-    ],
-  },
-  {
-    name: 'MapNewPaymentIdToPreviousIdActivity',
-    behaviors: [],
-    transition: 'None',
-    does: [
-      'Writes a row into the `ORIG_TRANS_REFER_MAP` table linking the old and new payment ids.',
-      'Preserves the audit trail when a scheduled payment is replaced by an updated one.',
-      'Invoked from `UpdatePaymentWF`.',
-    ],
+    name: 'CommunicationActivities',
+    system: 'Raven, customer messages',
+    queue: 'ds-comms',
+    calledBy: 'Announcements the customer is told about; Fulfil and the corporate completion check, before their commit',
   },
 ];
 
-# ActivityGroups & Activities
+# Activities
 
-<Lead>An activity is one retryable action: publish an event, persist a record, update a downstream balance. An activity group coordinates a set of them for a single business concern. Activities are shared across markets and stay thin, leaving protocol details to clients.</Lead>
+<Lead>An activity makes the calls to one system, on that system's task queue. There is one activity interface per system, shared by every market, and none of them vary by behavior.</Lead>
 
-Groups whose behavior varies by market carry their behaviors in the second column. The rest are generic and run the same way everywhere. Filter by a behavior to see only what changes when a market answers that question differently.
+The task queue is how Billpay throttles. A downstream system with an agreed rate gets its own `ds-*` queue, and the queue's server-side rate limit holds across every pod, so the system never sees more than it agreed to. Calls that nobody throttles run on the workflow's own queue, and Oracle is reached only through `PaymentStore`, which runs inside the workflow task itself. [Throttling](../throttling.md) covers how the limits are set and changed.
+
+Activities take IDs, not payment objects, and load what they need. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
+
+## The catalogue
 
 <ActivityTable rows={ACTIVITIES} />
 
-For the layering that governs what may call what, see the [design principles](../principles.md).
+A corporate payment is never declined because its allocations are slow. The parent clears on its due date anyway, its legs wait, and an alert fires at the market's alert point if they are still missing.
+
+## PaymentStore, the only way into Oracle
+
+`PaymentStore` is the only code that reads or writes Oracle. Each of its operations is one transaction:
+
+| Operation | What it writes |
+| --- | --- |
+| Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before |
+| A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates, releases or closes |
+| Writing legs | Split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row |
+| Cancel | The guarded update to `CANCELLED`, and the cancellation of the payment's Work Tracker rows |
+| Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
+| Settle | A batch of inbox rows as JDBC batches in one transaction: a guarded update from `PROCESSED` to `PAID` on `trans_dtl` for a payment or on `split_trans_dtl` for a leg, and a `PAID` timeline row tagged with the batch ID wherever the update changed a row. Then a read-back by batch ID |
+| Reads | The fields an activity or stage needs, by ID |
+
+It runs as a local activity, which is what lets a payment ride out an Oracle outage or a patching window without anyone stepping in:
+
+- Short blips retry inside the same workflow task.
+- Once the wait between retries passes the local retry threshold (three times the workflow task timeout, 30 seconds by default in the Java SDK), the SDK schedules a durable timer and retries in a later task. The payment pauses and resumes when Oracle is back, even across a worker restart.
+- `PaymentStore` gets a schedule-to-close timeout of a few hours and a maximum retry interval of about a minute. A Java local activity with neither a schedule-to-close nor a maximum number of attempts is not retried at all, so both are set.
+- During an outage the governor sees the Oracle errors and stops dispatching, so only the payments already in flight wait.
+
+## Where each call runs
+
+| Call | Runs as | Why |
+| --- | --- | --- |
+| Oracle reads and writes | A local activity (`PaymentStore`) | No task round trip, and one marker in history when the workflow task completes |
+| Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
+| Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
+
+Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the third row, since nobody throttles them. Raven has an agreed rate, so its calls run on `ds-comms`.
+
+## Retries and timeouts
+
+- Business failures that Verify or Reverify find, such as a closed account or insufficient funds, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
+- A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
+- Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
+- RTF and Raven get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
+- Start-to-close is about two to three times the call's p99, so a hung call frees its slot quickly.
+- HTTP clients inside activities don't retry on their own (no MicroProfile `@Retry`, for example). One task is one call, so a queue's limit stays the real call rate.
+- Every HTTP call carries an idempotency key, such as `{paymentId}-{step}`, because any activity can run twice.

@@ -123,7 +123,7 @@ function Chips({items = []}) {
 }
 
 function Block({block, depth, aside}) {
-  /* unitless 0–1, so the stylesheet can interpolate the tint with calc() */
+  /* unitless 0 to 1, so the stylesheet can interpolate the tint with calc() */
   const style = {};
   if (depth != null) style['--ly-d'] = depth;
   return (

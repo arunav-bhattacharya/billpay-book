@@ -20,7 +20,7 @@ import Lead from '@site/src/components/Lead';
 | **Activity** | `core/lib/activities/` + `impl/` | None |
 | **Client** | `core/lib/clients/` | None |
 
-What each type is called is in the [naming conventions](../../../design/principles.md#naming-conventions).
+What each type is called is in the [naming conventions](../../../design/principles.md#naming).
 
 Two things to notice. Activities and clients have **no market column**, because they are shared everywhere by design. Market variation lives one level up, in which stage or activity-group implementation gets composed in. Workflows almost never need a market override either. One workflow per journey is the rule, and a market that needs different behavior supplies different *stages*, not a different workflow. The spec still reserves a `market/{m}/workflows/` path and a `{Market}`-prefixed workflow name for the case where a market genuinely cannot share one, so the door is open and nothing has walked through it yet.
 

@@ -1,6 +1,6 @@
 ---
 title: Design
-description: 'Design sets out the precise model behind the platform: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.'
+description: 'Design is the model the code follows: the states a payment moves through, which workflow runs each journey, and how work nobody is waiting for is paced so it never slows down a customer who is.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,7 +8,13 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Design
 
-<Lead>Design sets out the **precise model** behind the platform: the components a workflow composes, the canonical states a payment moves through, and the logic behind every transition.</Lead>
+<Lead>Design is the model the code follows: the states a payment moves through, which workflow runs each journey, and how work nobody is waiting for is paced so it never slows down a customer who is.</Lead>
+
+Four layers handle every journey. A **workflow** runs it, **stages** take its business steps, **activities** make the calls to one system each, and **clients** speak that system's contract. Only stages change with a market's behaviors, so adding a market rarely means new code.
+
+In front of the workflows sits the **Billpay Router**. It admits a request (or turns it away with a 422 when the market isn't live), picks the journey, resolves the market's behaviors into a **plan key**, places the work on the Online or Offline cluster, and starts it in the right mode: Update-With-Start when a caller is waiting, an async start for an allocations callback, and a plain start when a dispatcher hands it work that was pulled or fell due.
+
+The pages below start with the rules and the states, then follow the moving parts.
 
 ## In this section
 
@@ -17,32 +23,52 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Principles',
       to: '/docs/design/principles',
-      desc: `The five layered components, what each one is responsible for, and the call, naming, and composition rules that keep business decisions apart from transport.`,
+      desc: `The rules behind every design choice, the four layers and what each may call, how they are named, and how a plan key picks a market's stages.`,
     },
     {
       term: 'Payment State Model',
       to: '/docs/design/payment-state-model',
-      desc: `The canonical lifecycle states a payment moves through, what each one means, and which states a consumer or corporate payment can reach.`,
+      desc: `The states every payment moves through, the stage that makes each move, and the rules for split payments and corporate parents.`,
+    },
+    {
+      term: 'Domain Model',
+      to: '/docs/design/domain-model',
+      desc: `How the code turns those states into types: one class per state, 26 functions between them, and the gaps the code still has.`,
     },
     {
       term: 'Journeys',
       to: '/docs/design/journeys',
-      desc: `Each payment followed end to end, from the channel a customer starts in, or the event that fires, to the money settling.`,
+      desc: `Each journey end to end, from the channel or event that starts it to the money settling.`,
     },
     {
       term: 'Routing',
       to: '/docs/design/routing',
-      desc: `What the Billpay Router reads off a request, and which workflow each trigger and condition starts.`,
+      desc: `The Router's six steps, the start mode for each kind of request, and which workflow each trigger starts, on which cluster.`,
     },
     {
       term: 'Component Model',
       to: '/docs/design/component-model',
-      desc: `What exists at each layer: every workflow, the stages those workflows sequence, and the activity groups the stages call.`,
+      desc: `Every workflow, the twelve stages they run, and the activities those stages call.`,
+    },
+    {
+      term: 'Pacing',
+      to: '/docs/design/pacing',
+      desc: `How dispatchers release dated and pulled work into the Offline cluster, and how the governor resets their rates every 15 seconds.`,
+    },
+    {
+      term: 'Throttling',
+      to: '/docs/design/throttling',
+      desc: `One rate-limited queue per downstream system, what happens on a 429, and the priority and fairness keys that decide who goes first.`,
+    },
+    {
+      term: 'Corporate Allocations',
+      to: '/docs/design/corporate-allocations',
+      desc: `How a corporate payment clears once while its allocations arrive by callback and post as legs, on a track of their own.`,
     },
     {
       term: 'Sequence Diagrams',
       to: '/docs/design/sequence-diagrams',
-      desc: `Twelve end-to-end flows traced from the caller through the router and the workflows to the activities that do the work.`,
+      desc: `Thirteen flows traced from the caller, through the Router, to the stages and the systems they call.`,
     },
   ]}
 />

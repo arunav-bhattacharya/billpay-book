@@ -34,3 +34,9 @@
 /* The narrow step is DataTable's, at 700px rather than the 640px this table
    used to carry alone. One breakpoint for every table on a page beats each
    one reflowing at its own width. */
+
+/* When a run happens: the muted ink, so the workflow stays the thing the eye
+   lands on. */
+.runsCell {
+  --dt-cell-color: var(--amex-mut);
+}

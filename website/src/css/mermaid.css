@@ -181,9 +181,9 @@
 /* ==================================================================== *
  * 14. Sequence diagrams — Amex-branded, theme-aware.
  *
- * The mermaid source carries light-tuned rgba() "sentinel" fills on its
- * box / rect regions; every role uses a unique RGB triple, so dark mode
- * re-tints each role here via [fill^=...] attribute selectors (CSS wins
+ * The mermaid source carries rgba() "sentinel" fills on its box and rect
+ * regions, and the rules at the end of this section repaint each one from
+ * the theme tokens through exact [fill=...] attribute selectors (CSS wins
  * over SVG presentation attributes; !important wins over mermaid's own
  * injected #id-scoped stylesheet). Everything else — actors, lifelines,
  * notes, alt/opt frames, message lines, autonumber badges — is styled
@@ -251,8 +251,8 @@
   stroke: color-mix(in srgb, #4da3e6 40%, transparent) !important;
 }
 
-/* Notes — pale blue caption panels. They carry the running commentary, so
-   they sit in the blue family and leave gold free to mean something. */
+/* Notes: pale blue caption panels. They carry the running commentary, so
+   they sit in the blue family with everything else. */
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] rect.note {
   fill: #e3f0fc !important;
   stroke: #7fb4e4 !important;
@@ -333,144 +333,77 @@
   fill: #ffffff !important;
 }
 
-/* --- Region-rect fills + chip chrome ------------------------------------
- * The palette is Amex blue throughout, with one gold.
+/* --- Region fills ---------------------------------------------------------
+ * Each region in the Mermaid source carries an rgba() fill, and that value is
+ * a sentinel: the rules below match it exactly and repaint it from the theme
+ * tokens, so one source reads right in both themes. Match the whole value,
+ * not a prefix, because two roles can share an RGB triple at different
+ * alphas (the caller group and the Offline cluster are both Deep Blue).
  *
- * Two distinctions do the work. Which worker ran the block: Amex blue for
- * online, electric blue for offline. And whether the caller has already been
- * answered: gold, dashed, for the async span. Everything else is a tint of
- * the same blue and carries only nesting.
+ * Every fill is opaque, a token mixed into the panel colour. Mermaid paints
+ * regions back to front, so translucent fills would composite differently
+ * wherever they nest; opaque ones are the same colour anywhere. Mermaid draws
+ * every region before the lifelines, actors, arrows and labels, so nothing
+ * readable sits underneath one.
  *
- * State-transition chips are deliberately all one colour. Colour-coding them
- * by outcome competed with the worker distinction for the reader's attention,
- * and the chip already spells the state out (`state → DECLINED`).
+ * Two things carry meaning. Which cluster runs a span: Bright Blue for
+ * Online and Deep Blue for Offline, the cluster tokens WorkerChip uses. And
+ * whether anything runs at all: a grey, dashed span is time the work waits in
+ * Oracle or in One-Data's inbox, with nothing in Temporal. A Light Blue chip
+ * is a commit through PaymentStore.
  *
- * Every fill here is OPAQUE, and the source rgba() values in the markdown are
- * only sentinels for these selectors to match on. Translucent fills looked
- * fine in isolation and wrong in combination: Mermaid paints these regions
- * back to front, so an offline block nested inside the gold async span
- * composited cyan over gold and came out green. Opaque fills mean a block is
- * the same colour wherever it is nested. Safe to do, because Mermaid draws
- * every region before the lifelines, actor boxes, arrows and labels, so
- * nothing readable sits underneath one.
- *
- * Sentinel key (unique RGB triples, matched on prefix):
- *   0,23,90     caller box       | 1,111,208  platform box
- *   1,91,179    online worker    | 0,163,224  offline worker
- *   96,165,224  nested sub-workflow
- *   198,146,20  async span       | 90,112,145 event-ingestion strip
- *   0,98,182    state chip, every transition
- */
-.docusaurus-mermaid-container rect[fill^='rgba(0,23,90'] {
-  fill: #eff2f7 !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
-  fill: #f2f6fc !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
-  fill: #bfd6f5 !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
-  fill: #d3f0fa !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(96,165,224'] {
-  fill: #e4edfb !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
-  fill: #f8e6bd !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
-  fill: #edeff4 !important;
-}
-.docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
-  fill: #8fb8e8 !important;
-}
+ * Sentinel key, exact values as written in the markdown:
+ *   rgba(0,23,90,0.07)      caller or One-Data group
+ *   rgba(0,111,207,0.05)    Billpay Platform group
+ *   rgba(0,111,207,0.12)    Online cluster
+ *   rgba(0,23,90,0.12)      Offline cluster
+ *   rgba(83,86,90,0.14)     waiting, nothing running
+ *   rgba(102,169,226,0.40)  a PaymentStore commit
+ * ------------------------------------------------------------------------ */
 
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,23,90'] {
-  fill: #16294a !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
-  fill: #102546 !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
-  fill: #123f7d !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
-  fill: #0b5f7d !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(96,165,224'] {
-  fill: #1d4372 !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
-  fill: #4a3f22 !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
-  fill: #16253d !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
-  fill: #2f6fb8 !important;
-}
-
-/* State-transition chips read as rounded, hairline-stroked pills. */
-.docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
-  rx: 6px !important;
-  ry: 6px !important;
-  stroke: rgba(0, 98, 182, 0.55) !important;
-  stroke-width: 1px !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,98,182'] {
-  stroke: rgba(120, 180, 240, 0.55) !important;
-}
-
-/* Worker regions. Each takes a hairline in its own hue, so the two read apart
-   at a glance rather than only once you reach the note at the top. */
-.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'],
-.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'],
-.docusaurus-mermaid-container rect[fill^='rgba(96,165,224'],
-.docusaurus-mermaid-container rect[fill^='rgba(90,112,145'] {
-  rx: 8px !important;
-  ry: 8px !important;
-}
-/* Online worker: Amex Blue Box. */
-.docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
-  stroke: #015bb3 !important;
-  stroke-width: 1.6px !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,91,179'] {
-  stroke: #4d94dd !important;
-}
-/* Offline worker: electric blue. */
-.docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
-  stroke: #0090c6 !important;
-  stroke-width: 1.6px !important;
-}
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,163,224'] {
-  stroke: #26b6e8 !important;
-}
-
-/* The two participant-group frames. Mermaid outlines them in its default
-   grey, which is the last non-Amex colour in the diagram. */
-.docusaurus-mermaid-container rect[fill^='rgba(0,23,90'],
-.docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
+/* The two participant groups. Mermaid outlines them in its default grey. */
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.07)'],
+.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.05)'] {
   rx: 10px !important;
   ry: 10px !important;
-  stroke: color-mix(in srgb, #016fd0 28%, transparent) !important;
+  stroke: color-mix(in srgb, var(--amex-blue) 28%, transparent) !important;
   stroke-width: 1px !important;
 }
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(0,23,90'],
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(1,111,208'] {
-  stroke: color-mix(in srgb, #4da3e6 26%, transparent) !important;
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.07)'] {
+  fill: color-mix(in srgb, var(--amex-txt-strong) 6%, var(--amex-panel)) !important;
+}
+.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.05)'] {
+  fill: color-mix(in srgb, var(--amex-worker-online) 5%, var(--amex-panel)) !important;
 }
 
-/* The async span. It is the one thing in a diagram that is not simply the next
-   step, so it gets the only gold and the only dashed frame. */
-.docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
+/* The cluster spans, and the waits between them. */
+.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.12)'],
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.12)'],
+.docusaurus-mermaid-container rect[fill='rgba(83,86,90,0.14)'] {
   rx: 8px !important;
   ry: 8px !important;
-  stroke: #c69214 !important;
   stroke-width: 1.6px !important;
-  stroke-dasharray: 7 4 !important;
 }
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill^='rgba(198,146,20'] {
-  stroke: rgba(235, 197, 100, 0.85) !important;
+.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.12)'] {
+  fill: color-mix(in srgb, var(--amex-worker-online) 12%, var(--amex-panel)) !important;
+  stroke: var(--amex-worker-online) !important;
+}
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.12)'] {
+  fill: color-mix(in srgb, var(--amex-worker-offline) 12%, var(--amex-panel)) !important;
+  stroke: var(--amex-worker-offline) !important;
+}
+.docusaurus-mermaid-container rect[fill='rgba(83,86,90,0.14)'] {
+  fill: color-mix(in srgb, var(--amex-platinum) 12%, var(--amex-panel)) !important;
+  stroke: var(--amex-line-strong) !important;
+  stroke-dasharray: 6 4 !important;
+}
+
+/* Commit chips: one colour for every state change, because the chip already
+   spells the state out (state -> ACCEPTED). */
+.docusaurus-mermaid-container rect[fill='rgba(102,169,226,0.40)'] {
+  fill: color-mix(in srgb, var(--amex-sky) 40%, var(--amex-panel)) !important;
+  stroke: color-mix(in srgb, var(--amex-sky) 70%, transparent) !important;
+  stroke-width: 1px !important;
+  rx: 6px !important;
+  ry: 6px !important;
 }

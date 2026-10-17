@@ -1,6 +1,6 @@
 ---
 title: Core Workflows
-description: 'The business workflows, one per request type.'
+description: 'Thirteen core workflows, one per journey. Each runs its stages in order and holds no market logic.'
 sidebar_label: Core
 ---
 
@@ -9,162 +9,149 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 # Core Workflows
 
-<Lead>The business workflows, one per request type. Each sequences the stages that move a payment through its lifecycle. The row under each heading shows the Temporal worker it runs on and the behaviors that select its stage and activity-group implementations.</Lead>
+<Lead>Thirteen core workflows, one per journey. Each runs its stages in order and holds no market logic: the stage implementations it looks up from its plan key do all the varying.</Lead>
 
-The steps below follow the workflow logic in the spec. [Stages](../stages.md) explains what each named stage does, the [state model](../../payment-state-model.md) covers the states themselves, and the [sequence diagrams](../../sequence-diagrams.md) trace the same flows across the participants.
+Every stage commits its state change in one guarded `PaymentStore` transaction. Then the workflow announces the change, an RTF lifecycle event and, where the customer is told, a Raven message, and waits for that before the next stage, so a payment's events reach RTF in order. Fulfil is the exception: it sends both before its commit, because `PROCESSED` means they have gone out.
+
+The strip under each heading shows the cluster, the workflow ID, what starts the workflow and which behaviors change its stages. [Stages](../stages.md) says what each stage calls, and the [sequence diagrams](../../sequence-diagrams.md) trace the same flows call by call.
 
 ## Create Immediate Payment
 
-<WorkflowMeta worker="Online" behaviors="all" />
+<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels" behaviors="all" />
 
-Runs when a payment is submitted to go out today. It records the request, validates it, replies to the caller as soon as the outcome is known, and then completes the money movement in the background.
+`CreateImmediatePaymentWorkflow` pays a bill today. The caller waits only until Verify decides.
 
-1. **InitiatedToPendingStage** turns the input into a `PENDING` payment, persisting it together with its idempotency record.
-2. If the request is not idempotent (a duplicate has already been seen), return the existing payment and stop.
-3. Validate the pending payment (`PaymentValidationActivityGroup`). If it fails, run **PendingToDeclinedStage** (`PENDING` → `DECLINED`) and return the declined payment.
-4. **PendingToAcceptedStage** moves the payment to `ACCEPTED`, and the workflow **returns early to the caller**. Everything below runs in the background.
-5. Finish processing, by account type and by whether the payment is full or split.
-   - A **corporate** payment runs **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`), triggers Get Corporate Payment Allocations, waits for the *AllocationsReceived* signal, then runs Execute Split Payment for each allocation.
-   - A **full consumer** payment runs **AcceptedToProcessingStage**, then **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
-   - A **split consumer** payment creates the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), then runs Execute Split Payment for each leg.
+1. Capture writes `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`).
+2. Verify decides `ACCEPTED` or `DECLINED` in one guarded commit, and the caller's update returns here. The announcements for both changes follow the reply, in order.
+3. If the payment is `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
+4. Execute moves it to `PROCESSING`: clearing, AR and open-to-buy in parallel.
+5. Fulfil runs accounting, eBNC and risk in parallel, then sends the RTF event and the Raven message, then commits `PROCESSED`. Comms go last, so the customer hears only once everything else has worked.
 
-## Create Schedule Payment
+A consumer split payment's commit also writes its legs, and each leg runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
 
-<WorkflowMeta worker="Online / Offline" behaviors={['accountType', 'requiresArPosting', 'requiresMandateAuthorization']} />
+A corporate payment takes a different path after Verify. Verify's commit also writes the `ALLOC_REQUEST` row and releases the legs. Execute clears at payment level, and there is no Fulfil: the parent completes through the leg dispatcher (see [Corporate Allocations](../../corporate-allocations.md)).
 
-Runs when a payment is booked for a future date. It validates the request now and parks the payment until its run date.
+## Create Scheduled Payment
 
-1. **InitiatedToPendingStage** persists the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
-2. Validate the pending payment (`PaymentValidationActivityGroup`).
-   - If it is valid, run **PendingToScheduledStage** (`PENDING` → `SCHEDULED`) and return early. A **corporate** payment also triggers Get Corporate Payment Allocations now, so the allocation breakdown is ready before the run date.
-   - If it is not, run **PendingToDeclinedStage** (`PENDING` → `DECLINED`).
+<WorkflowMeta cluster="Online / Offline" id="{paymentId}-init" start="Update-With-Start from channels, on Online; the AR intake dispatcher for AR, on Offline" behaviors="all" />
+
+`CreateScheduledPaymentWorkflow` books a payment for a future date, then closes. Nothing waits in Temporal until the due date.
+
+1. Capture, then Verify: `SCHEDULED` or `DECLINED`.
+2. The `SCHEDULED` commit writes the `SCHED_EXEC` Work Tracker row, due at the market's execution time on the due date, plus an `ALLOC_REQUEST` row for a corporate payment.
+3. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
 
 ## Execute Scheduled Payment
 
-<WorkflowMeta worker="Offline" behaviors="all" />
+<WorkflowMeta cluster="Offline" id="{paymentId}-execute" start="The scheduled-payments dispatcher, through the Router, with today's config" behaviors="all" />
 
-Runs on the payment's execution date, picked up in batches by the Scheduled Payments Executor. It re-checks the payment before moving any money, because time has passed since it was scheduled.
+`ExecuteScheduledPaymentWorkflow` runs on the due date. It checks the payment again before any money moves, because a lot can change in 30 days.
 
-1. Re-validate the scheduled (or already-allocated) payment (`PaymentValidationOnExecutionActivityGroup`).
-   - If it is valid, run **ScheduledToAcceptedStage** (`SCHEDULED` → `ACCEPTED`), then finish processing:
-     - A **full** payment runs **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
-     - A **corporate split** runs **AcceptedToProcessingStage**, triggers Get Corporate Payment Allocations, waits for the *AllocationsReceived* signal, then runs Execute Split Payment per split.
-     - A **consumer split** creates the split legs (`PaymentSplitsCreationActivity`), then runs Execute Split Payment per leg.
-   - If it is not, run **PendingToDeclinedStage** (→ `DECLINED`).
+1. Reverify: `ACCEPTED` or `DECLINED`. Its guard, `SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win.
+2. Execute, then Fulfil, as for pay today.
+3. The last commit marks the `SCHED_EXEC` row `DONE`, or `FAILED` when retries run out. That frees a slot under the dispatcher's in-flight cap.
+
+For a corporate payment, Reverify's commit releases the held legs, Execute clears at payment level, and there is no Fulfil.
 
 ## Execute Split Payment
 
-<WorkflowMeta worker="Online / Offline" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing']} />
+<WorkflowMeta cluster="Online / Offline" id="{paymentId}_{seq}-execute" start="The parent, for consumer splits; the leg dispatcher, for corporate legs" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing']} />
 
-Processes a single leg of a split payment. It runs the same two stages as a full payment, scoped to one allocation.
+`ExecuteSplitPaymentWorkflow` runs one leg of a split payment. Consumer legs run on their parent's cluster; corporate legs run only on the Offline cluster.
 
-1. **AcceptedToProcessingStage** (`ACCEPTED` → `PROCESSING`).
-2. **ProcessingToProcessedStage** (`PROCESSING` → `PROCESSED`).
+1. Execute updates the AR balance and open-to-buy in parallel. Consumer legs also clear. Corporate legs never clear per allocation; the parent clears once, as a whole, at payment level.
+2. Fulfil runs accounting, eBNC and risk, then sends the leg's RTF event and Raven message, then commits `PROCESSED`.
 
-The first stage varies by account type. A **corporate** leg only updates balances and Open-To-Buy. A **consumer** leg also clears the payment at the bank.
+Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment can't starve the others. Each leg turns `PAID` on its own later, once it has posted and its parent has settled.
 
-## Cancel Payment
+## Request Allocations
 
-<WorkflowMeta worker="Online" behaviors={['accountType', 'requiresArPosting']} />
+<WorkflowMeta cluster="Offline" id="{paymentId}-allocations" start="The allocation-request dispatcher, at the market's fetch time" behaviors="generic" />
 
-Withdraws a payment that has not yet gone out.
+`RequestAllocationsWorkflow` runs one stage. RequestAllocations asks the allocations manager for the breakdown, sets the allocation status to `ALLOCATING` and ends. No workflow waits for the answer: the allocations manager calls back.
 
-1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
-2. Validate the cancellation and read the payment's current state (`PaymentCancelValidationActivityGroup`).
-3. If the payment is eligible to cancel:
-   - A payment currently `SCHEDULED` runs **ScheduledToCancelledStage** (→ `CANCELLED`).
-   - A payment currently `ACCEPTED` runs **AcceptedToCancelledStage** (→ `CANCELLED`).
+## Receive Allocations
+
+<WorkflowMeta cluster="Offline" id="{paymentId}-allocations-{batch}" start="The allocations callback API, with only the payment ID and batch number" behaviors="generic" />
+
+`ReceiveAllocationsWorkflow` turns one callback batch into legs.
+
+1. ReceiveAllocations checks the stored batch, then writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED`, in 1,000-row array inserts, each with its `ALLOC_LEG` Work Tracker row. The rows are `HELD` while the parent is not yet `ACCEPTED`, and `SCHEDULED` once it has been released.
+2. The allocation status turns `ALLOCATED` once the legs add up to the payment amount.
 
 ## Update Payment
 
-<WorkflowMeta worker="Online" behaviors="all" />
+<WorkflowMeta cluster="Online" id="{paymentId}-update" start="Update-With-Start" />
 
-Changes a scheduled payment. Rather than editing it in place, Billpay cancels the original and creates a replacement, so the history stays clean.
+`UpdatePaymentWorkflow` changes a scheduled payment. Nothing is edited in place: the original is cancelled and a replacement is created, so every payment record stays as it was written.
 
-1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
-2. **ScheduledToCancelledStage** cancels the original payment (`SCHEDULED` → `CANCELLED`). This can be done by invoking Cancel Payment.
-3. Build a new pending payment with a new payment id, the **same confirmation number**, and the updated details.
-4. Invoke Create Schedule Payment for the replacement, which validates it and then runs **PendingToScheduledStage** (→ `SCHEDULED`) if valid, or **PendingToDeclinedStage** (→ `DECLINED`) if not.
-5. Map the new payment to the original in the database for audit (`MapNewPaymentIdToPreviousIdActivity`).
+1. Check the cancellation window and eligibility with read-only calls.
+2. Cancel the old payment with the guarded update. If it is no longer `SCHEDULED`, the answer is 409.
+3. Start the new payment as child `CreateScheduledPaymentWorkflow` `{newId}-init`, with the same confirmation number. Its result is the caller's answer.
+4. Map the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
 
 Two payments are in play at once, which is easier to see drawn:
 
 ```mermaid
 stateDiagram-v2
-  [*] --> PENDING: idempotency
   state "Original payment" as Orig {
-    SCHEDULED --> CANCELLED: CancelPaymentWF
+    SCHEDULED --> CANCELLED: guarded cancel
   }
   state "Replacement payment" as New {
     PENDING_new: PENDING
-    PENDING_new --> SCHEDULED_new: CreateSchedulePaymentWF
-    PENDING_new --> DECLINED_new: CreateSchedulePaymentWF
     SCHEDULED_new: SCHEDULED
     DECLINED_new: DECLINED
+    [*] --> PENDING_new: Capture
+    PENDING_new --> SCHEDULED_new: Verify
+    PENDING_new --> DECLINED_new: Verify fails
   }
-  PENDING --> Orig
-  PENDING --> New
-  Orig --> Mapping: map old to new
-  New --> Mapping
-  Mapping --> [*]
+  [*] --> Orig: inside the window
+  Orig --> New: start the child
+  New --> Mapped: old ID to new
+  Mapped --> [*]
 ```
+
+## Cancel Payment
+
+<WorkflowMeta cluster="Online" id="{paymentId}-cancel" start="Update-With-Start" behaviors={['accountType', 'requiresArPosting']} />
+
+`CancelPaymentWorkflow` withdraws a `SCHEDULED` payment inside the market's cancellation window.
+
+1. Check the window and eligibility with read-only calls.
+2. Cancel: one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
+3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409.
 
 ## Process Returned Payment
 
-<WorkflowMeta worker="Offline" behaviors={['accountType']} />
+<WorkflowMeta cluster="Offline" id="{paymentId}-return-{seq}" start="The returns dispatcher, from One-Data's inbox" behaviors="all" />
 
-Handles a payment the bank sends back after it was processed, and decides whether it can be re-attempted.
+`ProcessReturnedPaymentWorkflow` handles a payment the bank sends back, and queues another attempt when one makes sense.
 
-1. Check the request is unique (`IdempotencyCheckActivity`). If not, return the previous response.
-2. Validate the return by looking up the payment (full or split) and its current status. The eligible statuses are `PAID`, `PROCESSING`, and `PROCESSED`.
-3. If the return is valid:
-   - **ToReturnedStage** moves the payment to `RETURNED` (from `PAID`, `PROCESSING`, or `PROCESSED`).
-   - Check whether the return can be re-presented (`PaymentRepresentmentEligibilityActivityGroup`).
-   - If it is representable, run **ReturnedToRepresentingStage**, which enriches the representment details (such as the next representable date) and creates a new `REPRESENTING` transaction (`PaymentRepresentmentCreationActivityGroup`).
+1. Check the payment, full or split, and its current status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
+2. Return: `RETURNED`.
+3. Judge whether the return can be represented, and set the representment date from the market's rules: today or later.
+4. QueueRepresentment commits `REPRESENTING` with a `REPRESENT` Work Tracker row due on that date. A return never hands off to a representment workflow directly.
 
 ## Process Representment
 
-<WorkflowMeta worker="Offline" behaviors="all" />
+<WorkflowMeta cluster="Offline" id="{paymentId}-represent-{seq}" start="The representment dispatcher, on the representment date" behaviors="all" />
 
-Re-attempts a returned payment on its representment date.
-
-1. Validate the representment (`PaymentRepresentmentValidationActivityGroup`).
-   - If it is valid, run **RepresentingToRepresentedStage** (`REPRESENTING` → `REPRESENTED`).
-   - If it is not, run **RepresentingToDeclinedStage** (`REPRESENTING` → `DECLINED`).
-
-## Get Corporate Payment Allocations
-
-<WorkflowMeta worker="Offline" behaviors="generic" />
-
-Fetches how a corporate payment splits across the accounts it covers, then kicks off the per-allocation execution. It waits on a signal, because the breakdown comes back asynchronously from the allocation-processing system.
-
-1. **ToAllocatingStage** asks the appropriate allocations manager for the breakdown and moves the payment to `ALLOCATING`.
-2. Wait for the *AllocationsReady* signal, which the allocations manager sends once the breakdown exists.
-3. **AllocatingToAllocatedStage** moves the parent payment to `ALLOCATED`, creates the split legs in `ACCEPTED` (`PaymentSplitsCreationActivity`), and runs Execute Split Payment for each.
-
-There are two signals here, and they are not the same one. *AllocationsReady* comes into this workflow from the allocations manager. *AllocationsReceived* goes out to the parent workflow that started it, which is what Create Immediate Payment and Execute Scheduled Payment wait on.
+`ProcessRepresentmentWorkflow` presents a returned payment again. Represent rechecks eligibility before anything goes to clearing, then commits `REPRESENTED`, or `DECLINED` if the recheck fails.
 
 ## Process Inbound Payment
 
-<WorkflowMeta worker="Offline" behaviors={['TBD']} />
+<WorkflowMeta cluster="Offline" id="{paymentId}-init" start="The inbound dispatcher, from One-Data's inbox" behaviors="all" />
 
-Posts a payment that a third party initiated on the customer's behalf into Billpay.
-
-1. **InitiatedToPendingStage** persists the input as a `PENDING` payment with its idempotency record. If it is not idempotent, return the existing payment and stop.
-2. Validate the pending payment (`PaymentValidationActivityGroup`).
-   - If it is valid, run **PendingToAcceptedStage** (`PENDING` → `ACCEPTED`) and return early, then:
-     - A **full** payment runs **AcceptedToProcessingStage**, then **ProcessingToProcessedStage**.
-     - A **consumer split** creates the split legs (`PaymentSplitsCreationActivity`), then runs Execute Split Payment per leg.
-   - If it is not, run **PendingToDisallowedStage** (`PENDING` → `DISALLOWED`). This is the inbound-only outcome for a payment Amex does not accept.
+`ProcessInboundPaymentWorkflow` takes a payment a third party pushed. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil.
 
 ## Create Payment Intent
 
-<WorkflowMeta worker="Online" behaviors={['accountType', 'instrumentType', 'requiresMandateAuthorization']} />
+<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start" />
 
-Registers that a customer means to pay. It becomes a real payment only once the customer's financial institution confirms it. The detailed step logic is still being defined in the spec.
+`CreatePaymentIntentWorkflow` records an intent to pay. The payment is processed only when the customer's financial institution confirms it. Its detailed steps are still being defined.
 
 ## Create Balance Refund
 
-<WorkflowMeta worker="Online / Offline" behaviors={['TBD']} />
+<WorkflowMeta cluster="Online / Offline" id="{paymentId}-init" start="Update-With-Start from channels, on Online; the AR intake dispatcher for refunds AR raises, on Offline" />
 
-Sends money back to the customer from a credit balance on the card, following the same validate, process and fulfil path as a payment. Its detailed step logic is still being defined in the spec. Which worker runs it depends on where in the journey it is invoked.
+`CreateBalanceRefundWorkflow` refunds a credit balance. It follows the payment path, Capture, Verify, Execute and Fulfil, but its detailed steps are still being defined.

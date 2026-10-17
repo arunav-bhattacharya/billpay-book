@@ -6,12 +6,13 @@ import Layout from '@theme/Layout';
 import styles from './index.module.css';
 import ordinal from '../lib/ordinal';
 
-/* The eight sections, in sidebar order. The order is the numbering, and the
+/* The nine sections, in sidebar order. The order is the numbering, and the
    blurb is the one line each tile on the board has room for. */
 const SECTIONS = [
   {to: '/docs/vision', label: 'Vision', blurb: 'Why Billpay exists'},
   {to: '/docs/architecture', label: 'Architecture', blurb: 'The shape of the platform'},
   {to: '/docs/design', label: 'Design', blurb: 'Lifecycle, routing, components'},
+  {to: '/docs/onboarding', label: 'Market Onboarding', blurb: 'Profiles, releases, provisioning'},
   {to: '/docs/build', label: 'Build', blurb: 'APIs, data model and code'},
   {to: '/docs/testing', label: 'Testing', blurb: 'Correctness and performance'},
   {to: '/docs/deployment', label: 'Deployment', blurb: 'Deployables and the pipeline'},

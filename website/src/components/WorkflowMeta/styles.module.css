@@ -19,7 +19,7 @@
 }
 
 .label {
-  flex: 0 0 82px;
+  flex: 0 0 104px;
   font-size: 0.64rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -59,4 +59,13 @@
   font-size: 0.78rem;
   color: var(--amex-mut);
   font-style: italic;
+}
+
+.id {
+  font-size: 0.78rem;
+}
+
+.start {
+  font-size: 0.8rem;
+  color: var(--amex-txt);
 }

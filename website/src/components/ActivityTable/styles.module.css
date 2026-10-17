@@ -89,13 +89,13 @@
 }
 
 .thName {
+  width: 24%;
+}
+.thSystem {
   width: 20%;
 }
-.thBehaviors {
-  width: 17%;
-}
-.thState {
-  width: 17%;
+.thQueue {
+  width: 20%;
 }
 
 .nameCell {
@@ -103,56 +103,33 @@
   --dt-cell-color: var(--amex-txt-strong);
 }
 
-/* ---- behavior cell ---- */
+/* ---- queue cell ---- */
 
-.behaviorsCell {
-  display: table-cell;
-}
-
-.behavior,
-.generic {
+/* A rate-limited queue is the throttle itself, so it gets the chip; a
+   description such as "the workflow's own queue" stays as quiet text. */
+.queue {
   composes: chip from '../../css/recipes.module.css';
   --chip-fs: 0.76rem;
-  --chip-weight: 400;
+  --chip-weight: 500;
   --chip-tracking: normal;
-  margin: 0 0.25rem 0.25rem 0;
-  color: var(--amex-mut);
-  background: color-mix(in srgb, var(--amex-mut) 8%, transparent);
-  border: 1px solid var(--amex-line);
-}
-
-/* The behavior being filtered on is lit up, so a filtered row shows at a
-   glance which of its behaviors matched. */
-.behaviorOn {
-  color: var(--amex-blue);
-  background: color-mix(in srgb, var(--amex-blue) 12%, transparent);
-  border-color: color-mix(in srgb, var(--amex-blue) 34%, transparent);
-}
-
-:global([data-theme='dark']) .behaviorOn {
-  color: var(--amex-blue-bright);
-  background: color-mix(in srgb, var(--amex-blue-bright) 15%, transparent);
-  border-color: color-mix(in srgb, var(--amex-blue-bright) 36%, transparent);
-}
-
-.stateCell code {
+  font-family: var(--amex-font-mono);
   white-space: nowrap;
 }
 
-/* ---- what it does ---- */
-
-.does {
-  margin: 0;
-  padding-left: 1.05rem;
+.queueLimited {
+  color: var(--amex-blue);
+  background: color-mix(in srgb, var(--amex-blue) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amex-blue) 28%, transparent);
 }
 
-.does li {
-  margin: 0 0 0.3rem;
-  line-height: 1.55;
+:global([data-theme='dark']) .queueLimited {
+  color: var(--amex-blue-bright);
+  background: color-mix(in srgb, var(--amex-blue-bright) 14%, transparent);
+  border-color: color-mix(in srgb, var(--amex-blue-bright) 34%, transparent);
 }
 
-.does li:last-child {
-  margin-bottom: 0;
+.queueText {
+  color: var(--amex-mut);
 }
 
 .foot {
@@ -163,8 +140,8 @@
 
 @media (max-width: 700px) {
   .thName,
-  .thBehaviors,
-  .thState {
+  .thSystem,
+  .thQueue {
     width: auto;
   }
 }
