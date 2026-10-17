@@ -80,7 +80,7 @@ Each cluster has its own Aurora PostgreSQL database and its own OpenSearch, so a
 
 Three workflows appear on both sides, and what starts them decides where they run. `CreateScheduledPaymentWorkflow` and `CreateBalanceRefundWorkflow` run on the Online cluster when a channel calls, and on the Offline cluster when Accounts Receivable raises them. `ExecuteSplitPaymentWorkflow` runs consumer legs as children on their parent's cluster, and corporate legs only on the Offline cluster, where the leg dispatcher starts them.
 
-The clusters are separate, but the app isn't. One app, billpay-core, runs the workers for both, with a Temporal client for each. Offline work has its own Oracle connection pool and its own cap on how many tasks run at once, so it can never take a whole pod, and the governor cuts offline rates as soon as online response times climb. If the app itself ever becomes the bottleneck, its online and offline parts deploy separately from the same build. The [app's deployable page](../../../deployment/deployables/worker-app.md) has the detail.
+The clusters are separate, but the app isn't. One app, billpay-core, runs the workers for both, with a Temporal client for each. Offline work has its own Oracle connection pool and its own cap on how many tasks run at once, so it can never take a whole pod, and the governor cuts offline rates as soon as online response times climb. It ships as one app, and more capacity means more pods of it. The [billpay-core deployable page](../../../deployment/deployables/worker-app.md) has the detail.
 
 ## Four kinds of workflow
 

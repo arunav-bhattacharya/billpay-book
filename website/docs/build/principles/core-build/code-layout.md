@@ -38,4 +38,4 @@ This is not tidiness. It is how the module graph enforces [determinism](./workfl
 
 This is where the name-for-behavior rule earns its keep. A stage that skips realtime clearing is called something like `NonRealtimeClearingExecutionStage`, not `GermanyExecutionStage`, so the next market with the same rule reuses the file instead of copying it.
 
-The deployables this monorepo produces are covered under [Deployment](../../../deployment/deployables/index.md): the worker app (one JVM hosting both the Online and Offline workers), the codec server, the UI, and the mocks.
+The deployables this monorepo produces are covered under [Deployment](../../../deployment/deployables/index.md): billpay-core (the one app, running the workers for both Temporal clusters), the codec server, the UI, and the mocks.

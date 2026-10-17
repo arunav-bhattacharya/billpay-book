@@ -31,10 +31,10 @@ billpay-core is one app that runs the work for both Temporal clusters.
 
 - It runs the REST APIs, the [Billpay Router](../design/routing.md), the dispatchers, the governor and the workers for both clusters, with a Temporal client for each.
 - Offline work has its own Oracle connection pool and a cap on how many offline tasks run at once, so it can never take a whole pod. The governor also cuts offline rates as soon as online response times climb.
-- Its online and offline parts switch on by config. If the load test or production shows the app itself is the bottleneck, they deploy separately from the same build.
-- The app is deployed in both sites, and only IPC2's takes traffic. The IPC1 instance stays deployed and ready, and an operator promotes it if IPC2 goes.
+- It ships and deploys as one app. There is no separate online or offline app: when it needs more capacity, it gets more pods of the same app.
+- It runs in IPC2. IPC1 keeps a standby of the same app, deployed and ready, which an operator promotes if IPC2 goes.
 - It reads and writes the Oracle primary next to it in IPC2, and it is the only component that talks to Temporal.
-- So each kind of work runs in exactly one place, which is also one place to look when a payment is stuck. Deployment detail is on the [app's deployable page](../deployment/deployables/worker-app.md).
+- So each kind of work runs in exactly one place, which is also one place to look when a payment is stuck. Deployment detail is on the [billpay-core deployable page](../deployment/deployables/worker-app.md).
 
 ## Oracle
 
@@ -51,7 +51,7 @@ billpay-core is one app that runs the work for both Temporal clusters.
 - Each cluster has its own **Aurora PostgreSQL** database for its histories and its own **OpenSearch 2** store for visibility, the search behind the Temporal UI. Online runs 2,000 history shards and Offline 4,000, a number fixed when a cluster is created.
 - Nothing calls from one cluster to the other. A payment scheduled on Online reaches Offline through Oracle, so either cluster can go down while the other keeps working.
 - **us-west-1 holds a passive standby for each cluster**, with its database replicated from the east. Neither serves anything in normal operation. Each is promoted on its own, by hand, the same rule as the Oracle standby in IPC1: one write site at a time, no split brain.
-- Only IPC2's app talks to the clusters, over gRPC, with a client for each. IPC1's app is wired the same way but carries nothing until it's promoted.
+- Only the app in IPC2 talks to the clusters, over gRPC, with a client for each. Its standby in IPC1 is wired the same way but carries nothing until it's promoted.
 - Workflow state lives in each cluster's database, never in worker memory. Restart the workers and in-flight payments carry on from their event histories.
 - Cluster settings are on the [Temporal Server](../deployment/temporal-server.md) page.
 

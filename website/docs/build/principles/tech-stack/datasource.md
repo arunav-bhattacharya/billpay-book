@@ -8,13 +8,13 @@ import Lead from '@site/src/components/Lead';
 
 # DataSource: AgroalDataSource
 
-<Lead>Opening an Oracle connection is far too expensive to do per request, so everything runs through a pool. We use Agroal, the connection pool built by the Quarkus team, across every deployable: the worker app, the codec server, and the mocks.</Lead>
+<Lead>Opening an Oracle connection is far too expensive to do per request, so everything runs through a pool. We use Agroal, the connection pool built by the Quarkus team, across every deployable: billpay-core, the codec server, and the mocks.</Lead>
 
 ## Why Agroal
 
 | Reason | Why it matters for Billpay |
 | --- | --- |
-| **Built for low-latency JVM workloads** | Connection acquisition is measured in microseconds. On the Online worker, pool overhead has nowhere to hide. |
+| **Built for low-latency JVM workloads** | Connection acquisition is measured in microseconds. On billpay-core's online path, pool overhead has nowhere to hide. |
 | **Observability out of the box** | Pool size, in-use connections, acquisition time, and wait-queue depth are all exposed as metrics and fed straight into the App Health dashboards. When something is slow, one glance tells us whether the pool is the problem. |
 | **Tunable validation strategy** | Validate-on-acquire, validate-on-return, or idle background validation, chosen to balance latency against safety for the workload the pool serves. |
 | **A reaper for leaked connections** | An activity that dies mid-transaction must not hold a connection forever. Agroal's leak detector reclaims them past a configurable threshold. |

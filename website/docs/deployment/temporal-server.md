@@ -11,7 +11,7 @@ import Lead from '@site/src/components/Lead';
 
 ## The setup
 
-- The **active cluster in us-east-1** is the Temporal server the platform actually talks to. The [Worker App](./deployables/worker-app.md), which hosts billpay-core's Online and Offline workers on the on-prem East Hydra servers, connects here by default, and the Temporal Schedules that drive the periodic workflows are registered against it.
+- The **active cluster in us-east-1** is the Temporal server the platform actually talks to. [billpay-core](./deployables/worker-app.md), the one app that runs the workers for both clusters from the on-prem East Hydra servers, connects here by default, and the Temporal Schedules that drive the periodic workflows are registered against it.
 - **Persistence is PostgreSQL.** Temporal's own state, meaning workflow histories, task queues, and schedules, lives in Postgres on AWS. This is Temporal's database, separate from Billpay's own [Oracle schema](../build/principles/tech-stack/database.md).
 - The **passive region, us-west-1**, is a standby cluster with replicated Postgres. It takes no traffic in normal operation.
 

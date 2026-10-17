@@ -166,8 +166,8 @@ Separate databases mean offline load can never slow realtime traffic at the Temp
 One app, billpay-core, runs the core APIs, the Router, the dispatchers, the governor and the workers for both clusters, with a Temporal client for each cluster. Every piece of offline work reaches it at the governor's pace, so online and offline work can share it.
 
 - Offline work has its own Oracle connection pool and a cap on how many offline tasks run at once, so it can never take a whole pod. The governor checks every 15 s and only stops new starts; the cap protects online work in between.
-- The online part (core APIs, Online workers) and the offline part (dispatchers, governor, Offline workers) switch on by config. Splitting the app means deploying the same build twice, one part each.
-- Load-test runs 4 and 6 run on the single app, and online p99 must stay unchanged. After go-live, the app is split when the governor keeps cutting offline work because of online p99 while Oracle and the downstream systems are healthy: the app itself has become the bottleneck.
+- billpay-core ships and deploys as one app. There is no separate online or offline app: more capacity means more pods of the same app.
+- Load-test runs 4 and 6 run on the app, and online p99 must stay unchanged while offline work runs.
 
 ### Traffic classes
 
@@ -1374,7 +1374,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
 | A burst of AR intake, returns or inbound | Requests wait in One-Data's inbox; their dispatchers take them at the governor's rate | Nothing |
 | A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires; the sender is not told | Fix the market profile |
-| The single app becomes the bottleneck | Online p99 climbs while Oracle and the downstreams are healthy, so the governor cuts offline work, execution included | Split the app: deploy the same build twice, one part each |
+| billpay-core runs short of capacity | Online p99 climbs while Oracle and the downstreams are healthy, so the governor cuts offline work, execution included | Add billpay-core pods |
 | One-Data's inbox database down | One-Data can't store requests or events, so senders retry; the dispatchers' and the drain's fetches retry; nothing new starts from the inbox and nothing turns `PAID` until it is back | Restore it; the dispatchers and PAID catch up on their own |
 | A burst of settlements and postings | Events wait in the inbox; the drain takes them at the governor's rate | Nothing |
 | An inbox row matches no payment | `UNMATCHED`, tried again hourly; after 48 hours an alert fires | Check the event's IDs |
@@ -1389,12 +1389,12 @@ Seven runs show whether the design holds. Runs 1 and 2 measure costs and the DB 
 | 1. Cost per workflow | Each workflow type alone at 10 TPS | Measured writes within 20% of the model; otherwise the governor's costs are updated |
 | 2. DB ceiling | Execution at 25, 50, 100 and 150 TPS, then upward until 60% CPU, on 64, then 192 vCPU | Writes/s at 60% CPU and the persistence-p99 knee are recorded; they become the governor's ceiling and bands |
 | 3. US window | 1M executions, governor on | At least 50 TPS throughout; ramps up when healthy; Offline CPU under 60% |
-| 4. SEPA window | 500K executions with a 3-hour cutoff, plus 100 TPS synthetic realtime traffic on the Online cluster against the same stubs | Done with 15% of the cutoff to spare; online p99 unchanged on the single app |
+| 4. SEPA window | 500K executions with a 3-hour cutoff, plus 100 TPS synthetic realtime traffic on the Online cluster against the same stubs | Done with 15% of the cutoff to spare; online p99 unchanged on billpay-core |
 | 5. Failures | During run 3: a 429 storm, a downstream outage, worker kills, a governor kill, an Offline Aurora failover, an Oracle restart | No duplicates, no lost items, recovery with no manual step |
-| 6. Corporate and intake | One 100K and twenty 10K corporate payments, with allocations arriving by callback in parts before and after the due date, plus 100 TPS of AR intake and a 10-minute burst of 1,000 settlement and posting events a second, both into One-Data's inbox | Parents clear on time; legs progress fairly; One-Data stores intake with p99 under 500 ms; the AR intake dispatcher and the PAID drain clear their backlogs at the governor's pace, with online p99 unchanged on the single app |
+| 6. Corporate and intake | One 100K and twenty 10K corporate payments, with allocations arriving by callback in parts before and after the due date, plus 100 TPS of AR intake and a 10-minute burst of 1,000 settlement and posting events a second, both into One-Data's inbox | Parents clear on time; legs progress fairly; One-Data stores intake with p99 under 500 ms; the AR intake dispatcher and the PAID drain clear their backlogs at the governor's pace, with online p99 unchanged on billpay-core |
 | 7. Market release | Publish, test, activate and roll back a release in E1 while payments run | New payments use the new version; running ones keep theirs; rollback restores the old one |
 
-Runs 4 and 6 decide the app: if online p99 holds on the single app, it goes live as one app; if not, it is split first.
+Runs 4 and 6 prove the app: online p99 must hold on billpay-core while offline work runs, and go-live waits until it does.
 
 After every run, reconcile: Work Tracker rows by status match the completed workflows, and the stubs' ledger matches `PAID` payments and legs with no duplicates.
 

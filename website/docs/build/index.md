@@ -42,4 +42,4 @@ import SectionIndex from '@site/src/components/SectionIndex';
   ]}
 />
 
-The artifacts we ship, meaning the worker app, the codec server, and the mocks, live under [Deployment](../deployment/index.md).
+The artifacts we ship, meaning billpay-core, the codec server, and the mocks, live under [Deployment](../deployment/index.md).

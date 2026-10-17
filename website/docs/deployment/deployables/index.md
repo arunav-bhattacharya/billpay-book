@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Deployables
 
-<Lead>Every artifact the platform **ships to production**. There are five, and the worker app that runs the workflows is the one most changes touch.</Lead>
+<Lead>Every artifact the platform **ships to production**. There are five, and billpay-core, the one app that runs the APIs and the workflows, is the one most changes touch.</Lead>
 
 ## In this section
 
@@ -20,9 +20,9 @@ import SectionIndex from '@site/src/components/SectionIndex';
       desc: `The API gateway, and the functions it fronts.`,
     },
     {
-      term: 'Worker App',
+      term: 'billpay-core',
       to: '/docs/deployment/deployables/worker-app',
-      desc: `The Online and Offline Temporal workers, in one JVM.`,
+      desc: `The one app: the core APIs, the Router, the dispatchers, the governor and the workers for both Temporal clusters.`,
     },
     {
       term: 'Codec Server App',
