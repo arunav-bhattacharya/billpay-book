@@ -39,6 +39,7 @@ const sidebars = {
       items: [
         'design/principles',
         'design/payment-state-model',
+        'design/domain-model',
         'design/journeys/index',
         'design/routing',
         {
