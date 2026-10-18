@@ -60,13 +60,17 @@ Every write is safe to send twice. `PaymentStore`, the only code that reaches Or
 
 ## Provisioning API
 
-Each environment's billpay-core also exposes a provisioning API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity.
+Each environment's billpay-core also exposes a provisioning API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity. The work runs in `MarketProvisioningWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
 
-| Path | What it does |
-| --- | --- |
-| `/provisioning/releases` | Takes a frozen market release, reports its provisioning progress, records a sign-off and rolls a release back |
-| `/provisioning/markets/{market}/{account-type}/pause` | Pauses a live market's dispatchers |
-| `/provisioning/markets/{market}/{account-type}/resume` | Resumes them |
-| `GET /provisioning/capabilities` | Returns the deployed build's capability manifest: every behavior combination the build can run |
+The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/provisioning/releases/{market}/{account-type}/{version}` and `{live}` for `/provisioning/markets/{market}/{account-type}`.
+
+| Call | Request | Response |
+| --- | --- | --- |
+| `POST /provisioning/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
+| `GET {release}` | No body | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE` or `FAILED`), the step the workflow is on, and for a failure, the step and the reason |
+| `POST {release}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off |
+| `POST {release}/rollback` | `requestedBy`, `reason` | `202`; the version before it becomes active again |
+| `POST {live}/pause` and `POST {live}/resume` | `requestedBy`, `reason` | `202` |
+| `GET /provisioning/capabilities` | No body | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
 
 Sending a release is idempotent: one provisioning workflow per market, account type, version and environment. [Market Onboarding → Provisioning](../../onboarding/provisioning.md) follows a release through it.

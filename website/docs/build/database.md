@@ -37,6 +37,7 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | `rate_allocation` (new) | Traffic class, market or corporate payment | The rate the governor sets, which dispatchers read every few seconds. Manual overrides live here too. |
 | `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, Online cap and when it ends, last 429. |
 | `governor_decision` (new) | Governor check, every 15 seconds | Its inputs and outputs, so any rate can be explained later. |
+| `exception_list` (new) | Payment or leg whose retries ran out | The stage and status it stopped in, the last error, and who resolved it and when. Operations work from it. |
 
 ## The Work Tracker
 
@@ -73,6 +74,7 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Bank confirmation | The redirect link, the provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
 | Go-ahead | The `CONFIRM_EXPIRY` row and the IDs of the pending payments the customer was shown, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and cancelling the payment's Work Tracker rows |
+| Giving up | The Work Tracker row to `FAILED`, and the payment or leg onto `exception_list` in the status it stopped in |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of up to 500 inbox rows as JDBC batches: each a guarded update from `PROCESSED` to `PAID`, with a `PAID` timeline row tagged with the batch ID wherever the update changed a row |
 

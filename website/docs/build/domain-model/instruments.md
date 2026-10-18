@@ -30,15 +30,15 @@ sealed interface ContractInstrument : VerifiedInstrument     // non-fiat (contra
 
 Three ways in, one way to fund:
 
-- **`EnrollmentInstrument`** *(reference)* carries just an enrollment id. The full details live in the enrollment system and get resolved from there.
-- **`FinancialInstitutionProvidedInstrument`** and **`DebitCardProvidedInstrument`** *(provided)* carry account or card details that arrived on a trusted transaction event, the inbound path, and are taken as authoritative input.
+- `EnrollmentInstrument`, a reference, carries just an enrollment id. The full details live in the enrollment system and get resolved from there.
+- `FinancialInstitutionProvidedInstrument` and `DebitCardProvidedInstrument`, the provided kind, carry account or card details that arrived on a trusted transaction event, the inbound path, and are taken as authoritative input.
 - Resolution functions (`toFinancialInstitutionInstrument(…)`, `toDebitCardInstrument(…)`, `toLoyaltyInstrument()`) turn either of those into a **verified** instrument. The [Verified payment states](./payment.md) accept nothing less.
 
 The `RegulatedInstrument` split matters for compliance. Anything that touches real money must carry a secure **token** and a **fingerprint**, and sensitive numbers are encrypted or redacted, never raw. `ContractInstrument` covers value that is not fiat, like loyalty points paying down a card balance.
 
 ## The three verified instruments
 
-**`FinancialInstitutionInstrument`** is a bank account. It carries the institution code, redacted and optionally encrypted account numbers, and two enums that make it work internationally: `FIAccountType` and `IdentificationSchema`.
+`FinancialInstitutionInstrument` is a bank account. It carries the institution code, redacted and optionally encrypted account numbers, and two enums that make it work internationally: `FIAccountType` and `IdentificationSchema`.
 
 | Account type | How the account is identified |
 | --- | --- |
@@ -53,9 +53,9 @@ The `RegulatedInstrument` split matters for compliance. Anything that touches re
 
 *(These are two independent enums. The columns are not paired.)* A new market usually adds one `IdentificationSchema` value rather than a new instrument type.
 
-**`DebitCardInstrument`** is a debit card. It holds a redacted card number for display, optionally an encrypted card number, and an expiry serialized as `MM/yyyy` (`@field:JsonFormat(shape = STRING, pattern = "MM/yyyy") val expiryDate: YearMonth?`).
+`DebitCardInstrument` is a debit card. It holds a redacted card number for display, optionally an encrypted card number, and an expiry serialized as `MM/yyyy` (`@field:JsonFormat(shape = STRING, pattern = "MM/yyyy") val expiryDate: YearMonth?`).
 
-**`LoyaltyInstrument`** is the contract instrument. It holds an enrollment id and nothing else, because the loyalty program owns the balance.
+`LoyaltyInstrument` is the contract instrument. It holds an enrollment id and nothing else, because the loyalty program owns the balance.
 
 :::warning[Two different "account types"]
 `FIAccountType` here describes the **funding bank account**, savings versus checking. It is *not* the `accountType` **behavior** (`CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL`) that routes processing. That one lives on the Amex `Account`, not on the instrument. Conflating them is the easiest mistake to make in this part of the codebase.

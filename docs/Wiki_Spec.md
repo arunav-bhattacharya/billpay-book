@@ -451,7 +451,7 @@ The supplied file leans on five types it doesn't define. The build takes each on
 | --- | --- |
 | `TransactionId` | A payment's ID, which One-Data makes as a ULID (agreed 2026-10-18). A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`. A small class over the string, checked when it is built and written to JSON as the plain string |
 | `MonetaryAmount` | `javax.money.MonetaryAmount` from JSR 354, the Java money API, with Moneta's `Money` behind it, so an amount is never a floating-point number. In JSON it is an amount and a currency code |
-| `TokenizedAccount` | The card account, held as its token and never as a card number. The token is the account's `CARD_ACCT.ACCT_ID` |
+| `TokenizedAccount` | The card account, held as its token and never as a card number. The token is the account's `CARD_ACCT.ACCT_ID`. It narrows `Account`, the type `Transaction` holds; if the supplied files don't define `Account` either, it comes from the current app the same way |
 | `PlanInfo` | The Pay & Plan details a payment carries, null on a payment made outside Pay & Plan. Its fields follow the Installments API |
 | `LegacyPayment` | Today's payment class. The model uses only its three enums: `PaymentStatus`, `PaymentSource` and `DeclineCode`. `PaymentStatus` holds the fourteen states, with `ALLOCATING` and `ALLOCATED` added by change 2 |
 

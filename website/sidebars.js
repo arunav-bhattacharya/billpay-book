@@ -116,6 +116,7 @@ const sidebars = {
               link: {type: 'doc', id: 'build/principles/core-build/index'},
               items: [
                 'build/principles/core-build/code-layout',
+                'build/principles/core-build/router',
                 'build/principles/core-build/workflows',
                 'build/principles/core-build/stages',
                 'build/principles/core-build/activities',
@@ -143,6 +144,7 @@ const sidebars = {
           ],
         },
         'build/database',
+        'build/dispatchers',
         'build/schedules',
       ],
     },

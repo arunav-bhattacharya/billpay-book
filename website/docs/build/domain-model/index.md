@@ -17,22 +17,26 @@ import SectionIndex from '@site/src/components/SectionIndex';
 flowchart TD
   T["Transaction<br/><i>sealed interface · id · account · amount?</i>"]
   P["Payment<br/><i>sealed interface · status · timeline · option · instrument …</i>"]
-  S["11 status types<br/><i>PendingPayment · ScheduledPayment · AcceptedPayment · ProcessingPayment ·<br/>ProcessedPayment · PaidPayment · ReturnedPayment · RepresentingPayment ·<br/>RepresentedPayment · CancelledPayment · DeclinedPayment</i>"]
-  L["18 concrete data classes<br/><i>&#123;Status&#125;FullPayment / &#123;Status&#125;SplitPayment</i>"]
+  R["Refund<br/><i>no classes yet</i>"]
+  S["14 state classes<br/><i>PendingPayment · ScheduledPayment · AcceptedPayment · AllocatingPayment ·<br/>AllocatedPayment · ProcessingPayment · ProcessedPayment · PaidPayment ·<br/>ReturnedPayment · RepresentingPayment · RepresentedPayment ·<br/>CancelledPayment · DeclinedPayment · DisallowedPayment</i>"]
+  L["22 data classes<br/><i>&#123;State&#125;FullPayment / &#123;State&#125;SplitPayment</i>"]
   D["directives<br/><i>PaymentOption · Instrument, each Reference → Verified</i>"]
   TL["Timeline<br/><i>Initial · Immediate · Scheduled</i>"]
   T --> P --> S --> L
+  T --> R
   D --> P
   TL --> P
 ```
 
 Three patterns repeat throughout the model:
 
-- Status and shape are two independent axes. A payment's lifecycle state (its status type) and its shape (`FullPayment` or `SplitPayment`) combine into the concrete classes, so `AcceptedSplitPayment` is exactly what its name says.
-- The in-flight states, `SCHEDULED` through `REPRESENTED`, are required by their own types to carry a non-null amount, a `VerifiedPaymentOption`, and a `VerifiedInstrument`. `PENDING`, `CANCELLED`, and `DECLINED` may hold unverified data. Validation here is a change of type, not a boolean flag.
+- State and shape are two independent axes. A payment's state (its sealed class) and its shape (`FullPayment` or `SplitPayment`) combine into the data classes, so `AcceptedSplitPayment` is exactly what its name says.
+- Every state that can move money, `SCHEDULED` through `REPRESENTED` with the corporate `ALLOCATING` and `ALLOCATED`, is required by its type to carry a tokenized account, a non-null amount, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an executable timeline. `PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` may hold unverified data. Validation here is a change of type, not a boolean flag.
 - Payment options and instruments both arrive as unverified references and are resolved into verified values by the system of record. The same two-phase pattern runs on both directive families.
 
-Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary. See [Serialization](../principles/tech-stack/serialization.md).
+Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary ([Serialization](../principles/tech-stack/serialization.md)).
+
+The five behaviors that route a payment, `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization` and `requiresBankConfirmation`, aren't on these types. The Router resolves them per journey and pins them in the plan key the workflow carries ([Building the Router](../principles/core-build/router.md)). Idempotency and the lifecycle timeline are persistence concerns, with no domain type of their own.
 
 ## In this section
 
@@ -41,12 +45,7 @@ Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete
     {
       term: 'Payment',
       to: '/docs/build/domain-model/payment',
-      desc: (
-        <>
-          covers <code>Transaction</code>, <code>Payment</code>, the eleven status types, Full and
-          Split, timelines, and the transition functions that are the state machine.
-        </>
-      ),
+      desc: `The root types, the five supporting types the model leans on, the traits that narrow each state, how legs are made, and what a move between states looks like in code.`,
     },
     {
       term: 'Payment Options',
@@ -61,14 +60,8 @@ Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete
   ]}
 />
 
-The Oracle tables these types are persisted into, and how the code maps onto them, are on the [Database](../database.md) page.
+The Oracle tables these types are persisted into are on the [Database](../database.md) page.
 
-:::info[Still to be modelled]
-The code does not yet cover everything the [spec's state model](../../design/payment-state-model.md) defines. These gaps are tracked deliberately rather than papered over.
+## The supplied file and the agreed model
 
-- No classes or functions for the corporate states **`ALLOCATING`** and **`ALLOCATED`**, or the moves into and out of them.
-- No move from `PendingFullPayment` to `CancelledFullPayment` for a payment never confirmed or one the customer said no to, and no field for the bank-confirmation provider's reference or the redirect link.
-- No first-class **Allocation** entity. Corporate allocations are represented today as `SplitPayment` legs plus `SplitSlice`.
-- The five **processing behaviors** (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`, `requiresBankConfirmation`) live in the payment *context* used for routing, not on these domain types.
-- **Idempotency and lifecycle events** are persistence-layer concerns (`idempotency_checker`, `trans_lfcyc_event`) with no domain type of their own.
-:::
+The Kotlin supplied on 2026-10-16 is behind the model agreed on 2026-10-17 in nine places, such as the corporate states and the move from `PENDING` to `CANCELLED`. The build makes all nine (agreed 2026-10-18), and [Design → Domain Model](../../design/domain-model.md#what-the-code-still-needs) lists them. The file also leans on five types it doesn't define; [Payment](./payment.md#the-types-the-model-leans-on) has them. Refunds stay unmodelled for now, because their steps are still to be defined.

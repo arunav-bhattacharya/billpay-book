@@ -9,7 +9,9 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # API Spec
 
-<Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data Functions</strong> are the versioned public contracts the rest of Amex integrates with; each delegates to a <strong>Billpay core REST API</strong>, where the router decides which workflow runs. Most integration questions come down to knowing which of the two layers you are in.</Lead>
+<Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data functions</strong> are the versioned contracts the rest of Amex calls. Most of them front a <strong>billpay-core REST API</strong>, where the Router admits the request and starts its workflow. The rest keep work nobody waits for in One-Data's inbox, and Billpay's dispatchers pull it from there.</Lead>
+
+Each layer has its own job. One-Data makes the payment ID, runs the check for other pending payments, and holds a create while billpay-core is slow. billpay-core decides what happens to the payment.
 
 ## In this section
 
@@ -18,14 +20,12 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'One-Data Functions',
       to: '/docs/build/api-spec/one-data',
-      desc: `The gateway. Every function, what it is for, and which core API it delegates to, including the event-handler functions that bring asynchronous outcomes back in.`,
+      desc: `Every function and the billpay-core API behind it, the pending check in Redis, the event handlers, and the inbox functions Billpay pulls work through.`,
     },
     {
       term: 'Billpay Core APIs',
       to: '/docs/build/api-spec/billpay-core',
-      desc: `The REST surface. Each endpoint, how the router branches it to a workflow, and how idempotency is enforced at the boundary.`,
+      desc: `Every endpoint with its start mode and reply, what the Router refuses before a workflow starts, why a repeated request is safe, and the provisioning API.`,
     },
   ]}
 />
-
-Request and response schemas live with the code as OpenAPI definitions and are rendered from there. These pages document the contract *structure*, not the field lists.

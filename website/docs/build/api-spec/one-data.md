@@ -36,11 +36,11 @@ Every linked name opens its contract in the One-Data explorer. Names the explore
 
 ## Stored creates and the pending check
 
-One-Data makes each payment's ID, a ULID, and every retry of a create carries it, so a retry always lands on the payment billpay-core already has. Two things live in One-Data's Redis, one active-active database across IPC1 and IPC2 that each One-Data writes at its own site: every create, stored as Pending, and one hash per card account listing the account's pending payments, each with its amount, date and time created. Persistence is on and eviction is off, so a restart or memory pressure can't drop either.
+One-Data makes each payment's ID, a ULID (a unique ID that sorts by time), and every retry of a create carries it, so a retry always lands on the payment billpay-core already has. Two things live in One-Data's Redis, one active-active database across the two sites, IPC1 and IPC2, that each One-Data writes at its own site: every create, stored as Pending, and one hash per card account listing the account's pending payments, each with its amount, date and time created. Persistence is on and eviction is off, so a restart or memory pressure can't drop either.
 
 - On every pay-today or scheduled create, before it calls billpay-core, One-Data reads the account's hash, adds the new payment and stores the create, in one MULTI/EXEC transaction through the Java Redis SDK. That is one Redis call, and it puts the create in Redis before billpay-core's delete can arrive (Proposed).
 - If the account already has pending payments, One-Data sends their IDs with the create. billpay-core holds the new payment at `PENDING` for the customer's go-ahead, and One-Data adds the pending payments to the reply. Any pending payment triggers it. Only the new payment waits: the earlier one carries on by itself, and the step offers no way to cancel it.
-- If billpay-core doesn't answer within 3 seconds, or answers with a 5xx, One-Data hands the stored create to RTF, which retries it into billpay-core with exponential backoff and the same payment ID. The channel gets the payment ID and `PENDING`. A `PENDING` reply in time is an answer, so it never goes to RTF. Only creates are stored and held: confirms, updates and cancels go straight to billpay-core.
+- If billpay-core doesn't answer within 3 seconds, or answers with a 5xx, One-Data hands the stored create to the Reliable Transaction Framework (RTF), which retries it into billpay-core with exponential backoff and the same payment ID. The channel gets the payment ID and `PENDING`. A `PENDING` reply in time is an answer, so it never goes to RTF. Only creates are stored and held: confirms, updates and cancels go straight to billpay-core.
 - At the end of each create's workflow, billpay-core calls One-Data's delete API, `DeletePendingPayment.v1`, with the payment and account IDs, and retries until it lands. One-Data removes the stored create and the account's hash entry. When the payment still waits for a confirmation, billpay-core says so, and One-Data removes only the stored create; the confirm or cancel workflow removes the hash entry when it ends. One-Data removes either only on billpay-core's word: the delete, or billpay-core refusing the create with a 4xx. Its contract is still to come.
 - `ReadPayments.v1` reads Redis and billpay-core, removes duplicates on payment ID and customer account, and Oracle wins. A payment shows from the moment it is made, and shows one `PENDING`, whatever it waits for.
 
@@ -48,7 +48,7 @@ Three edge cases have a working answer:
 
 - If Redis is down, One-Data creates the payment anyway, with no check and nothing stored, so a customer can pay twice while it lasts. Product is to confirm this.
 - Two creates for one account that reach different Redis sites within the replication lag miss each other, and both go through with no go-ahead. The window is narrow, so it is accepted, and such pairs are counted from Oracle. If they show up, billpay-core can run the same check against Oracle, at one query per create (Proposed).
-- A held pay-by-bank create would get a redirect link nobody sees. One-Data can probably tell such a create from its instrument type, when it carries bank details, which One-Data is to confirm. Proposed: One-Data doesn't hold it, and the channel asks the customer to try again.
+- A held pay-by-bank create would get a redirect link nobody sees. One-Data can probably tell such a create from its instrument type, when it carries bank details, which One-Data is to confirm. Proposed: One-Data doesn't hold it, and the channel asks the customer to try again. If billpay-core never got the create, no delete comes, and the alert on the age of pending entries finds it.
 
 [Pay while another payment is pending](../../design/journeys/index.md#pay-while-another-payment-is-pending) walks through the go-ahead, and [Creates that arrive late or twice](../../design/component-model/workflows/core.md#creates-that-arrive-late-or-twice) covers what billpay-core does with a repeat.
 
@@ -62,13 +62,13 @@ Event handlers take events from other platforms. None of them starts or waits on
 
 | Handler | What it takes |
 | --- | --- |
-| `CreateMoneyMovementEventHandler.v1` | Money movement events from MR/M3. A return is stored in the inbox for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment. |
+| `CreateMoneyMovementEventHandler.v1` | Money movement events from MR/M3, the clearing system. A return is stored in the inbox for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment. |
 | `CreateAccountsReceivableTransactionEventHandler.v1` | Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment, or leg, and presentment. |
 | `CreateOpentoBuyUpdatePaymentEventHandler.v1` | Authorizations (AMP) events. It acknowledges them and does nothing else: no inbox row, and no work in Billpay. |
 
 The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. For `PAID`, One-Data marks a payment's row `READY` once it has both an AR posting and a settlement, and `ProcessPaidEventsWorkflow` reads only `READY` rows and sets each payment or leg `PAID`.
 
-- The money movement and AR handlers write the raw event and upsert the payment's inbox row in one transaction, and acknowledges the sender only after the commit. If the database is down, the sender gets an error and retries.
+- The money movement and AR handlers write the raw event and upsert the payment's inbox row in one transaction, and acknowledge the sender only after the commit. If the database is down, the sender gets an error and retries.
 - There is one row per payment or leg, under the ID the event carries. A leg's ID is `{paymentId}_{seq}`, and its AR posting pairs with the settlement of the payment named before the `_`: a split payment settles once, as a whole, while each leg posts on its own.
 - An event without a payment ID is matched through `ReadPayments.v1`, by its account ID. Most events carry the ID, so the lookup is rare. If it finds no single payment, the raw event stays in `billpay_extnl_event` and an alert names it.
 - Whichever event arrives second sets the row `READY`, in the same transaction. A lock per payment ID makes a settlement and its legs' postings that arrive together see each other, and a repeated event can't set a row twice.
@@ -80,7 +80,7 @@ Billpay reaches the inbox only through four functions, never through the databas
 
 | Function | What it does |
 | --- | --- |
-| `ReadPaidReadyPayments.v1` | Puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, then returns up to 500 of the oldest `READY` rows, each with its `stlmt_ts` and `ar_pstd_ts`, which Settle writes onto the payment. It changes nothing else, so a repeat returns the same rows. Proposed: `UpdateUnmatchedPayments.v1` takes over the move back to `READY`, so this one only reads. |
+| `ReadPaidReadyPayments.v1` | Puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, then returns up to 500 of the oldest `READY` rows, each with its `stlmt_ts` and `ar_pstd_ts`, which Settle writes onto the payment. It changes nothing else, so a repeat before the status update returns the same rows. Proposed: `UpdateUnmatchedPayments.v1` takes over the move back to `READY`, so this one only reads. |
 | `UpdatePaidReadyPayments.v1` | Sets the listed rows `DONE` or `UNMATCHED` in one transaction and returns the counts. Setting a status twice does no harm, so a retry is safe. |
 | `ReadStartRequests.v1` | Returns up to a dispatcher's tick of the oldest `READY` requests for that dispatcher: AR intake (payments and refunds), returns or inbound. It changes nothing, so a repeat returns the same requests. |
 | `UpdateStartRequests.v1` | Sets the listed requests `DONE` or `REJECTED` in one transaction. Setting a status twice does no harm. |

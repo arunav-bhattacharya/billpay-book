@@ -20,16 +20,16 @@ Jackson does that job, with `jackson-module-kotlin` so it understands Kotlin con
     include = JsonTypeInfo.As.PROPERTY,
     property = Payment.PROPERTY_NAME,   // "type"
 )
-sealed interface Payment : Transaction { … }
+sealed interface Payment : Transaction { /* ... */ }
 ```
 
 Serialized, every payment, option, instrument, and timeline carries a `"type"` property holding the concrete class's simple name: `"AcceptedFullPayment"`, `"VerifiedMinimumDuePaymentOption"`, `"ScheduledTimeline"`. On the way back in, Jackson uses that discriminator to reconstruct the exact subtype. This is what lets workflow code receive a `Payment` and safely `when` over the sealed hierarchy: the concrete type survived the wire.
 
 Three conventions to keep:
 
-- **Every new sealed hierarchy gets the same `@JsonTypeInfo` block**, with a `PROPERTY_NAME = "type"` companion constant. Do not invent a second discriminator name.
-- **Formatting quirks are annotated at the field.** The debit card expiry is the example: `@field:JsonFormat(shape = STRING, pattern = "MM/yyyy") val expiryDate: YearMonth?`.
-- **A new field gets a default value.** Temporal keeps a workflow's payloads for as long as it runs, so a payload written last week has to read in this week's code. With a default, an old payload still reads, and because the mapper ignores fields it doesn't know, code one release behind reads the new payload too.
+- Every new sealed hierarchy gets the same `@JsonTypeInfo` block, with a `PROPERTY_NAME = "type"` companion constant. Do not invent a second discriminator name.
+- Formatting quirks are annotated at the field. The debit card expiry is the example: `@field:JsonFormat(shape = STRING, pattern = "MM/yyyy") val expiryDate: YearMonth?`.
+- A new field gets a default value. Temporal keeps a workflow's payloads for as long as it runs, so a payload written last week has to read in this week's code. With a default, an old payload still reads, and because the mapper ignores fields it doesn't know, code one release behind reads the new payload too.
 
 ## One mapper for every boundary
 

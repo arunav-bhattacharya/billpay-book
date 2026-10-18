@@ -11,8 +11,6 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 <Lead>The decisions that hold across billpay-core. Each page records the alternatives we weighed and why the winner won, because knowing *why* Exposed beat Hibernate is what tells you how to use it well.</Lead>
 
-The section has two halves:
-
 ## In this section
 
 <SectionIndex
@@ -25,7 +23,7 @@ The section has two halves:
     {
       term: 'Core Build',
       to: '/docs/build/principles/core-build',
-      desc: `What we write: how our own code is organised into workflows, stages, activity groups, activities, and clients, and the rules that keep those layers honest.`,
+      desc: `What we write: the Router, and how our own code is organised into workflows, stages, activities and clients, with the rules that keep those layers honest.`,
     },
   ]}
 />

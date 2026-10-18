@@ -12,7 +12,7 @@ import Lead from '@site/src/components/Lead';
 
 ## From reference to verified
 
-Every option starts as a **reference**. The customer named an option, but nothing is confirmed. Validation then resolves it into a **verified** option, with an id and amount the system of record stands behind.
+Every option starts as a **reference**. The customer named an option, but nothing is confirmed. Verify then resolves it into a **verified** option, with an ID and an amount the system of record stands behind.
 
 ```kotlin
 sealed interface PaymentOption {
@@ -29,7 +29,7 @@ sealed interface VerifiedPaymentOption : PaymentOption {         // post-lookup
 }
 ```
 
-The nullability *is* the state. A `PaymentOptionReference` may hold nothing but the option type, and a `VerifiedPaymentOption` cannot exist without a confirmed id and amount. That is why the [Verified payment states](./payment.md) can demand a `VerifiedPaymentOption` and know at compile time that an amount exists.
+A `PaymentOptionReference` may hold nothing but the option type, while a `VerifiedPaymentOption` can't exist without a confirmed ID and amount. The nullable fields are the state, which is why [every state that can move money](./payment.md#what-each-state-must-hold) can demand a `VerifiedPaymentOption` and know at compile time that an amount exists.
 
 ## The eight option types
 
@@ -39,12 +39,12 @@ The nullability *is* the state. A `PaymentOptionReference` may hold nothing but 
 | `OUTSTANDING_BALANCE` | Everything currently owed on the account. |
 | `REMAINING_STATEMENT_BALANCE` | What is left of the statement after partial payments. |
 | `INITIAL_PAYMENT_AMOUNT` | The up-front payment on a deferred payment plan. |
-| `OTHER_AMOUNT` | A custom, user-specified amount. |
+| `OTHER_AMOUNT` | An amount the customer typed in. |
 | `ADJUSTED_BALANCE` | The balance after credits and adjustments. |
 | `TOTAL_BALANCE` | The total balance including all charges. |
 | `STATEMENT_BALANCE` | The current statement balance. |
 
-Each type gets a small family: a sealed category class that pins the `optionType`, a `…Reference` data class, and a `Verified…` data class. `MINIMUM_DUE` reads like this, and the other seven are identical in shape:
+Each type gets a small family: a sealed class that pins the `optionType`, a `...Reference` data class, and a `Verified...` data class. `MINIMUM_DUE` reads like this, and the other seven are identical in shape:
 
 ```kotlin
 sealed class MinimumDuePaymentOption : PaymentOptionType {
@@ -69,4 +69,4 @@ Six of the eight references take an optional `value`, because the amount is the 
 - `OtherAmountPaymentOptionReference(value: MonetaryAmount)`
 - `InitialPaymentAmountPaymentOptionReference(value: MonetaryAmount)`
 
-Those are the user-specified amounts. There is nothing to look up, so a reference without a value would be meaningless. This is the same rule `PendingFullPayment` enforces in its [init guard](./payment.md#the-guard-on-pendingfullpayment): amount present for user-specified options, amount absent for computed ones.
+The customer named these amounts, so there is nothing to look up, and a reference without a value would mean nothing. This is the same rule `PendingFullPayment` enforces in its [init guard](./payment.md#the-guard-on-pendingfullpayment): amount present for user-specified options, amount absent for computed ones.

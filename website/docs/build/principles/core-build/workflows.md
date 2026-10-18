@@ -33,14 +33,7 @@ Every behavior combination has a default implementation. A combination with no i
 
 ## How a workflow starts
 
-How a workflow starts depends on who is waiting for it, and the Router picks the start mode for the journey.
-
-| When | Start | Used by |
-| --- | --- | --- |
-| A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | Pay today, schedule, composites, confirm, update, cancel, refunds from channels |
-| Nobody waits | One-Data stores the request, and a dispatcher pulls it from the inbox | AR intake, returns, inbound |
-| An allocation callback | Async start, before the 202 reply | Allocation callbacks |
-| Due on a date, or a big fan-out | A Work Tracker row in the producer's commit, which a dispatcher picks up | Scheduled execution, allocation requests, corporate execution, corporate legs, representments, confirmation expiries |
+How a workflow starts depends on who is waiting for it, and the Router picks the start mode for the journey: Update-With-Start when a caller waits, a dispatcher's start for work pulled from One-Data's inbox or due on a date, and an async start for an allocation callback. [Design → Routing](../../../design/routing.md#start-modes) has the table, and [Building the Router](./router.md#6-start) has the start calls in code.
 
 When a caller waits, its update lands on the workflow's update method and returns as soon as the workflow has the answer, which for a new payment is Verify's decision. The workflow carries on after the reply. A repeated request joins the running workflow instead of starting a second one; that is what `USE_EXISTING` does.
 

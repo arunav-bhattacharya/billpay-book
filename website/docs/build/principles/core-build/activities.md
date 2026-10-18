@@ -1,67 +1,99 @@
 ---
-title: Building Activities & ActivityGroups
-description: 'Activities are where the platform touches the world.'
+title: Building Activities
+description: 'An activity makes the calls to one system, and nothing else.'
 sidebar_label: Activities
 ---
 
 import Lead from '@site/src/components/Lead';
 
-# Building Activities & ActivityGroups
+# Building Activities
 
-<Lead>Activities are where the platform touches the world. Every database write, every downstream call, and every event publish is an activity. Everything above them is orchestration. This layer is the I/O. Keep each one small, boring, and safe to run twice.</Lead>
+<Lead>An activity makes the calls to one system, and nothing else. It is the only layer that touches the world, so writing one well comes down to three habits: take an ID, make every call safe to repeat, and leave the retrying to Temporal.</Lead>
 
-## Activities: one retryable action
+[Design → Activities](../../../design/component-model/activities.md) has the catalogue: every interface, its system, its task queue and the stages that call it, and the retry rules. This page shows how to write one.
 
-An activity does a single side-effecting thing: persist the pending payment, publish a lifecycle event, call clearing. The interface and implementation split is mechanical, `{Action}Activity` and `{Action}ActivityImpl`, in `core/lib/activities/` and its `impl/`.
+## One interface per system
+
+Each system gets one interface, `{System}Activities`, in `core/lib/activities/`, with its implementation in `impl/`. `ClearingActivities` talks to clearing, `ReceivablesActivities` to Accounts Receivable, and so on. The implementation calls that system's [client](./clients.md), and the client owns the wire format. Activities are shared by every market and never vary by behavior: that is the stage's job.
 
 ```kotlin
-interface PaymentStateTransitionActivity {
-    fun transition(payment: Payment)
+@ActivityInterface
+interface ClearingActivities {
+    fun clear(paymentId: String): ClearingResult
 }
 
-class PaymentStateTransitionActivityImpl(
-    private val db: Database,
-) : PaymentStateTransitionActivity {
-    override fun transition(payment: Payment) = transaction(db) {
-        TransDtl.update({ TransDtl.paymentId eq payment.paymentId }) {
-            it[status] = payment.status.name
+class ClearingActivitiesImpl(
+    private val store: PaymentStoreReader,
+    private val client: ClearingClient,
+) : ClearingActivities {
+
+    override fun clear(paymentId: String): ClearingResult {
+        val p = store.forClearing(paymentId)                 // load what this call needs
+        return try {
+            client.clear(p, idempotencyKey = "$paymentId-clear")
+        } catch (e: TooManyRequests) {
+            // Wait out Retry-After, plus a little jitter, instead of the policy's interval.
+            throw ApplicationFailure.newFailureWithCauseAndDelay(
+                "429 from clearing", "RateLimited", e, e.retryAfter.plusMillis(jitter()))
         }
-        TransLfcycEvent.insert { /* new row for the new state */ }
-        // publish the lifecycle event to Lumi via RTF
     }
 }
 ```
 
-*(Shape, simplified.)* Three rules make activities safe:
+*(A sketch: the interface and the idempotency key follow the spec; the other names are illustrative.)*
 
-- **Assume Temporal will retry the activity.** An activity that writes half its state and throws gets called again with the same input, so it must not double-write. Idempotent writes are the habit: keyed inserts, and absolute updates like `status = ACCEPTED` rather than increments.
-- **Take only the fields you need.** Activities are shared across every market, and their inputs are recorded in workflow history. Pass the payment id and the two fields you use, not the whole `Payment` object.
-- **One `transaction { }` per activity.** The activity is the transaction boundary *and* the retry boundary. If it throws, the transaction rolls back and Temporal's retry policy decides what happens next. One clean unit, with no partial commits to reason about.
+Three things in that sketch are rules, not style:
 
-An activity talks to the world through a [client](./clients.md), never directly. The client owns the protocol, and the activity owns the action.
+- The activity takes the payment ID and loads what it needs. Its inputs are recorded in workflow history, so passing whole payment objects would bloat every history and freeze old data into it.
+- Every HTTP call carries an idempotency key such as `{paymentId}-{step}`. An activity can be retried after a timeout even when its call went through, and the key is what makes the second call harmless.
+- The HTTP client has its own retries off. One task is one call, so a queue's rate limit stays the real call rate, and Temporal decides when to try again.
 
-## ActivityGroups: one business concern
+## Options belong to the stub
 
-An **ActivityGroup** composes activities for a single concern and is named for it: `{Responsibility}ActivityGroup`, in `core/lib/activityGroups/`, or `market/{m}/activityGroups/` for an override. `PaymentValidationActivityGroup` gathers and evaluates everything validation needs. `PaymentExecutionActivityGroup` runs the three execution actions.
-
-Two responsibilities live at this level and not below:
-
-- **Sequencing and fan-out.** The group decides what runs in parallel and what must wait. Execution fires clearing, the AR balance reduction, and the Open-To-Buy increase *in parallel*, and records each in the notification tracker. Fulfillment notifies accounting, audit, and risk in parallel, and holds customer communications until they are done.
-- **Activity options.** Timeouts and retry policies are set by the *composing group*, not defaulted inside the activity. The same activity can run with a tight timeout and two retries on the Online path, and a generous timeout with a long retry tail on the Offline path. The group knows the context. The activity does not.
+Where an activity runs, how long a call may take and how it retries are set on the stub the stage creates, not inside the activity:
 
 ```kotlin
-class PaymentExecutionActivityGroup(/* … */) {
-    fun execute(paymentId: String /* + required fields */) {
-        val opts = ActivityOptions { startToCloseTimeout = …; retryPolicy = … }
-        listOf(
-            async { clearingCall(paymentId, opts) },      // to the bank, via MR/M3
-            async { arBalanceReduction(paymentId, opts) },// Accounts Receivable
-            async { otbIncrease(paymentId, opts) },       // Authorizations (AMP)
-        ).awaitAll()
+private val clearing = Workflow.newActivityStub(
+    ClearingActivities::class.java,
+    ActivityOptions.newBuilder()
+        .setTaskQueue("ds-clearing")                            // the rate-limited queue on Offline
+        .setStartToCloseTimeout(Duration.ofSeconds(3))          // about 2 to 3 times clearing's p99
+        .setRetryOptions(RetryOptions.newBuilder()
+            .setInitialInterval(Duration.ofSeconds(1))           // from 1 s, doubling,
+            .setMaximumInterval(Duration.ofSeconds(60))          // capped at 60 s
+            .setDoNotRetry(BusinessFailure::class.java.name)     // a decline is final
+            .build())
+        .build(),
+)
+```
+
+On the Offline cluster, a call to a throttled system runs on that system's `ds-*` queue, whose server-side limit is the throttle. A call nobody throttles, such as RTF or Payment Instruments, runs on the workflow's own queue with eager dispatch. A short start-to-close frees a hung call's slot fast; the schedule-to-close limit decides when to give up.
+
+## PaymentStore
+
+`PaymentStore` is the one activity that reaches Oracle, and no other code does. It runs as a local activity, inside the workflow task, so a commit costs no task round trip. Each operation is one transaction. A stage commit, for example, is the guarded status update, the timeline row with the cluster, and any Work Tracker rows the step opens or closes:
+
+```kotlin
+override fun commit(c: StageCommit): Boolean = transaction(pool) {
+    val moved = TransDtl.update({
+        (TransDtl.transId eq c.paymentId) and (TransDtl.status eq c.expected.code)
+    }) { it[status] = c.next.code } == 1                     // the guard
+
+    if (moved) {
+        TransLfcycEvent.insert { /* c.next, with the cluster that ran the step */ }
+        c.workRows.forEach { WorkTracker.insertIfAbsent(it) } // deterministic item_id
+        c.closesRow?.let { WorkTracker.markDone(it) }
     }
+    moved                                                    // false: someone else moved it first
 }
 ```
 
-*(Shape, simplified.)* Which groups carry behaviors and which are generic, all 22 of them with their transitions and invoking stages, is catalogued in [Design → ActivityGroups & Activities](../../../design/component-model/activities.md).
+A commit that changes no row isn't an error. It means another writer, such as a cancel, moved the payment first, and the stage returns the payment as it stands. Because local activities run again if a worker dies mid-task, every write in `PaymentStore` is insert-if-absent or a guarded update, so running it twice changes nothing.
 
-When in doubt about granularity, prefer several short activities composed by a group over one long activity. Short activities retry cheaply. Long ones repeat work.
+Give `PaymentStore` a schedule-to-close of a few hours and a maximum retry interval of about a minute. That is what lets a payment wait out an Oracle outage and carry on when Oracle is back, and a Java local activity with neither a schedule-to-close nor a maximum number of attempts isn't retried at all. Capture on the Online cluster is the exception: it gets a short deadline, so a caller gets a quick error instead of a long wait.
+
+## RTF and Raven are activities too
+
+There is no outbox. A stage's announcement calls `LifecycleEventActivities`, which sends the lifecycle event to RTF, and `CommunicationActivities`, which sends the customer's message through Raven. Both carry idempotency keys, and both get a long schedule-to-close, like `PaymentStore`: they must succeed, so an outage pauses payments where they are instead of failing them.
+
+RTF has no rate limit, and it guarantees delivery once it has an event, so its calls run on the workflow's own queue. Raven has an agreed rate, so its calls run on `ds-comms` like any other throttled system.

@@ -1,6 +1,6 @@
 ---
 title: Payment
-description: 'One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions.'
+description: 'One sealed class per lifecycle state, two shapes, and moves between states as functions the compiler checks.'
 sidebar_label: Payment
 ---
 
@@ -8,25 +8,25 @@ import Lead from '@site/src/components/Lead';
 
 # Payment
 
-<Lead>One type per lifecycle state, one marker per shape, and transitions as compiler-checked functions. This page walks the hierarchy top down. Read it once against the sources under `docs/domainModel` and the naming will carry you from there.</Lead>
+<Lead>One sealed class per lifecycle state, two shapes, and moves between states as functions the compiler checks. This page is the payment model as Kotlin, top down, from the sources under <code>docs/domainModel</code>.</Lead>
+
+[Design → Domain Model](../../design/domain-model.md) has the map: all fourteen states, what each one guarantees, and the 36 moves between them. This page shows the code a builder works with.
 
 ## The root types
 
-`Transaction` is the platform root, meaning anything that moves value. `Payment` is its only family so far.
+`Transaction` is the root, meaning anything that moves value. It has two branches, `Payment` and `Refund`, and `Refund` has no concrete classes yet, because the refund steps are still to be defined.
 
 ```kotlin
-@JsonTypeInfo(use = JsonTypeInfo.Id.SIMPLE_NAME, include = JsonTypeInfo.As.PROPERTY, property = Transaction.PROPERTY_NAME)
+@JsonTypeInfo(use = JsonTypeInfo.Id.SIMPLE_NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 sealed interface Transaction {
-    val id: String
+    val id: TransactionId
     val account: Account
-    val amount: MonetaryAmount?   // nullable, since PENDING may not know it yet
+    val amount: MonetaryAmount?          // nullable: a PENDING payment may not know it yet
 }
-```
 
-```kotlin
 sealed interface Payment : Transaction {
-    val paymentId: String
-    override val id: String get() = paymentId
+    val paymentId: TransactionId
+    override val id: TransactionId get() = paymentId
 
     val confirmationCode: ConfirmationCode?
     val status: LegacyPayment.PaymentStatus
@@ -40,81 +40,92 @@ sealed interface Payment : Transaction {
 }
 ```
 
-Amounts are `javax.money.MonetaryAmount` throughout. `confirmationCode` is the customer-stable key, and it survives both an update (which issues a new `paymentId`) and a representment. `presentmentSequence` counts settlement attempts: `1` for the original presentment, bumped when a return is re-presented. `planDetailData` carries the installment-plan linkage for *Pay & Plan* flows.
+`confirmationCode` is the key the customer keeps: it survives an update, which issues a new payment ID, and a representment. `presentmentSequence` numbers the payment's trips to the bank, starting at 1. Every sealed type carries the `type` property, so the JSON says which class, and which state, it holds ([Serialization](../principles/tech-stack/serialization.md)).
 
-## The Verified narrowing
+## The types the model leans on
 
-A file-private interface carries the constraint:
+The supplied file uses five types it doesn't define. The build takes each one from the current app where it exists there, and otherwise creates it as below (Proposed, 2026-10-18).
+
+```kotlin
+/** A payment's ID: a ULID, which One-Data makes. A leg's ID is its parent's plus "_{seq}". */
+data class TransactionId @JsonCreator(mode = JsonCreator.Mode.DELEGATING) constructor(
+    @get:JsonValue val value: String,
+) {
+    init { require(FORMAT.matches(value)) { "not a payment or leg ID: $value" } }
+    fun withSplit(sequenceNumber: Int) = TransactionId("${value}_$sequenceNumber")
+    override fun toString() = value
+    private companion object { val FORMAT = Regex("[0-9A-HJKMNP-TV-Z]{26}(_[0-9]+)?") }
+}
+
+/** The card account, held as its token and never as a card number. */
+data class TokenizedAccount(val accountId: String) : Account   // CARD_ACCT.ACCT_ID
+
+/** The Pay & Plan details a payment carries. More fields come with the Installments API. */
+data class PlanInfo(val planId: String? = null)
+
+/** Today's payment class. The model uses only these three enums. */
+object LegacyPayment {
+    enum class PaymentStatus {
+        PENDING, SCHEDULED, ACCEPTED, ALLOCATING, ALLOCATED, PROCESSING, PROCESSED,
+        PAID, RETURNED, REPRESENTING, REPRESENTED, CANCELLED, DECLINED, DISALLOWED,
+    }
+    enum class PaymentSource   // the current app's values
+    enum class DeclineCode     // the current app's values
+}
+```
+
+Money is `javax.money.MonetaryAmount` from JSR 354, the Java money API, with Moneta's `Money` behind it, so an amount is never a floating-point number. On the wire it is an amount and a currency code. `PaymentSource` and `DeclineCode` keep the current app's values exactly: they are part of what other systems already read.
+
+## What each state must hold
+
+Two traits narrow what a class has to carry. `VerifiedPayment` is the one that matters most: every class from `SCHEDULED` to `REPRESENTED`, `ALLOCATING` and `ALLOCATED` included, mixes it in.
 
 ```kotlin
 private interface VerifiedPayment {
-    val amount: MonetaryAmount          // non-null, narrows Transaction.amount
-    val option: VerifiedPaymentOption   // narrows PaymentOption
-    val instrument: VerifiedInstrument  // narrows Instrument
+    val account: TokenizedAccount        // narrows Transaction.account
+    val amount: MonetaryAmount           // non-null, narrows Transaction.amount
+    val option: VerifiedPaymentOption    // narrows PaymentOption
+    val instrument: VerifiedInstrument   // narrows Instrument
+    val timeline: ExecutableTimeline     // knows its clearing date and cancel cutoff
+}
+
+interface RepresentmentPayment {         // RETURNED, REPRESENTING and REPRESENTED
+    val returnedInfo: ReturnedInfo
+}
+
+sealed class AcceptedPayment : Payment, VerifiedPayment {
+    override val status = LegacyPayment.PaymentStatus.ACCEPTED
 }
 ```
 
-Every in-flight status type mixes it in, and the entry and terminal-failure types do not. That single choice encodes the business rule that nothing moves money until validation has resolved the amount, the option, and the instrument. It is a compile error, not a runtime check.
+That single choice encodes a business rule: nothing moves money until Verify has resolved the account, the amount, the option, the instrument and the timeline. Breaking it is a compile error, not a runtime check. Each of the fourteen state classes fixes its own `status` the same way, so the status can't drift from the data.
 
-## The eleven status types
+## Full payments and legs
 
-Each status is a `sealed class` that pins `status` to one constant:
-
-| Status type | Status constant | Verified? | Notes |
-| --- | --- | --- | --- |
-| `PendingPayment` | `PENDING` | No | May carry a null amount and unverified directives. |
-| `ScheduledPayment` | `SCHEDULED` | ✓ | |
-| `AcceptedPayment` | `ACCEPTED` | ✓ | |
-| `ProcessingPayment` | `PROCESSING` | ✓ | |
-| `ProcessedPayment` | `PROCESSED` | ✓ | |
-| `PaidPayment` | `PAID` | ✓ | |
-| `ReturnedPayment` | `RETURNED` | ✓ | |
-| `RepresentingPayment` | `REPRESENTING` | ✓ | |
-| `RepresentedPayment` | `REPRESENTED` | ✓ | |
-| `CancelledPayment` | `CANCELLED` | No | |
-| `DeclinedPayment` | `DECLINED` | No | Adds `abstract val declineCode`, because a decline always says why. |
-
-## Shape: Full and Split
-
-Two marker interfaces cut across the statuses. `FullPayment` adds nothing. It is the marker for a payment that settles as one amount. `SplitPayment` carries the linkage back to its parent.
+`FullPayment` marks a payment that settles as one amount. `SplitPayment` is a leg, and carries its link to the parent:
 
 ```kotlin
 sealed interface SplitPayment : Payment {
-    val originalPaymentId: String
+    val originalPaymentId: TransactionId     // the parent
     val sequenceNumber: Int
 }
-```
 
-The concrete classes are the cross-product: 18 immutable `data class`es.
-
-| Status | Full | Split |
-| --- | --- | --- |
-| `PENDING` | ✓ | |
-| `SCHEDULED` | ✓ | |
-| `ACCEPTED` | ✓ | ✓ |
-| `PROCESSING` | ✓ | ✓ |
-| `PROCESSED` | ✓ | ✓ |
-| `PAID` | ✓ | ✓ |
-| `RETURNED` | ✓ | ✓ |
-| `REPRESENTING` | ✓ | ✓ |
-| `REPRESENTED` | ✓ | ✓ |
-| `CANCELLED` | ✓ | |
-| `DECLINED` | ✓ | |
-
-The gaps in the Split column are deliberate, because **splitting begins at `ACCEPTED`.** A split leg is born from an already-accepted parent, with a `SplitSlice` in hand, so a pending, scheduled, cancelled, or declined split cannot exist. It does not compile.
-
-```kotlin
 data class SplitSlice(
     val sequenceNumber: Int,
     val splitAmount: MonetaryAmount,
+    val splitPaymentId: TransactionId,       // the leg's ID, {paymentId}_{seq}
+    val account: TokenizedAccount,           // the card account this leg pays
 )
 ```
 
-A leg's identity comes from its parent: `paymentId = "${parent.paymentId}_$sequenceNumber"`, with `originalPaymentId` pointing back at the parent.
+A leg is made from a parent Verify has already passed, so it starts at `ACCEPTED`, and there is no pending, scheduled, allocating or allocated leg. Two moves make one, and each kind of split uses one of them:
+
+- A consumer split's legs are written by Verify's `ACCEPTED` commit, through `AcceptedFullPayment.toAcceptedSplitPayment(splitSlice)`.
+- A corporate payment's legs are written at its release, once its Execute has cleared it, through `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)`. Each leg pays its own card account, which is why the slice carries one.
 
 ## The guard on PendingFullPayment
 
-`PendingFullPayment`, the type every API-created payment starts as, checks its own consistency at construction.
+`PendingFullPayment`, the class every payment starts as, checks itself when it is built:
 
 ```kotlin
 init { checkAmountAgainstPaymentOption() }
@@ -129,44 +140,27 @@ private fun checkAmountAgainstPaymentOption() {
 }
 ```
 
-In words: if the customer named the amount (`OTHER_AMOUNT`, `INITIAL_PAYMENT_AMOUNT`) or the option is already verified, an amount must be present. For every other option the amount is *computed later* by the system of record, so supplying one up front is an error. The defaults on this type are `presentmentSequence = 1`, `hasMoneyMovement = true`, and `planDetailData = null`.
+If the customer named the amount, or the option is already verified, the amount must be there. For any other option, Verify works the amount out later, so supplying one up front is an error. The defaults are `presentmentSequence = 1`, `hasMoneyMovement = true`, `planDetailData = null` and `bankConfirmation = null`. A payment that waits for its customer's bank holds a `BankConfirmation`: the provider's reference and the redirect link.
 
-## Timelines
+## A move, in code
 
-Dates and times live in their own small hierarchy rather than as loose fields.
+There is no `setStatus`. Each move is an extension function that takes one class and returns the next, so a move without a function can't happen. The move to the next presentment shows what the types buy:
 
-| Type | Adds | Used by |
-| --- | --- | --- |
-| `Timeline` *(sealed)* | `captureTimestamp` · `transactionDate` · `transactionTimestamp` | the base, used by `PENDING` and `DECLINED` |
-| `ExecutableTimeline` *(sealed)* | `clearingDate` · `executionTimestamp` · `cancelCutoffTimestamp` · `frequency` (`ONCE` / `RECURRING`) | every state that can move money |
-| `InitialTimeline` | nothing | the plain concrete base |
-| `ImmediateTimeline` | `frequency` fixed to `ONCE` | pay-today payments |
-| `ScheduledTimeline` | `scheduleDate` | future-dated payments (`SCHEDULED` requires it) |
+```kotlin
+fun ReturnedFullPayment.toRepresentingFullPayment(representmentDate: LocalDate) =
+    RepresentingFullPayment(
+        paymentId = paymentId,
+        presentmentSequence = presentmentSequence + 1,        // a new presentment, a new row
+        timeline = timeline.withClearingDate(representmentDate),
+        returnedInfo = returnedInfo,
+        /* the rest carried over unchanged */
+    )
+```
 
-This mirrors the Verified narrowing. A payment cannot reach an executable state without a timeline that knows its clearing date and cancel cutoff, because the types will not line up otherwise.
+The returned payment isn't moved: its row stays `RETURNED`, and the function builds the next presentment beside it. The arguments of every move say what it needs. The move out of `PENDING` takes what Verify resolved, and every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile.
 
-## Transitions: the state machine as functions
+A [stage](../principles/core-build/stages.md) runs one of these moves and commits the result through `PaymentStore`, which is why stage code stays short.
 
-There is no `setStatus`. Each legal edge is a top-level extension function that consumes one immutable type and returns the next. There are 26 of them.
+## What the build adds
 
-| From | To |
-| --- | --- |
-| `PendingFullPayment` | `toAcceptedFullPayment(amount, timeline, option, instrument)` · `toScheduledFullPayment(…)` · `toDeclinedFullPayment(declineCode)` |
-| `ScheduledFullPayment` | `toAcceptedFullPayment()` · `toDeclinedFullPayment(declineCode)` · `toCancelledFullPayment()` |
-| `AcceptedFullPayment` | `toProcessingFullPayment()` · `toAcceptedSplitPayment(splitSlice)` |
-| `ProcessingFullPayment` | `toProcessedFullPayment()` · `toAcceptedSplitPayment(splitSlice)` |
-| `ProcessedFullPayment` | `toPaidFullPayment()` · `toReturnedFullPayment()` |
-| `PaidFullPayment` | `toReturnedFullPayment()` |
-| `ReturnedFullPayment` | `toRepresentingFullPayment()` |
-| `RepresentingFullPayment` | `toRepresentedFullPayment()` · `toReturnedFullPayment()` |
-| `RepresentedFullPayment` | `toReturnedFullPayment()` |
-| `AcceptedSplitPayment` | `toProcessingSplitPayment()` |
-| `ProcessingSplitPayment` | `toProcessedSplitPayment()` |
-| `ProcessedSplitPayment` | `toPaidSplitPayment()` · `toReturnedSplitPayment()` |
-| `PaidSplitPayment` / `ReturnedSplitPayment` / `RepresentingSplitPayment` / `RepresentedSplitPayment` | mirror the Full edges at the split level |
-
-The pending to accepted edge takes the verified pieces as arguments, so validation's outputs are the transition's inputs. `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)` is the corporate fan-out edge: a corporate parent is `PROCESSING` by the time its Execute releases the legs, and each leg starts `ACCEPTED`.
-
-A [stage](../principles/core-build/stages.md) is one of these functions plus the persistence and event publication around it, which is why stage signatures stay short.
-
-The eleven status types above are fewer than the [spec's state model](../../design/payment-state-model.md) defines. What is missing, and why, is listed on the [Domain Model](./index.md) page.
+The file supplied on 2026-10-16 is behind the agreed model in nine places, such as the corporate `ALLOCATING` and `ALLOCATED` classes and the move from `PENDING` to `CANCELLED`. The build makes all nine from the spec's list (agreed 2026-10-18). [Design → Domain Model](../../design/domain-model.md#what-the-code-still-needs) lists them.

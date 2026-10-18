@@ -88,7 +88,7 @@ On the wire, every sealed type carries a `type` property with its class's simple
 
 ## What the code still needs
 
-These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The map dashes the classes and moves among them.
+These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The build makes them from this list (agreed 2026-10-18), and the map dashes the classes and moves among them until then.
 
 1. `PROCESSING` → `RETURNED`, for a payment and a leg: `toReturnedFullPayment(returnedInfo)` and `toReturnedSplitPayment(returnedInfo)`.
 2. The corporate states: `AllocatingPayment` and `AllocatedPayment`, their two full classes, the six moves into and out of them, and the two status values.
