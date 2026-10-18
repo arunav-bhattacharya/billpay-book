@@ -121,8 +121,8 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       term: 'Stages chosen from the plan key',
       desc: (
         <>
-          When the Router starts a payment it pins a plan key: the journey, the behaviors resolved for
-          it and the market's config version. The workflow looks up its stage implementations from that
+          When the Router starts a payment it pins a plan key: the market, the journey, the behaviors
+          resolved for it and the market's config version. The workflow looks up its stage implementations from that
           key, most specific match first, so no market decision is left in the workflow code. Worker
           Versioning pins the workflow to the build it started on, so neither a deploy nor a new release
           changes a payment already running. Nothing is inherited: workflows and stages are never{' '}
@@ -214,7 +214,7 @@ A new way of processing a payment is a new stage implementation behind one combi
     },
     {
       term: 'Efficiency',
-      desc: `Every write to Temporal's database is capacity the midnight run needs. A stage makes its calls in parallel and commits once, and the database calls run as local activities, so an executed payment costs an estimated 49 writes, a figure the first load test is there to confirm.`,
+      desc: `Every write to Temporal's database is capacity the midnight run needs. A stage makes its calls in parallel and commits once, and the database calls run as local activities, so an executed payment costs an estimated 55 writes, a figure the first load test is there to confirm.`,
     },
   ]}
 />

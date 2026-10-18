@@ -21,13 +21,13 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 - One workflow per journey, with one implementation. Create Immediate Payment, Execute Scheduled Payment and Process Returned Payment exist once each, and no market has a workflow of its own.
 - Never `abstract`. Variation comes from composing different stage implementations, per the [composition rules](../../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
 - Call stages and, on the workflow's own cluster, child workflows. Nothing else: no activity, no client, no outside system and nothing on the other cluster. The [four layers](../../../design/principles.md#the-four-layers) have the full call rules.
-- Pass the payment ID, not the payment. Stages and activities load what they need.
+- Pass the payment ID, not the payment. Stages and activities load what they need. The one exception is data from Payment Options and Payment Instruments: what a stage gets there, clear text included, travels on in the workflow to the later stages that need it, and the payload codec keeps it encrypted in history.
 - Set search attributes once, at start. Use no signals or queries on the hot path.
 - Never wait for a date. Work due later is a Work Tracker row in Oracle, written in the same commit as the state change, and a dispatcher starts the next workflow when it falls due. Nothing waits on a Temporal timer until then.
 
 ## How a workflow finds its stages
 
-The Router pins a plan key when it starts the workflow: the journey, the resolved behaviors and the market's config version. The workflow reads its plan key and looks up its stages at runtime, in an index that KSP (Kotlin Symbol Processing) generates at build time. The most specific match wins, and a market override is a more specific match for that market. Stage objects are never passed into a workflow.
+The Router pins a plan key when it starts the workflow: the market, the journey, the resolved behaviors and the market's config version (the market is Proposed, so a market override can match). The workflow reads its plan key and looks up its stages at runtime, in an index that KSP (Kotlin Symbol Processing) generates at build time. The most specific match wins, and a market override is a more specific match for that market. Stage objects are never passed into a workflow.
 
 Every behavior combination has a default implementation. A combination with no implementation can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts.
 
@@ -88,7 +88,9 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
             if (decided == PaymentDecision.DECLINED) stages.requestConfirmation.announce(paymentId)
             return
         }
-        decided = stages.verify.run(paymentId)         // ACCEPTED or DECLINED, one guarded commit
+        val verified = stages.verify.run(paymentId)    // ACCEPTED or DECLINED, one guarded commit,
+                                                       // with what Options and Instruments returned
+        decided = verified.decision
         // The caller's update has its answer here. Announce both changes, in order.
         stages.capture.announce(paymentId)             // the PENDING event to RTF
         stages.verify.announce(paymentId)              // the decision to RTF, and to Raven where the customer is told
@@ -97,9 +99,10 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
         // and dispatchers start every later step.
         if (plan.accountType == AccountType.CORPORATE) return
 
-        stages.execute.run(paymentId)                  // PROCESSING: clearing, AR and OTB in parallel
+        // Data from Options and Instruments travels on in the workflow, encrypted in history by the payload codec.
+        val executed = stages.execute.run(paymentId, verified)  // PROCESSING: clearing, AR, and the Instruments call, then OTB
         stages.execute.announce(paymentId)             // the PROCESSING event
-        stages.fulfil.run(paymentId)                   // accounting, eBNC, risk, TFNE, GPHDB; then RTF and Raven; then PROCESSED
+        stages.fulfil.run(paymentId, executed)         // accounting, eBNC, risk, TFNE, GPHDB, B2Notifier; then RTF and Raven; then PROCESSED
     }
 
     override fun decision(): PaymentDecision {

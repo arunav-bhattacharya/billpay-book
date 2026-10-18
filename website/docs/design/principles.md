@@ -82,13 +82,13 @@ Naming an implementation for its behavior rather than its market means a rule th
 
 - There is one implementation of each workflow. A workflow is composed from stage implementations and never copied per market.
 - Workflows and stages are never `abstract`.
-- Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs.
+- Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs. Data from Payment Options and Payment Instruments is the exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec.
 
 ## How a workflow finds its stages
 
-A workflow is never handed its stages. When the Router starts it, the Router pins a **plan key**: the journey, the market's behaviors resolved for that journey, and the version of the market's config. The workflow reads its plan key and looks up its stage implementations at runtime.
+A workflow is never handed its stages. When the Router starts it, the Router pins a **plan key**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market override can match (Proposed). The workflow reads its plan key and looks up its stage implementations at runtime.
 
-The lookup uses an index built at compile time with KSP (Kotlin Symbol Processing). It maps each combination of behaviors to its stage implementations, and the most specific match wins, so a market override beats the default for that market.
+The lookup uses an index built at compile time with KSP (Kotlin Symbol Processing). It maps each combination of behaviors to its stage implementations, and the most specific match wins, so a market override beats the default for that market. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
 
 - Every combination has a default implementation. A combination with no implementation can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
 - The same index produces the build's **capability manifest**, the list of every combination the build can run. Provisioning checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).

@@ -58,7 +58,7 @@ The allocated-payments dispatcher runs every minute. When an `ALLOC_EXEC` row fa
 
 Once a parent is released, the leg dispatcher writes the legs of every stored batch, 1,000 rows at a time. Each leg is a payment of its own, `{paymentId}_{seq}`, with its allocation's card account, written in `ACCEPTED` with a `SCHEDULED` `ALLOC_LEG` row, and each batch records when its legs were written, so none is written twice. A declined parent is never released, so its batches are never written, and a cancelled one never got as far as asking.
 
-The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg on the Offline cluster, apart from the parent's clearing. A leg updates the AR balance and open-to-buy in parallel, then tells accounting, eBNC, risk, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB), then sends its RTF event and Raven message, and commits `PROCESSED`.
+The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg on the Offline cluster, apart from the parent's clearing. A leg updates the AR balance and open-to-buy in parallel (open-to-buy once Payment Instruments has returned the instrument's clear-text details), then tells accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier, then sends its RTF event and Raven message, and commits `PROCESSED`.
 
 Legs run at priority 2 with the parent's payment ID as their fairness key, and a per-key limit caps how fast any one parent's legs can go. At 100 legs a second, a 100K payment takes about 17 minutes without starving any other payment on the same queues.
 
@@ -71,6 +71,6 @@ Every 60 seconds the leg dispatcher counts each parent's legs. Once every batch 
 
 ## Volume
 
-Billpay plans for up to 50K corporate payments and 500K allocations a day, with up to 100K allocations in one payment. One workflow per leg handles that comfortably, so there is no separate chunk mode for big payments. 500K legs a day average about 200 Temporal writes a second on the Offline cluster. A single 100K payment, at 100 legs a second, adds about 3,400 writes a second for those 17 minutes, which the governor budgets like any other class.
+Billpay plans for up to 50K corporate payments and 500K allocations a day, with up to 100K allocations in one payment. One workflow per leg handles that comfortably, so there is no separate chunk mode for big payments. 500K legs a day average about 230 Temporal writes a second on the Offline cluster. A single 100K payment, at 100 legs a second, adds about 4,000 writes a second for those 17 minutes, which the governor budgets like any other class.
 
 The [Payment State Model](./payment-state-model.md#corporate-payments) has the rules in brief, and the [journeys](./journeys/index.md#corporate-payments) show both corporate flows step by step.

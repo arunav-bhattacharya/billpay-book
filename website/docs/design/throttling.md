@@ -16,7 +16,7 @@ Billpay calls clearing, Accounts Receivable and several other systems for every 
 
 Every downstream endpoint with an agreed rate gets its own activity task queue on the Offline cluster:
 
-`ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-comms` and `ds-allocations`.
+`ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms` and `ds-allocations`.
 
 Until each system's owner agrees a number, every one of them is taken at 100 calls a second. Payment Instruments and Payment Options have no limit, so calls to them run on the workflow's own queue.
 
@@ -67,7 +67,7 @@ Worker slots follow the limit, not the other way round. A queue needs roughly it
 
 ## Calls that must succeed
 
-Clearing, Accounts Receivable, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and Raven must all succeed before a payment is `PROCESSED`. None of them is skipped or deferred. A failed call retries within its activity's schedule-to-close limit; after that the Work Tracker row goes `FAILED` and the payment goes onto the exception list in its last state. RTF and Raven are the exception: they get a long limit, so an outage of either pauses payments where they are.
+Clearing, Accounts Receivable, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB), B2Notifier and Raven must all succeed before a payment is `PROCESSED`. None of them is skipped or deferred. A failed call retries within its activity's schedule-to-close limit; after that the Work Tracker row goes `FAILED` and the payment goes onto the exception list in its last state. RTF and Raven are the exception: they get a long limit, so an outage of either pauses payments where they are.
 
 - Raven is throttled like the rest. `ds-comms` carries its offline share, and a 429 waits out `Retry-After`.
 - RTF has no limit to respect, because RTF guarantees delivery once it has an event. Its calls run on the workflow's own queue, and each workflow announces one state change at a time, so a payment's events reach RTF in order.
@@ -103,7 +103,7 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
 | `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-expiry`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
-| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
+| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
 

@@ -530,6 +530,14 @@
   );
   box-shadow: 0 3px 12px color-mix(in srgb, var(--jm-wf) 45%, transparent);
 }
+/* A long workflow name wraps on a phone instead of pushing the page wide. */
+@media (max-width: 480px) {
+  .orchestrator {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
 :global([data-theme='dark']) .orchestrator {
   background: linear-gradient(
     140deg,

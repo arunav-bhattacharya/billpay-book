@@ -57,7 +57,8 @@ const SYSTEMS = {
   Risk: 'Risk platform, kept current with payment activity',
   TFNE: 'Transaction Notification Engine (TFNE), a legacy system told when a payment is processed',
   GPHDB: 'The legacy Payments History Database (GPHDB), told when a payment is processed',
-  'Payment Instruments': 'Payment Instruments, which owns and verifies the way a customer pays',
+  B2Notifier: 'B2Notifier, which tells other downstream systems when a payment is processed',
+  'Payment Instruments': 'Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need',
   'Payment Options': 'Payment Options, which resolves the amount a customer chose',
   Installments: 'Installments, which owns the instalment plan',
   Globestar: 'Globestar, which holds the instalment plan',
@@ -205,7 +206,7 @@ function StatePill({state, className}) {
   );
 }
 
-function SystemFan({systems, parallel}) {
+function SystemFan({systems, parallel, note}) {
   if (!systems || systems.length === 0) return null;
   return (
     <div className={styles.fan}>
@@ -218,7 +219,7 @@ function SystemFan({systems, parallel}) {
           </li>
         ))}
       </ul>
-      {parallel && systems.length > 1 && <p className={styles.fanNote}>at the same time</p>}
+      {parallel && systems.length > 1 && <p className={styles.fanNote}>{note || 'at the same time'}</p>}
     </div>
   );
 }
@@ -544,7 +545,7 @@ export default function JourneyMap({
                     </div>
                   )}
                   <div className={styles.fanCell} style={{'--col': i + 1}}>
-                    <SystemFan systems={step.systems} parallel={step.parallel} />
+                    <SystemFan systems={step.systems} parallel={step.parallel} note={step.fanNote} />
                   </div>
                 </React.Fragment>
               ))}

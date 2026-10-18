@@ -150,7 +150,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget outright. Persistenc
 ### The budget
 
 - Raise by 5%, but only after two calm checks in a row, because the metrics lag by about 30 seconds. Cut by multiplying by 0.8.
-- The budget is in Temporal writes per second, not workflow starts, because the database is the constraint. Each class is charged its measured cost per workflow: about 49 writes for a scheduled execution, 34 for a leg, 20 for a return.
+- The budget is in Temporal writes per second, not workflow starts, because the database is the constraint. Each class is charged its measured cost per workflow: about 55 writes for a scheduled execution, 40 for a leg, 20 for a return.
 - The PAID drain costs only about 20 Temporal writes per batch of 500 payments, but its weight falls on Oracle instead. So its rate is in payments a second, and the Oracle signals cut it first.
 - The ceiling is the writes per second the load test measured at 60% CPU.
 

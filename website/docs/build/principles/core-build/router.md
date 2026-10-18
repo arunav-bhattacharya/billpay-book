@@ -28,6 +28,7 @@ Every start produces a plan key, which the workflow receives, and a placement, w
 
 ```kotlin
 data class PlanKey(
+    val market: Market,                           // Proposed: so a market override can match
     val journey: Journey,
     val accountType: AccountType,                 // CONSUMER, CORPORATE or BUSINESS_TRAVEL
     val requiresArPosting: Boolean,               // the other four behaviors arrive resolved,
@@ -136,7 +137,7 @@ The version is the active one, with one exception. Provisioning tests a new vers
 
 ### 4. Pin the plan key
 
-The workflow gets the plan key as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages:
+The workflow gets the plan key as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages. The key carries the market as well as the behaviors (Proposed), because a market override is matched on the market:
 
 ```kotlin
 val stages = StageIndex.lookup(plan)              // inside the workflow

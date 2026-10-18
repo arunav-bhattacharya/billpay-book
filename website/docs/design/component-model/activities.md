@@ -1,6 +1,6 @@
 ---
 title: Activities
-description: "An activity makes the calls to one system, on that system's task queue. There is one activity interface per system, shared by every market."
+description: "An activity makes the calls to one system, on that system's task queue. Every system has one activity interface, shared by every market."
 sidebar_label: Activities
 ---
 
@@ -18,7 +18,7 @@ export const ACTIVITIES = [
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
     queue: "The workflow's queue: Payment Instruments has no rate limit",
-    calledBy: "Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid",
+    calledBy: "Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call",
   },
   {
     name: 'OptionsActivities',
@@ -64,14 +64,8 @@ export const ACTIVITIES = [
   },
   {
     name: 'TransactionNotificationActivities',
-    system: 'TFNE, the Transaction Notification Engine, a legacy system told when a payment is processed',
-    queue: 'ds-tfne',
-    calledBy: 'Fulfil, and every leg',
-  },
-  {
-    name: 'PaymentHistoryActivities',
-    system: 'GPHDB, the legacy Payments History Database, told when a payment is processed',
-    queue: 'ds-gphdb',
+    system: 'Three systems told when a payment is processed: TFNE, the Transaction Notification Engine; GPHDB, the legacy Payments History Database; and B2Notifier, which tells other downstream systems',
+    queue: 'ds-tfne, ds-gphdb and ds-b2notifier, one per system',
     calledBy: 'Fulfil, and every leg',
   },
   {
@@ -108,17 +102,19 @@ export const ACTIVITIES = [
 
 # Activities
 
-<Lead>An activity makes the calls to one system, on that system's task queue. There is one activity interface per system, shared by every market, and none of them vary by behavior.</Lead>
+<Lead>An activity makes the calls to one system, on that system's task queue. Every system has one activity interface, shared by every market, and none of them vary by behavior.</Lead>
 
 The task queue is how Billpay throttles. A downstream system with an agreed rate gets its own `ds-*` queue, and the queue's server-side rate limit holds across every pod, so the system never sees more than it agreed to. Calls that nobody throttles run on the workflow's own queue, and Oracle is reached only through `PaymentStore`, which runs inside the workflow task itself. [Throttling](../throttling.md) covers how the limits are set and changed.
 
-Activities take IDs, not payment objects, and load what they need. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
+Activities take IDs, not payment objects, and load what they need. Data from Payment Options and Payment Instruments is the one exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, such as Execute's open-to-buy call and Fulfil's notifications. Workflow history keeps it encrypted by the payload codec. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
 
 ## The catalogue
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself. The names of the TFNE and GPHDB interfaces and their queues are Proposed.
+`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself.
+
+`TransactionNotificationActivities` is the one interface that spans systems. TFNE, GPHDB and B2Notifier are all told the same news at the same moment, so they share an interface, but each gets a method of its own, and each method runs on its own system's queue, so every system keeps its own rate limit. The queue names are Proposed.
 
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 

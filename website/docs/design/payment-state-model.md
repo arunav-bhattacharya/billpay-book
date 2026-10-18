@@ -111,7 +111,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager. Batches may be arriving. | No |
 | `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once if it was paid today, at its execution time if it was scheduled. | No |
 | `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. | No |
-| `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB) have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
+| `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
 | `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date the market's rules set. | No |
 | `PAID` | Settled with the bank and posted to Accounts Receivable. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank sent the funds back. | Yes. A representment is a new row |

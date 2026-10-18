@@ -81,13 +81,13 @@ sequenceDiagram
     else ACCEPTED
       WF->>RTF: ACCEPTED event
       WF->>EXE: run
-      Note over EXE: clearing, AR and OTB in parallel
+      Note over EXE: clearing and AR in parallel with<br/>Instruments (clear text), then OTB
       rect rgba(102,169,226,0.40)
         EXE->>PS: state → PROCESSING
       end
       WF->>RTF: PROCESSING event
       WF->>FUL: run
-      Note over FUL: accounting, eBNC, risk,<br/>TFNE and GPHDB in parallel
+      Note over FUL: accounting, eBNC, risk, TFNE,<br/>GPHDB and B2Notifier in parallel
       FUL->>RTF: PROCESSED event
       FUL->>RAV: PROCESSED message
       rect rgba(102,169,226,0.40)
@@ -264,7 +264,7 @@ sequenceDiagram
     AD->>PS: claim due ALLOC_LEG<br/>rows, fair across parents
     AD->>R: start each leg through the Router
     Note over R,XW: admit, pin plan key, place on Offline: priority 2, the parent's ID as fairness key
-    Note over R,EXE: One ExecuteSplitPaymentWorkflow per leg, {paymentId}_{seq}-execute: AR and OTB, no clearing, then accounting, eBNC, risk, TFNE and GPHDB, then the leg's RTF event and Raven message, then PROCESSED
+    Note over R,EXE: One ExecuteSplitPaymentWorkflow per leg, {paymentId}_{seq}-execute: AR and OTB (OTB after the Instruments call), no clearing, then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then the leg's RTF event and Raven message, then PROCESSED
   end
 
   rect rgba(0,23,90,0.12)

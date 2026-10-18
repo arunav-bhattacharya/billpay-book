@@ -20,9 +20,39 @@ The Router runs the same six steps for every request.
 1. Admit the request. The market, account type and API must be live in this environment, which the Router checks against billpay-core's in-memory copy of the onboarding config, so admission adds no call. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them. One create is never refused: a create One-Data held while billpay-core was slow, which arrives after its market was taken out of service, is captured and declined instead, so the customer is told.
 2. Pick the journey from the routing table below.
 3. Resolve the behaviors from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel. Bank confirmation set to BOTH follows the request's payment method instead: a method that needs the customer to confirm at their bank gets Y.
-4. Pin the plan key: the journey, the resolved behaviors and the config version. The workflow looks up its stages from it at runtime (see [Principles](./principles.md#how-a-workflow-finds-its-stages)).
+4. Pin the plan key: the market, the journey, the resolved behaviors and the config version. The market is there so a market override can match (Proposed). The workflow looks up its stages from the key at runtime ([From profile to stages](#from-profile-to-stages) walks through one).
 5. Place the work: cluster, task queue, priority, fairness key and workflow ID.
 6. Start it in the journey's start mode.
+
+## From profile to stages
+
+A market and an account type never pick code directly. Their profile sets five behaviors, the Router resolves those for the journey, and the resolved behaviors pick the stage implementations. Follow one profile through.
+
+```mermaid
+flowchart LR
+  P["Profile<br/>market +<br/>account type"] --> R["Router<br/>behaviors<br/>to Y or N"]
+  R --> K["Plan key"]
+  K --> I["Stage index<br/>one class per step,<br/>most specific wins"]
+```
+
+Say a market's consumer profile sets AR posting to Y, mandate authorization to Y, bank confirmation to N, and realtime clearing to BOTH, with Y for pay today. Two payments from that profile resolve differently:
+
+| | Pay today, from a channel | Scheduled, on its due date |
+| --- | --- | --- |
+| Account type | Consumer | Consumer |
+| AR posting | Y | Y |
+| Realtime clearing | Y | N: every future-dated payment clears in batch |
+| Mandate authorization | Y | Y |
+| Bank confirmation | N | N |
+| Verify, or Reverify on the due date | `MandateVerifyStage` | Reverify's mandate implementation |
+| Execute | `RealtimeClearingExecuteStage` | `BatchClearingExecuteStage` |
+| Fulfil | The consumer Fulfil | The consumer Fulfil |
+
+*(An example. `MandateVerifyStage` is the spec's name; the other class names are illustrative.)*
+
+Each step runs one implementation, and that implementation does the whole step. The workflow calls Verify once. `MandateVerifyStage` calls Payment Options, Payment Instruments and the mandate check as activities, in parallel, then commits once. It doesn't call other stages, because a stage never calls another stage ([Call rules](./principles.md#call-rules)). The Options and Instruments calls every Verify makes are written once, in a helper each implementation calls, so nothing is copied.
+
+If this market ever needed a Verify rule of its own, an override in `market/{m}/stages/` would declare the same behaviors plus the market. That is a more specific match, so it would win for this market and no other, which is why the plan key carries the market (Proposed). A second market with the same profile runs exactly the same classes, with no code of its own.
 
 ## Start modes
 

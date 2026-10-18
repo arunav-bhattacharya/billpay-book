@@ -22,7 +22,7 @@ Every stage follows the same three beats.
 Two stages bend that order, for good reasons:
 
 - On the Online cluster, Capture and Verify commit back to back so the caller's answer isn't held up. Both announcements follow the reply, in order.
-- Fulfil sends its event and message before its commit, because `PROCESSED` means they have gone out. Comms go last, after accounting, eBNC, risk, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB), so the customer hears only once everything else has worked.
+- Fulfil sends its event and message before its commit, because `PROCESSED` means they have gone out. Comms go last, after accounting, eBNC, risk and the three notification systems (the Transaction Notification Engine, TFNE; the legacy Payments History Database, GPHDB; and B2Notifier), so the customer hears only once everything else has worked.
 
 Which changes send a Raven message is a market setting. By default they are `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED`. A market can change that default, and an account type can change its market's. Where both have a setting, the account type's wins. A change that is switched off sends no message, and Fulfil then waits for RTF alone.
 
@@ -99,13 +99,15 @@ Checks a scheduled payment again on its due date, with the same calls as Verify,
 
 Moves the money and commits `PROCESSING`. Three calls go out in parallel, each on its own rate-limited queue: clearing (MR/M3), the AR balance (GAR) and open-to-buy (AMP).
 
+Open-to-buy needs the instrument's details in clear text, which Billpay never stores. So that branch starts with a call to Payment Instruments for them, and only then calls AMP. Clearing and AR don't wait for it. The same details stay in the workflow for Fulfil, whose notifications need them too, and workflow history keeps them encrypted by the payload codec.
+
 - A corporate parent clears once, at payment level, and makes no AR or open-to-buy call. The same commit sets `legs_released_at`, which tells the leg dispatcher to write and start its legs, and each leg makes those two calls.
 - A corporate leg updates the AR balance and open-to-buy only. It never clears.
 - A consumer leg also clears.
 
 ## Fulfil
 
-Tells everyone who needs to know, then commits `PROCESSED`. Accounting, eBNC, risk, TFNE and GPHDB run in parallel. Then the RTF event and the Raven message go out, and only then does the commit happen. For a scheduled payment, the same commit marks its `SCHED_EXEC` row `DONE`. A corporate parent has no Fulfil: Execute's commit marks its `ALLOC_EXEC` row `DONE`, and the leg dispatcher's completion check moves it to `PROCESSED` once every leg is done. A consumer split's parent has none either: its legs run Fulfil, and the parent commits `PROCESSED` once every leg has finished.
+Tells everyone who needs to know, then commits `PROCESSED`. Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier run in parallel. B2Notifier is a notification system that passes the news on to other downstream systems, and the three notification calls use the clear-text details Execute fetched. Then the RTF event and the Raven message go out, and only then does the commit happen. For a scheduled payment, the same commit marks its `SCHED_EXEC` row `DONE`. A corporate parent has no Fulfil: Execute's commit marks its `ALLOC_EXEC` row `DONE`, and the leg dispatcher's completion check moves it to `PROCESSED` once every leg is done. A consumer split's parent has none either: its legs run Fulfil, and the parent commits `PROCESSED` once every leg has finished.
 
 ## RequestAllocations
 

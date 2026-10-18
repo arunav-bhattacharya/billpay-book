@@ -67,8 +67,9 @@ export const IFACES = [
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
     fails: 'decline',
+    failsAt: {Execute: 'must'},
     queue: "the workflow's queue",
-    at: ['Verify', 'Reverify', 'Represent'],
+    at: ['Verify', 'Reverify', 'Execute', 'Represent'],
     note: 'it has no rate limit',
   },
   {
@@ -118,19 +119,12 @@ export const IFACES = [
   {name: 'RiskActivities', system: 'Risk', fails: 'must', queue: 'ds-risk', at: ['Fulfil']},
   {
     name: 'TransactionNotificationActivities',
-    system: 'TFNE',
-    long: 'TFNE, the Transaction Notification Engine',
+    system: 'TFNE, GPHDB, B2Notifier',
+    long: 'TFNE, the Transaction Notification Engine; GPHDB, the legacy Payments History Database; and B2Notifier, which tells other downstream systems',
     fails: 'must',
-    queue: 'ds-tfne',
+    queue: 'ds-tfne, ds-gphdb, ds-b2notifier',
     at: ['Fulfil'],
-  },
-  {
-    name: 'PaymentHistoryActivities',
-    system: 'GPHDB',
-    long: 'GPHDB, the legacy Payments History Database',
-    fails: 'must',
-    queue: 'ds-gphdb',
-    at: ['Fulfil'],
+    note: 'one method and one queue per system',
   },
   {name: 'AllocationActivities', system: 'Allocations manager', queue: 'ds-allocations', at: ['RequestAllocations']},
   {
@@ -667,6 +661,7 @@ export const BANDS = [
               'Execute|ClearingActivities': {kind: 'call', note: 'once, for the parent'},
               'Execute|ReceivablesActivities': {kind: 'skip', note: 'per leg instead'},
               'Execute|AuthorizationActivities': {kind: 'skip', note: 'per leg instead'},
+              'Execute|InstrumentActivities': {kind: 'skip', note: 'per leg instead, before open-to-buy'},
             },
             stop: {
               title: 'No Fulfil for a corporate parent.',
@@ -992,6 +987,9 @@ export function calls(j, f) {
       }
     }
     if (f.name === 'BankConfirmationActivities') note = 'for the redirect link';
+    if (f.name === 'InstrumentActivities' && s === 'Execute') {
+      note = 'first, for the clear-text details open-to-buy and the notifications need';
+    }
     out[s] = note ? {kind, note} : {kind};
   });
   return out;
@@ -1041,6 +1039,9 @@ function runsOn(j, f) {
     return "One-Data's inbox functions, on the workflow's own queue, since nobody throttles them.";
   }
   const sys = f.long || f.system;
+  if (f.name === 'TransactionNotificationActivities' && j.cluster !== 'Online') {
+    return 'One method per system, each on its own queue: TFNE on ds-tfne, GPHDB on ds-gphdb and B2Notifier on ds-b2notifier. The governor sets each queue\'s rate limit, so each system keeps its own.';
+  }
   if (j.cluster === 'Online') return `${sys}, on online-wf, the Online cluster's main task queue. Online calls are capped only while a SEPA run needs the room.`;
   if (f.queue.startsWith('ds-')) {
     return `${sys}, on ${f.queue}. The governor sets that queue's rate limit, so it is the one choke point for ${f.system}.`;
@@ -1076,7 +1077,11 @@ export function callDetail(j, f, s, c) {
     /* the call's own note is already on its line, so it is not repeated */
     out.push(`The child ${j.childWf} makes this call.`);
   }
-  if (f.fails && !(s && c.kind === 'skip')) out.push(FAILS[f.fails]);
+  const fails = (s && f.failsAt && f.failsAt[s]) || f.fails;
+  if (fails && !(s && c.kind === 'skip')) out.push(FAILS[fails]);
+  if (f.name === 'InstrumentActivities' && s === 'Execute' && c.kind !== 'skip') {
+    out.push('The details stay in the workflow for Fulfil, and its history keeps them encrypted by the payload codec.');
+  }
   if (s) {
     const cl = calls(j, f);
     const also = Object.keys(cl).filter((t) => t !== s && cl[t].kind !== 'skip');

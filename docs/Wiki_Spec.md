@@ -273,7 +273,7 @@ Consumer and corporate payments share one set of states. A corporate payment add
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager; batches may be arriving. | No |
 | `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once for pay today, at its execution time for a scheduled payment. | No |
 | `PROCESSING` | Being executed: clearing with the bank, the AR balance reduced, open-to-buy raised. | No |
-| `PROCESSED` | Clearing, AR, OTB, accounting, eBNC, risk, TFNE and GPHDB have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
+| `PROCESSED` | Clearing, AR, OTB, accounting, eBNC, risk, TFNE, GPHDB and B2Notifier have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
 | `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date market rules set. | No |
 | `PAID` | Settled and posted to Accounts Receivable. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank returned the funds. | Yes. A representment is a new row |
@@ -507,7 +507,7 @@ A stage is one business step, named after the journey step it performs. It retur
 After the commit, the workflow calls the stage's announcement: an RTF lifecycle event for every state change, plus a Raven message where the customer is told. Which status changes send a Raven message is a market setting ([Operations settings](#operations-settings)); a status that is switched off sends none, and Fulfil then waits for RTF alone. The workflow waits for it before the next stage, so each payment's events reach RTF in order. Two exceptions:
 
 - On the Online cluster, Capture and Verify commit back to back so the caller's answer isn't held up. Both announcements follow the reply, in order.
-- Fulfil sends its event and message before its commit, because `PROCESSED` means they have gone out. Comms go last, after accounting, eBNC, risk, TFNE and GPHDB.
+- Fulfil sends its event and message before its commit, because `PROCESSED` means they have gone out. Comms go last, after accounting, eBNC, risk, TFNE, GPHDB and B2Notifier.
 
 | Stage | Moves | Varies by |
 | --- | --- | --- |
@@ -515,7 +515,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment with its `CONFIRM_EXPIRY` row. `PENDING` → `DECLINED` when the provider gives no link. For a go-ahead, no provider call: the `CONFIRM_EXPIRY` row and the IDs the customer was shown | What the payment waits for: the bank, or a go-ahead |
 | Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | All four behaviors; at confirm, what the payment waited for |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
-| Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
+| Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls. The open-to-buy call first waits for the instrument's clear-text data from Payment Instruments (agreed 2026-10-18) | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | `SCHEDULED`, or `ACCEPTED` for pay today, → `ALLOCATING` | Nothing |
 | ReceiveAllocations | `ALLOCATING` → `ALLOCATED` once the batches add up, with the payment's `ALLOC_EXEC` row; earlier batches change no state | Nothing |
@@ -529,7 +529,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 
 ### Plan keys and stage lookup
 
-- The Router pins a **plan key** at start: the journey, the resolved behaviors and the market's config version.
+- The Router pins a **plan key** at start: the market, the journey, the resolved behaviors and the market's config version. The market is there so a market override can match (Proposed, 2026-10-18).
 - A KSP-built index maps each behavior combination to its stage implementations, and the most specific match wins. A market override is a more specific match for that market. The workflow reads its plan key and looks up its stages at runtime; stage objects are never passed into a workflow.
 - The same index produces the build's **capability manifest**: every combination the build can run. Provisioning checks each market profile against it.
 - Every combination has a default implementation. A combination with no implementation cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
@@ -539,7 +539,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 
 - Workflows and stages are never `abstract`: composition over inheritance.
 - There is one implementation of each workflow. Workflows are composed from different stage implementations, never copied per market.
-- Activities are shared across markets. Pass IDs, not payment objects; activities load what they need.
+- Activities are shared across markets. Pass IDs, not payment objects; activities load what they need. The one exception is data from Payment Options and Payment Instruments: what a stage gets there, clear text included, travels in the workflow to the later calls of the same run that need it, such as Execute's and Fulfil's. Workflow history holds it encrypted by the payload codec (agreed 2026-10-18).
 - Set search attributes once, at start. No signals or queries on the hot path.
 - Every HTTP call carries an idempotency key such as `{paymentId}-{step}`. Every Oracle write is insert-if-absent or a conditional update on the current state, because local activities run again if a worker dies mid-task and any activity can be retried after a timeout even when its call went through.
 
@@ -597,8 +597,8 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 - **Capture:** `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`).
 - **Verify:** `ACCEPTED` or `DECLINED`, in one guarded commit. The caller's update returns here.
 - If `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
-- **Execute:** `PROCESSING`. Clearing, AR and OTB run in parallel, varied by account type, AR posting and realtime clearing.
-- **Fulfil:** `PROCESSED`. Accounting, eBNC, risk, TFNE and GPHDB run in parallel; then the RTF event and the Raven message; then the commit. TFNE, the Transaction Notification Engine, and GPHDB, the legacy Payments History Database, are legacy downstreams told when a payment moves from `PROCESSING` to `PROCESSED`, so `PROCESSED` waits for both (agreed 2026-10-18). Comms go last, so the customer hears only once everything else has succeeded.
+- **Execute:** `PROCESSING`. Clearing, AR and OTB run in parallel, varied by account type, AR posting and realtime clearing. OTB first waits for an `InstrumentActivities` call that fetches the instrument's clear-text data; clearing and AR don't wait for it (agreed 2026-10-18).
+- **Fulfil:** `PROCESSED`. Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier run in parallel; then the RTF event and the Raven message; then the commit. TFNE, the Transaction Notification Engine, and GPHDB, the legacy Payments History Database, are legacy downstreams told when a payment moves from `PROCESSING` to `PROCESSED`, and B2Notifier is a downstream notification system that tells other downstream systems; `PROCESSED` waits for all three, and all three take the clear-text data Execute fetched (agreed 2026-10-18). Comms go last, so the customer hears only once everything else has succeeded.
 - **Consumer split:** Verify's `ACCEPTED` commit writes the split legs, and each runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster. The parent doesn't clear, since its legs clear on their own. Once every leg has finished, the parent sends its RTF event and Raven message and commits `PROCESSED`, as the corporate completion check does (agreed 2026-10-18).
 - **Corporate:** Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step, the same way as for a scheduled corporate payment (see [Corporate Allocations](#corporate-allocations)).
 - **Bank confirmation:** when `requiresBankConfirmation` resolves to Y, **RequestConfirmation** runs after Capture in place of Verify. It asks the market's provider for the customer's redirect link, with one try that fits inside the API's wait, then commits the link and the provider's reference on the payment, with its `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. If the provider gives no link, because it is down or too slow, the same workflow commits `DECLINED` and the caller gets `DECLINED` instead. No payment is left `PENDING` without a link, so capture writes no expiry row (agreed 2026-10-18). Nothing waits in Temporal while the customer is on the provider's site: `ConfirmPaymentWorkflow` takes over when the caller confirms. The provider only checks the customer's bank details and never moves money; Billpay moves it in Execute, after the confirm (agreed 2026-10-18).
@@ -626,8 +626,8 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 > `{paymentId}_{seq}-execute` · Offline for corporate legs; the parent's cluster for consumer splits
 
-- **Execute:** AR balance and OTB in parallel. Consumer legs also clear; corporate legs never clear per allocation.
-- **Fulfil:** accounting, eBNC, risk, TFNE and GPHDB, then the leg's RTF event and Raven message, then `PROCESSED`.
+- **Execute:** AR balance and OTB in parallel, OTB once the Instruments call has returned the clear-text data. Consumer legs also clear; corporate legs never clear per allocation.
+- **Fulfil:** accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then the leg's RTF event and Raven message, then `PROCESSED`.
 - Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment cannot starve the others.
 
 #### 5. RequestAllocationsWorkflow
@@ -738,7 +738,9 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
             if (decided == PaymentDecision.DECLINED) stages.requestConfirmation.announce(paymentId)
             return
         }
-        decided = stages.verify.run(paymentId)         // ACCEPTED or DECLINED, one guarded commit
+        val verified = stages.verify.run(paymentId)    // ACCEPTED or DECLINED, one guarded commit,
+                                                       // with what Options and Instruments returned
+        decided = verified.decision
         // The caller's update has its answer here. Announce both changes, in order.
         stages.capture.announce(paymentId)             // the PENDING event to RTF
         stages.verify.announce(paymentId)              // the decision to RTF, and to Raven where the customer is told
@@ -747,9 +749,10 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
         // and dispatchers start every later step.
         if (plan.accountType == AccountType.CORPORATE) return
 
-        stages.execute.run(paymentId)                  // PROCESSING: clearing, AR and OTB in parallel
+        // Data from Options and Instruments travels on in the workflow, encrypted in history by the payload codec.
+        val executed = stages.execute.run(paymentId, verified)  // PROCESSING: clearing, AR, and the Instruments call, then OTB
         stages.execute.announce(paymentId)             // the PROCESSING event
-        stages.fulfil.run(paymentId)                   // accounting, eBNC, risk, TFNE, GPHDB; then RTF and Raven; then PROCESSED
+        stages.fulfil.run(paymentId, executed)         // accounting, eBNC, risk, TFNE, GPHDB, B2Notifier; then RTF and Raven; then PROCESSED
     }
 
     override fun decision(): PaymentDecision {
@@ -801,12 +804,12 @@ Billpay pulls PAID work at its own pace. A Temporal Schedule starts this workflo
 
 ## Activities
 
-One activity interface per system, each on that system's task queue. Lifecycle events (RTF) and customer messages (Raven) are activities like the rest.
+One activity interface per system, each on that system's task queue, with one exception: `TransactionNotificationActivities` covers three notification systems, one method each, and each method runs on its own system's queue (agreed 2026-10-18). Lifecycle events (RTF) and customer messages (Raven) are activities like the rest.
 
 | Interface | System | Task queue | Called by |
 | --- | --- | --- | --- |
 | `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update |
-| `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid |
+| `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call (agreed 2026-10-18) |
 | `OptionsActivities` | Payment Options | The workflow's queue: Payment Options has no rate limit | Verify, Reverify, Represent |
 | `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
@@ -814,8 +817,7 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 | `AccountingActivities` | Accounting | `ds-accounting` | Fulfil, and every leg |
 | `BalanceControlActivities` | eBNC (Balance & Control) | `ds-ebnc` | Fulfil, and every leg |
 | `RiskActivities` | Risk | `ds-risk` | Fulfil, and every leg |
-| `TransactionNotificationActivities` (Proposed name) | TFNE, the Transaction Notification Engine: a legacy downstream told when a payment moves from `PROCESSING` to `PROCESSED` (agreed 2026-10-18) | `ds-tfne` (Proposed) | Fulfil, and every leg |
-| `PaymentHistoryActivities` (Proposed name) | GPHDB, the legacy Payments History Database: told when a payment moves from `PROCESSING` to `PROCESSED` (agreed 2026-10-18) | `ds-gphdb` (Proposed) | Fulfil, and every leg |
+| `TransactionNotificationActivities` | Three systems told when a payment moves from `PROCESSING` to `PROCESSED`: TFNE, the Transaction Notification Engine; GPHDB, the legacy Payments History Database; and B2Notifier, a downstream notification system that tells other downstream systems (agreed 2026-10-18) | `ds-tfne`, `ds-gphdb` and `ds-b2notifier` (Proposed): one per system, each with its own limit | Fulfil, and every leg |
 | `AllocationActivities` | Allocations manager | `ds-allocations` | RequestAllocations |
 | `BankConfirmationActivities` | The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK | The workflow's queue: only the Online cluster calls it | RequestConfirmation, for the redirect link. Verify doesn't call it: the provider verifies the customer's bank details itself |
 | `InboxActivities` | One-Data's inbox functions, event handlers and delete API | The workflow's own queue: nobody throttles them | `ProcessPaidEventsWorkflow`, to fetch and to mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create's workflow at its end, and the confirm or cancel that ends a payment's wait, for the delete (Proposed: One-Data's one activity interface makes this call too) |
@@ -909,7 +911,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 1. **Admit.** The market, account type and API must be live in this environment, checked against billpay-core's in-memory copy of the onboarding config, so admission adds no call; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. A held create that arrives after its market was taken out of service is captured and declined instead ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). A Work Tracker row is refused only if its market was taken out of service after the row was written: its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
 2. **Pick the journey** from the routing table.
 3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
-4. **Pin the plan key:** the journey, the resolved behaviors and the config version. When One-Data sends a create with other pending payments' IDs, the plan key also marks that the payment waits for a go-ahead, so the stage index picks RequestConfirmation's and Verify's go-ahead implementations (Proposed).
+4. **Pin the plan key:** the market, the journey, the resolved behaviors and the config version (the market Proposed, 2026-10-18, so a market override can match). When One-Data sends a create with other pending payments' IDs, the plan key also marks that the payment waits for a go-ahead, so the stage index picks RequestConfirmation's and Verify's go-ahead implementations (Proposed).
 5. **Place:** cluster, task queue, priority, fairness key and workflow ID. While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
 6. **Start** with the journey's start mode.
 
@@ -1185,7 +1187,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget instead. Persistence
 **The budget**
 
 - Raise by 5%, but only after two calm checks, because metrics lag about 30 s. Cut ×0.8.
-- The budget is in Temporal writes per second, not starts, because the DB is the constraint. Each class is charged its measured cost per workflow: about 49 for execution, 34 for a leg, 20 for a return. The PAID drain costs about 20 per batch of 500; its weight falls on Oracle instead, so its rate is in payments a second and the Oracle signals cut it first.
+- The budget is in Temporal writes per second, not starts, because the DB is the constraint. Each class is charged its measured cost per workflow: about 55 for execution, 40 for a leg, 20 for a return. The PAID drain costs about 20 per batch of 500; its weight falls on Oracle instead, so its rate is in payments a second and the Oracle signals cut it first.
 - The ceiling is the writes/s the load test measured at 60% CPU.
 
 **Handing it out, in order**
@@ -1221,9 +1223,9 @@ Each downstream sees at most its agreed TPS. The two clusters share it by use, n
 
 Until each downstream's owner agrees its own number, every downstream is taken at 100 TPS. Payment Instruments and Payment Options have no limit, so their calls run on the workflow's own queue (agreed 2026-10-17).
 
-### Must-succeed calls: clearing, AR, OTB, accounting, eBNC, risk, TFNE, GPHDB, Raven
+### Must-succeed calls: clearing, AR, OTB, accounting, eBNC, risk, TFNE, GPHDB, B2Notifier, Raven
 
-- **One choke point.** One activity task queue per downstream endpoint on the Offline cluster: `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-comms` and `ds-allocations`. Its server-side rate limit is the overall limit for the queue, across all pods. The governor changes it at runtime through the task queue config API.
+- **One choke point.** One activity task queue per downstream endpoint on the Offline cluster: `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms` and `ds-allocations`. Its server-side rate limit is the overall limit for the queue, across all pods. The governor changes it at runtime through the task queue config API.
 - **Online's use, measured (OK for now, 2026-10-18).** Online's calls share one queue, so Temporal can't count them per downstream. Online workers count their calls and 429s per downstream, and billpay-core publishes them with its other metrics. The Prometheus server that scrapes Temporal's metrics scrapes billpay-core's pods too, and the governor reads Online's use as the peak of the last minute. That server has to be sized for the extra volume; how to scale it is a separate discussion ([Open Items](#open-items)).
 - **Offline share** = agreed TPS − Online's use − headroom, recomputed every 15 s. There is no fixed split: with an agreed TPS of 100, Online at 25 leaves Offline 65, Online at 80 leaves it 10, and an idle Online leaves it 90.
 - **Headroom (OK for now, 2026-10-18; to revisit).** Offline reacts up to about 45 s late. The governor checks every 15 s, and the numbers it reads are about 30 s old: the scrape interval plus the window a rate is computed over. So after Online's traffic jumps, Offline can keep its old share for up to 45 s, and the headroom has to cover the biggest rise Online can make in that time. It is the larger of 10% of the agreed TPS and the biggest rise in Online's use within 45 s over the last 4 weeks and in the load test, and it is the online margin in `downstream_limit`. A faster scrape shortens the lag, and the headroom with it.
@@ -1280,7 +1282,7 @@ A corporate payment fetches its allocations before it moves money, and no workfl
 - **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`), once or several times, with batches numbered per payment. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch and writes no legs. Once the batches add up to the payment amount, one guarded commit moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row: due at once for pay today, or at the execution time on the due date for a scheduled payment (at once, if that time has passed).
 - **Execute.** The allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow` for both kinds. A scheduled payment is reverified first (`ALLOCATED` → `ACCEPTED`, or `DECLINED`); pay today skips Reverify. Execute clears the parent once, at payment level (→ `PROCESSING`), and makes no AR or open-to-buy call: the legs do. Its commit marks the legs released. There is no Fulfil.
 - **Release.** The leg dispatcher writes the legs of every stored batch as `{paymentId}_{seq}` in `ACCEPTED`, each with its allocation's card account, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` row. A declined parent is never released, so its batches are never written.
-- **Legs.** Each runs `ExecuteSplitPaymentWorkflow`, apart from the parent's clearing: AR balance and OTB in parallel, then accounting, eBNC, risk, TFNE and GPHDB, then RTF and Raven. Clearing never runs per allocation.
+- **Legs.** Each runs `ExecuteSplitPaymentWorkflow`, apart from the parent's clearing: AR balance and OTB in parallel (OTB after the Instruments call), then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then RTF and Raven. Clearing never runs per allocation.
 - **Fairness.** Legs run at priority 2 with the parent's ID as fairness key and a per-key limit. At 100 legs a second, a 100K payment takes about 17 minutes without starving other payments.
 - **Completion.** The leg dispatcher counts each parent's legs by status every 60 s. The parent turns `PROCESSED`, by a guarded update, once it has cleared, every batch has its legs, and every leg is `PROCESSED` or `PAID`; the check sends the parent's RTF event and Raven message first. Its legs turn `PAID` one by one through Settle, each once the parent has settled and the leg's AR posting is in; the parent stays `PROCESSED`. A leg whose retries run out goes on the exception list, and its parent stays `PROCESSING` until operations resolve it.
 - **Late allocations.** A payment still `ALLOCATING` at the market's alert point raises an alert. Nothing clears and no leg runs until the last batch arrives; a scheduled payment already past its execution time then executes at once.
@@ -1400,7 +1402,7 @@ One Offline namespace serves all markets, with market as a fairness key, so each
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
 | `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-expiry`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
-| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
+| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
 
 Queue limits are set through the task queue config API, for example:
 
@@ -1458,27 +1460,27 @@ Every number here is an estimate from the write model; load-test run 1 measures 
 
 | Workflow | Writes per workflow |
 | --- | --- |
-| Scheduled execution | ≈49 |
+| Scheduled execution | ≈55 |
 | Return | ≈20 |
-| Leg | ≈34 |
+| Leg | ≈40 |
 | AR batch intake | ≈24 |
 | PAID drain | ≈20 per batch of 500 payments |
 
-An announcement costs about 4 writes, or about 7 when RTF and Raven go together, so announcements are about 15 of an execution's 49.
+An announcement costs about 4 writes, or about 7 when RTF and Raven go together, so announcements are about 15 of an execution's 55. Execute's Instruments call before OTB adds about 4, and B2Notifier in Fulfil about 2 (2026-10-18).
 
 | Window | Work | Rate | Offline writes/s |
 | --- | --- | --- | --- |
-| SEPA, 23:00 to 02:00 UTC | DE and IT execution | 56 TPS | ≈2,750 |
-| US, from 07:01 UTC | US execution | 50 to 100 TPS | 2,450 to 4,900 |
+| SEPA, 23:00 to 02:00 UTC | DE and IT execution | 56 TPS | ≈3,100 |
+| US, from 07:01 UTC | US execution | 50 to 100 TPS | 2,750 to 5,500 |
 | Any time | AR batch intake, whenever AR sends it | 100 TPS | ≈2,400 |
 | Any time | Returns, at the full burst | 100 TPS | ≈2,000 |
-| Any time | Corporate legs, paced | 100 a second | ≈3,400 |
+| Any time | Corporate legs, paced | 100 a second | ≈4,000 |
 | US early morning, last priority | The PAID drain, as AR posting events arrive | Up to about 1,000 payments a second | ≈40 |
 
-- The worst overlap (US at 100 TPS, AR intake, a returns burst and corporate legs at once) needs about 12,700 writes/s. AR can send at any time, so it is counted in (agreed 2026-10-18). The governor still keeps the total under its ceiling: past it, the classes further down its order wait.
+- The worst overlap (US at 100 TPS, AR intake, a returns burst and corporate legs at once) needs about 13,900 writes/s. AR can send at any time, so it is counted in (agreed 2026-10-18). The governor still keeps the total under its ceiling: past it, the classes further down its order wait.
 - Dispatchers and the governor add under 10 writes/s.
 - The PAID drain is light on Temporal and heavy on Oracle: at full speed it adds about 2,000 Oracle writes/s, an update and a timeline insert per payment or leg. That is why the governor gives it budget last and the Oracle signals cut it first.
-- 500K legs a day average about 200 writes/s. A 100K payment at 100 legs a second adds about 3,400 writes/s for about 17 minutes.
+- 500K legs a day average about 230 writes/s. A 100K payment at 100 legs a second adds about 4,000 writes/s for about 17 minutes.
 - **Offline DB size.** Load-test run 2 measures writes/s at 60% CPU on 64 and on 192 vCPU. If 64 vCPU covers the worst overlap, Offline starts there and keeps 192 as headroom.
 - **Downstream demand.** Calls per second to a downstream = the sum over classes of rate × calls per workflow to it. US execution at 100 TPS calling clearing once needs 100 RPS of clearing's offline share. During a SEPA run, Online is capped at a downstream's agreed TPS less the run's need, so an agreed TPS that covers Online's evening peak plus the run's need (about 56 RPS of clearing) keeps Online uncapped.
 

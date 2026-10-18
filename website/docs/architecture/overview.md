@@ -70,7 +70,7 @@ export const GROUPS = [
         title: 'External Systems',
         role: 'Where the money and the side effects land',
         icon: 'external',
-        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider'],
+        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider'],
       },
     ],
   },
@@ -108,7 +108,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. A request a dispatcher pulled is marked `REJECTED` instead, and only operations hear of it. An allocation callback over its budget gets 429 with `Retry-After`.
 2. Pick the journey from the routing table.
 3. Resolve the behaviors from the market's active release. A behavior set to BOTH becomes Y or N for this journey.
-4. Pin the plan key: the journey, the resolved behaviors and the config version.
+4. Pin the plan key: the market, the journey, the resolved behaviors and the config version (the market is Proposed, so a market's own override can be found).
 5. Place the work: cluster, task queue, priority and workflow ID.
 6. Start it. When a caller is waiting that means Update-With-Start: the caller gets the payment's state back, the decision once Verify has made it or `PENDING` until then, while the workflow carries on. When nobody is waiting, a dispatcher starts it at the governor's pace, as dated work falls due in Oracle or as it pulls requests from One-Data's inbox. Only an allocation callback is an async start, answered 202 once the workflow exists.
 
@@ -120,8 +120,8 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 
 ### External systems
 
-- Clearing moves the money out to the customer's bank. Accounts Receivable reduces the statement balance, and Authorization raises open-to-buy. These three run in parallel in the Execute stage.
-- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, together with two legacy systems that need to know a payment is done: the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB). Last of all come the customer's message (Raven) and the lifecycle event other systems consume (RTF). All ten must succeed before the payment is `PROCESSED`.
+- Clearing moves the money out to the customer's bank. Accounts Receivable reduces the statement balance, and Authorization raises open-to-buy. These three run in parallel in the Execute stage. Authorization needs the payment instrument's details in clear text, so its call waits for Payment Instruments to supply them.
+- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, together with three notification systems that need to know a payment is done: two legacy ones, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB), and B2Notifier, which passes the news on to other downstream systems. Last of all come the customer's message (Raven) and the lifecycle event other systems consume (RTF). All eleven must succeed before the payment is `PROCESSED`.
 - Every other state change sends its lifecycle event, and a customer message where one is due, straight after its commit. A workflow waits for them before its next step, so each payment's events arrive in order.
 - A corporate payment asks the allocations manager for its breakdown first, and the allocations arrive by callback. Once they are all in, the payment clears once, at payment level, and each allocation then posts as a leg of its own.
 - A payment the customer confirms at their bank asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for a redirect link first. The payment waits at `PENDING` until the caller confirms it, and only then is it verified and executed.

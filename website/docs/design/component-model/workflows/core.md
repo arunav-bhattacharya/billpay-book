@@ -24,8 +24,8 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 1. Capture writes `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`). One that comes after the workflow has closed starts a new run, and Capture's check decides what it does ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)).
 2. Verify decides `ACCEPTED` or `DECLINED` in one guarded commit, and the caller's update returns here. The announcements for both changes follow the reply, in order.
 3. If the payment is `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
-4. Execute moves it to `PROCESSING`: clearing, AR and open-to-buy in parallel.
-5. Fulfil runs accounting, eBNC, risk, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB) in parallel, then sends the RTF event and the Raven message, then commits `PROCESSED`. TFNE and GPHDB are legacy systems that need to know when a payment is processed. Comms go last, so the customer hears only once everything else has worked.
+4. Execute moves it to `PROCESSING`: clearing, AR and open-to-buy in parallel. Open-to-buy first fetches the instrument's clear-text details from Payment Instruments, and Fulfil reuses them.
+5. Fulfil runs accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier in parallel, then sends the RTF event and the Raven message, then commits `PROCESSED`. TFNE and GPHDB are legacy systems that need to know when a payment is processed, and B2Notifier passes the news on to other downstream systems. Comms go last, so the customer hears only once everything else has worked.
 
 A consumer split payment's legs are written by Verify's `ACCEPTED` commit, and each leg runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster. The parent doesn't clear, because its legs clear on their own. Once every leg has finished, the parent sends its RTF event and Raven message and commits `PROCESSED`, the same way a corporate parent completes.
 
@@ -67,8 +67,8 @@ For a corporate payment, Execute clears the parent once, at payment level, and m
 
 `ExecuteSplitPaymentWorkflow` runs one leg of a split payment. Consumer legs run on their parent's cluster; corporate legs run only on the Offline cluster.
 
-1. Execute updates the AR balance and open-to-buy in parallel. Consumer legs also clear. Corporate legs never clear per allocation; the parent clears once, as a whole, at payment level.
-2. Fulfil runs accounting, eBNC, risk, TFNE and GPHDB, then sends the leg's RTF event and Raven message, then commits `PROCESSED`.
+1. Execute updates the AR balance and open-to-buy in parallel, open-to-buy once Payment Instruments has returned the clear-text details. Consumer legs also clear. Corporate legs never clear per allocation; the parent clears once, as a whole, at payment level.
+2. Fulfil runs accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then sends the leg's RTF event and Raven message, then commits `PROCESSED`.
 
 Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment can't starve the others. Each leg turns `PAID` on its own later, once it has posted and its parent has settled.
 

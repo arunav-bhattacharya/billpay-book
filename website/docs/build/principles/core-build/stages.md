@@ -18,8 +18,8 @@ Every stage is a `{Step}Stage` interface with two functions. `run` does the step
 
 ```kotlin
 interface ExecuteStage {
-    fun run(paymentId: String): ExecuteOutcome     // PROCESSING, after the calls succeed
-    fun announce(paymentId: String)                // the PROCESSING event
+    fun run(paymentId: String, verified: VerifyOutcome): ExecuteOutcome  // PROCESSING, after the calls succeed
+    fun announce(paymentId: String)                                      // the PROCESSING event
 }
 ```
 
@@ -27,26 +27,32 @@ The implementations are named for the behavior they serve, never for a market. `
 
 ## Writing run
 
-A stage makes its calls first, in parallel wherever they don't depend on each other, and then commits once. Here is the Execute for a consumer payment, which clears, posts to Accounts Receivable (AR) and raises open-to-buy at the same time:
+A stage makes its calls first, in parallel wherever they don't depend on each other, and then commits once. Here is the Execute for a consumer payment, which clears, posts to Accounts Receivable (AR) and raises open-to-buy at the same time. Open-to-buy needs the instrument's details in clear text, so its branch asks Payment Instruments first, and `thenCompose` chains the two without holding up clearing and AR:
 
 ```kotlin
 class RealtimeClearingExecuteStage(
     private val clearing: ClearingActivities,
     private val receivables: ReceivablesActivities,
+    private val instruments: InstrumentActivities,   // Payment Instruments, no rate limit
     private val authorization: AuthorizationActivities,
-    private val store: PaymentStore,               // a local activity
-    private val events: LifecycleEventActivities,  // RTF
+    private val store: PaymentStore,                 // a local activity
+    private val events: LifecycleEventActivities,    // RTF
 ) : ExecuteStage {
 
-    override fun run(paymentId: String): ExecuteOutcome {
+    override fun run(paymentId: String, verified: VerifyOutcome): ExecuteOutcome {
+        val details = Async.function(instruments::clearTextDetails, paymentId)
+        val openToBuy = details.thenCompose { d -> Async.function(authorization::raiseOpenToBuy, paymentId, d) }
         Promise.allOf(
             Async.function(clearing::clear, paymentId),
             Async.function(receivables::reduceBalance, paymentId),
-            Async.function(authorization::raiseOpenToBuy, paymentId),
+            openToBuy,
         ).get()
         // One commit: the guarded move, the timeline row with the cluster,
         // and any Work Tracker rows this step opens or closes.
-        return store.commitExecute(paymentId, expected = ACCEPTED, next = PROCESSING)
+        val outcome = store.commitExecute(paymentId, expected = ACCEPTED, next = PROCESSING)
+        // Fulfil's notifications need the same details. They travel on in the workflow,
+        // and the payload codec keeps them encrypted in history.
+        return outcome.copy(instrument = details.get())
     }
 
     override fun announce(paymentId: String) =
@@ -86,7 +92,7 @@ class RealtimeClearingExecuteStage(...) : ExecuteStage
 
 *(The annotation is illustrative; what matters is what it records.)*
 
-For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. Three rules keep the index honest:
+For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs. Three rules keep the index honest:
 
 - Every combination has a default implementation. A combination with none can't be onboarded at all.
 - The same generated code produces the build's capability manifest, every behavior combination the build can run. Provisioning checks each market release against it before anything goes live.

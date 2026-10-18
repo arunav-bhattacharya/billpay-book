@@ -12,9 +12,9 @@ import Lead from '@site/src/components/Lead';
 
 ## Why the first two runs come first
 
-Every capacity number in the design is an estimate from a write model: a scheduled execution costs about 49 writes to the Offline cluster's database, a leg about 34, a return about 20. The [governor](../../design/pacing.md) budgets in those writes, so it can only be as right as they are. Run 1 measures the real cost of each workflow, and the governor takes the measured numbers. Run 2 finds how many writes a second the Offline database can take at 60% CPU, and that becomes the governor's ceiling. It also finds the knee where persistence latency starts to climb, which sets where the governor holds instead of raising.
+Every capacity number in the design is an estimate from a write model: a scheduled execution costs about 55 writes to the Offline cluster's database, a leg about 40, a return about 20. The [governor](../../design/pacing.md) budgets in those writes, so it can only be as right as they are. Run 1 measures the real cost of each workflow, and the governor takes the measured numbers. Run 2 finds how many writes a second the Offline database can take at 60% CPU, and that becomes the governor's ceiling. It also finds the knee where persistence latency starts to climb, which sets where the governor holds instead of raising.
 
-Run 2 settles a sizing question too. It runs on 64 vCPU, then on 192. If 64 covers the worst overlap of work, about 12,700 writes a second, the Offline database starts there and keeps 192 as headroom.
+Run 2 settles a sizing question too. It runs on 64 vCPU, then on 192. If 64 covers the worst overlap of work, about 13,900 writes a second, the Offline database starts there and keeps 192 as headroom.
 
 ## The seven runs
 

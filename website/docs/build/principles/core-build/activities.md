@@ -44,7 +44,7 @@ class ClearingActivitiesImpl(
 
 Three things in that sketch are rules, not style:
 
-- The activity takes the payment ID and loads what it needs. Its inputs are recorded in workflow history, so passing whole payment objects would bloat every history and freeze old data into it.
+- The activity takes the payment ID and loads what it needs. Its inputs are recorded in workflow history, so passing whole payment objects would bloat every history and freeze old data into it. Data from Payment Options and Payment Instruments is the exception: a later call that needs it, such as open-to-buy or the notifications in Fulfil, gets it from the stage, and the payload codec keeps it encrypted in history.
 - Every HTTP call carries an idempotency key such as `{paymentId}-{step}`. An activity can be retried after a timeout even when its call went through, and the key is what makes the second call harmless.
 - The HTTP client has its own retries off. One task is one call, so a queue's rate limit stays the real call rate, and Temporal decides when to try again.
 
@@ -68,6 +68,33 @@ private val clearing = Workflow.newActivityStub(
 ```
 
 On the Offline cluster, a call to a throttled system runs on that system's `ds-*` queue, whose server-side limit is the throttle. A call nobody throttles, such as RTF or Payment Instruments, runs on the workflow's own queue with eager dispatch. A short start-to-close frees a hung call's slot fast; the schedule-to-close limit decides when to give up.
+
+## One interface, three queues
+
+`TransactionNotificationActivities` is the one interface that covers more than one system. TFNE, GPHDB and B2Notifier hear the same news at the same moment, so they share an interface, but each keeps its own method and its own queue, so each keeps its own rate limit. The stub takes options per method:
+
+```kotlin
+@ActivityInterface
+interface TransactionNotificationActivities {
+    fun notifyTfne(paymentId: String, details: InstrumentDetails)      // TFNE
+    fun recordHistory(paymentId: String, details: InstrumentDetails)   // GPHDB
+    fun notifyB2(paymentId: String, details: InstrumentDetails)        // B2Notifier
+}
+
+private val notifications = Workflow.newActivityStub(
+    TransactionNotificationActivities::class.java,
+    notificationOptions,                                         // timeouts and retries, as above
+    mapOf(                                                       // one queue per system, on Offline
+        "NotifyTfne" to notificationOptions.toBuilder().setTaskQueue("ds-tfne").build(),
+        "RecordHistory" to notificationOptions.toBuilder().setTaskQueue("ds-gphdb").build(),
+        "NotifyB2" to notificationOptions.toBuilder().setTaskQueue("ds-b2notifier").build(),
+    ),
+)
+```
+
+*(The method names are illustrative, and so are the queue names until they are agreed.)*
+
+A worker on each of the three queues registers the same implementation, and each only ever receives its own method's tasks. Each method calls one client, so the rule that a call reaches one system still holds.
 
 ## PaymentStore
 
