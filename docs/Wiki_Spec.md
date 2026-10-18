@@ -547,9 +547,12 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 ### Plan keys and stage lookup
 
 - The Router pins a **plan key** at start: the market, the journey, the resolved behaviors and the market's config version. The market is there so a market override can match (Proposed, 2026-10-18). The key also carries the market's rule settings from that version, for the [verification rules](#verification-rules), and for a payment that waits for the customer, the market's confirmation window, which its timer uses (agreed 2026-10-18).
-- A KSP-built index maps each behavior combination to its stage implementations, and the most specific match wins. A market override is a more specific match for that market. The workflow reads its plan key and looks up its stages at runtime; stage objects are never passed into a workflow.
-- The same index produces the build's **capability manifest**: every combination the build can run. Provisioning checks each market profile against it.
-- Every stage interface has a default implementation, and lists the behavior values its default can't handle, such as mandate authorization Y for Verify or a corporate account for Execute. A combination with one of those values counts as runnable only when an implementation declares it, so a market can't go live on a default that skips a check it needs (agreed 2026-10-18). A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- A KSP-built index maps each behavior combination to its stage implementations, and the most specific match wins. A market override is a more specific match for that market. KSP works out the winner for every combination while the code compiles and writes the result as a table: for each step, one row per combination, keyed only by the behaviors that step's implementations declare, and rows of their own for a market with overrides. The workflow reads its plan key and, for each step, reads one row: its market's own row if there is one, otherwise the shared row (agreed 2026-10-18). Stage objects are never passed into a workflow.
+- KSP picks each row's implementation in this order. An implementation must match everything it declares, and must declare every value in the row that the step's default can't handle. A market's own implementation beats the shared ones in that market. Then the one that declares the most behaviors wins. Two left level fail the build, naming the row; a row with none left is not written, so the build can't run that combination (agreed 2026-10-18).
+- The lookup runs inside the workflow, never in the Router: during a rolling deploy the Router and the workers can run different builds, so only the workflow's own build picks its classes (agreed 2026-10-18).
+- KSP also writes a report of every combination and the implementation each step gets for it. The report is checked in, and a test compares it with the build's, so a change to which class a combination runs is reviewed as a diff (agreed 2026-10-18).
+- The same tables are the build's **capability manifest**: a combination the build can run has a row in every step its journey runs. Provisioning checks each market profile against it.
+- Every stage interface has a default implementation, and lists the behavior values its default can't handle, such as mandate authorization Y for Verify or a corporate account for Execute. A row with one of those values runs only on an implementation that declares it, so a market can't go live on an implementation that skips a check it needs (agreed 2026-10-18). A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
 - Every class that implements a `Payment{Step}Stage` interface carries the index annotation; KSP fails the build for one that doesn't, so no implementation is silently left out (agreed 2026-10-18).
 - Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes code under a running payment.
 
@@ -570,6 +573,7 @@ The implementation that declares nothing is `DefaultPayment{Step}Stage`; it runs
 | Also bank confirmation | `PaymentVerifyStageWithBankConfirmation` | Payment Instruments, with the verification token check; Payment Options |
 | Both | `PaymentVerifyStageWithMandateAndBankConfirmation` | Payment Instruments, with the verification token check; Payment Options; Plans |
 | Corporate, with mandate authorization | `PaymentVerifyStageForCorporateWithMandate` | As above; its commit also writes the `ALLOC_REQUEST` row |
+| Waited for a go-ahead (Proposed) | `PaymentVerifyStageWithGoAhead` | Payment Instruments, Payment Options: the usual checks, with no provider call |
 | A rule only GB needs | `PaymentVerifyStageWithBankConfirmationInGb`, in `market/gb/stages/` | Its own |
 
 On the due date, a payment whose profile requires mandate authorization runs `PaymentReverifyStageWithMandate`, which asks Plans again. Execute follows the same rule: `DefaultPaymentExecuteStage` clears in batch, and `PaymentExecuteStageWithRealtimeClearing` clears in real time.
@@ -580,10 +584,10 @@ On the due date, a payment whose profile requires mandate authorization runs `Pa
 
 ### Why KSP builds the index
 
-KSP (Kotlin Symbol Processing) runs while the code compiles. It reads each stage class's annotation and constructor, writes the `StageIndex` and the capability manifest, and fails the build at the class for an equal match, a missing default, a missing annotation or a name that doesn't match its declaration. A combination with a value no implementation declares is left out of the manifest (agreed 2026-10-18). It was chosen because:
+KSP (Kotlin Symbol Processing) runs while the code compiles. It reads each stage class's annotation and constructor, writes the `StageIndex` tables, the capability manifest and the report, and fails the build at the class for a tie, a missing default, a missing annotation or a name that doesn't match its declaration. A tie's error names the combination where two implementations are level. A combination with a value no implementation declares is left out of the manifest (agreed 2026-10-18). It was chosen because:
 
 - Mistakes stop the compile, at the class that caused them.
-- The lookup at runtime is plain generated code, with no reflection, I/O or container call, so replay finds the same classes. Worker Versioning pins the build, so a running payment keeps its index.
+- The lookup at runtime is one read from a generated table, with no branches, reflection, I/O or container call, so replay finds the same classes. Worker Versioning pins the build, so a running payment keeps its index.
 - Stages are built on the workflow's own thread, where Temporal requires activity stubs to be made. Quarkus's CDI never sees them, and if workers ever move to a GraalVM native image, the index needs no reflection config there.
 - Adding an implementation is one edit: the annotated class.
 
@@ -597,7 +601,7 @@ KSP (Kotlin Symbol Processing) runs while the code compiles. It reads each stage
 | `ServiceLoader` | At runtime | A missing entry is skipped silently |
 | kapt | At compile | The same model as KSP, but slower, and Android's guidance lists it as in maintenance mode |
 
-KSP processes one Gradle module at a time: each module that holds implementations writes its piece of the index, and the app joins the pieces with an experimental KSP API, which a KSP upgrade can change. KSP's supported Kotlin versions need checking against the build's, and whether KSP reruns in Quarkus dev mode hasn't been checked.
+KSP processes one Gradle module at a time: each module that holds implementations writes the declarations it found, and the app joins them, works out the winners and writes the table, the manifest and the report, with an experimental KSP API, which a KSP upgrade can change. KSP's supported Kotlin versions need checking against the build's, and whether KSP reruns in Quarkus dev mode hasn't been checked.
 
 ### Rules
 

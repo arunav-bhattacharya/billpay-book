@@ -40,7 +40,7 @@ The call chain is strict, **Workflow → Stage → Activity → Client → exter
     {
       term: 'Stage Index',
       to: '/docs/build/principles/core-build/stage-index',
-      desc: `How KSP builds the lookup and the capability manifest at compile time, and why it beat the alternatives.`,
+      desc: `How KSP works out every lookup at compile time and writes it as a table, worked through for Verify, and why it beat the alternatives.`,
     },
     {
       term: 'Activities',

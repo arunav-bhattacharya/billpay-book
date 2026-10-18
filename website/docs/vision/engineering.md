@@ -123,7 +123,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
         <>
           When the Router starts a payment it pins a plan key: the market, the journey, the behaviors
           resolved for it and the market's config version. The workflow looks up its stage implementations from that
-          key, most specific match first, so no market decision is left in the workflow code. Worker
+          key, in a table worked out when the code is built, so no market decision is left in the workflow code. Worker
           Versioning pins the workflow to the build it started on, so neither a deploy nor a new release
           changes a payment already running. Nothing is inherited: workflows and stages are never{' '}
           <code>abstract</code>.

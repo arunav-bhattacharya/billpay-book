@@ -80,7 +80,7 @@ Two stages bend that order:
 A workflow never chooses its stages, and nothing hands them to it. When it starts, it looks them up from the plan key the [Router](./router.md) pinned:
 
 ```kotlin
-val stages = StageIndex.lookup(plan)               // inside the workflow
+val stages = StageIndex.lookup(plan)               // inside the workflow: one row per step
 ```
 
 `StageIndex` is generated at build time by KSP (Kotlin Symbol Processing), from what each implementation declares it serves. A declaration names the step and the behaviors it covers, and leaves out the ones it doesn't care about:
@@ -92,7 +92,7 @@ class PaymentExecuteStageWithRealtimeClearing(...) : PaymentExecuteStage
 
 *(The annotation is illustrative; what matters is what it records.)*
 
-For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs, and [Building the Stage Index](./stage-index.md) covers how KSP builds the index, the mistakes that stop the build, and why KSP was chosen.
+The most specific match wins, and KSP works that out for every combination while the code compiles. It writes the answers as a table, one row per combination for each step, so the lookup at runtime reads a row and weighs nothing. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs, and [Building the Stage Index](./stage-index.md) works through Verify's table row by row, with the mistakes that stop the build and why KSP was chosen.
 
 Stages are never `abstract`. A variation is a concrete class composed in through the index, not an override of a base class, so reading one file tells you everything a stage does. Payment workflows are pinned to their build with Worker Versioning, so a deploy that adds or changes a stage never changes the code under a payment that is already running.
 

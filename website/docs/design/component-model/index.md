@@ -10,7 +10,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 <Lead>The [design principles](../principles.md) set out four layers and what each may call. These pages list what actually exists at three of them: every workflow, the thirteen stages those workflows run, and the activities the stages call.</Lead>
 
-A journey reads top to bottom across the three. `ExecuteScheduledPaymentWorkflow` runs the Reverify, Execute and Fulfil stages in order. For a consumer payment, Execute calls `ClearingActivities`, `ReceivablesActivities` and `AuthorizationActivities` at the same time, each on its own rate-limited queue. Only the stages change between markets; the activities are shared, and none of them vary by behavior.
+A journey reads top to bottom across the three. `ExecuteScheduledPaymentWorkflow` runs the Reverify, Execute and Fulfil stages in order. For a consumer payment, Execute calls `ClearingActivities` and `ReceivablesActivities` at the same time, each on its own rate-limited queue, and calls `AuthorizationActivities` for open-to-buy once `InstrumentActivities` has fetched the instrument's details. Only the stages change between markets; the activities are shared, and none of them vary by behavior.
 
 ## In this section
 
