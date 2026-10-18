@@ -21,17 +21,29 @@ A stage makes its calls, commits once through `PaymentStore`, and returns its ou
 
 The announcement gets its own case: the RTF event names the state that was committed, and a Raven message goes out only where the market's setting turns it on. Fulfil is the one stage that announces before its commit, so its test checks that order too.
 
-A new implementation, such as `PaymentVerifyStageWithMandate` for markets that check a mandate, arrives with these tests for the behaviors it serves.
+A new implementation, such as `PaymentVerifyStageWithMandate` for markets that check a mandate, arrives with these tests for the behaviors it serves. For Verify, Reverify and Represent, the decision itself comes from the verification rules, which are tested on their own (below). Their stage tests check that each version runs the right checks and commits the decision the rules gave.
+
+## Verification rules
+
+A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the catalog for one step and checks the report ([Writing verification rules](../../build/principles/core-build/stages.md#writing-verification-rules)):
+
+- Each rule gets a table of cases, facts in and pass or fail out. The mandate rule needs a case for an active mandate and one for each status that isn't.
+- Priority decides. When two rules fail, the decision carries the code of the higher-priority one, and the report names both.
+- A rule whose check didn't run is skipped, not failed. The default Verify gathers no mandate details, so no mandate rule runs for it. A rule whose earlier rule failed is skipped the same way.
+- A rule runs only in the steps it lists.
+- The time is part of the facts. A test sets it, so a rule about dates gives the same answer on every run.
 
 ## The plan-key lookup
 
-A workflow finds its stages through the index that KSP (Kotlin Symbol Processing) generates at build time from the plan key the Router pins. The index is code like any other, so it is tested like any other:
+A workflow finds its stages by looking up the plan key the Router pins in an index that KSP (Kotlin Symbol Processing) generates at build time ([Building the Stage Index](../../build/principles/core-build/stage-index.md)). The index is code like any other, so it is tested like any other:
 
 - Every combination in the build's capability manifest resolves to an implementation for every step its journey runs.
 - The most specific match wins. A market override in `market/{m}/stages/` beats the default for its own market, and nowhere else.
-- A combination with no implementation can't be onboarded, so it must not appear in the manifest.
+- A combination with a value a default can't handle appears in the manifest only when a class declares it. With no Verify that declares mandate authorization, no combination with mandate authorization is in the manifest.
 
-Provisioning checks every market release against that manifest, so a gap the tests miss turns into a release that can't go live.
+The processor itself is tested by compiling small sets of sample classes with it. Each of these must fail the compile, at the class: two classes that match a combination equally, a stage interface with no default, a class without the annotation, and a class whose name doesn't match its declaration.
+
+Provisioning checks every market release against the manifest, so a gap the tests miss turns into a release that can't go live.
 
 ## Workflows
 

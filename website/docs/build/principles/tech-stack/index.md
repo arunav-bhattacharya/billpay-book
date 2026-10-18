@@ -28,7 +28,7 @@ Four choices sit underneath everything and are not revisited per component:
 | [ORM](./orm.md) | **Exposed** | SQL stays visible, Kotlin-native, no session magic anywhere near payments. |
 | [HTTP client](./http-client.md) | **OkHttp** | Pooling, HTTP/2, and four independent timeouts that respect the activity deadline above them. |
 | [Serialization](./serialization.md) | **Jackson** | Polymorphic `type` discriminators carry our sealed domain model across every boundary, and Temporal's own converter already speaks it. |
-| Code generation | **KSP** | Builds the index that maps each behavior combination to its stages, and the build's capability manifest, at compile time. |
+| [Code generation](../core-build/stage-index.md) | **KSP** | Builds the index that maps each behavior combination to its stages, and the build's capability manifest, at compile time, so a mistake stops the build at the class that caused it. |
 
 ## Under evaluation
 

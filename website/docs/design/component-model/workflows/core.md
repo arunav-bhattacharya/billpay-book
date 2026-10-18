@@ -22,7 +22,7 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 `CreateImmediatePaymentWorkflow` pays a bill today. The caller waits only until Verify decides.
 
 1. Capture writes `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`). One that comes after the workflow has closed starts a new run, and Capture's check decides what it does ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)).
-2. Verify checks the payment with Payment Instruments and Payment Options, and with Plans where the profile requires a mandate, then decides `ACCEPTED` or `DECLINED` in one guarded commit, and the caller's update returns here. The announcements for both changes follow the reply, in order.
+2. Verify fetches what it needs from Payment Instruments and Payment Options, and from Plans where the profile requires a mandate, runs the verification rules over the answers, then decides `ACCEPTED` or `DECLINED` in one guarded commit, and the caller's update returns here. The announcements for both changes follow the reply, in order.
 3. If the payment is `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
 4. Execute moves it to `PROCESSING`: clearing, AR and open-to-buy in parallel. Open-to-buy first fetches the instrument's clear-text details from Payment Instruments, and Fulfil reuses them.
 5. Fulfil runs accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier in parallel, then sends the RTF event and the Raven message, then commits `PROCESSED`. TFNE and GPHDB are legacy systems that need to know when a payment is processed, and B2Notifier passes the news on to other downstream systems. Comms go last, so the customer hears only once everything else has worked.
@@ -55,7 +55,7 @@ A create from a channel that One-Data sends with other pending payments' IDs tak
 
 `ExecuteScheduledPaymentWorkflow` runs a scheduled payment on its due date, and every corporate payment once its allocations are in. It checks a scheduled payment again before any money moves, because a lot can change in 30 days.
 
-1. Reverify: `ACCEPTED` or `DECLINED`. Its guard, `SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'` (or `'ALLOCATED'` for a corporate payment), means a cancel and the execution can never both win. Where the profile requires a mandate, Reverify asks Plans to check it again. A corporate payment paid today skips Reverify, because Verify passed it minutes earlier.
+1. Reverify: `ACCEPTED` or `DECLINED`. Its guard, `SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'` (or `'ALLOCATED'` for a corporate payment), means a cancel and the execution can never both win. Where the profile requires a mandate, Reverify fetches it from Plans again, and the same rules check it. A corporate payment paid today skips Reverify, because Verify passed it minutes earlier.
 2. Execute, then Fulfil, as for pay today.
 3. The last commit marks its Work Tracker row, `SCHED_EXEC` or `ALLOC_EXEC`, `DONE`, or `FAILED` when retries run out. That frees a slot under the dispatcher's in-flight cap.
 

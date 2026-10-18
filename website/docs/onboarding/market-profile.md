@@ -25,7 +25,7 @@ These are the payment dimensions. Every stage that varies between markets varies
 | `accountType` | `CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL` | Who is paying, which shapes everything from splits to allocations |
 | `requiresArPosting` | Y, N or BOTH | Whether the processed payment is posted to Accounts Receivable |
 | `requiresRealtimeClearing` | Y, N or BOTH | Whether clearing is realtime or batch |
-| `requiresMandateAuthorization` | Y, N or BOTH | Whether Plans checks the payment's mandate, at Verify and again at Reverify on the due date. A mandate Plans can't verify declines the payment |
+| `requiresMandateAuthorization` | Y, N or BOTH | Whether the payment's mandate is checked, with its details from Plans, at Verify and again at Reverify on the due date. A mandate that fails its check declines the payment |
 | `requiresBankConfirmation` | Y, N or BOTH | Whether the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
 
 ## BOTH, resolved per journey
@@ -38,7 +38,7 @@ Bank confirmation is resolved by how the customer pays rather than by the journe
 
 ## What the build can run
 
-Each combination of behaviors needs stage implementations, and every combination the build supports has a default one. The build lists them in its **capability manifest**, which the provisioning API returns from `GET /provisioning/capabilities`. The manifest comes from the same compile-time index the workflows use to look up their stages, so the two can't disagree.
+Each combination of behaviors needs stage implementations that handle it. Every stage has a default, but a default can't handle everything: the default Verify doesn't check a mandate, so a combination with mandate authorization runs only once a Verify that does is in the build. The build lists the combinations it can run in its **capability manifest**, which the provisioning API returns from `GET /provisioning/capabilities`. The manifest comes from the same compile-time index the workflows use to look up their stages, so the two can't disagree.
 
 - A profile built only from combinations in the manifest goes live with config alone, no deploy needed.
 - A new combination is flagged as needing a build while it is being authored, so the gap shows up early.

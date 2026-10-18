@@ -476,7 +476,7 @@ A market profile is one market and one account type. Onboarding picks the Billpa
 | `accountType` | `CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL` |
 | `requiresArPosting` | Y, N or BOTH: the processed payment is posted to AR |
 | `requiresRealtimeClearing` | Y, N or BOTH: clearing is realtime or batch |
-| `requiresMandateAuthorization` | Y, N or BOTH: Plans checks the payment's mandate at Verify, and again at Reverify on the due date; a mandate it can't verify declines the payment (agreed 2026-10-18) |
+| `requiresMandateAuthorization` | Y, N or BOTH: Verify, and Reverify on the due date, fetch the payment's mandate details from Plans, and the verification rules check them; a mandate that fails its check declines the payment (agreed 2026-10-18) |
 | `requiresBankConfirmation` | Y, N or BOTH: the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
 
 **BOTH** means required for some journeys and not others. Onboarding stores which journeys get Y, and the Router resolves BOTH to Y or N per journey. For realtime clearing only pay-today payments from channels get Y: every future-dated payment clears in batch, whether it came from a channel or from AR. Future-dated payments never clear in real time. For bank confirmation, BOTH is resolved from the request's payment method: a method that needs the customer to confirm at their bank gets Y. Only consumer payments made today take bank confirmation, and only with one instruction: a request with several instructions that would need bank confirmation gets 422, and so does a Pay & Plan request (agreed 2026-10-18).
@@ -527,12 +527,32 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 
 "All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior; it decides whether RequestConfirmation runs, and which Verify implementation confirms the payment.
 
+### Verification rules
+
+Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
+
+1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Options check (Payment Options) and the Mandate check (Plans, which holds the mandate details). A stage implementation is a list of checks: a market that checks only instruments and options runs the first two, and one that requires mandate authorization adds the third. Represent runs checks of its own, still to be defined.
+2. **Facts.** The checks' calls run in parallel, and their answers go into one read-only `VerificationFacts`, with the payment, the market's rule settings and the time, read once from `Workflow.currentTimeMillis()`. A check that didn't run leaves its part empty. These are the facts Verify passes on to Execute and Fulfil, encrypted in history.
+3. **Rules.** A rule is a pure condition over the facts, with an ID, a decline code, a priority, the steps it runs in and the checks it needs. It makes no calls and never reads the clock. Rules live in one catalog the three steps share, and a rule may read more than one check's answer.
+4. **Evaluation.** Every rule that applies runs. A rule is skipped when a check it needs didn't run, or when a rule it depends on failed, such as the instrument rules after "instrument not found". The highest-priority failure decides, and the report keeps every rule's result.
+5. **Decision.** With no failure the payment moves on: `ACCEPTED`, `SCHEDULED`, or the representment. A failure is `DECLINED` with that rule's decline code, or `DISALLOWED` for a push payment. There is no review outcome, since the state model has no state for one.
+6. **Commit.** One guarded commit, whose timeline row keeps the failed rules' IDs. A metric counts declines by step and rule (Proposed: `billpay_verification_declines_total`).
+
+- Rules run inside the stage, in workflow code. They are pure and fast, so they add no Temporal writes, and replay gives the same answer.
+- An activity returns what a system said, such as a closed account or no valid mandate, as a fact. Only an error throws, and errors are retried, so an outage never declines a payment and a business "no" is never retried.
+- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, read from the config version pinned in the plan key, so they change with a release and no deploy. Proposed: the Router passes them in the workflow's input.
+- A rule's logic changes with a deploy. Worker Versioning keeps a running payment on the rules it started with, and Reverify uses the build and config of the due date, which is what a recheck should use.
+- The stage implementation picks the checks and rules, never a flag inside a rule: `PaymentVerifyStageWithMandate` adds the Mandate check and its rules.
+- The checks and the rule catalog sit in `core/lib/verification/`, the rules in `core/lib/verification/rules/`. Like stage code, they depend only on activity interfaces.
+- Conditions don't change without a deploy for now. If business teams need that later, simple conditions could move into the release as expressions, such as CEL, pinned with the config version.
+
 ### Plan keys and stage lookup
 
 - The Router pins a **plan key** at start: the market, the journey, the resolved behaviors and the market's config version. The market is there so a market override can match (Proposed, 2026-10-18).
 - A KSP-built index maps each behavior combination to its stage implementations, and the most specific match wins. A market override is a more specific match for that market. The workflow reads its plan key and looks up its stages at runtime; stage objects are never passed into a workflow.
 - The same index produces the build's **capability manifest**: every combination the build can run. Provisioning checks each market profile against it.
-- Every combination has a default implementation. A combination with no implementation cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- Every stage interface has a default implementation, and lists the behavior values its default can't handle, such as mandate authorization Y for Verify or a corporate account for Execute. A combination with one of those values counts as runnable only when an implementation declares it, so a market can't go live on a default that skips a check it needs (agreed 2026-10-18). A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- Every class that implements a `Payment{Step}Stage` interface carries the index annotation; KSP fails the build for one that doesn't, so no implementation is silently left out (agreed 2026-10-18).
 - Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes code under a running payment.
 
 ### Naming stage implementations
@@ -560,6 +580,27 @@ On the due date, a payment whose profile requires mandate authorization runs `Pa
 - Calls that every implementation of a step makes, such as Verify's Instruments and Options calls, live in a plain helper function, never in a base class.
 - Each step's implementations sit in one folder, such as `core/lib/stages/impl/verify/`.
 
+### Why KSP builds the index
+
+KSP (Kotlin Symbol Processing) runs while the code compiles. It reads each stage class's annotation and constructor, writes the `StageIndex` and the capability manifest, and fails the build at the class for an equal match, a missing default, a missing annotation or a name that doesn't match its declaration. A combination with a value no implementation declares is left out of the manifest (agreed 2026-10-18). It was chosen because:
+
+- Mistakes stop the compile, at the class that caused them.
+- The lookup at runtime is plain generated code, with no reflection, I/O or container call, so replay finds the same classes. Worker Versioning pins the build, so a running payment keeps its index.
+- Stages are built on the workflow's own thread, where Temporal requires activity stubs to be made. Quarkus's CDI never sees them, and if workers ever move to a GraalVM native image, the index needs no reflection config there.
+- Adding an implementation is one edit: the annotated class.
+
+| Alternative | When a mistake shows up | Why not |
+| --- | --- | --- |
+| A hand-written registry, as a map or a small DSL | Never: a forgotten line silently runs the default | Every class needs a second edit |
+| A registry plus a ClassGraph test | In tests | The close second: simpler, but every class still needs a second edit. The one to switch to if nobody owns the processor |
+| A classpath scan at startup, then reflection | At boot, per environment | It needs reflection config, and ClassGraph finds nothing in a native image |
+| A Quarkus extension, a `@BuildStep` over Jandex | At build, but not at a source line | A module missing from the index silently drops out. Two extension modules to maintain |
+| CDI `Instance<T>` with qualifiers | At runtime | Stages can't be beans: their activity stubs must be made on the workflow's thread |
+| `ServiceLoader` | At runtime | A missing entry is skipped silently |
+| kapt | At compile | The same model as KSP, but slower, and Android's guidance lists it as in maintenance mode |
+
+KSP processes one Gradle module at a time: each module that holds implementations writes its piece of the index, and the app joins the pieces with an experimental KSP API, which a KSP upgrade can change. KSP's supported Kotlin versions need checking against the build's, and whether KSP reruns in Quarkus dev mode hasn't been checked.
+
 ### Rules
 
 - Workflows and stages are never `abstract`: composition over inheritance.
@@ -570,7 +611,7 @@ On the due date, a payment whose profile requires mandate authorization runs `Pa
 
 ### Retries and timeouts
 
-- **Business failures** found by Verify or Reverify (closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, a mandate Plans can't verify) are non-retryable. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
+- **Business failures** found by Verify or Reverify (closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, a mandate that fails its check) are non-retryable. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
 - **429 with Retry-After:** throw `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
 - **Other errors:** retry from 1 s, doubling, capped at 60 s, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED` and the payment goes onto the exception list in its last state. Operations resolve each one by hand: someone reprocesses the payment's workflow, or terminates it (agreed 2026-10-18).
 - **RTF and Raven** get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
@@ -620,7 +661,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 > `{paymentId}-init` · Online · Update-With-Start from channels
 
 - **Capture:** `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`).
-- **Verify:** `ACCEPTED` or `DECLINED`, in one guarded commit. The caller's update returns here. It calls Payment Instruments and Payment Options in parallel, and Plans too where the profile requires mandate authorization; a mandate Plans can't verify means `DECLINED` (agreed 2026-10-18).
+- **Verify:** `ACCEPTED` or `DECLINED`, in one guarded commit. The caller's update returns here. It calls Payment Instruments and Payment Options in parallel, and Plans too where the profile requires mandate authorization, then runs the [verification rules](#verification-rules) over the answers; a failed rule means `DECLINED` with its decline code (agreed 2026-10-18).
 - If `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
 - **Execute:** `PROCESSING`. Clearing, AR and OTB run in parallel, varied by account type, AR posting and realtime clearing. OTB first waits for an `InstrumentActivities` call that fetches the instrument's clear-text data; clearing and AR don't wait for it (agreed 2026-10-18).
 - **Fulfil:** `PROCESSED`. Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier run in parallel; then the RTF event and the Raven message; then the commit. TFNE, the Transaction Notification Engine, and GPHDB, the legacy Payments History Database, are legacy downstreams told when a payment moves from `PROCESSING` to `PROCESSED`, and B2Notifier is a downstream notification system that tells other downstream systems; `PROCESSED` waits for all three, and all three take the clear-text data Execute fetched (agreed 2026-10-18). Comms go last, so the customer hears only once everything else has succeeded.
@@ -642,7 +683,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 > `{paymentId}-execute` · Offline · started through the Router, with today's config, by the scheduled-payments dispatcher; for a corporate payment, scheduled or paid today, by the allocated-payments dispatcher
 
-- **Reverify:** `ACCEPTED` or `DECLINED`. Its guard (`SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`, or `'ALLOCATED'` for a corporate payment) means a cancel and the execution can never both win. A corporate payment paid today skips Reverify: Verify passed it minutes earlier. Where the profile requires mandate authorization, Reverify asks Plans to check the mandate again, and a mandate it can't verify means `DECLINED` (agreed 2026-10-18).
+- **Reverify:** `ACCEPTED` or `DECLINED`. Its guard (`SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`, or `'ALLOCATED'` for a corporate payment) means a cancel and the execution can never both win. A corporate payment paid today skips Reverify: Verify passed it minutes earlier. Where the profile requires mandate authorization, Reverify fetches the mandate details from Plans again, and the same rules check them; a failed rule means `DECLINED` (agreed 2026-10-18).
 - **Execute**, then **Fulfil**, as for pay today.
 - **Corporate:** Execute clears once, at payment level, and makes no AR or open-to-buy call; its commit marks the legs released, and the leg dispatcher then writes and starts them. There is no Fulfil.
 - The last commit marks its Work Tracker row, `SCHED_EXEC` or `ALLOC_EXEC`, `DONE`, or `FAILED` when retries run out.
@@ -836,7 +877,7 @@ One activity interface per system, each on that system's task queue, with one ex
 | `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update |
 | `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call (agreed 2026-10-18) |
 | `OptionsActivities` | Payment Options | The workflow's queue: Payment Options has no rate limit | Verify, Reverify |
-| `PlansActivities` | Plans, which checks the payment's mandate where the profile requires mandate authorization (agreed 2026-10-18) | The workflow's queue, like Payment Instruments and Payment Options (agreed 2026-10-18) | Verify and Reverify (agreed 2026-10-18) |
+| `PlansActivities` | Plans, which holds the payment's mandate details; the verification rules check them where the profile requires mandate authorization (agreed 2026-10-18) | The workflow's queue, like Payment Instruments and Payment Options (agreed 2026-10-18) | Verify and Reverify (agreed 2026-10-18) |
 | `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `AuthorizationActivities` | Authorizations (AMP), open-to-buy | `ds-authorization` | Execute, except a corporate parent's, and every leg |
@@ -1724,5 +1765,6 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | The onboarding config cache | Each billpay-core pod keeps the onboarding config in memory (agreed 2026-10-18). Proposed: it reloads when provisioning activates or rolls back a version | How fast a release reaches every pod |
 | Balance refund steps | They follow the payment path. Skipped for now (OK for now, 2026-10-18) | Detailed stages are still to be defined |
 | Represent's eligibility checks | Its own checks, not Verify's: no call to Payment Instruments, Payment Options or Plans (2026-10-18) | Which systems it calls, and what fails the recheck, are still to be defined |
+| Decline codes for verification rules | Each rule maps to a `DeclineCode` the current app has; mandate failures may need new codes (2026-10-18) | Which code a declined payment carries, and what the channel tells the customer |
 
 [^ Top](#table-of-contents)

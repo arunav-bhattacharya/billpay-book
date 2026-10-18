@@ -28,7 +28,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'PlansActivities',
-    system: "Plans, which checks the payment's mandate where the profile requires mandate authorization",
+    system: "Plans, which holds the payment's mandate details; the verification rules check them where the profile requires mandate authorization",
     queue: "The workflow's queue, like Payment Instruments and Payment Options",
     calledBy: "Verify and Reverify",
   },
@@ -158,7 +158,7 @@ Throttled calls stay off eager dispatch, because it hands the task straight back
 
 ## Retries and timeouts
 
-- Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate Plans can't verify, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
+- Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate that fails its check, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
 - A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
 - Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
 - RTF and Raven get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.

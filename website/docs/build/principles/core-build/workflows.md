@@ -29,7 +29,7 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 
 The Router pins a plan key when it starts the workflow: the market, the journey, the resolved behaviors and the market's config version (the market is Proposed, so a market override can match). The workflow reads its plan key and looks up its stages at runtime, in an index that KSP (Kotlin Symbol Processing) generates at build time. The most specific match wins, and a market override is a more specific match for that market. Stage objects are never passed into a workflow.
 
-Every behavior combination has a default implementation. A combination with no implementation can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts.
+Every stage has a default implementation, but a market whose behaviors need more, such as Verify's mandate check, runs only once an implementation that declares them is in the build. A combination the build can't run can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts. [Building the Stage Index](./stage-index.md#the-capability-manifest) has the rule.
 
 ## How a workflow starts
 

@@ -19,7 +19,7 @@ import Lead from '@site/src/components/Lead';
 | Activity | `core/lib/activities/` and `impl/` | None |
 | Client | `core/lib/clients/` | None |
 
-What each type is called is in the [naming conventions](../../../design/principles.md#naming). The Router, the dispatchers and the governor, and the KSP processor that builds the stage index sit beside these four in modules of their own.
+What each type is called is in the [naming conventions](../../../design/principles.md#naming). The Router, the dispatchers and the governor, and the KSP processor that builds the [stage index](./stage-index.md) sit beside these four in modules of their own. The verification checks and the rule catalog that Verify, Reverify and Represent share sit in `core/lib/verification/`, with the rules in `rules/`. Like stage code, they depend only on activity interfaces.
 
 Only stages have a market column, because stages are the only layer that varies. There is one implementation of each workflow, composed from different stage implementations, never copied per market. Activities and clients are shared by every market by design.
 

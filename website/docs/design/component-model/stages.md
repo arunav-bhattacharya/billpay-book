@@ -95,6 +95,31 @@ Three rules keep the names straight:
 - Calls that every implementation of a step makes, such as Verify's Instruments and Options calls, live in a plain helper function, never in a base class.
 - A step's implementations sit together in one folder, such as `core/lib/stages/impl/verify/`.
 
+## How verification decides
+
+Verify, Reverify and Represent each decide whether a payment can go ahead, and they decide it the same way. The stage first asks the systems that know about the payment, then runs a set of rules over their answers. Keeping the two apart makes each rule a plain condition over data, and lets the three stages share one catalog of rules.
+
+```mermaid
+flowchart TB
+  subgraph C["Checks, in parallel"]
+    direction TB
+    I["Payment<br/>Instruments"]
+    O["Payment<br/>Options"]
+    P["Plans<br/>for a mandate"]
+  end
+  C --> F["Facts<br/>answers, settings<br/>and the time"]
+  F --> R["Rules<br/>one shared catalog"]
+  R --> D{"Did a rule fail?"}
+  D -- "No" --> M["The payment<br/>moves on"]
+  D -- "Yes" --> X["DECLINED<br/>with the code of<br/>the top failure"]
+```
+
+- A check is one system and the rules about its answer. A version of a stage is its list of checks: the default Verify runs the Instrument and Options checks, and `PaymentVerifyStageWithMandate` adds the Mandate check, which asks Plans. Represent will run checks of its own, still to be defined.
+- The checks' calls go out in parallel. What a system says, such as a closed account or no valid mandate, comes back as a fact. Only an error fails the call, and Temporal retries it, so an outage never declines a payment and a business "no" is never retried.
+- A rule makes no calls and never reads the clock, so a replay reaches the same decision. Every rule that applies runs, except one whose check didn't run or whose earlier rule failed, such as the instrument rules after "instrument not found".
+- The highest-priority failure decides: `DECLINED` with that rule's code, or `DISALLOWED` for a push payment. There is no outcome that sends a payment to review, because the state model has no state for one.
+- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, so they change with a release and no deploy. A rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed.
+
 ## Capture
 
 Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent. A duplicate means the request was seen before, and the caller gets the existing payment. On the Online cluster Capture gets a short deadline, so a caller facing an Oracle problem gets a quick error instead of a long wait.
@@ -111,14 +136,14 @@ RequestConfirmation also holds a payment for the customer's go-ahead, when One-D
 
 Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and Payment Options, to confirm the amount.
 
-- A business failure, such as a closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, or a mandate Plans can't verify, is not retried. The payment goes to `DECLINED`.
+- A business failure, such as a closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, or a mandate that fails its check, is not retried. The payment goes to `DECLINED`.
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
 - A payment that waited for a go-ahead is verified in Confirm Payment too, with the usual checks and no provider call, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
 
-Verify varies by all four behaviors and, at confirm, by what the payment waited for. Where the profile requires mandate authorization, Verify also asks Plans to check the mandate, in parallel with its other two calls, and a mandate Plans can't verify is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`.
+Verify varies by all four behaviors and, at confirm, by what the payment waited for. Where the profile requires mandate authorization, Verify also fetches the mandate details from Plans, in parallel with its other two calls, and a mandate that fails its check is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`.
 
 ## Reverify
 

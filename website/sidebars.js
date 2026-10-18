@@ -119,6 +119,7 @@ const sidebars = {
                 'build/principles/core-build/router',
                 'build/principles/core-build/workflows',
                 'build/principles/core-build/stages',
+                'build/principles/core-build/stage-index',
                 'build/principles/core-build/activities',
                 'build/principles/core-build/clients',
               ],

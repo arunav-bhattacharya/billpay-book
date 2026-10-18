@@ -11,7 +11,7 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>Billpay keeps business decisions apart from transport. Four layers handle every journey, each with one job and a strict rule about what it may call.</Lead>
 
-The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is one version of the Verify stage, `PaymentVerifyStageWithMandate`, which also calls Plans to check the mandate. The workflow above it and the activities below it stay the same in both markets.
+The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is one version of the Verify stage, `PaymentVerifyStageWithMandate`, which also fetches the mandate details from Plans and checks them. The workflow above it and the activities below it stay the same in both markets.
 
 ## Eight rules behind every choice
 
@@ -90,7 +90,7 @@ A workflow is never handed its stages. When the Router starts it, the Router pin
 
 The lookup uses an index built at compile time with KSP (Kotlin Symbol Processing). It maps each combination of behaviors to its stage implementations, and the most specific match wins, so a market override beats the default for that market. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
 
-- Every combination has a default implementation. A combination with no implementation can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
+- Every stage has a default implementation, but a default can't handle everything. Each stage lists the behavior values its default can't handle, such as mandate authorization for Verify, and a combination with one of those values runs only on an implementation that declares it. A combination the build can't run can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
 - The same index produces the build's **capability manifest**, the list of every combination the build can run. Provisioning checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
 - Payment workflows are pinned to their build with Worker Versioning, and the plan key carries the config version. A deploy never changes the code under a running payment, and a new market release never changes its config.
 

@@ -92,52 +92,62 @@ class PaymentExecuteStageWithRealtimeClearing(...) : PaymentExecuteStage
 
 *(The annotation is illustrative; what matters is what it records.)*
 
-For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs. Four rules keep the index honest:
+For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs, and [Building the Stage Index](./stage-index.md) covers how KSP builds the index, the mistakes that stop the build, and why KSP was chosen.
 
-- Every combination has a default implementation. A combination with none can't be onboarded at all.
-- The same generated code produces the build's capability manifest, every behavior combination the build can run. Provisioning checks each market release against it before anything goes live.
-- Stages are never `abstract`. A variation is a concrete class composed in through the index, not an override of a base class, so reading one file tells you everything a stage does.
-- A class's name must match its declaration. The processor builds the expected name from the step and what the class declares, and fails the build when the class is called anything else, so no name can drift from what the class serves.
-
-Payment workflows are pinned to their build with Worker Versioning. A deploy that adds or changes a stage never changes the code under a payment that is already running.
+Stages are never `abstract`. A variation is a concrete class composed in through the index, not an override of a base class, so reading one file tells you everything a stage does. Payment workflows are pinned to their build with Worker Versioning, so a deploy that adds or changes a stage never changes the code under a payment that is already running.
 
 ## Naming an implementation
 
 A stage interface is `Payment{Step}Stage`. An implementation keeps that name and adds what it serves, in a fixed order: `For` and the account type, `With` and each behavior it needs, then `In` and the market for an override. The one that declares nothing is `DefaultPayment{Step}Stage`. [Design → Stages](../../../design/component-model/stages.md#naming-implementations) has the full rule and a table of examples.
 
-A name says what an implementation serves, never what it calls. A market that needs a mandate doesn't get a mandate stage: it gets a version of Verify that also calls Plans, which checks the mandate. The calls every Verify makes are written once, in a plain function, so this version adds only what is new:
+A name says what an implementation serves, never what it calls. A market that needs a mandate doesn't get a mandate stage: it gets a version of Verify, `PaymentVerifyStageWithMandate`, that also fetches the mandate details from Plans and runs the rules that check them. The next section shows that class.
+
+## Writing verification rules
+
+Verify, Reverify and Represent decide the same way. Each runs its checks, gathers the answers into one set of facts, runs the rules that apply, and commits once. [Design → Stages](../../../design/component-model/stages.md#how-verification-decides) explains the model, and this is the code it turns into:
 
 ```kotlin
-/** The Instruments and Options calls every Verify makes. A plain function, not a base class. */
-fun instrumentAndOptionChecks(
-    instruments: InstrumentActivities,
-    options: OptionsActivities,
-    paymentId: String,
-): Promise<Void> = Promise.allOf(
-    Async.function(instruments::verify, paymentId),
-    Async.function(options::resolveAmount, paymentId),
-)
+/** One data source. Its call runs in parallel with the other checks' calls. */
+class MandateCheck(private val plans: PlansActivities) : Check<MandateDetails> {
+    override val key = CheckKey.MANDATE
+    override fun fetch(paymentId: String): Promise<MandateDetails> =
+        Async.function(plans::mandateDetails, paymentId)
+}
+
+/** A pure condition over the facts: no calls, no clock. */
+val mandateActive = Rule(
+    id = "MANDATE_ACTIVE",
+    declineCode = DeclineCode.MANDATE_INACTIVE,   // codes for mandate failures are an open item
+    priority = 300,                               // the highest-priority failure decides
+    steps = setOf(Step.VERIFY, Step.REVERIFY),
+    needs = setOf(CheckKey.MANDATE),
+) { facts -> facts.mandate!!.status == MandateStatus.ACTIVE }
 
 @StageFor(step = VERIFY, requiresMandateAuthorization = Y)
 class PaymentVerifyStageWithMandate(
-    private val instruments: InstrumentActivities,
-    private val options: OptionsActivities,
-    private val plans: PlansActivities,          // Plans, on the workflow's queue
+    instruments: InstrumentActivities,
+    options: OptionsActivities,
+    plans: PlansActivities,                       // all three on the workflow's queue
+    private val settings: RuleSettings,           // the market's thresholds, from the plan key (Proposed)
     private val store: PaymentStore,
 ) : PaymentVerifyStage {
 
+    private val checks = listOf(InstrumentCheck(instruments), OptionsCheck(options), MandateCheck(plans))
+
     override fun run(paymentId: String): VerifyOutcome {
-        val checked = Promise.allOf(
-            instrumentAndOptionChecks(instruments, options, paymentId),
-            Async.function(plans::verifyMandate, paymentId),
-        )
-        // A business failure, such as a mandate Plans can't verify, means DECLINED. It is never retried.
-        val next = if (passed(checked)) ACCEPTED else DECLINED
-        return store.commitVerify(paymentId, expected = PENDING, next = next)
+        val facts = fetchAll(checks, paymentId, settings,
+            asOf = Workflow.currentTimeMillis())      // the only clock a rule may see
+        val report = RuleCatalog.evaluate(Step.VERIFY, facts)   // every rule that applies
+        val outcome = store.commitVerify(paymentId, report.decision, report.failedRuleIds)
+        return outcome.copy(facts = facts)            // travels on to Execute and Fulfil
     }
 }
 ```
 
-*(A sketch: the method names are illustrative.)*
+*(A sketch: the names are illustrative.)*
 
-On the due date the same payment runs `PaymentReverifyStageWithMandate`, which calls Plans again. Represent calls none of these three: its recheck is its own, still to be defined.
+- The default Verify is the same class with two checks, Instrument and Options. A version differs only in its list of checks, never in an `if` on a behavior.
+- `fetchAll` waits for every check. An activity returns what its system said, such as a closed account or an expired mandate, as data, and throws only on an error, which Temporal retries. So an outage never declines a payment, and a "no" is never retried.
+- Rules live in one catalog, `core/lib/verification/rules/`, each with the steps it runs in. `PaymentReverifyStageWithMandate` runs the same mandate rule on the due date. Represent calls none of these three systems: it will add checks and rules of its own once they are defined.
+- A rule reads only the facts, never `Instant.now()` or a service. That is what makes it safe inside the workflow, where a replay must reach the same decision.
+- The report keeps every rule's result. The commit's timeline row stores the IDs of the rules that failed, and a metric counts declines by step and rule.

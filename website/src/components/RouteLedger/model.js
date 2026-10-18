@@ -83,7 +83,7 @@ export const IFACES = [
   {
     name: 'PlansActivities',
     system: 'Plans',
-    long: 'Plans, for the mandate check',
+    long: 'Plans, for the mandate details',
     fails: 'mandate',
     queue: "the workflow's queue",
     at: ['Verify', 'Reverify'],
@@ -1038,7 +1038,7 @@ const FAILS = {
   must: 'It must succeed: a 429 waits out Retry-After, and other errors retry from 1 second, doubling up to 60.',
   hold: 'It must succeed, so it gets a long timeout: an outage holds the payment where it is instead of failing it.',
   decline: 'A business failure found here, such as a closed account, declines the payment and is never retried.',
-  mandate: "A mandate Plans can't verify declines the payment and is never retried.",
+  mandate: 'A mandate that fails its check declines the payment and is never retried.',
 };
 
 /* where a call runs, on road j's cluster */

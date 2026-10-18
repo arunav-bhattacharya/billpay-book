@@ -35,7 +35,12 @@ The call chain is strict, **Workflow → Stage → Activity → Client → exter
     {
       term: 'Stages',
       to: '/docs/build/principles/core-build/stages',
-      desc: `One business step each: the calls, one guarded commit, the announcement, and how the index picks an implementation.`,
+      desc: `One business step each: the calls, one guarded commit, the announcement, naming, and the verification rules.`,
+    },
+    {
+      term: 'Stage Index',
+      to: '/docs/build/principles/core-build/stage-index',
+      desc: `How KSP builds the lookup and the capability manifest at compile time, and why it beat the alternatives.`,
     },
     {
       term: 'Activities',
