@@ -158,6 +158,17 @@ Each environment's app exposes a provisioning API. Only the market-onboarding co
 
 Sending a release is idempotent: one provisioning workflow per market, account type, version and environment.
 
+The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. The work runs in `MarketProvisioningWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+
+| Call | Request | Response |
+| --- | --- | --- |
+| `POST /provisioning/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
+| `GET /provisioning/releases/{market}/{account-type}/{version}` | | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE` or `FAILED`), the step the workflow is on, and for a failure, the step and the reason |
+| `POST /provisioning/releases/{market}/{account-type}/{version}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off |
+| `POST /provisioning/releases/{market}/{account-type}/{version}/rollback` | `requestedBy`, `reason` | `202`; the version before it becomes active again |
+| `POST /provisioning/markets/{market}/{account-type}/pause`, `.../resume` | `requestedBy`, `reason` | `202` |
+| `GET /provisioning/capabilities` | | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
+
 [^ Top](#table-of-contents)
 
 ---
@@ -343,7 +354,7 @@ Corporate rules:
 
 The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
 
-The model below is the target, agreed on 2026-10-17. It covers the whole lifecycle apart from what [Still open](#still-open) lists, and [Changes the code needs](#changes-the-code-needs) lists what the supplied file doesn't have yet.
+The model below is the target, agreed on 2026-10-17. It covers the whole lifecycle apart from what [Still open](#still-open) lists. [Changes the code needs](#changes-the-code-needs) lists what the supplied file doesn't have yet, and [Types the model uses but doesn't define](#types-the-model-uses-but-doesnt-define) covers the five types it leans on.
 
 ### Root types
 
@@ -420,7 +431,7 @@ Verify's results are the arguments of the move out of `PENDING`. A return's `Ret
 
 ### Changes the code needs
 
-Agreed on 2026-10-17, and not yet in the supplied file:
+Agreed on 2026-10-17, and not yet in the supplied file. The build makes them from this list (agreed 2026-10-18):
 
 1. `ProcessingFullPayment.toReturnedFullPayment(returnedInfo)` and `ProcessingSplitPayment.toReturnedSplitPayment(returnedInfo)`.
 2. `AllocatingPayment` and `AllocatedPayment`, with `AllocatingFullPayment` and `AllocatedFullPayment`, the six moves into and out of them, and the two status values.
@@ -431,6 +442,18 @@ Agreed on 2026-10-17, and not yet in the supplied file:
 7. `ReturnedFullPayment.toRepresentingFullPayment(representmentDate)` and the leg's version build the next presentment: numbered one higher, with the representment date as its clearing date. Today they copy the returned presentment's `presentmentSequence` and timeline.
 8. A representment that fails its recheck: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`, `DeclinedSplitPayment` and `RepresentingSplitPayment.toDeclinedSplitPayment(declineCode)`. The new presentment's row turns `DECLINED`; the one before it is already `RETURNED`. The moves from `REPRESENTING` back to `RETURNED`, for a payment and a leg, go.
 9. `SplitSlice` gains `splitPaymentId` and `account`, and `toAcceptedSplitPayment(splitSlice)` takes the leg's ID and card account from it. Today it builds the ID with `paymentId.withSplit(seq)` and copies the parent's account.
+
+### Types the model uses but doesn't define
+
+The supplied file leans on five types it doesn't define. The build takes each one from the current app where it exists there, and otherwise creates it as below (Proposed, 2026-10-18).
+
+| Type | What it is |
+| --- | --- |
+| `TransactionId` | A payment's ID, which One-Data makes as a ULID (agreed 2026-10-18). A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`. A small class over the string, checked when it is built and written to JSON as the plain string |
+| `MonetaryAmount` | `javax.money.MonetaryAmount` from JSR 354, the Java money API, with Moneta's `Money` behind it, so an amount is never a floating-point number. In JSON it is an amount and a currency code |
+| `TokenizedAccount` | The card account, held as its token and never as a card number. The token is the account's `CARD_ACCT.ACCT_ID` |
+| `PlanInfo` | The Pay & Plan details a payment carries, null on a payment made outside Pay & Plan. Its fields follow the Installments API |
+| `LegacyPayment` | Today's payment class. The model uses only its three enums: `PaymentStatus`, `PaymentSource` and `DeclineCode`. `PaymentStatus` holds the fourteen states, with `ALLOCATING` and `ALLOCATED` added by change 2 |
 
 ### Still open
 
@@ -1394,6 +1417,15 @@ Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other 
 - Worker Versioning: payment workflows are PINNED; dispatchers and the governor upgrade when they continue-as-new.
 - Offline workers in the shared app: their own slot caps (`setMaxConcurrentActivityExecutionSize`, `setMaxConcurrentWorkflowTaskExecutionSize`) and their own Oracle pool, so they can't starve online work.
 - OpenTelemetry interceptors on clients and workers. HTTP clients inside activities have their own retries off.
+
+### Environments
+
+A release moves through E1, E2 and E3, and E3 is production ([Market Onboarding](#market-onboarding)). Each environment has its own billpay-core, its own Online and Offline clusters and its own Oracle schema. Proposed (2026-10-18):
+
+- One build runs in every environment. What differs is config or a secret, read when the app starts, and nothing environment-specific goes into the image.
+- Both namespaces keep their names everywhere, `billpay-online` and `billpay-offline`, so moving between environments changes only the cluster endpoints.
+- Config per environment: the two Temporal endpoints, the Oracle connection for each pool, One-Data's base URL, each downstream's base URL, the Prometheus address and the OpenTelemetry collector's address.
+- Secrets come from the organization's secret store, under one path per environment: the two Oracle pools' logins, the client certificate for each Temporal cluster, the credentials One-Data and each downstream take (held the way the current app holds them), and the Prometheus login the governor reads with. No secret sits in a config file.
 
 ### Sizing
 
