@@ -69,7 +69,7 @@ export const IFACES = [
     fails: 'decline',
     failsAt: {Execute: 'must'},
     queue: "the workflow's queue",
-    at: ['Verify', 'Reverify', 'Execute', 'Represent'],
+    at: ['Verify', 'Reverify', 'Execute'],
     note: 'it has no rate limit',
   },
   {
@@ -77,7 +77,7 @@ export const IFACES = [
     system: 'Payment Options',
     fails: 'decline',
     queue: "the workflow's queue",
-    at: ['Verify', 'Reverify', 'Represent'],
+    at: ['Verify', 'Reverify'],
     note: 'it has no rate limit',
   },
   {
@@ -730,7 +730,7 @@ export const BANDS = [
             behave: 'Example values. Represent varies by the four behaviors other than bank confirmation.',
             notes: {
               Represent:
-                'It rechecks eligibility before anything goes to clearing, then sends the new presentment: REPRESENTED, or DECLINED if the recheck fails and nothing is sent.',
+                "It rechecks eligibility with checks of its own, still to be defined, not Verify's calls to Payment Instruments, Payment Options or Plans. Then it sends the new presentment: REPRESENTED, or DECLINED if the recheck fails and nothing is sent.",
             },
             then: [{to: 'returned', text: 'if this presentment is returned too, under its own workflow ID'}],
           },

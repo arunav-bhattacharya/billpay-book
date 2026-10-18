@@ -18,19 +18,19 @@ export const ACTIVITIES = [
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
     queue: "The workflow's queue: Payment Instruments has no rate limit",
-    calledBy: "Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call",
+    calledBy: "Verify, Reverify; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call",
   },
   {
     name: 'OptionsActivities',
     system: 'Payment Options',
     queue: "The workflow's queue: Payment Options has no rate limit",
-    calledBy: 'Verify, Reverify, Represent',
+    calledBy: 'Verify, Reverify',
   },
   {
     name: 'PlansActivities',
     system: "Plans, which checks the payment's mandate where the profile requires mandate authorization",
     queue: "The workflow's queue, like Payment Instruments and Payment Options",
-    calledBy: "Verify and Reverify. Represent doesn't check the mandate",
+    calledBy: "Verify and Reverify",
   },
   {
     name: 'ClearingActivities',

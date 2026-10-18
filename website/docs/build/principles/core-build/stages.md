@@ -140,4 +140,4 @@ class PaymentVerifyStageWithMandate(
 
 *(A sketch: the method names are illustrative.)*
 
-On the due date the same payment runs `PaymentReverifyStageWithMandate`, which calls Plans again. Represent doesn't check the mandate.
+On the due date the same payment runs `PaymentReverifyStageWithMandate`, which calls Plans again. Represent calls none of these three: its recheck is its own, still to be defined.

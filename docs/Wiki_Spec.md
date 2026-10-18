@@ -700,7 +700,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 > `{paymentId}-represent-{seq}` · Offline · started by the representment dispatcher on the representment date; `{seq}` is the new presentment's
 
-- **Represent:** rechecks eligibility before anything goes to clearing. If the recheck passes, the new presentment goes to the bank and turns `REPRESENTED`; if it fails, nothing is sent and the presentment is `DECLINED`.
+- **Represent:** rechecks eligibility before anything goes to clearing, with checks of its own rather than Verify's: it calls neither Payment Instruments, Payment Options nor Plans, and its checks are still to be defined (2026-10-18). If the recheck passes, the new presentment goes to the bank and turns `REPRESENTED`; if it fails, nothing is sent and the presentment is `DECLINED`.
 
 #### 11. ProcessInboundPaymentWorkflow
 
@@ -834,9 +834,9 @@ One activity interface per system, each on that system's task queue, with one ex
 | Interface | System | Task queue | Called by |
 | --- | --- | --- | --- |
 | `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update |
-| `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call (agreed 2026-10-18) |
-| `OptionsActivities` | Payment Options | The workflow's queue: Payment Options has no rate limit | Verify, Reverify, Represent |
-| `PlansActivities` | Plans, which checks the payment's mandate where the profile requires mandate authorization (agreed 2026-10-18) | The workflow's queue, like Payment Instruments and Payment Options (agreed 2026-10-18) | Verify and Reverify; Represent doesn't check the mandate (agreed 2026-10-18) |
+| `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call (agreed 2026-10-18) |
+| `OptionsActivities` | Payment Options | The workflow's queue: Payment Options has no rate limit | Verify, Reverify |
+| `PlansActivities` | Plans, which checks the payment's mandate where the profile requires mandate authorization (agreed 2026-10-18) | The workflow's queue, like Payment Instruments and Payment Options (agreed 2026-10-18) | Verify and Reverify (agreed 2026-10-18) |
 | `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `AuthorizationActivities` | Authorizations (AMP), open-to-buy | `ds-authorization` | Execute, except a corporate parent's, and every leg |
@@ -1723,5 +1723,6 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | One-Data's delete API | `DeletePendingPayment.v1` (agreed name, 2026-10-18) removes a stored create and its account-hash entry; its contract is to come | How billpay-core reports a finished create |
 | The onboarding config cache | Each billpay-core pod keeps the onboarding config in memory (agreed 2026-10-18). Proposed: it reloads when provisioning activates or rolls back a version | How fast a release reaches every pod |
 | Balance refund steps | They follow the payment path. Skipped for now (OK for now, 2026-10-18) | Detailed stages are still to be defined |
+| Represent's eligibility checks | Its own checks, not Verify's: no call to Payment Instruments, Payment Options or Plans (2026-10-18) | Which systems it calls, and what fails the recheck, are still to be defined |
 
 [^ Top](#table-of-contents)

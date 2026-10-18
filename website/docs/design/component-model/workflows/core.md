@@ -148,7 +148,7 @@ It also takes a customer's no to a payment made while another was pending. The c
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-represent-{seq}" start="The representment dispatcher, on the representment date" behaviors="all" />
 
-`ProcessRepresentmentWorkflow` sends a returned payment's next presentment to the bank, and `{seq}` is that presentment's number. Represent rechecks eligibility before anything goes to clearing, then commits `REPRESENTED`, or `DECLINED` if the recheck fails and nothing is sent.
+`ProcessRepresentmentWorkflow` sends a returned payment's next presentment to the bank, and `{seq}` is that presentment's number. Represent rechecks eligibility before anything goes to clearing, with checks of its own that are still to be defined, then commits `REPRESENTED`, or `DECLINED` if the recheck fails and nothing is sent.
 
 ## Process Inbound Payment
 

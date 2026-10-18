@@ -164,7 +164,7 @@ Writes the next presentment as a new row, with the same payment ID and a `presen
 
 ## Represent
 
-Rechecks eligibility with Payment Instruments and Payment Options before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. It doesn't check the mandate again. A failed recheck commits `DECLINED`, and nothing is sent.
+Rechecks eligibility before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. The recheck is its own, not Verify's: Represent calls neither Payment Instruments, Payment Options nor Plans, and which checks it runs is still to be defined. A failed recheck commits `DECLINED`, and nothing is sent.
 
 ## Settle
 
