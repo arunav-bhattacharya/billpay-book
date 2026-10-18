@@ -11,7 +11,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 <Lead>Thirteen core workflows, one per journey. Each runs its stages in order and holds no market logic: the stage implementations it looks up from its plan key do all the varying.</Lead>
 
-Every stage commits its state change in one guarded `PaymentStore` transaction. Then the workflow announces the change, an RTF lifecycle event and, where the customer is told, a Raven message, and waits for that before the next stage, so a payment's events reach RTF in order. Fulfil is the exception: it sends both before its commit, because `PROCESSED` means they have gone out.
+Every stage commits its state change in one guarded `PaymentStore` transaction. Then the workflow announces the change, an RTF lifecycle event and, where the market tells the customer, a Raven message, and waits for that before the next stage, so a payment's events reach RTF in order. Fulfil is the exception: it sends both before its commit, because `PROCESSED` means they have gone out.
 
 The strip under each heading shows the cluster, the workflow ID, what starts the workflow and which behaviors change its stages. [Stages](../stages.md) says what each stage calls, and the [sequence diagrams](../../sequence-diagrams.md) trace the same flows call by call.
 
@@ -133,7 +133,7 @@ The same workflow cancels a payment the customer never confirmed at their bank. 
 
 1. Check the payment, full or split, the presentment that came back, and its status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
 2. Return: that presentment's row turns `RETURNED` and stays there.
-3. Judge whether the return can be represented, and set the representment date from the market's rules: today or later.
+3. Judge whether the return can be represented under the market's representment rules: which returns are eligible, and how many times a payment can be represented. A return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.
 4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never hands off to a representment workflow directly.
 
 ## Process Representment
@@ -154,7 +154,7 @@ The same workflow cancels a payment the customer never confirmed at their bank. 
 
 `ConfirmPaymentWorkflow` picks up a payment that waited for the customer's bank. The caller sends the same payment ID once the customer has confirmed their bank details on the provider's site, and the workflow runs the rest of the pay-today path.
 
-1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. Proposed: Verify also asks the provider whether the customer confirmed.
+1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify checks the verification token Payment Instruments holds for the instrument, to guard against fraud. Proposed: a payment without a valid token is `DECLINED`.
 2. Execute, then Fulfil, as for pay today.
 
 A repeated confirm joins the running workflow. A confirm for a payment that was cancelled when its window closed gets 409; Proposed: once the workflow has closed, a repeated confirm gets the payment's current state.

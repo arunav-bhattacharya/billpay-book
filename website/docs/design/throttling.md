@@ -18,6 +18,8 @@ Every downstream endpoint with an agreed rate gets its own activity task queue o
 
 `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-comms` and `ds-allocations`.
 
+Until each system's owner agrees a number, every one of them is taken at 100 calls a second. Payment Instruments and Payment Options have no limit, so calls to them run on the workflow's own queue.
+
 The queue's server-side rate limit is the overall limit for that downstream, however many pods are polling it. The governor changes it at runtime through the task queue config API, for example:
 
 ```bash

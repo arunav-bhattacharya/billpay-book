@@ -37,14 +37,14 @@ The request is also the point of no return for the customer. A scheduled payment
 
 ## Receiving them
 
-The allocations manager calls back through One-Data, once or several times, with batches numbered per payment. The function is `CreatePaymentAllocations.v1`, a placeholder name until the real one is known, and it calls `POST /payments/{payment-id}/allocations`.
+The allocations manager calls back through One-Data, once or several times, with batches numbered per payment. The function is `CreatePaymentAllocations.v1`, and it calls `POST /payments/{payment-id}/allocations`.
 
 1. The API stores the batch in `allocation_batch`, so a big batch never travels inside a workflow's input.
 2. It starts `ReceiveAllocationsWorkflow` with only the payment ID and the batch number, and replies 202. A callback over its traffic budget gets 429 with `Retry-After`, and one that arrives while the Offline cluster is down gets 503. The allocations manager retries both.
 3. The workflow checks the batch. It writes no legs: every batch waits in `allocation_batch` until the payment executes.
 4. The batch that completes the amount moves the payment to `ALLOCATED`, in one guarded commit that also writes its `ALLOC_EXEC` row. That row is due at once for pay today, or at the execution time on the due date for a scheduled payment.
 
-Two assumptions sit under this, and both are open: the callback contract (batches numbered per payment, complete when they add up to the amount), and that allocations don't change once they have arrived. If they could change, a batch would need replacing before its legs are written.
+Two rules sit under this, and both are agreed: the callback contract (batches numbered per payment, complete when they add up to the amount), and that allocations never change once they have arrived. So a batch never needs replacing before its legs are written.
 
 ## Executing the payment
 

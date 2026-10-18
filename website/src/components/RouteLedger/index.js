@@ -412,8 +412,8 @@ function Trigger({j, n, brief, go}) {
           <b>READY rows in One-Data&apos;s inbox</b>
         </p>
         <p className={styles.stepNote}>
-          <span className={styles.mono}>MoneyMovementEventHandler.v1</span> records settlements from MR/M3, and{' '}
-          <span className={styles.mono}>AccountsReceivableTransactionEventHandler.v1</span> records AR postings from
+          <span className={styles.mono}>CreateMoneyMovementEventHandler.v1</span> records settlements from MR/M3, and{' '}
+          <span className={styles.mono}>CreateAccountsReceivableTransactionEventHandler.v1</span> records AR postings from
           GAR. A row is READY once it has both.
         </p>
       </li>
@@ -1614,7 +1614,8 @@ export default function RouteLedger() {
           </div>
           <p className={styles.note}>
             Task queues are the Offline cluster&apos;s. On the Online cluster every regular activity runs on online-wf,
-            its main task queue, except calls to a downstream a SEPA run has capped. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
+            its main task queue, except calls to a downstream a SEPA run has capped. Raven calls follow the default Raven
+            setting, which a market or an account type can change. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
             it moves a corporate parent to PROCESSED, and ProcessMissingPaidEvents asks MR/M3 and GAR for a
             payment&apos;s state. The two reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}
             and <span className={styles.mono}>GET /payments/{'{payment-id}'}</span>, go straight to Oracle and start no

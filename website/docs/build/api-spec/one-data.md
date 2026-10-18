@@ -15,8 +15,8 @@ export const CORE = [
   {fn: 'ReadPaymentEventsById.v1', method: 'GET', path: '/payments/{payment-id}', purpose: 'Lists the lifecycle states one payment has been through.'},
   {fn: 'CreateCreditBalanceRefund.v1', method: 'POST', path: '/refunds', purpose: 'Refunds a credit balance on a card account.'},
   {fn: 'CreateInboundPayment.v1', api: "None (One-Data's inbox)", link: false, purpose: 'Takes a payment a third party pushed. One-Data stores it and replies 202, and the inbound dispatcher starts its workflow.'},
-  {fn: 'ConfirmPayment.v1', method: 'POST', path: '/payments/{payment-id}/confirm', link: false, tag: 'Placeholder', purpose: "Confirms a payment that waited for the customer's bank, with the same payment ID, once the customer has confirmed their bank details on the provider's site. It starts processing the payment. Channels call it."},
-  {fn: 'CreatePaymentAllocations.v1', method: 'POST', path: '/payments/{payment-id}/allocations', link: false, tag: 'Placeholder', purpose: 'The allocations callback for corporate payments, one numbered batch at a time. Replies 202 once the batch is stored and its workflow has started.'},
+  {fn: 'ConfirmPendingPayment.v1', method: 'POST', path: '/payments/{payment-id}/confirm', link: false, purpose: "Confirms a payment that waited for the customer's bank, with the same payment ID, once the customer has confirmed their bank details on the provider's site. It starts processing the payment. Channels call it."},
+  {fn: 'CreatePaymentAllocations.v1', method: 'POST', path: '/payments/{payment-id}/allocations', link: false, purpose: 'The allocations callback for corporate payments, one numbered batch at a time. Replies 202 once the batch is stored and its workflow has started.'},
 ];
 
 export const COMPOSITE = [
@@ -28,7 +28,7 @@ export const COMPOSITE = [
 
 <Lead>One-Data functions are the platform's front door: the versioned contracts that channels and other platforms call. A function either delegates to one billpay-core API or, for work nobody waits on, stores the request in One-Data's inbox for a dispatcher to pull.</Lead>
 
-Every linked name opens its contract in the One-Data explorer. Names the explorer doesn't list yet are plain text, and the ones still marked Placeholder will change when the real names are agreed.
+Every linked name opens its contract in the One-Data explorer. Names the explorer doesn't list yet are plain text.
 
 ## Core functions
 
@@ -44,9 +44,9 @@ Event handlers take events from other platforms. None of them starts or waits on
 
 | Handler | What it takes |
 | --- | --- |
-| `MoneyMovementEventHandler.v1` | Money movement events from MR/M3. A return is stored in the inbox for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment. |
-| `AccountsReceivableTransactionEventHandler.v1` | Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment, or leg, and presentment. |
-| `OpentoBuyUpdatePaymentEventHandler.v1` | Authorizations (AMP) events, stored by One-Data. Details are still to be defined. |
+| `CreateMoneyMovementEventHandler.v1` | Money movement events from MR/M3. A return is stored in the inbox for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment. |
+| `CreateAccountsReceivableTransactionEventHandler.v1` | Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment, or leg, and presentment. |
+| `CreateOpentoBuyUpdatePaymentEventHandler.v1` | Authorizations (AMP) events, stored by One-Data. Details are still to be defined. |
 
 The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. For `PAID`, One-Data marks a payment's row `READY` once it has both an AR posting and a settlement, and `ProcessPaidEventsWorkflow` reads only `READY` rows and sets each payment or leg `PAID`.
 

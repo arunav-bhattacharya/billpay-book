@@ -124,10 +124,12 @@ A tick costs about 5 Temporal writes. Releasing a million payments at 50 TPS tak
 
 | Window | Starts (UTC, winter) | Starts (local) | Volume | Cutoff | Rate needed |
 | --- | --- | --- | --- | --- | --- |
-| SEPA (DE, IT) | 23:00 | Midnight CET, 6 PM ET | Up to 500K | 3 to 4 hours | 46 TPS for 3 hours; the governor aims at about 56 |
-| US | 05:00 | Midnight ET | Up to 1M | None | 50 TPS floor (5.6 hours); 100 TPS takes 2.8 hours |
+| SEPA (DE, IT) | 23:00 | Midnight CET, 4 PM MST | Up to 500K | 3 to 4 hours | 46 TPS for 3 hours; the governor aims at about 56 |
+| US | 07:01 | 00:01 MST (Phoenix time) | Up to 1M | None | 50 TPS floor (5.6 hours); 100 TPS takes 2.8 hours |
 
-In summer both windows start an hour earlier in UTC. They never overlap, so one Offline cluster serves them in turn, and the US window sets its size. SEPA runs during the US evening, which makes it the window most likely to meet heavy online traffic. Its floor is there for its cutoff: it aims to finish the run 30 minutes early, and if online traffic would take too much of a downstream, the cutoff wins and online calls are capped ([Throttling](./throttling.md#when-the-cutoff-wins)).
+In summer the SEPA window starts an hour earlier in UTC. The US run doesn't move, because Phoenix keeps no daylight saving. AT and the other SEPA markets run in the same window as DE and IT, with smaller volumes. The windows never overlap, so one Offline cluster serves them in turn, and the US window sets its size. SEPA runs during the US evening, which makes it the window most likely to meet heavy online traffic. Its floor is there for its cutoff: it aims to finish the run 30 minutes early, and if online traffic would take too much of a downstream, the cutoff wins and online calls are capped ([Throttling](./throttling.md#when-the-cutoff-wins)).
+
+Two other kinds of work arrive at known times. Inbound payments come in around 8 PM MST, up to 100 a second and 500K a day, after the SEPA run and before the US one. The AR posting events that move payments to `PAID` arrive in the US early morning, and the governor gives the PAID drain its share last.
 
 ## The governor
 

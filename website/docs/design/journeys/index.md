@@ -173,7 +173,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   }}
   entry={[
     {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
-    {kind: 'function', label: 'ConfirmPayment.v1', logo: 'oneData', note: 'once confirmed'},
+    {kind: 'function', label: 'ConfirmPendingPayment.v1', logo: 'oneData', note: 'once confirmed'},
   ]}
   core={[
     {kind: 'api', label: 'POST /payments'},
@@ -240,7 +240,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
     {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and commits a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes. The caller\'s update returns `PENDING` with the link, the `PENDING` event goes to RTF, and `CreateImmediatePaymentWorkflow` ends.'},
     {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the payment waits in Oracle. If no confirm comes before the window closes, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster, and the payment ends `CANCELLED`.'},
-    {step: 4, text: 'The caller comes back with the same payment ID. `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start, and Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
+    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start. The provider has already verified the customer\'s bank details. To guard against fraud, Verify checks the verification token Payment Instruments holds for the instrument, then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. Proposed: a payment without a valid token is `DECLINED`. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
     {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
     {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`.'},
@@ -864,7 +864,6 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
     {step: 3, text: 'The workflow checks the batch against the payment. It writes no legs: every batch waits in `allocation_batch` until the payment executes.'},
     {step: 4, text: 'The batch that completes the amount moves the payment from `ALLOCATING` to `ALLOCATED`, in one guarded commit.'},
     {step: 5, text: 'The same commit writes the `ALLOC_EXEC` row: due at once for a payment made today, or at the execution time on the due date for a scheduled one. The allocated-payments dispatcher picks it up from there.'},
-    {text: '`CreatePaymentAllocations.v1` is a placeholder name until the real function name is known.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#13-allocations-callback', label: 'Sequence diagram'}}
 />
@@ -954,7 +953,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
       name: 'Judge',
       mode: 'background',
       caption: 'worth another try',
-      exit: {label: 'not representable, so it stays returned'},
+      exit: {label: 'not eligible, so it stays returned'},
     },
     {
       icon: 'calendar',
@@ -968,7 +967,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
     {text: 'Returns come in bursts, up to 100 a second and 100K a day. One-Data keeps each one in its inbox, and the returns dispatcher starts them through the Router at the governor\'s pace, at priority 5, the lowest priority level.'},
     {step: 1, text: 'Only a payment that got far enough can come back. The workflow checks the payment, whole or a leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment returned again.'},
     {step: 2, text: 'The presentment that came back moves to `RETURNED`, and its row stays there.'},
-    {step: 3, text: 'Not every return is worth another try. Billpay judges whether this one can be represented, and sets the representment date from the market\'s rules: today or later.'},
+    {step: 3, text: 'Not every return is worth another try. The market\'s representment rules say which returns are eligible and how many times a payment can be represented, and a return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.'},
     {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never starts the representment itself; the date does.'},
     {text: 'What happens on that date is [A payment is represented](#a-payment-is-represented).'},
   ]}

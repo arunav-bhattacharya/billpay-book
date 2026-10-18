@@ -34,7 +34,7 @@ A Schedule is a timer the cluster owns, not a workflow. It fires on its cadence 
   ]}
 />
 
-Every Schedule lives on the Offline cluster. A market's Schedules take the market's time zone, so its execution time holds across daylight saving. They use overlap policy SKIP and a 6-hour catch-up window, so a trigger missed during an outage still fires once the cluster is back.
+Every Schedule lives on the Offline cluster. A market's Schedules take the market's time zone, so its execution time holds across daylight saving. The US runs on Phoenix time, which has no daylight saving, so its run starts at 00:01 MST all year. Execution runs every day, and no market keeps a holiday calendar. They use overlap policy SKIP and a 6-hour catch-up window, so a trigger missed during an outage still fires once the cluster is back.
 
 ## Dispatchers
 

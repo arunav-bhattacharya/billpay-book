@@ -17,13 +17,13 @@ export const ACTIVITIES = [
   {
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
-    queue: "The workflow's queue; its own queue once it has an agreed limit",
-    calledBy: 'Verify, Reverify, Represent',
+    queue: "The workflow's queue: Payment Instruments has no rate limit",
+    calledBy: "Verify, Reverify, Represent; at confirm, Verify also checks the instrument's verification token",
   },
   {
     name: 'OptionsActivities',
     system: 'Payment Options',
-    queue: "The workflow's queue; its own queue once it has an agreed limit",
+    queue: "The workflow's queue: Payment Options has no rate limit",
     calledBy: 'Verify, Reverify, Represent',
   },
   {
@@ -72,7 +72,7 @@ export const ACTIVITIES = [
     name: 'BankConfirmationActivities',
     system: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
     queue: "The workflow's queue: only the Online cluster calls it",
-    calledBy: 'RequestConfirmation, for the redirect link; Proposed: Verify, at confirm',
+    calledBy: "RequestConfirmation, for the redirect link. Verify doesn't call it: the provider verifies the customer's bank details itself",
   },
   {
     name: 'InboxActivities',
@@ -106,7 +106,7 @@ Activities take IDs, not payment objects, and load what they need. RTF lifecycle
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` is a Proposed name, and what it asks the provider is still to be agreed.
+`BankConfirmationActivities` is a Proposed name. Billpay asks the provider only for the redirect link.
 
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 
@@ -140,7 +140,7 @@ It runs as a local activity, which is what lets a payment ride out an Oracle out
 | Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 
-Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the third row, since nobody throttles them. Raven has an agreed rate, so its calls run on `ds-comms`.
+Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the third row, since nobody throttles them, and so do calls to Payment Instruments and Payment Options, which have no limit. Raven has an agreed rate, so its calls run on `ds-comms`.
 
 ## Retries and timeouts
 

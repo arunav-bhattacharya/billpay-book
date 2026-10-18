@@ -503,7 +503,7 @@ sequenceDiagram
   participant RTF
   participant RAV as Raven
 
-  MM->>IN: return event:<br/>MoneyMovementEventHandler.v1
+  MM->>IN: return event:<br/>CreateMoneyMovementEventHandler.v1
   rect rgba(83,86,90,0.14)
     Note over IN: stored as a READY start request
   end
@@ -524,7 +524,7 @@ sequenceDiagram
     end
     WF->>RTF: RETURNED event
     WF->>RAV: RETURNED message
-    opt it can be represented
+    opt the market's rules allow another presentment
       Note over WF,RET: date from market rules, today or later
       WF->>QR: run
       rect rgba(102,169,226,0.40)
@@ -688,8 +688,8 @@ sequenceDiagram
 
   rect rgba(83,86,90,0.14)
     Note over MM,IN: One-Data's inbox keeps one row per payment or leg
-    MM->>IN: settlement, MoneyMovementEventHandler.v1
-    GAR->>IN: AR posting, AccountsReceivable<br/>TransactionEventHandler.v1
+    MM->>IN: settlement,<br/>CreateMoneyMovementEventHandler.v1
+    GAR->>IN: AR posting, CreateAccountsReceivable<br/>TransactionEventHandler.v1
     Note over GAR,IN: whichever arrives second sets the row READY. A leg's posting takes its payment's settlement
   end
 
@@ -864,7 +864,7 @@ sequenceDiagram
 
   box rgba(0,23,90,0.07) Caller
     participant OD as CreatePayment.v3
-    participant OC as ConfirmPayment.v1
+    participant OC as ConfirmPending<br/>Payment.v1
   end
 
   box rgba(0,111,207,0.05) Billpay Platform
@@ -916,6 +916,7 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over CW,PS: Online cluster
       CW->>VER: run
+      Note over VER: checks the verification token<br/>Payment Instruments holds
       rect rgba(102,169,226,0.40)
         VER->>PS: state → ACCEPTED or DECLINED, guarded on PENDING,<br/>and the CONFIRM_EXPIRY row cancelled, one commit
       end

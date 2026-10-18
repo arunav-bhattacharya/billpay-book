@@ -61,7 +61,7 @@ export const IFACES = [
     fails: 'hold',
     queue: 'ds-comms',
     at: ['Verify', 'Reverify', 'Fulfil', 'Cancel', 'Return', 'Represent'],
-    note: 'where the customer is told',
+    note: 'where the market tells the customer',
   },
   {
     name: 'InstrumentActivities',
@@ -294,9 +294,8 @@ export const BANDS = [
         ],
       },
       {
-        fn: ['ConfirmPayment.v1'],
+        fn: ['ConfirmPending|Payment.v1'],
         from: 'a channel',
-        aside: 'a placeholder name',
         calls: 'A channel calls',
         does: "go ahead with a payment that waited for the customer's bank, with the same payment ID",
         api: ['POST', '/payments/{payment-id}/confirm'],
@@ -416,7 +415,7 @@ export const BANDS = [
         ],
       },
       {
-        fn: ['MoneyMovementEvent|Handler.v1'],
+        fn: ['CreateMoneyMovement|EventHandler.v1'],
         from: 'MR/M3, a return',
         calls: 'MR/M3 sends a return to',
         handler: true,
@@ -439,7 +438,7 @@ export const BANDS = [
               Return:
                 'It checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again. That presentment stays RETURNED.',
               QueueRepresentment:
-                'It judges whether the payment can be represented and sets the date from market rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with that date as its clearing date and a REPRESENT row due on it.',
+                "It judges whether the payment can be represented under the market's rules (which returns are eligible, and how many times) and sets the date from the same rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with that date as its clearing date and a REPRESENT row due on it.",
             },
             then: [{to: 'represent', text: 'on the representment date, its REPRESENT row'}],
           },
@@ -480,7 +479,6 @@ export const BANDS = [
       {
         fn: ['CreatePayment|Allocations.v1'],
         from: 'the allocations manager',
-        aside: 'a placeholder name',
         calls: 'The allocations manager calls',
         does: 'one numbered batch of allocations for a corporate payment',
         api: ['POST', '/payments/{payment-id}/allocations'],
@@ -646,7 +644,7 @@ export const BANDS = [
         writer: 'ProcessReturnedPayment',
         wrote: ['returned'],
         written: 'at QueueRepresentment',
-        origin: ['MoneyMovementEvent|Handler.v1'],
+        origin: ['CreateMoneyMovement|EventHandler.v1'],
         due: 'on the date market rules set',
         roads: [
           {
@@ -706,7 +704,7 @@ export const BANDS = [
     drain: true,
     requests: [
       {
-        fn: ['MoneyMovementEvent|Handler.v1', 'AccountsReceivable|TransactionEventHandler.v1'],
+        fn: ['CreateMoneyMovement|EventHandler.v1', 'CreateAccountsReceivable|TransactionEventHandler.v1'],
         from: 'settlements from MR/M3, postings from GAR',
         ready: true,
         roads: [
@@ -860,9 +858,10 @@ export function moveOf(j, s) {
   return MOVE[s];
 }
 
-/* Raven at Verify: a scheduled payment is always told; a payment made today
-   only when it declines; an inbound one never, since DISALLOWED is not one
-   of the states the customer is told about. */
+/* Raven at Verify, under the default Raven setting: a scheduled payment is
+   told; a payment made today only when it declines; an inbound one never,
+   since DISALLOWED is not one of the states the customer is told about. A
+   market or an account type can change the setting. */
 function ravenAtVerify(j) {
   if (j.id === 'inbound') return null;
   if (VERIFY[j.id]) return '';

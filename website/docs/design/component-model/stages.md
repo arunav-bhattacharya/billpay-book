@@ -24,7 +24,7 @@ Two stages bend that order, for good reasons:
 - On the Online cluster, Capture and Verify commit back to back so the caller's answer isn't held up. Both announcements follow the reply, in order.
 - Fulfil sends its event and message before its commit, because `PROCESSED` means they have gone out. Comms go last, after accounting, eBNC and risk, so the customer hears only once everything else has worked.
 
-The changes that send a Raven message are assumed, for now, to be `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED`.
+Which changes send a Raven message is a market setting. By default they are `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED`. A market can change that default, and an account type can change its market's (Proposed: the most specific setting wins). A change that is switched off sends no message, and Fulfil then waits for RTF alone.
 
 ## The thirteen stages
 
@@ -82,7 +82,7 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
-- A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. Proposed: Verify also asks the provider whether the customer confirmed.
+- A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. The provider has already verified the customer's bank details, so Verify checks the verification token Payment Instruments holds for the instrument, to guard against fraud. Proposed: a payment without a valid token is `DECLINED`.
 
 Verify varies by all four behaviors and by bank confirmation. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
 

@@ -32,7 +32,7 @@ The Router answers a write before any workflow starts when it can't take it:
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
 | `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment |
 
-`PENDING` in a reply means the payment is captured but not yet decided. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID.
+`PENDING` in a reply means the payment is captured but not yet decided: the API waits at most 3 seconds for the decision, then replies `PENDING`. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID.
 
 One composite API runs core workflows as children:
 

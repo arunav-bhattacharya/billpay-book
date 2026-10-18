@@ -39,6 +39,7 @@ export const SETTINGS = [
   'Allocation fetch',
   'Bank confirmation window',
   'Representment rules',
+  'Raven notifications',
   'Expected volumes',
 ];
 
