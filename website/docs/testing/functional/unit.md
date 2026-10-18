@@ -21,7 +21,7 @@ A stage makes its calls, commits once through `PaymentStore`, and returns its ou
 
 The announcement gets its own case: the RTF event names the state that was committed, and a Raven message goes out only where the market's setting turns it on. Fulfil is the one stage that announces before its commit, so its test checks that order too.
 
-A new implementation, such as `MandateVerifyStage` for markets that check a mandate, arrives with these tests for the behaviors it serves.
+A new implementation, such as `PaymentVerifyStageWithMandate` for markets that check a mandate, arrives with these tests for the behaviors it serves.
 
 ## The plan-key lookup
 

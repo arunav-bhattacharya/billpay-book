@@ -27,6 +27,12 @@ export const ACTIVITIES = [
     calledBy: 'Verify, Reverify, Represent',
   },
   {
+    name: 'PlansActivities',
+    system: "Plans, which checks the payment's mandate where the profile requires mandate authorization",
+    queue: "The workflow's queue, like Payment Instruments and Payment Options",
+    calledBy: "Verify and Reverify. Represent doesn't check the mandate",
+  },
+  {
     name: 'ClearingActivities',
     system: 'MR/M3',
     queue: 'ds-clearing',
@@ -148,11 +154,11 @@ It runs as a local activity, which is what lets a payment ride out an Oracle out
 | Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 
-Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the third row, since nobody throttles them, and so do calls to Payment Instruments and Payment Options, which have no limit. Raven has an agreed rate, so its calls run on `ds-comms`.
+Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the third row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans. Raven has an agreed rate, so its calls run on `ds-comms`.
 
 ## Retries and timeouts
 
-- Business failures that Verify or Reverify find, such as a closed account or insufficient funds, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
+- Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate Plans can't verify, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
 - A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
 - Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
 - RTF and Raven get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.

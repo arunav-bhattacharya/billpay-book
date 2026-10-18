@@ -15,7 +15,7 @@ import Lead from '@site/src/components/Lead';
 | Layer | Default (shared) | Market override |
 | --- | --- | --- |
 | Workflow | `core/lib/workflows/impl/` | None |
-| Stage | `core/lib/stages/impl/` | `market/{m}/stages/` |
+| Stage | `core/lib/stages/impl/{step}/`, one folder per step | `market/{m}/stages/` |
 | Activity | `core/lib/activities/` and `impl/` | None |
 | Client | `core/lib/clients/` | None |
 
@@ -41,6 +41,6 @@ The Gradle module graph makes a violation a compile error, not a review comment.
 - A market that really does something differently gets a stage implementation in `market/{m}/stages/`. Its workflows, activities and clients stay as they are.
 - A new downstream system means a new `{System}Client`, the `{System}Activities` that calls it, and the stage that uses it.
 
-This is where the name-for-behavior rule earns its keep. A stage that clears in batch is called something like `BatchClearingExecuteStage`, not `GermanyExecuteStage`, so the next market with the same rule reuses the file instead of copying it.
+This is where the name-for-behavior rule earns its keep. The Verify that checks a mandate is `PaymentVerifyStageWithMandate`, not `GermanyVerifyStage`, so the next market that needs a mandate reuses the file instead of copying it. Only a real market override carries a market in its name, as `In{Market}` at the end ([the naming rule](../../../design/component-model/stages.md#naming-implementations)).
 
 The deployables this monorepo produces are covered under [Deployment](../../../deployment/deployables/index.md).

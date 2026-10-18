@@ -44,15 +44,15 @@ Say a market's consumer profile sets AR posting to Y, mandate authorization to Y
 | Realtime clearing | Y | N: every future-dated payment clears in batch |
 | Mandate authorization | Y | Y |
 | Bank confirmation | N | N |
-| Verify, or Reverify on the due date | `MandateVerifyStage` | Reverify's mandate implementation |
-| Execute | `RealtimeClearingExecuteStage` | `BatchClearingExecuteStage` |
-| Fulfil | The consumer Fulfil | The consumer Fulfil |
+| Verify, or Reverify on the due date | `PaymentVerifyStageWithMandate` | `PaymentReverifyStageWithMandate` |
+| Execute | `PaymentExecuteStageWithRealtimeClearing` | `DefaultPaymentExecuteStage`, which clears in batch |
+| Fulfil | `DefaultPaymentFulfilStage` | `DefaultPaymentFulfilStage` |
 
-*(An example. `MandateVerifyStage` is the spec's name; the other class names are illustrative.)*
+*(An example. The class names follow the [naming rule](./component-model/stages.md#naming-implementations).)*
 
-Each step runs one implementation, and that implementation does the whole step. The workflow calls Verify once. `MandateVerifyStage` calls Payment Options, Payment Instruments and the mandate check as activities, in parallel, then commits once. It doesn't call other stages, because a stage never calls another stage ([Call rules](./principles.md#call-rules)). The Options and Instruments calls every Verify makes are written once, in a helper each implementation calls, so nothing is copied.
+Each step runs one implementation, and that implementation does the whole step. The workflow calls Verify once. `PaymentVerifyStageWithMandate` calls Payment Options, Payment Instruments and Plans, which checks the mandate, as activities, in parallel, then commits once. It doesn't call other stages, because a stage never calls another stage ([Call rules](./principles.md#call-rules)). The Options and Instruments calls every Verify makes are written once, in a helper each implementation calls, so nothing is copied.
 
-If this market ever needed a Verify rule of its own, an override in `market/{m}/stages/` would declare the same behaviors plus the market. That is a more specific match, so it would win for this market and no other, which is why the plan key carries the market (Proposed). A second market with the same profile runs exactly the same classes, with no code of its own.
+If this market ever needed a Verify rule of its own, an override in `market/{m}/stages/` would declare the same behaviors plus the market, and its name would end with the market, such as `PaymentVerifyStageWithMandateInGb`. That is a more specific match, so it would win for this market and no other, which is why the plan key carries the market (Proposed). A second market with the same profile runs exactly the same classes, with no code of its own.
 
 ## Start modes
 

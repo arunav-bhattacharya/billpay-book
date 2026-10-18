@@ -60,6 +60,7 @@ const SYSTEMS = {
   B2Notifier: 'B2Notifier, which tells other downstream systems when a payment is processed',
   'Payment Instruments': 'Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need',
   'Payment Options': 'Payment Options, which resolves the amount a customer chose',
+  Plans: "Plans, which checks the payment's mandate where the market requires one",
   Installments: 'Installments, which owns the instalment plan',
   Globestar: 'Globestar, which holds the instalment plan',
   Allocations: 'Allocations Manager, which returns a corporate breakdown',

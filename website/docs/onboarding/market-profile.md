@@ -25,7 +25,7 @@ These are the payment dimensions. Every stage that varies between markets varies
 | `accountType` | `CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL` | Who is paying, which shapes everything from splits to allocations |
 | `requiresArPosting` | Y, N or BOTH | Whether the processed payment is posted to Accounts Receivable |
 | `requiresRealtimeClearing` | Y, N or BOTH | Whether clearing is realtime or batch |
-| `requiresMandateAuthorization` | Y, N or BOTH | Whether a mandate is verified before processing |
+| `requiresMandateAuthorization` | Y, N or BOTH | Whether Plans checks the payment's mandate, at Verify and again at Reverify on the due date. A mandate Plans can't verify declines the payment |
 | `requiresBankConfirmation` | Y, N or BOTH | Whether the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
 
 ## BOTH, resolved per journey

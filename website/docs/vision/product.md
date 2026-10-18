@@ -88,7 +88,7 @@ The first kind sets the **behaviors**, the choices that change how a payment is 
 | **Account type** | Which kind of card account the payment is for (`accountType`). Each is onboarded as a profile of its own, because each is processed differently, and a request for an account type the market hasn't onboarded is turned away. | Consumer, corporate or business travel |
 | **Good faith credit** | Whether the cardmember gets credit for the payment before the money settles. Billpay tells Accounts Receivable, the system that tracks what they owe, to post the payment while it is still processing (`requiresArPosting`). | Y, N or BOTH |
 | **Realtime clearing** | Whether the payment goes to the customer's bank straight away or waits for a periodic batch (`requiresRealtimeClearing`). | Y, N or BOTH |
-| **Mandate authorization** | Whether Billpay has to verify a mandate, the standing authorization to collect the money, while the payment is processed (`requiresMandateAuthorization`). | Y, N or BOTH |
+| **Mandate authorization** | Whether Billpay has to verify a mandate, the standing authorization to collect the money, before the payment is processed. Plans does the check, and a payment whose mandate fails is declined (`requiresMandateAuthorization`). | Y, N or BOTH |
 | **Bank confirmation** | Whether the customer confirms their bank details on a provider's site, such as Plaid or Pay with Bank Transfer, before the payment is processed (`requiresBankConfirmation`). | Y, N or BOTH |
 
 ### Operations settings

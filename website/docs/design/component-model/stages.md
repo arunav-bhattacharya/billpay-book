@@ -66,6 +66,35 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 
 Create Balance Refund follows the payment path; its detailed stages are still being defined.
 
+## Naming implementations
+
+A stage interface is named for its step, with `Payment` in front: `PaymentVerifyStage`, `PaymentExecuteStage`. An implementation keeps that name whole and adds what it serves after it, so it always reads as one version of a step, never as a step of its own. The parts come from the implementation's index declaration, in this order:
+
+1. `For` and the account type: `ForConsumer`, `ForCorporate` or `ForBusinessTravel`.
+2. `With` and each behavior it needs, joined with `And`, in the profile's order: `ArPosting`, `RealtimeClearing` (`BatchClearing` when it is N), `Mandate`, `BankConfirmation`, then `GoAhead`. A behavior it needs to be N follows as `Without`, such as `WithoutArPosting`.
+3. `In` and the market, for a market override only, such as `InGb`.
+
+The implementation that declares nothing is `DefaultPayment{Step}Stage`, and it runs for every combination nothing more specific matches. A name never lists the activities an implementation calls. The mandate check, for example, is a call to Plans that Verify makes, so a market that needs one runs a Verify that makes that call:
+
+| Verify implementation | What it does |
+| --- | --- |
+| `DefaultPaymentVerifyStage` | Instruments and Options checks only: Payment Instruments and Payment Options |
+| `PaymentVerifyStageWithMandate` | Mandate authorization: Payment Instruments, Payment Options and Plans |
+| `PaymentVerifyStageWithBankConfirmation` | Bank confirmation: Payment Instruments, with the verification token check, and Payment Options |
+| `PaymentVerifyStageWithMandateAndBankConfirmation` | Both: Payment Instruments, with the token check, Payment Options and Plans |
+| `PaymentVerifyStageForCorporateWithMandate` | A corporate payment with mandate authorization: the same calls, and its commit also writes the `ALLOC_REQUEST` row |
+| `PaymentVerifyStageWithBankConfirmationInGb` | A rule only GB needs, kept in `market/gb/stages/` |
+
+*(Examples of the rule, agreed on 2026-10-18.)*
+
+On the due date, a payment that needs a mandate runs `PaymentReverifyStageWithMandate`, which asks Plans again. Execute works the same way: `DefaultPaymentExecuteStage` clears in batch, and `PaymentExecuteStageWithRealtimeClearing` clears in real time.
+
+Three rules keep the names straight:
+
+- The build checks every name. KSP, the code generator that builds the stage index, works out the expected name from each declaration and fails the build when a class is named anything else.
+- Calls that every implementation of a step makes, such as Verify's Instruments and Options calls, live in a plain helper function, never in a base class.
+- A step's implementations sit together in one folder, such as `core/lib/stages/impl/verify/`.
+
 ## Capture
 
 Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent. A duplicate means the request was seen before, and the caller gets the existing payment. On the Online cluster Capture gets a short deadline, so a caller facing an Oracle problem gets a quick error instead of a long wait.
@@ -82,18 +111,18 @@ RequestConfirmation also holds a payment for the customer's go-ahead, when One-D
 
 Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and Payment Options, to confirm the amount.
 
-- A business failure, such as a closed account, insufficient funds, or an amount above the customer's AR balance, which Payment Options refuses, is not retried. The payment goes to `DECLINED`.
+- A business failure, such as a closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, or a mandate Plans can't verify, is not retried. The payment goes to `DECLINED`.
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
 - A payment that waited for a go-ahead is verified in Confirm Payment too, with the usual checks and no provider call, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
 
-Verify varies by all four behaviors and, at confirm, by what the payment waited for. A market that requires mandate authorization runs `MandateVerifyStage`, which verifies the mandate as part of the decision.
+Verify varies by all four behaviors and, at confirm, by what the payment waited for. Where the profile requires mandate authorization, Verify also asks Plans to check the mandate, in parallel with its other two calls, and a mandate Plans can't verify is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`.
 
 ## Reverify
 
-Checks a scheduled payment again on its due date, with the same calls as Verify, and commits `ACCEPTED` or `DECLINED`. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
+Checks a scheduled payment again on its due date, with the same calls as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
 
 ## Execute
 
@@ -135,7 +164,7 @@ Writes the next presentment as a new row, with the same payment ID and a `presen
 
 ## Represent
 
-Rechecks eligibility with Payment Instruments and Payment Options before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. A failed recheck commits `DECLINED`, and nothing is sent.
+Rechecks eligibility with Payment Instruments and Payment Options before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. It doesn't check the mandate again. A failed recheck commits `DECLINED`, and nothing is sent.
 
 ## Settle
 

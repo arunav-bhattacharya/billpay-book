@@ -14,30 +14,30 @@ import Lead from '@site/src/components/Lead';
 
 ## The shape of a stage
 
-Every stage is a `{Step}Stage` interface with two functions. `run` does the step and returns what happened. `announce` tells RTF, and Raven where the customer is told, about the change `run` committed. The workflow calls them in that order, so a payment's events always reach RTF after the state they describe is in Oracle.
+Every stage is a `Payment{Step}Stage` interface with two functions. `run` does the step and returns what happened. `announce` tells RTF, and Raven where the customer is told, about the change `run` committed. The workflow calls them in that order, so a payment's events always reach RTF after the state they describe is in Oracle.
 
 ```kotlin
-interface ExecuteStage {
+interface PaymentExecuteStage {
     fun run(paymentId: String, verified: VerifyOutcome): ExecuteOutcome  // PROCESSING, after the calls succeed
     fun announce(paymentId: String)                                      // the PROCESSING event
 }
 ```
 
-The implementations are named for the behavior they serve, never for a market. `MandateVerifyStage` is the Verify that checks a mandate, wherever a market needs one. If two markets share a rule, they share the file, and a market's name in a class name usually means the rule was written in the wrong place.
+An implementation is named for what it serves, never for a market: `PaymentVerifyStageWithMandate` is the Verify for every market that requires mandate authorization. If two markets share a rule, they share the file, and a market's name in a class name usually means the rule was written in the wrong place. [Naming an implementation](#naming-an-implementation) has the rule.
 
 ## Writing run
 
 A stage makes its calls first, in parallel wherever they don't depend on each other, and then commits once. Here is the Execute for a consumer payment, which clears, posts to Accounts Receivable (AR) and raises open-to-buy at the same time. Open-to-buy needs the instrument's details in clear text, so its branch asks Payment Instruments first, and `thenCompose` chains the two without holding up clearing and AR:
 
 ```kotlin
-class RealtimeClearingExecuteStage(
+class PaymentExecuteStageWithRealtimeClearing(
     private val clearing: ClearingActivities,
     private val receivables: ReceivablesActivities,
     private val instruments: InstrumentActivities,   // Payment Instruments, no rate limit
     private val authorization: AuthorizationActivities,
     private val store: PaymentStore,                 // a local activity
     private val events: LifecycleEventActivities,    // RTF
-) : ExecuteStage {
+) : PaymentExecuteStage {
 
     override fun run(paymentId: String, verified: VerifyOutcome): ExecuteOutcome {
         val details = Async.function(instruments::clearTextDetails, paymentId)
@@ -87,15 +87,57 @@ val stages = StageIndex.lookup(plan)               // inside the workflow
 
 ```kotlin
 @StageFor(step = EXECUTE, requiresRealtimeClearing = Y)
-class RealtimeClearingExecuteStage(...) : ExecuteStage
+class PaymentExecuteStageWithRealtimeClearing(...) : PaymentExecuteStage
 ```
 
 *(The annotation is illustrative; what matters is what it records.)*
 
-For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs. Three rules keep the index honest:
+For each plan key, the most specific match wins. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market (Proposed). [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs. Four rules keep the index honest:
 
 - Every combination has a default implementation. A combination with none can't be onboarded at all.
 - The same generated code produces the build's capability manifest, every behavior combination the build can run. Provisioning checks each market release against it before anything goes live.
 - Stages are never `abstract`. A variation is a concrete class composed in through the index, not an override of a base class, so reading one file tells you everything a stage does.
+- A class's name must match its declaration. The processor builds the expected name from the step and what the class declares, and fails the build when the class is called anything else, so no name can drift from what the class serves.
 
 Payment workflows are pinned to their build with Worker Versioning. A deploy that adds or changes a stage never changes the code under a payment that is already running.
+
+## Naming an implementation
+
+A stage interface is `Payment{Step}Stage`. An implementation keeps that name and adds what it serves, in a fixed order: `For` and the account type, `With` and each behavior it needs, then `In` and the market for an override. The one that declares nothing is `DefaultPayment{Step}Stage`. [Design → Stages](../../../design/component-model/stages.md#naming-implementations) has the full rule and a table of examples.
+
+A name says what an implementation serves, never what it calls. A market that needs a mandate doesn't get a mandate stage: it gets a version of Verify that also calls Plans, which checks the mandate. The calls every Verify makes are written once, in a plain function, so this version adds only what is new:
+
+```kotlin
+/** The Instruments and Options calls every Verify makes. A plain function, not a base class. */
+fun instrumentAndOptionChecks(
+    instruments: InstrumentActivities,
+    options: OptionsActivities,
+    paymentId: String,
+): Promise<Void> = Promise.allOf(
+    Async.function(instruments::verify, paymentId),
+    Async.function(options::resolveAmount, paymentId),
+)
+
+@StageFor(step = VERIFY, requiresMandateAuthorization = Y)
+class PaymentVerifyStageWithMandate(
+    private val instruments: InstrumentActivities,
+    private val options: OptionsActivities,
+    private val plans: PlansActivities,          // Plans, on the workflow's queue
+    private val store: PaymentStore,
+) : PaymentVerifyStage {
+
+    override fun run(paymentId: String): VerifyOutcome {
+        val checked = Promise.allOf(
+            instrumentAndOptionChecks(instruments, options, paymentId),
+            Async.function(plans::verifyMandate, paymentId),
+        )
+        // A business failure, such as a mandate Plans can't verify, means DECLINED. It is never retried.
+        val next = if (passed(checked)) ACCEPTED else DECLINED
+        return store.commitVerify(paymentId, expected = PENDING, next = next)
+    }
+}
+```
+
+*(A sketch: the method names are illustrative.)*
+
+On the due date the same payment runs `PaymentReverifyStageWithMandate`, which calls Plans again. Represent doesn't check the mandate.

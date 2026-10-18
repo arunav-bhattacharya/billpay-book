@@ -11,7 +11,7 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>Billpay keeps business decisions apart from transport. Four layers handle every journey, each with one job and a strict rule about what it may call.</Lead>
 
-The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is a stage implementation, `MandateVerifyStage`. The workflow above it and the activities below it stay the same in both markets.
+The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is one version of the Verify stage, `PaymentVerifyStageWithMandate`, which also calls Plans to check the mandate. The workflow above it and the activities below it stay the same in both markets.
 
 ## Eight rules behind every choice
 
@@ -72,7 +72,7 @@ Work flows one way: workflow, stage, activity, client, external system. Nothing 
 | Layer | Name | Lives in |
 | --- | --- | --- |
 | Workflow | `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow` | `core/lib/workflows/impl/` |
-| Stage | A `{Step}Stage` interface, named for the journey step. Implementations are named for the behavior they encode, such as `MandateVerifyStage` | `core/lib/stages/impl/`; a market override in `market/{m}/stages/` |
+| Stage | A `Payment{Step}Stage` interface, named for the journey step, such as `PaymentVerifyStage`. An implementation adds what it serves after that name, such as `PaymentVerifyStageWithMandate` ([the full rule](./component-model/stages.md#naming-implementations)) | `core/lib/stages/impl/{step}/`; a market override in `market/{m}/stages/` |
 | Activity | `{System}Activities`, such as `ClearingActivities`. Oracle reads and writes are in `PaymentStore` | `core/lib/activities/` and `impl/` |
 | Client | `{System}Client` | `core/lib/clients/` |
 

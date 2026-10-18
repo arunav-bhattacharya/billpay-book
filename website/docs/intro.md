@@ -38,7 +38,7 @@ After that, the path depends on what you need.
 
 - States are written in `UPPER_SNAKE_CASE`, for example `PENDING`, `ACCEPTED`, `PROCESSED`.
 - Workflows are named `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow`.
-- Stages are named for the step they perform: a `VerifyStage` interface, with implementations named for the behavior they handle, such as `MandateVerifyStage`.
+- Stages are named for the step they perform: a `PaymentVerifyStage` interface, with implementations that add what they serve to that name, such as `PaymentVerifyStageWithMandate`.
 - Activities are grouped per system as `{System}Activities`, such as `ClearingActivities`. Clients are `{System}Client`.
 - A workflow ID is the payment ID plus a suffix, such as `{paymentId}-execute`, so any payment can be found from its ID alone.
 - The state and sequence diagrams are [Mermaid](https://mermaid.js.org/), so you can copy one straight into Confluence or another Mermaid host. The system maps, journey maps and the legacy estate map are React components, and those only render here.
