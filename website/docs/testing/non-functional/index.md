@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Non-Functional Testing
 
-<Lead>Non-functional testing covers how the platform holds up rather than what it does. Today that means **performance**.</Lead>
+<Lead>Non-functional testing covers how the platform holds up rather than what it does. Today that means performance: whether the design carries the midnight runs, the bursts and a market release at the same time as customers paying today.</Lead>
 
 ## In this section
 
@@ -17,7 +17,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Performance',
       to: '/docs/testing/non-functional/performance',
-      desc: `Load profiles, target throughput, and p99 latency targets.`,
+      desc: `The seven load-test runs, what each one measures or replays, and what it must show to pass.`,
     },
   ]}
 />

@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Deployables
 
-<Lead>Every artifact the platform **ships to production**. There are five, and billpay-core, the one app that runs the APIs and the workflows, is the one most changes touch.</Lead>
+<Lead>Every artifact the platform ships to production. There are five, and billpay-core, the one app that runs the APIs and the workflows, is the one most changes touch.</Lead>
 
 ## In this section
 
@@ -17,7 +17,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'One-Data Functions',
       to: '/docs/deployment/deployables/one-data-functions',
-      desc: `The API gateway, and the functions it fronts.`,
+      desc: `The API gateway, the functions it fronts, and the inbox database that holds work nobody waits for.`,
     },
     {
       term: 'billpay-core',
@@ -30,9 +30,9 @@ import SectionIndex from '@site/src/components/SectionIndex';
       desc: `Decrypts Temporal Web UI content, so workflow payloads read as plain data when you inspect them there.`,
     },
     {
-      term: 'UI App',
+      term: 'billpay-ui',
       to: '/docs/deployment/deployables/ui-app',
-      desc: `A standalone UI on top of Billpay.`,
+      desc: `The market onboarding control plane: one for every environment, reaching each one only through its provisioning API.`,
     },
     {
       term: 'Mocks App',
@@ -42,4 +42,4 @@ import SectionIndex from '@site/src/components/SectionIndex';
   ]}
 />
 
-The Temporal server itself is not a deployable of this monorepo. It is self-hosted infrastructure, covered under [Temporal Server](../temporal-server.md).
+The two Temporal clusters are not deployables. They are self-hosted infrastructure, covered under [Temporal Server](../temporal-server.md).

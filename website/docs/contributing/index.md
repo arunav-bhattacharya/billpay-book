@@ -22,7 +22,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Publish',
       to: '/docs/contributing/publish',
-      desc: <>explains how a push to <code>main</code> becomes the live site.</>,
+      desc: <>How a push to <code>main</code> becomes the live site.</>,
     },
   ]}
 />

@@ -51,4 +51,7 @@ billpay-ui already has most of this flow. These are the changes that connect it 
 - `verifyProfile()`, the sign-off, will send the sign-off to that environment's workflow.
 - `recordRfc()` stays, and becomes required before the E3 sign-off.
 - `Readiness.kt` is simulated today. The deployment rows replace it.
+- The behaviors gain `requiresBankConfirmation`, and `requiresRepresentableReturn` goes, since representment is now a market rule. Today's profiles hold none of the Operations step's settings yet.
+- The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
+- The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`. Provisioning maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring will check each new behavior combination against the build's capability manifest.

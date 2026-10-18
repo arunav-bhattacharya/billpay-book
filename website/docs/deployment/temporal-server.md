@@ -1,26 +1,44 @@
 ---
 title: Temporal Server
-description: 'Temporal is self-hosted on AWS, with PostgreSQL as its persistence backend.'
+description: 'Billpay runs on two self-hosted Temporal clusters in AWS us-east-1, Online and Offline, each with a passive standby in us-west-1.'
 ---
 
 import Lead from '@site/src/components/Lead';
 
 # Temporal Server
 
-<Lead>Temporal is <strong>self-hosted on AWS</strong>, with <strong>PostgreSQL</strong> as its persistence backend. The active cluster runs in <strong>us-east-1</strong>, and <strong>us-west-1</strong> holds a passive standby. It is infrastructure we run, not an artifact the monorepo ships, which is why it lives here rather than under Deployables.</Lead>
+<Lead>Billpay runs on two self-hosted Temporal clusters in AWS us-east-1, Online and Offline, each with a passive standby in us-west-1. They are infrastructure we run, not artifacts the monorepo ships, which is why they live here rather than under Deployables.</Lead>
 
-## The setup
+## Two clusters
 
-- The **active cluster in us-east-1** is the Temporal server the platform actually talks to. [billpay-core](./deployables/worker-app.md), the one app that runs the workers for both clusters from the on-prem East Hydra servers, connects here by default, and the Temporal Schedules that drive the periodic workflows are registered against it.
-- **Persistence is PostgreSQL.** Temporal's own state, meaning workflow histories, task queues, and schedules, lives in Postgres on AWS. This is Temporal's database, separate from Billpay's own [Oracle schema](../build/principles/tech-stack/database.md).
-- The **passive region, us-west-1**, is a standby cluster with replicated Postgres. It takes no traffic in normal operation.
+The Online cluster runs journeys where a caller waits for an answer, at a peak of 100 TPS (transactions per second). The Offline cluster runs work that can be paced: scheduled execution, AR intake, corporate allocations, returns, inbound payments, representments, confirmation expiries, the periodic jobs and the control workflows. [Two clusters](../design/component-model/workflows/index.md#two-clusters) explains the split.
 
-## Failover
+Nothing calls across the clusters. A payment accepted or scheduled on Online reaches Offline as a Work Tracker row in Oracle, written in the same commit as its state change, so either cluster can go down while the other keeps working.
 
-Failover to us-west-1 is a **manual promotion**. During a us-east-1 outage an operator promotes the standby, and billpay-core reconnects to the west cluster. In-flight payments resume from their event histories once workers reconnect, which is the [durability the platform is built on](../architecture/overview.md#why-temporal).
+## Settings
 
-The full regional picture, showing how Temporal's two regions line up with the on-prem Hydra sites, Oracle's Data Guard pair, and the Redis buffer, is on the [High Availability](../architecture/high-availability.md) page.
+Both clusters run the latest Temporal server, at least 1.30.1, so visibility can use OpenSearch 2.
 
-## Running the cluster day to day
+| Setting | Online | Offline | Why |
+| --- | --- | --- | --- |
+| History shards | 2K | 4K | Fixed when the cluster is created; room for more markets |
+| Persistence | Own Aurora PostgreSQL | Own Aurora PostgreSQL | Isolation |
+| Visibility | OpenSearch 2 | OpenSearch 2, its own index | Off the main database; Temporal recommends it at scale |
+| Standby | Passive, in us-west-1 | Passive, in us-west-1 | Active-passive; an operator promotes each standby on its own |
+| `system.enableActivityEagerExecution` | true | true | Eager activities save writes |
+| Eager workflow start | Not used | Not used | The server refuses it with Update-With-Start |
+| `matching.enableFairness` | Not needed | true | Fairness keys and per-key limits |
+| Namespace retention | 30 days | 30 days | The retention requirement |
+| Namespace RPS limits | Well above peak | About 2× the API requests per second at the governor's ceiling | A hard backstop if the governor misbehaves |
 
-Operational familiarity with the cluster lives under Operations: [Temporal Server on AWS](../operations/familiarity/temporal-server-aws.md) (namespaces, task queues, scaling), [Temporal DB on AWS](../operations/familiarity/temporal-db-aws.md) (the persistence layer), and the [Temporal Web UI](../operations/familiarity/temporal-web-ui.md). Note that workflow payloads in the Web UI are decrypted via the [Codec Server](./deployables/codec-server-app.md).
+All Temporal Schedules live on the Offline cluster. One Offline namespace serves every market, with market as a fairness key, so each downstream has exactly one queue and one limit. Work on that cluster runs at five priority levels, 1 to 5, by traffic class ([Throttling](../design/throttling.md)).
+
+## Standbys and failover
+
+Each cluster runs active-passive, like the single cluster it replaces. The standby in us-west-1 replicates its database from the east and takes no traffic. An operator promotes each standby on its own, and billpay-core points its client for that cluster at the new frontend. Workflows carry on from the histories the standby received.
+
+When the Offline cluster is down, the Online cluster keeps serving. Dated work waits in Oracle, pulled work waits in One-Data's inbox, and allocation callbacks get 503 with `Retry-After` until the cluster is back. [High Availability](../architecture/high-availability.md#when-things-break) covers every failure, including losing all of us-east-1.
+
+## Running the clusters day to day
+
+Operators' notes live under Operations: [Temporal Server on AWS](../operations/familiarity/temporal-server-aws.md) for the namespaces, queues and priorities, [Temporal DB on AWS](../operations/familiarity/temporal-db-aws.md) for the two Aurora databases, and the [Temporal Web UI](../operations/familiarity/temporal-web-ui.md), one per cluster. Workflow payloads in the Web UI are decrypted by the [Codec Server](./deployables/codec-server-app.md).

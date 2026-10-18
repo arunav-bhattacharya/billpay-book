@@ -217,6 +217,7 @@ const sidebars = {
           items: [
             'observability/monitoring/app-health',
             'observability/monitoring/temporal-health',
+            'observability/monitoring/pacing',
             {
               type: 'category',
               label: 'SLA · SLI · SLO',
@@ -258,6 +259,7 @@ const sidebars = {
             'operations/familiarity/temporal-server-aws',
             'operations/familiarity/temporal-db-aws',
             'operations/familiarity/oracle-db',
+            'operations/familiarity/dispatch-controls',
           ],
         },
         'operations/sops',

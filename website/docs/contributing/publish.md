@@ -7,22 +7,22 @@ import Lead from '@site/src/components/Lead';
 
 # Publish
 
-<Lead>Publishing is automatic: every push to <code>main</code> triggers the <strong>Deploy to GitHub Pages</strong> workflow, which builds the site and deploys it to <strong>https://arunav-bhattacharya.github.io/billpay-book/</strong>. There is no manual deploy step.</Lead>
+<Lead>Publishing is automatic: every push to <code>main</code> triggers the Deploy to GitHub Pages workflow, which builds the site and deploys it to https://arunav-bhattacharya.github.io/billpay-book/. There is no manual deploy step.</Lead>
 
 ## How it works
 
-GitHub Pages for this repo is configured with **Source: GitHub Actions**. The workflow (`.github/workflows/`) checks out `main`, runs `npm ci` and `npm run build` in `website/`, uploads the build as a Pages artifact, and deploys it.
+GitHub Pages for this repo is configured with its source set to GitHub Actions. The workflow (`.github/workflows/`) checks out `main`, runs `npm ci` and `npm run build` in `website/`, uploads the build as a Pages artifact, and deploys it.
 
 Two consequences worth knowing:
 
-- **Pushing to `main` is publishing.** If the build passes in CI, the change is live a minute or two later.
-- **Pushing a `gh-pages` branch does nothing.** The live site serves the workflow's artifact, not a branch, so a hand-built `gh-pages` push is silently ignored.
+- Pushing to `main` is publishing. If the build passes in CI, the change is live a minute or two later.
+- Pushing a `gh-pages` branch does nothing. The live site serves the workflow's artifact, not a branch, so a hand-built `gh-pages` push is silently ignored.
 
 ## When the deploy fails
 
-The **Build** job failing means a real problem, usually a broken link (`onBrokenLinks: 'throw'`). Fix it and push again.
+The Build job failing means a real problem, usually a broken link (`onBrokenLinks: 'throw'`). Fix it and push again.
 
-The **Deploy** job occasionally fails with *"Deployment failed, try again later."* while Build is green. That's a transient on GitHub's side, not your change. Re-run just the failed job:
+The Deploy job occasionally fails with "Deployment failed, try again later." while Build is green. That's a transient on GitHub's side, not your change. Re-run just the failed job:
 
 ```bash
 gh run list --workflow "Deploy to GitHub Pages" --limit 3

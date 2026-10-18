@@ -431,6 +431,7 @@ Every page moves to the target design in the *Billpay Temporal Scaling Design* d
 27. Answers of 2026-10-18, fifth batch (what each Build milestone needs). The build makes the model's nine changes itself. The spec now has the five types the supplied model leans on without defining (`TransactionId`, `MonetaryAmount`, `TokenizedAccount`, `PlanInfo`, `LegacyPayment`), Proposed where the current app doesn't have them. The `BPYSCH` DDL is in hand and the payment ID is a ULID. The other contracts (core API bodies, Payment Instruments and Options, RTF, Raven, the clearing, AR, open-to-buy, accounting, eBNC, risk, Installments, Autopay and allocations APIs, One-Data's functions and authentication, the MR/M3 and GAR lookups) already exist in the organization's code, and the build agent pulls them from there when each milestone starts; that lives in the design doc's Build spec, not on the wiki. Bank-confirmation provider APIs don't exist yet, so the build stubs them. Proposed and in the spec: the provisioning API's request and response bodies, and an Environments section (one build everywhere, the same namespace names, config per environment, secrets in the organization's secret store). Wiki, in phase 4: `build/domain-model` shows the five types, and `build/api-spec/billpay-core.md` shows the provisioning bodies, both marked Proposed. Still waiting on the user: TFNE and GPHDB, the exception list, and which commit writes a consumer split's legs (answered in note 28).
 28. Answers of 2026-10-18, sixth batch (the defaults were confirmed). TFNE, the Transaction Notification Engine, and GPHDB, the legacy Payments History Database, are legacy downstreams told when a payment moves from `PROCESSING` to `PROCESSED`: Fulfil calls them in parallel with accounting, eBNC and risk, before RTF and Raven, so `PROCESSED` waits for both, and every leg's Fulfil calls them too. Proposed names: `TransactionNotificationActivities` on `ds-tfne` and `PaymentHistoryActivities` on `ds-gphdb`. Two more parallel calls cost about 4 writes per Fulfil, so an execution is about 49 writes, a leg about 34, and the worst overlap about 12,700 writes/s. Billpay keeps its own exception list (`exception_list`, columns Proposed). A consumer split's legs are written by Verify's `ACCEPTED` commit, the parent doesn't clear, and it commits `PROCESSED` once every leg has finished. billpay-ui, read on 2026-10-18, lags the target: no bank-confirmation behavior or Operations settings yet, `requiresRepresentableReturn` still there, API names from before the spec's, and `BUSINESS_TRAVEL_ACCOUNT` as the stored key (provisioning maps it, Proposed). Wiki: Fulfil everywhere it is listed, the activities catalogue, the queue lists, the journeys' chips, sequence diagrams 1 and the corporate legs, the state model, The Complete Picture's activities (16), the cluster map and the External Systems layer.
 29. Build, written 2026-10-18 (phase 4). Two new pages, Building the Router (`build/principles/core-build/router.md`) and Building Dispatchers and the Governor (`build/dispatchers.md`), each with its `sidebars.js` line and its parent's SectionIndex entry. The provisioning bodies replace the path table on `build/api-spec/billpay-core.md`, so the paths stay once on Onboarding → Provisioning. Build pages show code and link to Design's tables (start modes, the stage catalogue, the state map) rather than repeating them. The only market override in the code layout is a stage in `market/{m}/stages/`. `TokenizedAccount` narrows `Account`, the type `Transaction` holds in the supplied file, and the spec now says so. Bold came off the subjects of the tech-stack and OkHttp bullets.
+30. Testing, Deployment, Observability, Operations and Contributing, written 2026-10-18 (phase 5). Two new pages: Monitoring → Pacing (`observability/monitoring/pacing.md`) and Familiarity → Dispatch Controls (`operations/familiarity/dispatch-controls.md`), each in `sidebars.js` and its parent's SectionIndex. Deployment's UI App becomes billpay-ui (path kept), and the One-Data deployable carries the inbox: its three Postgres tables, the handler's upsert and pairing statements, indexes and the 30-day purge. The spec's Platform tables are split by subject rather than repeated: server settings on Deployment → Temporal Server, Aurora sizing on Temporal DB, workers on billpay-core, the seven load-test runs on Performance, the alert catalogue (grouped in four tables, each linking to its runbook) on Kibana Alerts, and the failure modes as thirteen runbooks on SOPs. The pipeline page carries the Proposed environment setup. The SLA pages drop `POST /payments/returns` and `POST /payments/inbound`, which no longer exist, name the spec's workflows, and add the work nobody waits for (the 202, then backlog age) and the confirm and allocations APIs, which have no targets yet. `onboarding/releases.md` gained the billpay-ui changes from note 28. Two gaps the spec leaves open are named on the pages as still to be defined: how a payment off the exception list is put back on its way, and what happens to a `REJECTED` request once its market profile is fixed.
 
 **Voice** (user direction, 2026-10-15). Blog-post style: a senior engineer or product owner explaining the system, so the reader learns something and stays with it. Run `human-writing` with `tone-of-voice` and `humanizer`. A page marked **Style pass** keeps its facts; its prose is reworked only where it lists without explaining.
 
@@ -550,69 +551,69 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `testing/index.md` | Style pass | | ☐ |
-| `testing/functional/index.md` | Update | The Unit line adds stages | ☐ |
-| `testing/functional/unit.md` | Update | Each stage implementation per behavior, and the plan-key lookup | ☐ |
-| `testing/functional/integration.md` | Style pass | | ☐ |
-| `testing/functional/replay.md` | Style pass | | ☐ |
-| `testing/functional/e2e.md` | Style pass | | ☐ |
-| `testing/non-functional/index.md` | Style pass | | ☐ |
-| `testing/non-functional/performance.md` | Update | The seven load-test runs and their pass criteria, against stubs at agreed TPS with real latency; reconcile Work Tracker rows and PAID payments and legs after every run. Runs 4 and 6 decide whether billpay-core ships as one app | ☐ |
+| `testing/index.md` | Style pass | | ☑ |
+| `testing/functional/index.md` | Update | The Unit line adds stages | ☑ |
+| `testing/functional/unit.md` | Update | Each stage implementation per behavior, and the plan-key lookup | ☑ |
+| `testing/functional/integration.md` | Style pass | | ☑ |
+| `testing/functional/replay.md` | Style pass | | ☑ |
+| `testing/functional/e2e.md` | Style pass | | ☑ |
+| `testing/non-functional/index.md` | Style pass | | ☑ |
+| `testing/non-functional/performance.md` | Update | The seven load-test runs and their pass criteria, against stubs at agreed TPS with real latency; reconcile Work Tracker rows and PAID payments and legs after every run. Runs 4 and 6 decide whether billpay-core ships as one app | ☑ |
 
 #### Deployment
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `deployment/index.md` | Update | Temporal Server in the SectionIndex. Market releases reach E1, E2 and E3 through each environment's provisioning API, not the pipeline | ☐ |
-| `deployment/deployables/index.md` | Update | Five deployables: billpay-core, one app, replaces the Worker App. billpay-ui is the onboarding control plane. The two clusters are not deployables | ☐ |
-| `deployment/deployables/ui-app.md` | Update | One control plane for all environments: SSO, maker-checker, audit, versioned releases. Authoring tables in their own schema, outside billpay-core | ☐ |
-| `deployment/deployables/worker-app.md` | Update | Path kept, retitled "billpay-core". One app for both clusters: what it contains, offline work's own Oracle pool and slot caps, a worker per `ds-*` queue (slots ≈ queue limit × call latency), and more pods for more capacity. Payment workflows pinned with Worker Versioning | ☐ |
-| `deployment/pipeline.md` | Update | The app deploys as one. Old builds keep running until their pinned workflows finish. Each build ships a capability manifest that provisioning checks | ☐ |
-| `deployment/temporal-server.md` | Update | Two clusters on server 1.30.1 or later: 2K and 4K shards, OpenSearch 2, 30-day retention. Schedules on Offline. A passive standby per cluster in us-west-1, promoted on its own. With Offline down, Online keeps serving, dated work waits in Oracle, pulled work in One-Data's inbox, and allocation callbacks get 503. Offline: fairness on, priorities 1 to 5, no eager start | ☐ |
-| `deployment/ci-checks.md` | Style pass | | ☐ |
-| `deployment/code-merge-strategy.md` | Style pass | | ☐ |
-| `deployment/deployables/codec-server-app.md` | Style pass | | ☐ |
-| `deployment/deployables/mocks-app.md` | Style pass | | ☐ |
-| `deployment/deployables/one-data-functions.md` | Update | One-Data also runs the inbox: its Postgres database (one primary, replicated across IPC1 and IPC2), the handlers' upsert and their `ReadPayments.v1` lookup, the start requests for AR intake, returns and inbound, the four inbox functions and the daily purge | ☐ |
+| `deployment/index.md` | Update | Temporal Server in the SectionIndex. Market releases reach E1, E2 and E3 through each environment's provisioning API, not the pipeline | ☑ |
+| `deployment/deployables/index.md` | Update | Five deployables: billpay-core, one app, replaces the Worker App. billpay-ui is the onboarding control plane. The two clusters are not deployables | ☑ |
+| `deployment/deployables/ui-app.md` | Update | One control plane for all environments: SSO, maker-checker, audit, versioned releases. Authoring tables in their own schema, outside billpay-core | ☑ |
+| `deployment/deployables/worker-app.md` | Update | Path kept, retitled "billpay-core". One app for both clusters: what it contains, offline work's own Oracle pool and slot caps, a worker per `ds-*` queue (slots ≈ queue limit × call latency), and more pods for more capacity. Payment workflows pinned with Worker Versioning | ☑ |
+| `deployment/pipeline.md` | Update | The app deploys as one. Old builds keep running until their pinned workflows finish. Each build ships a capability manifest that provisioning checks | ☑ |
+| `deployment/temporal-server.md` | Update | Two clusters on server 1.30.1 or later: 2K and 4K shards, OpenSearch 2, 30-day retention. Schedules on Offline. A passive standby per cluster in us-west-1, promoted on its own. With Offline down, Online keeps serving, dated work waits in Oracle, pulled work in One-Data's inbox, and allocation callbacks get 503. Offline: fairness on, priorities 1 to 5, no eager start | ☑ |
+| `deployment/ci-checks.md` | Style pass | | ☑ |
+| `deployment/code-merge-strategy.md` | Style pass | | ☑ |
+| `deployment/deployables/codec-server-app.md` | Style pass | | ☑ |
+| `deployment/deployables/mocks-app.md` | Style pass | | ☑ |
+| `deployment/deployables/one-data-functions.md` | Update | One-Data also runs the inbox: its Postgres database (one primary, replicated across IPC1 and IPC2), the handlers' upsert and their `ReadPayments.v1` lookup, the start requests for AR intake, returns and inbound, the four inbox functions and the daily purge | ☑ |
 
 #### Observability
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `observability/index.md` | Style pass | | ☐ |
-| `observability/alerts/index.md` | Style pass | | ☐ |
-| `observability/alerts/kibana.md` | Update | The alert catalogue from the spec's Platform section | ☐ |
-| `observability/monitoring/index.md` | Update | Both clusters, and a fourth view for the governor and dispatchers | ☐ |
-| `observability/monitoring/app-health.md` | Style pass | | ☐ |
-| `observability/monitoring/pacing.md` | New | Governor and dispatchers: rates per class, backlog and in-flight against the cap, inbox backlogs per dispatcher, cutoff projection, downstream limits and 429s, payments waiting on RTF or Raven | ☐ |
-| `observability/monitoring/sla-sli-slo/index.md` | Update | Pulled entries measure time to One-Data's 202, once stored, then the backlog age until a dispatcher starts them; the allocations callback's 202 goes out after its workflow starts, with 429 over budget | ☐ |
-| `observability/monitoring/sla-sli-slo/billpay-apis.md` | Update | Channels reply through Update-With-Start within the 500 ms p99. AR, returns and inbound get One-Data's 202 once stored; after that, the measure is their backlog age. Update and Cancel: 409 outside the window. Refunds on both routes. The allocations callback | ☐ |
-| `observability/monitoring/sla-sli-slo/one-data-functions.md` | Update | Cancel: the round trip to CANCELLED, or 409 outside the window | ☐ |
-| `observability/monitoring/temporal-health.md` | Update | Both clusters. Panels for the governor's inputs and for backlog and rate limit on each `ds-*` and `ctl-*` queue | ☐ |
+| `observability/index.md` | Style pass | | ☑ |
+| `observability/alerts/index.md` | Style pass | | ☑ |
+| `observability/alerts/kibana.md` | Update | The alert catalogue from the spec's Platform section | ☑ |
+| `observability/monitoring/index.md` | Update | Both clusters, and a fourth view for the governor and dispatchers | ☑ |
+| `observability/monitoring/app-health.md` | Style pass | | ☑ |
+| `observability/monitoring/pacing.md` | New | Governor and dispatchers: rates per class, backlog and in-flight against the cap, inbox backlogs per dispatcher, cutoff projection, downstream limits and 429s, payments waiting on RTF or Raven | ☑ |
+| `observability/monitoring/sla-sli-slo/index.md` | Update | Pulled entries measure time to One-Data's 202, once stored, then the backlog age until a dispatcher starts them; the allocations callback's 202 goes out after its workflow starts, with 429 over budget | ☑ |
+| `observability/monitoring/sla-sli-slo/billpay-apis.md` | Update | Channels reply through Update-With-Start within the 500 ms p99. AR, returns and inbound get One-Data's 202 once stored; after that, the measure is their backlog age. Update and Cancel: 409 outside the window. Refunds on both routes. The allocations callback | ☑ |
+| `observability/monitoring/sla-sli-slo/one-data-functions.md` | Update | Cancel: the round trip to CANCELLED, or 409 outside the window | ☑ |
+| `observability/monitoring/temporal-health.md` | Update | Both clusters. Panels for the governor's inputs and for backlog and rate limit on each `ds-*` and `ctl-*` queue | ☑ |
 
 #### Operations
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `operations/index.md` | Style pass | | ☐ |
-| `operations/familiarity/index.md` | Update | One Temporal UI per cluster, billpay-ui as the control plane, two Aurora DBs. SectionIndex adds dispatch controls | ☐ |
-| `operations/familiarity/billpay-ui.md` | Update | The Operations step and releases in brief, linking to Market Onboarding for the process. Readiness shows real provisioning progress. Pause and resume stop and restart a live market's dispatchers | ☐ |
-| `operations/familiarity/oracle-db.md` | Update | Oracle is the only hand-off between the clusters; a scheduled payment is a Work Tracker row until it is due. During patching payments pause and resume; escalate only past the `PaymentStore` schedule-to-close | ☐ |
-| `operations/familiarity/temporal-db-aws.md` | Update | Two Aurora DBs and their sizing; OpenSearch 2; Offline CPU and persistence p99 feed the governor | ☐ |
-| `operations/familiarity/temporal-server-aws.md` | Update | Offline queues, priorities 1 to 5 by class, Schedules on Offline | ☐ |
-| `operations/familiarity/temporal-web-ui.md` | Update | Search by `{paymentId}-{suffix}` and by the search attributes. A scheduled payment has no workflow until its due date. No signals | ☐ |
-| `operations/familiarity/tracing-ui.md` | Update | One trace per workflow; span links through `trace_parent`; the lookup path | ☐ |
-| `operations/familiarity/opensearch-logs.md` | Style pass | | ☐ |
-| `operations/familiarity/dispatch-controls.md` | New | Work Tracker statuses, `dispatch_run`, rate overrides, pausing Schedules, `governor_decision`, the exception list | ☐ |
-| `operations/sops.md` | Update | Runbooks for Oracle patching, late allocations, a failed release, SEPA cutoff at risk (overrides in `rate_allocation`), retries exhausted, Offline cluster down, promoting a cluster's standby, PAID backlog age, a payment not PAID after 48 hours, an event without a payment ID that matches no payment, a rejected pulled request, One-Data's inbox down, billpay-core short of capacity (add pods) | ☐ |
+| `operations/index.md` | Style pass | | ☑ |
+| `operations/familiarity/index.md` | Update | One Temporal UI per cluster, billpay-ui as the control plane, two Aurora DBs. SectionIndex adds dispatch controls | ☑ |
+| `operations/familiarity/billpay-ui.md` | Update | The Operations step and releases in brief, linking to Market Onboarding for the process. Readiness shows real provisioning progress. Pause and resume stop and restart a live market's dispatchers | ☑ |
+| `operations/familiarity/oracle-db.md` | Update | Oracle is the only hand-off between the clusters; a scheduled payment is a Work Tracker row until it is due. During patching payments pause and resume; escalate only past the `PaymentStore` schedule-to-close | ☑ |
+| `operations/familiarity/temporal-db-aws.md` | Update | Two Aurora DBs and their sizing; OpenSearch 2; Offline CPU and persistence p99 feed the governor | ☑ |
+| `operations/familiarity/temporal-server-aws.md` | Update | Offline queues, priorities 1 to 5 by class, Schedules on Offline | ☑ |
+| `operations/familiarity/temporal-web-ui.md` | Update | Search by `{paymentId}-{suffix}` and by the search attributes. A scheduled payment has no workflow until its due date. No signals | ☑ |
+| `operations/familiarity/tracing-ui.md` | Update | One trace per workflow; span links through `trace_parent`; the lookup path | ☑ |
+| `operations/familiarity/opensearch-logs.md` | Style pass | | ☑ |
+| `operations/familiarity/dispatch-controls.md` | New | Work Tracker statuses, `dispatch_run`, rate overrides, pausing Schedules, `governor_decision`, the exception list | ☑ |
+| `operations/sops.md` | Update | Runbooks for Oracle patching, late allocations, a failed release, SEPA cutoff at risk (overrides in `rate_allocation`), retries exhausted, Offline cluster down, promoting a cluster's standby, PAID backlog age, a payment not PAID after 48 hours, an event without a payment ID that matches no payment, a rejected pulled request, One-Data's inbox down, billpay-core short of capacity (add pods) | ☑ |
 
 #### Contributing
 
 | Page | Treatment | What changes | Status |
 |---|---|---|---|
-| `contributing/index.md` | Style pass | | ☐ |
-| `contributing/publish.md` | Style pass | | ☐ |
-| `contributing/run-locally.md` | Update | The onboarding folder in the project layout tree | ☐ |
+| `contributing/index.md` | Style pass | | ☑ |
+| `contributing/publish.md` | Style pass | | ☑ |
+| `contributing/run-locally.md` | Update | The onboarding folder in the project layout tree | ☑ |
 
 ### Components
 

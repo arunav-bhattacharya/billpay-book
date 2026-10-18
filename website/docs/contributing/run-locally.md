@@ -17,7 +17,7 @@ nvm use
 npm ci
 ```
 
-Prefer `npm ci` over `npm install`, because it reproduces the lockfile exactly. On Apple Silicon, make sure you are on an **arm64** Node (the nvm one, not an x64 build under `/usr/local`), or the native bindings will fail.
+Prefer `npm ci` over `npm install`, because it reproduces the lockfile exactly. On Apple Silicon, make sure you are on an arm64 Node (the nvm one, not an x64 build under `/usr/local`), or the native bindings will fail.
 
 ## 2. Start the dev server
 
@@ -25,7 +25,7 @@ Prefer `npm ci` over `npm install`, because it reproduces the lockfile exactly. 
 npm start
 ```
 
-The dev server is pinned to port **3100**, so the site boots at **http://localhost:3100/billpay-book/** with hot reload.
+The dev server is pinned to port 3100, so the site boots at http://localhost:3100/billpay-book/ with hot reload.
 
 ## 3. Build a production bundle
 
@@ -39,7 +39,7 @@ The static site lands in `./build/`. The build fails on broken internal links (`
 npm run serve
 ```
 
-That serves the built site on port **3101**, so it can run next to the dev server rather than fighting it for 3100.
+That serves the built site on port 3101, so it can run next to the dev server rather than fighting it for 3100.
 
 Search is the one thing `npm start` cannot show you. The index is built from the finished pages, so it only exists after `npm run build`. Under the dev server the box is there but reports that the index is missing. Build and serve to try a query.
 
@@ -62,13 +62,15 @@ billpay-book/
 │   ├── Wiki_Spec.md
 │   └── domainModel/
 └── website/
-    ├── docs/                 # the wiki content
-    │   ├── vision/  architecture/  design/  build/
+    ├── docs/                 # the wiki content, one folder per section
+    │   ├── vision/  architecture/  design/  onboarding/  build/
     │   ├── testing/  deployment/  observability/  operations/
     │   └── contributing/
     ├── src/
-    │   ├── components/       # Lead, Highlights, LayerStack, RouteMap, WorkflowMeta
-    │   ├── css/custom.css    # the design system (Amex tokens, Mermaid theming)
+    │   ├── components/       # one folder per component, each importable from MDX
+    │   ├── css/              # custom.css (tokens), recipes.module.css, mermaid.css
+    │   ├── lib/              # shared hooks and helpers, not MDX-facing
+    │   ├── theme/            # swizzles
     │   └── pages/index.js    # landing page
     ├── static/img/
     ├── sidebars.js           # left-nav definition
