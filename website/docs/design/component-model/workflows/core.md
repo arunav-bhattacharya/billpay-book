@@ -35,7 +35,7 @@ A payment the customer must confirm at their bank stops even earlier. When `requ
 
 A payment made while another is pending on the same card account stops at the same point. When One-Data sends other pending payments' IDs with the create, RequestConfirmation runs after Capture with its go-ahead implementation. It makes no provider call: it commits a `CONFIRM_EXPIRY` row, due when the market's confirmation window closes, with the IDs of the payments the customer was shown. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow ends. A payment that needs both waits once: the reply carries the link and the list, and confirming at the bank is the go-ahead. [Confirm Payment](#confirm-payment) takes over on a yes, and [Cancel Payment](#cancel-payment) on a no.
 
-Every create from a channel ends with a call to One-Data's delete API, which clears the payment out of One-Data's Redis. When the payment still waits for a confirmation, the call says so: One-Data drops only the stored create, and the account's pending entry stays until Confirm Payment or Cancel Payment ends.
+Every create from a channel ends with a call to One-Data's delete API, `DeletePendingPayment.v1`, which clears the payment out of One-Data's Redis. When the payment still waits for a confirmation, the call says so: One-Data drops only the stored create, and the account's pending entry stays until Confirm Payment or Cancel Payment ends.
 
 ## Create Scheduled Payment
 
@@ -141,7 +141,7 @@ It also takes a customer's no to a payment made while another was pending. The c
 
 1. Check the payment, full or split, the presentment that came back, and its status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
 2. Return: that presentment's row turns `RETURNED` and stays there.
-3. Judge whether the return can be represented under the market's representment rules: which returns are eligible, and how many times a payment can be represented. A return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.
+3. Judge whether the return can be represented under the market's representment rules: which return reasons can be represented, and how many times a payment can be. A return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.
 4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never hands off to a representment workflow directly.
 
 ## Process Representment
@@ -162,7 +162,7 @@ It also takes a customer's no to a payment made while another was pending. The c
 
 `ConfirmPaymentWorkflow` picks up a payment that waited for the customer: for their bank, or for their go-ahead on a payment made while another was pending. The caller sends the same payment ID once the customer has confirmed, and the workflow runs the rest of the pay-today path. The confirm is admitted only for a `PENDING` payment with an open `CONFIRM_EXPIRY` row. Anything else gets 409, so a confirm never races the create's own Verify.
 
-1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify checks the verification token Payment Instruments holds for the instrument, to guard against fraud. A payment without a valid token is `DECLINED`.
+1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
 
    For a go-ahead, Verify runs the usual pay-today checks with no provider call, and the payment goes through even if the earlier one was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row, and the workflow stops there (Proposed).
 2. Execute, then Fulfil, as for pay today. When the workflow ends, it calls One-Data's delete API, and the payment leaves the account's pending list.

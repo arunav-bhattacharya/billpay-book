@@ -174,7 +174,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   }}
   entry={[
     {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
-    {kind: 'function', label: 'ConfirmPendingPayment.v1', logo: 'oneData', note: 'once confirmed'},
+    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', logo: 'oneData', note: 'once confirmed'},
   ]}
   core={[
     {kind: 'api', label: 'POST /payments'},
@@ -241,7 +241,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
     {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and commits the link with a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes. The caller\'s update returns `PENDING` with the link, the `PENDING` event goes to RTF, and `CreateImmediatePaymentWorkflow` ends. If the provider gives no link, the payment is `DECLINED` instead.'},
     {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the payment waits in Oracle. If no confirm comes before the window closes, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
-    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start. The provider has already verified the customer\'s bank details. To guard against fraud, Verify checks the verification token Payment Instruments holds for the instrument, then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. A payment without a valid token is `DECLINED`. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
+    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. A payment without a valid token is `DECLINED`. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
     {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
     {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`.'},
@@ -270,7 +270,7 @@ A customer who isn't sure their first payment went through may pay again, and en
   }}
   entry={[
     {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData', note: 'checks pending'},
-    {kind: 'function', label: 'ConfirmPendingPayment.v1', logo: 'oneData', note: 'on a yes'},
+    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', logo: 'oneData', note: 'on a yes'},
     {kind: 'function', label: 'DeletePayment.v1', logo: 'oneData', note: 'on a no'},
   ]}
   core={[
@@ -340,10 +340,10 @@ A customer who isn't sure their first payment went through may pay again, and en
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment.'},
     {step: 2, text: 'Because the create came with other pending payments\' IDs, RequestConfirmation runs in place of Verify, with its go-ahead implementation. It calls no provider. It commits a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes, with the IDs of the payments the customer is shown. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow ends. A payment that also needs bank confirmation waits only once: the reply carries the redirect link and the list, and confirming at the bank is the go-ahead.'},
     {step: 3, text: 'The channel shows the pending payments and asks whether to go ahead. A no comes in through `DeletePayment.v1`, and `CancelPaymentWorkflow` moves the new payment to `CANCELLED`, guarded on `PENDING`. So does the confirmation window closing with no answer. Either way, RTF gets the event, the customer gets the message through Raven, and the payment leaves the account\'s pending list.'},
-    {step: 4, text: 'A yes comes in through `ConfirmPendingPayment.v1` with the same payment ID, and `ConfirmPaymentWorkflow` runs Verify: the usual checks, with no provider call. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and closes the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A yes and a no from two tabs race on that guard: one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment waits for its date (Proposed).'},
+    {step: 4, text: 'A yes comes in through `CreateConfirmPendingPayment.v1` with the same payment ID, and `ConfirmPaymentWorkflow` runs Verify: the usual checks, with no provider call. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and closes the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A yes and a no from two tabs race on that guard: one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment waits for its date (Proposed).'},
     {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
-    {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, and the payment leaves the account\'s pending list.'},
+    {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, and the payment leaves the account\'s pending list.'},
     {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#15-a-new-payment-while-another-is-pending', label: 'Sequence diagram'}}
@@ -1006,7 +1006,7 @@ This is where a payment turns `PAID`, or for a split payment, each of its legs. 
     {step: 1, text: 'A Schedule starts `ProcessPaidEventsWorkflow` every 30 seconds, and only one run is ever active. Each batch fetches up to 500 `READY` rows through a One-Data function.'},
     {step: 2, text: 'Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a guarded update, and tags each `PAID` timeline row with the batch\'s ID. A retried Settle finds the payments it already moved by that ID.'},
     {step: 3, text: 'The `PAID` events go to RTF.'},
-    {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours. Marking last means a row is `DONE` only once its event has gone out.'},
+    {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data\'s own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row is `DONE` only once its event has gone out.'},
     {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its parent has settled, and the parent stays `PROCESSED`.'},
     {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert.'},
   ]}
@@ -1067,7 +1067,7 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
     {text: 'Returns come in bursts, up to 100 a second and 100K a day. One-Data keeps each one in its inbox, and the returns dispatcher starts them through the Router at the governor\'s pace, at priority 5, the lowest priority level.'},
     {step: 1, text: 'Only a payment that got far enough can come back. The workflow checks the payment, whole or a leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment returned again.'},
     {step: 2, text: 'The presentment that came back moves to `RETURNED`, and its row stays there.'},
-    {step: 3, text: 'Not every return is worth another try. The market\'s representment rules say which returns are eligible and how many times a payment can be represented, and a return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.'},
+    {step: 3, text: 'Not every return is worth another try. The market\'s representment rules say which return reasons can be represented and how many times a payment can be, and a return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.'},
     {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never starts the representment itself; the date does.'},
     {text: 'What happens on that date is [A payment is represented](#a-payment-is-represented).'},
   ]}

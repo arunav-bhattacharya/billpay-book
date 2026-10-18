@@ -345,7 +345,7 @@ export const BANDS = [
         ],
       },
       {
-        fn: ['ConfirmPending|Payment.v1'],
+        fn: ['CreateConfirm|PendingPayment.v1'],
         from: 'a channel',
         calls: 'A channel calls',
         does: 'go ahead with a payment that waited for the customer, with the same payment ID',
@@ -367,7 +367,7 @@ export const BANDS = [
                 "One commit, guarded on PENDING, that also cancels the CONFIRM_EXPIRY row. The caller's update returns here. A payment no longer PENDING gets 409, such as one cancelled when its window closed.",
             },
             exc: {
-              'Verify|InstrumentActivities': {kind: 'call', note: "also checks the instrument's verification token"},
+              'Verify|InstrumentActivities': {kind: 'call', note: "also asks whether the instrument's verification token is valid"},
             },
             then: [PAID],
           },
@@ -489,7 +489,7 @@ export const BANDS = [
               Return:
                 'It checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again. That presentment stays RETURNED.',
               QueueRepresentment:
-                "It judges whether the payment can be represented under the market's rules (which returns are eligible, and how many times) and sets the date from the same rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with that date as its clearing date and a REPRESENT row due on it.",
+                "It judges whether the payment can be represented under the market's rules (which return reasons can be represented, and how many times) and sets the date from the same rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with that date as its clearing date and a REPRESENT row due on it.",
             },
             then: [{to: 'represent', text: 'on the representment date, its REPRESENT row'}],
           },

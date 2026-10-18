@@ -44,4 +44,4 @@ Each combination of behaviors needs stage implementations, and every combination
 - A new combination is flagged as needing a build while it is being authored, so the gap shows up early.
 - If a release still reaches an environment without the build it needs, provisioning stops at its first step, the check against the manifest, until that build is deployed.
 
-Whether a return can be represented isn't one of these behaviors. It is a market rule, set with the market's other representment rules in its [operations settings](./operations-settings.md): which returns are eligible, and how many times a payment can be represented.
+Whether a return can be represented isn't one of these behaviors. It is a market rule, set with the market's other representment rules in its [operations settings](./operations-settings.md): which return reasons can be represented, and how many times a payment can be.

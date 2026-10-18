@@ -751,7 +751,7 @@ sequenceDiagram
         Note over SCH,WF: alert. The inbox row shows which event is missing
       end
     end
-    Note over IN,WF: A row UNMATCHED for 48 hours is left for a person. The alert names it
+    Note over IN,WF: A row UNMATCHED for 48 hours is left for a person. One-Data's UpdateUnmatchedPayments.v1 alerts on it
   end
 ```
 
@@ -864,7 +864,7 @@ sequenceDiagram
 
   box rgba(0,23,90,0.07) Caller
     participant OD as CreatePayment.v3
-    participant OC as ConfirmPending<br/>Payment.v1
+    participant OC as CreateConfirm<br/>PendingPayment.v1
   end
 
   box rgba(0,111,207,0.05) Billpay Platform
@@ -922,7 +922,7 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over CW,PS: Online cluster
       CW->>VER: run
-      Note over VER: checks the verification token<br/>Payment Instruments holds
+      Note over VER: asks Payment Instruments whether<br/>the instrument's token is valid
       rect rgba(102,169,226,0.40)
         VER->>PS: state → ACCEPTED or DECLINED, guarded on PENDING,<br/>and the CONFIRM_EXPIRY row cancelled, one commit
       end
@@ -972,7 +972,7 @@ sequenceDiagram
   box rgba(0,23,90,0.07) Caller
     participant OD as CreatePayment.v3
     participant RD as One-Data's<br/>Redis
-    participant OC as ConfirmPending<br/>Payment.v1
+    participant OC as CreateConfirm<br/>PendingPayment.v1
     participant OX as DeletePayment.v1
   end
 
@@ -1012,7 +1012,7 @@ sequenceDiagram
   rect rgba(0,111,207,0.12)
     Note over WF,RTF: Online cluster, after the reply. Then the workflow ends
     WF->>RTF: PENDING event
-    WF->>RD: delete API, still waiting: only<br/>the stored create goes
+    WF->>RD: DeletePendingPayment.v1, still waiting:<br/>only the stored create goes
   end
 
   rect rgba(83,86,90,0.14)
@@ -1037,7 +1037,7 @@ sequenceDiagram
       Note over CW,RAV: Online cluster, after the reply
       CW->>RTF: ACCEPTED or DECLINED event
       Note over CW,VER: ACCEPTED: Execute, then Fulfil, as for pay today.<br/>DECLINED: the Raven message
-      CW->>RD: delete API at the end:<br/>the account's entry goes
+      CW->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
     end
   else the customer says no
     OX->>R: DELETE /payments/<br/>{payment-id}
@@ -1056,7 +1056,7 @@ sequenceDiagram
       Note over XW,RAV: Online cluster, after the reply
       XW->>RTF: CANCELLED event
       XW->>RAV: CANCELLED message
-      XW->>RD: delete API at the end:<br/>the account's entry goes
+      XW->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
     end
   end
 ```

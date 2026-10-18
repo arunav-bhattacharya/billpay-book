@@ -53,14 +53,14 @@ One-Data functions are the versioned contracts that channels and partner systems
 
 ### Core
 
-1. [CreatePayment.v3](https://explorer.aexp.com/functions/CreatePayment.v3?method=post): create a payment for today or schedule one for a future date. A payment that needs the customer to confirm their bank details (`requiresBankConfirmation`) comes back `PENDING` with the provider's redirect link, and `ConfirmPendingPayment.v1` starts it once the customer has confirmed. So does a create that finds other pending payments on the account: it waits for the customer's go-ahead ([Held creates and the pending check](#held-creates-and-the-pending-check)).
+1. [CreatePayment.v3](https://explorer.aexp.com/functions/CreatePayment.v3?method=post): create a payment for today or schedule one for a future date. A payment that needs the customer to confirm their bank details (`requiresBankConfirmation`) comes back `PENDING` with the provider's redirect link, and `CreateConfirmPendingPayment.v1` starts it once the customer has confirmed. So does a create that finds other pending payments on the account: it waits for the customer's go-ahead ([Held creates and the pending check](#held-creates-and-the-pending-check)).
 2. [UpdatePayment.v1](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post): update a `SCHEDULED` payment. Works only inside the market's cancellation window; after that the answer is 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.
 3. [DeletePayment.v1](https://explorer.aexp.com/functions/DeletePayment.v1?method=post): cancel a `SCHEDULED` payment. Works only inside the cancellation window; after that the answer is 409. A corporate payment leaves `SCHEDULED` when its allocations are requested. It also cancels a `PENDING` payment that waits for a confirmation, when the customer says no (agreed 2026-10-18).
 4. [ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1): list the payments on a card account.
 5. [ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1): list the lifecycle states one payment has been through.
 6. [CreateCreditBalanceRefund.v1](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post): refund a credit balance on a card account.
 7. `CreateInboundPayment.v1`: take a payment pushed by a third party. One-Data stores it in its inbox and replies 202; the inbound dispatcher starts its workflow.
-8. `ConfirmPendingPayment.v1`: confirm a payment that waited for the customer. Channels call it with the same payment ID once the customer has confirmed their bank details on the provider's site, or has given the go-ahead for a payment made while another was pending, and it starts processing the payment.
+8. `CreateConfirmPendingPayment.v1`: confirm a payment that waited for the customer. Channels call it with the same payment ID once the customer has confirmed their bank details on the provider's site, or has given the go-ahead for a payment made while another was pending, and it starts processing the payment.
 9. `CreatePaymentAllocations.v1`: the allocations callback for corporate payments. Asynchronous: 202 once the batch is stored and its workflow has started.
 
 ### Composite
@@ -74,11 +74,11 @@ Event handlers take events from other platforms. None of them starts or waits on
 
 1. `CreateMoneyMovementEventHandler.v1`: money movement events from MR/M3. A return is stored in One-Data's **inbox** for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment.
 2. `CreateAccountsReceivableTransactionEventHandler.v1`: Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment, or leg, and presentment.
-3. `CreateOpentoBuyUpdatePaymentEventHandler.v1`: Authorizations (AMP) events, stored by One-Data. Details still to be defined.
+3. `CreateOpentoBuyUpdatePaymentEventHandler.v1`: Authorizations (AMP) events. It acknowledges them and does nothing else: no inbox row, and no work in Billpay (agreed 2026-10-18).
 
 The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. For PAID, One-Data marks a row `READY` once it has an AR posting and its settlement, and `ProcessPaidEventsWorkflow` reads only `READY` rows and sets each payment or leg `PAID` (see [Work Tracker and Inbox](#work-tracker-and-inbox)).
 
-- Each handler writes the raw event and upserts the payment's inbox row in one transaction, and acknowledges the sender only after the commit. If the database is down, the sender gets an error and retries.
+- The money movement and AR handlers write the raw event and upsert the payment's inbox row in one transaction, and acknowledge the sender only after the commit. If the database is down, the sender gets an error and retries.
 - There is one row per payment or leg, under the ID the event carries. A leg's ID is `{paymentId}_{seq}`, and its AR posting pairs with the settlement of the payment named before the `_`: a split payment settles once, as a whole, while each leg posts on its own.
 - An event without a payment ID is matched through `ReadPayments.v1`, by its account ID. Most events carry the ID, so the lookup is rare. If it finds no single payment, the raw event stays in `billpay_extnl_event` and an alert names it.
 - Whichever event arrives second sets the row `READY` in the same transaction. A lock per payment ID makes a payment's settlement and its legs' postings that arrive together see each other, and a repeated event can't set a row twice.
@@ -86,12 +86,13 @@ The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. For PA
 
 ### Inbox functions
 
-Billpay reaches the inbox through four One-Data functions, never through the database. `ProcessPaidEventsWorkflow` calls the first two, and the AR intake, returns and inbound dispatchers call the other two. `ProcessMissingPaidEventsWorkflow` hands a found event to its One-Data handler, the same way MR/M3 and GAR send events. All four names are **placeholders**.
+Billpay reaches the inbox through four One-Data functions, never through the database. `ProcessPaidEventsWorkflow` calls the first two, and the AR intake, returns and inbound dispatchers call the other two. One-Data runs a fifth on its own schedule. `ProcessMissingPaidEventsWorkflow` hands a found event to its One-Data handler, the same way MR/M3 and GAR send events. Every One-Data function's name starts with Create, Read, Update or Delete, by what it does, and these are the real names (agreed 2026-10-18).
 
-1. `ReadPaidReadyPayments.v1`: puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, then returns up to 500 of the oldest `READY` rows. It changes nothing else, so a repeat before the status update returns the same rows.
+1. `ReadPaidReadyPayments.v1`: puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, then returns up to 500 of the oldest `READY` rows, each with its `stlmt_ts` and `ar_pstd_ts`, which Settle writes onto the payment (agreed 2026-10-18). It changes nothing else, so a repeat before the status update returns the same rows. Proposed: function 5 takes over the move back to `READY`, so this one only reads.
 2. `UpdatePaidReadyPayments.v1`: sets the listed rows `DONE` or `UNMATCHED` in one transaction and returns the counts. Setting a status twice does no harm, so a retry is safe.
 3. `ReadStartRequests.v1`: returns up to a dispatcher's tick of the oldest `READY` requests for that dispatcher: AR intake (payments and refunds), returns or inbound. It changes nothing, so a repeat returns the same requests.
 4. `UpdateStartRequests.v1`: sets the listed requests `DONE` or `REJECTED` in one transaction. Setting a status twice does no harm.
+5. `UpdateUnmatchedPayments.v1`: One-Data runs it on a cron schedule; Billpay never calls it. It raises an alert for each row that has stayed `UNMATCHED` for 48 hours (agreed 2026-10-18). Proposed: it runs every 15 minutes, puts `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`, and checks the age of the oldest waiting row in each inbox, for the returns and PAID backlog-age alerts.
 
 ### Held creates and the pending check
 
@@ -99,7 +100,7 @@ One-Data makes each payment's ID, a ULID, and every retry of a create carries it
 
 - **The pending check.** One Redis hash per card account lists its pending payments, each with a short summary: amount, date and time created. On every pay-today or scheduled create, before it calls billpay-core, One-Data reads the hash, adds the new payment and stores the create as Pending, all in one MULTI/EXEC transaction through the Java Redis SDK, which is one Redis call. One-Data stores every create (agreed 2026-10-18). Storing it in the check's call adds no wait, and puts it in Redis before billpay-core's delete can arrive (Proposed). If the account already has pending payments, One-Data sends their IDs with the create, and billpay-core holds the new payment for the customer's go-ahead ([12. ConfirmPaymentWorkflow](#12-confirmpaymentworkflow)). Any pending payment triggers the go-ahead. Only the new payment is confirmed: the pending one carries on by itself, and the step offers no way to cancel it (agreed 2026-10-18).
 - **Held creates.** When billpay-core doesn't answer `POST /payments` within 3 s, or answers with a 5xx, One-Data holds the create: it hands the stored create to RTF, which retries it into billpay-core with exponential backoff and the same payment ID. The channel gets the payment ID and `PENDING`. A `PENDING` reply in time is an answer, so it never goes to RTF. Only creates are stored and held: confirms, updates and cancels go straight to billpay-core.
-- **The delete.** At the end of each create's workflow, billpay-core calls One-Data's delete API with the payment and account IDs, and retries until it lands. One-Data removes the stored create and the payment's entry in the account's hash. When the payment still waits for a confirmation, billpay-core says so, and One-Data removes only the stored create; the confirm or cancel workflow removes the hash entry when it ends. A create repeated after its run has closed starts a new run, which ends with the delete like any other ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). One-Data removes either only on billpay-core's word: the delete, or billpay-core refusing the create with a 4xx.
+- **The delete.** At the end of each create's workflow, billpay-core calls One-Data's delete API, `DeletePendingPayment.v1` (agreed name, 2026-10-18), with the payment and account IDs, and retries until it lands. One-Data removes the stored create and the payment's entry in the account's hash. When the payment still waits for a confirmation, billpay-core says so, and One-Data removes only the stored create; the confirm or cancel workflow removes the hash entry when it ends. A create repeated after its run has closed starts a new run, which ends with the delete like any other ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). One-Data removes either only on billpay-core's word: the delete, or billpay-core refusing the create with a 4xx.
 - **Reading.** `ReadPayments.v1` reads Redis and billpay-core, removes duplicates on payment ID and customer account, and Oracle wins. Every create is in Redis from the start, so a payment shows as soon as it is made, and it shows one `PENDING`, whatever it waits for.
 
 Three cases are settled for now, and two wait on another team:
@@ -192,7 +193,7 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 | Schedule, update, cancel, from channels | Part of realtime traffic; cancel under 2 TPS | Yes | Cancel only inside the cancellation window | Online |
 | Bank confirmation, from channels | Part of pay today: the create call, then the confirm | Yes: until `PENDING` with the redirect link, then until `ACCEPTED` | Confirm only inside the market's confirmation window | Online |
 | Credit balance refunds | From channels, or raised by AR | Channels: yes. AR: no, pulled with AR intake | None | Online from channels; Offline for AR |
-| Scheduled intake, AR batch | 100 TPS sustained (1M in 2.8 h) | No: stored by One-Data, then 202; pulled at the governor's pace | None | Offline |
+| Scheduled intake, AR batch | 100 TPS sustained (1M in 2.8 h), at any time of day, spread out or in bursts (agreed 2026-10-18) | No: stored by One-Data, then 202; pulled at the governor's pace | None | Offline |
 | Scheduled execution, US | Up to 1M at 00:01 MST (Phoenix time) | No | No cutoff; 50 TPS floor, faster when healthy | Offline |
 | Scheduled execution, SEPA | Up to 250K per market (DE, IT) at midnight CET | No | 3 to 4 hour cutoff | Offline |
 | Corporate | Up to 50K payments and 500K allocations a day; up to 100K allocations in one payment | Only for pay today, until `ACCEPTED` | The parent clears once `ALLOCATED`: at once for pay today, at the execution time for a scheduled payment | Offline; pay today starts on Online |
@@ -644,7 +645,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 - Checks the payment (full or split), the presentment that came back, and its status. Eligible statuses: `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
 - **Return:** that presentment's row turns `RETURNED`, with the return's details, and stays `RETURNED`.
-- Judges whether the return can be represented under the market's representment rules: which returns are eligible, and how many times a payment can be represented. A return that isn't eligible, or a payment already represented the market's maximum number of times, stays `RETURNED`. Sets the representment date from the same rules: today or later.
+- Judges whether the return can be represented under the market's representment rules: which return reasons can be represented, and how many times a payment can be (agreed 2026-10-18). A return that isn't eligible, or a payment already represented the market's maximum number of times, stays `RETURNED`. Sets the representment date from the same rules: today or later.
 - **QueueRepresentment:** in one commit, writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with the representment date as its clearing date, and its `REPRESENT` Work Tracker row due on that date. Returns never hand off to a representment workflow directly.
 
 #### 10. ProcessRepresentmentWorkflow
@@ -666,7 +667,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 - The caller confirms with the same payment ID once the customer has confirmed their bank details on the provider's site, or has given the go-ahead for a payment made while another was pending (agreed 2026-10-18).
 - The confirm is admitted only for a `PENDING` payment with an open `CONFIRM_EXPIRY` row; anything else gets 409, so a confirm never races the create's own Verify. Verify runs the implementation for what the payment waited for: the bank, below, or a go-ahead, which runs the usual pay-today checks with no provider call. A go-ahead still goes through if the earlier payment was decided while the customer looked.
-- **Verify:** `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING` that also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider does the verification, so Verify doesn't call it. Before it accepts the payment, Verify's bank-confirmation implementation checks the verification token Payment Instruments holds for the payment's instrument, to guard against fraud (agreed 2026-10-17). A payment without a valid token is `DECLINED` (agreed 2026-10-18).
+- **Verify:** `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING` that also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider does the verification, so Verify doesn't call it. Before it accepts the payment, Verify's bank-confirmation implementation asks Payment Instruments whether the verification token it holds for the payment's instrument is valid, to guard against fraud (agreed 2026-10-17). Payment Instruments decides what makes a token valid (agreed 2026-10-18). A payment without a valid token is `DECLINED` (agreed 2026-10-18).
 - **Execute**, then **Fulfil**, as for pay today.
 - A repeated confirm is a retry of a confirm that already reached Billpay, usually because the caller lost the reply. While the workflow runs, the repeat joins it (conflict policy `USE_EXISTING`) and gets the same answer. Once the workflow has closed, the API reads the payment and answers with its current state, such as `PROCESSED` or `DECLINED`, so the channel never shows a failure for a payment that went through (agreed 2026-10-18). A confirm for a payment that was cancelled, such as one whose confirmation window closed, gets 409.
 
@@ -757,7 +758,7 @@ Billpay pulls PAID work at its own pace. A Temporal Schedule starts this workflo
 - Mark runs last, so a row is `DONE` only once its payment's event has gone out. RTF consumers already accept a repeated event, because any activity can run twice.
 - If RTF is down, the run waits on its batch. Later triggers are skipped, and new rows wait in the inbox.
 - A run terminated by hand between Settle and the announcement leaves its payments `PAID` without their event. The batch ID, in the run's history and on their timeline rows, says which payments to re-send.
-- An `UNMATCHED` row (no payment or leg, or one not yet `PROCESSED`) comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED` and raises an alert.
+- An `UNMATCHED` row (no payment or leg, or one not yet `PROCESSED`) comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED`, and One-Data's `UpdateUnmatchedPayments.v1` raises the alert.
 - One run settles an estimated 1,000 payments a second, at about half a second a batch; load-test run 1 measures it. More would need lanes: the fetch would take a lane number and count and filter on a hash of the payment ID.
 - A split payment, consumer or corporate, turns `PAID` leg by leg: each leg's row is `READY` once the leg has posted and its payment has settled. The parent stays `PROCESSED`. One parent's settlement can make up to 100K legs ready at once; the drain takes them 500 at a time, at the governor's pace.
 
@@ -782,7 +783,7 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 | Interface | System | Task queue | Called by |
 | --- | --- | --- | --- |
 | `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update |
-| `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify, Represent; at confirm, Verify also checks the instrument's verification token |
+| `InstrumentActivities` | Payment Instruments | The workflow's queue: Payment Instruments has no rate limit | Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid |
 | `OptionsActivities` | Payment Options | The workflow's queue: Payment Options has no rate limit | Verify, Reverify, Represent |
 | `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
@@ -838,7 +839,7 @@ Between the core APIs and the workflows sits the Billpay Router. For every row b
 | | | Future-dated; Update-With-Start | `CreateScheduledPaymentWorkflow` (Online), then `ExecuteScheduledPaymentWorkflow` on the due date (Offline) | Consumer: as for pay today, on the Offline cluster. Corporate: `RequestAllocationsWorkflow` and `ReceiveAllocationsWorkflow` first, then the execution and one `ExecuteSplitPaymentWorkflow` per leg, each started by a dispatcher |
 | `UpdatePayment.v1` | `PUT /payments/{payment-id}` | `SCHEDULED`, inside the window; Update-With-Start | `UpdatePaymentWorkflow` (Online) | Child `CreateScheduledPaymentWorkflow` `{newId}-init` |
 | `DeletePayment.v1` | `DELETE /payments/{payment-id}` | `SCHEDULED`, inside the window; or `PENDING`, waiting for a confirmation, on a no; Update-With-Start | `CancelPaymentWorkflow` (Online) | |
-| `ConfirmPendingPayment.v1` | `POST /payments/{payment-id}/confirm` | `PENDING`, waiting for bank confirmation or a go-ahead; Update-With-Start | `ConfirmPaymentWorkflow` (Online) | |
+| `CreateConfirmPendingPayment.v1` | `POST /payments/{payment-id}/confirm` | `PENDING`, waiting for bank confirmation or a go-ahead; Update-With-Start | `ConfirmPaymentWorkflow` (Online) | |
 | `CreatePaymentInstallment.v1` | `POST /payment-installments` | Pay & Plan; Update-With-Start | Pay & Plan composite (Online) | `CreateImmediatePaymentWorkflow` |
 | `CreateCreditBalanceRefund.v1` | `POST /refunds` | From a channel; Update-With-Start | `CreateBalanceRefundWorkflow` (Online) | |
 | `CreateBillpayTransactionFromAccountsReceivable.v1` (payment) | None: stored in One-Data's inbox | Future-dated from AR; the AR intake dispatcher calls the Router | `CreateScheduledPaymentWorkflow` (Offline), then `ExecuteScheduledPaymentWorkflow` on the due date | As for any scheduled payment |
@@ -994,7 +995,7 @@ A PAID row is `READY` once it has an AR posting and a settlement: its own, or fo
 | `WAITING` | A payment or leg still missing an event |
 | `READY` | Its posting and its settlement are in; waiting for Billpay |
 | `DONE` | Billpay has applied it; or, for a split payment's own row, a leg has taken its settlement |
-| `UNMATCHED` | Billpay found nothing ready for it: no payment or leg, or one not yet `PROCESSED`. Tried again an hour later, for up to 48 hours |
+| `UNMATCHED` | Billpay found nothing ready for it: no payment or leg, or one not yet `PROCESSED`. Tried again an hour later, for up to 48 hours; after that, `UpdateUnmatchedPayments.v1` raises an alert |
 
 Each event is one transaction: a lock on its payment ID, an upsert that sets the event's timestamp only where it is still empty, then the pairing across rows for a leg's posting or a payment's settlement:
 
@@ -1313,7 +1314,7 @@ A step in billpay-ui. Each setting drives something at runtime.
 | Cancellation window: by default it closes 1 hour before the run, at 11 PM local time, in every market | Cancel and update. It closes before execution starts. A corporate payment leaves `SCHEDULED`, and stops taking cancels and updates, once its allocations are requested |
 | Cutoff, if any | The governor's cutoff floor and alert |
 | Allocation fetch timing and alert point | When a scheduled payment's `ALLOC_REQUEST` row falls due (on the due date, or a set number of hours or days before it), and when a payment still `ALLOCATING` raises an alert |
-| Representment rules: which returns are eligible, how many times a payment can be represented, and the representment date | The return workflow, which decides whether a return is represented and when |
+| Representment rules: which return reasons can be represented, how many times a payment can be, and the representment date | The return workflow, which decides whether a return is represented and when |
 | Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's: the account type's setting wins (agreed 2026-10-18) | Every stage's announcement: a status that is switched off sends no Raven message |
 | Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18). The same window is how long a customer has to give a go-ahead (agreed 2026-10-18, for product to confirm) | Which provider RequestConfirmation asks for the redirect link, and when a payment still waiting for confirmation is cancelled |
 | Expected volumes | The governor's floors and budgets |
@@ -1430,12 +1431,12 @@ An announcement costs about 4 writes, or about 7 when RTF and Raven go together,
 | --- | --- | --- | --- |
 | SEPA, 23:00 to 02:00 UTC | DE and IT execution | 56 TPS | ≈2,500 |
 | US, from 07:01 UTC | US execution | 50 to 100 TPS | 2,250 to 4,500 |
-| Business hours | AR batch intake | 100 TPS | ≈2,400 |
+| Any time | AR batch intake, whenever AR sends it | 100 TPS | ≈2,400 |
 | Any time | Returns, at the full burst | 100 TPS | ≈2,000 |
 | Any time | Corporate legs, paced | 100 a second | ≈3,000 |
 | US early morning, last priority | The PAID drain, as AR posting events arrive | Up to about 1,000 payments a second | ≈40 |
 
-- The worst overlap (US at 100 TPS, a returns burst and corporate legs at once) needs about 9,500 writes/s.
+- The worst overlap (US at 100 TPS, AR intake, a returns burst and corporate legs at once) needs about 11,900 writes/s. AR can send at any time, so it is counted in (agreed 2026-10-18). The governor still keeps the total under its ceiling: past it, the classes further down its order wait.
 - Dispatchers and the governor add under 10 writes/s.
 - The PAID drain is light on Temporal and heavy on Oracle: at full speed it adds about 2,000 Oracle writes/s, an update and a timeline insert per payment or leg. That is why the governor gives it budget last and the Oracle signals cut it first.
 - 500K legs a day average about 180 writes/s. A 100K payment at 100 legs a second adds about 3,000 writes/s for about 17 minutes.
@@ -1470,9 +1471,9 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | SEPA cutoff at risk | The projected finish passes the cutoff minus 15 minutes, or the cutoff floor no longer fits the budget | Raise downstream limits or the rate override, or accept the delay |
 | Online capped | A SEPA run caps Online on a downstream, or the cap warning says one is likely | Raise that downstream's agreed TPS if it happens often |
 | Late allocations | A corporate payment is still `ALLOCATING` at the market's alert point | Chase the allocation source |
-| Returns backlog age | The oldest return waiting in One-Data's inbox passes its age threshold | Check whether higher priorities are holding the queue |
-| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold | Check whether the governor is holding the drain, or RTF is down |
-| Payment not PAID | A payment, other than a split parent, or a leg is still `PROCESSED` after 48 hours, or an inbox row has stayed `UNMATCHED` for 48 hours | Read the inbox row for the missing event, or check the event's IDs against Oracle |
+| Returns backlog age | The oldest return waiting in One-Data's inbox passes its age threshold (Proposed: checked by `UpdateUnmatchedPayments.v1`) | Check whether higher priorities are holding the queue |
+| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold (Proposed: checked by `UpdateUnmatchedPayments.v1`) | Check whether the governor is holding the drain, or RTF is down |
+| Payment not PAID | A payment, other than a split parent, or a leg is still `PROCESSED` after 48 hours, or an inbox row has stayed `UNMATCHED` for 48 hours (that part raised by One-Data's `UpdateUnmatchedPayments.v1`) | Read the inbox row for the missing event, or check the event's IDs against Oracle |
 | Event without a payment | An event with no payment ID matches no payment through `ReadPayments.v1`, or more than one | Find the payment and replay the event through its handler |
 | Pending entry age | An entry in One-Data's account hash passes its set age, longer than a normal workflow and the confirmation window | Find where it is stuck, in Redis or in billpay-core, and re-send the create with the same ID |
 | Creates held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-core and the Online cluster: this is usually the first sign |
@@ -1645,9 +1646,6 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Item | Assumed for now | Why it matters |
 | --- | --- | --- |
 | Agreed TPS per downstream | 100 TPS for every downstream, until each owner agrees its own (OK for now, 2026-10-17) | Caps every window. During a SEPA run, Online is capped at agreed TPS less the run's need, about 56 RPS of clearing |
-| AR intake time of day | Business hours, outside the midnight windows (OK for now, 2026-10-17) | Overlap with execution changes the budget split |
-| Representment eligibility | A market setting, with a maximum number of representments | How eligibility is expressed, for example by return reason |
-| Verification token check | Payment Instruments holds the token and Verify checks it at confirm; a payment without a valid token is declined (agreed 2026-10-18) | What makes a token valid, and the Payment Instruments call that returns it |
 | Provider link lifetime | About 10 minutes for every provider (OK for now, 2026-10-18) | Sets the longest confirmation window a market can have |
 | Confirmation expiries during an Online outage | Proposed: they pause until Online is back, plus a grace period of one confirmation window (agreed 2026-10-18, for product to confirm), since a customer can't confirm while Online is down. To brainstorm (2026-10-18) | Without it, a payment whose short window runs out during the outage is cancelled although the customer couldn't confirm. To settle: how the expiry dispatcher learns of the outage, how long the grace is, and what the customer sees |
 | Prometheus capacity | The server that scrapes Temporal's metrics also scrapes billpay-core's pods (OK for now, 2026-10-18) | It has to be sized for the volume of metrics; how to scale it is a separate discussion |
@@ -1655,9 +1653,8 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Go-ahead window | The market's confirmation window, at most 10 minutes for now (agreed 2026-10-18) | For product to confirm: how long a customer has to answer before the payment is cancelled |
 | Redis down | One-Data creates payments with no pending check and nothing stored (2026-10-18) | For product to confirm: customers can pay twice while it lasts |
 | Pay by bank while billpay-core is slow | One-Data spots it from the instrument type and doesn't hold it for RTF (Proposed) | For One-Data to confirm it can tell |
-| One-Data's delete API | Removes a stored create and its account-hash entry; its name and contract are to come | How billpay-core reports a finished create |
+| One-Data's delete API | `DeletePendingPayment.v1` (agreed name, 2026-10-18) removes a stored create and its account-hash entry; its contract is to come | How billpay-core reports a finished create |
 | The onboarding config cache | Each billpay-core pod keeps the onboarding config in memory (agreed 2026-10-18). Proposed: it reloads when provisioning activates or rolls back a version | How fast a release reaches every pod |
-| Open-to-buy event handler | Events stored by One-Data; a placeholder handler in Billpay | Its details are still to be defined |
-| Balance refund steps | They follow the payment path. Skipped for now | Detailed stages are still to be defined |
+| Balance refund steps | They follow the payment path. Skipped for now (OK for now, 2026-10-18) | Detailed stages are still to be defined |
 
 [^ Top](#table-of-contents)

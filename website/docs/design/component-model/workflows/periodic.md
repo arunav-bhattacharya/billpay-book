@@ -62,7 +62,7 @@ Only one run is ever active. A run takes batches until the inbox has no `READY` 
 4. Marks the rows through `UpdatePaidReadyPayments.v1`: `DONE` for a payment or leg now `PAID`, `UNMATCHED` for the rest.
 5. Paces itself: it waits as long as the governor's rate for the `PAID` class asks, then fetches again. The run continues-as-new every 20 batches.
 
-The four function names are placeholders until One-Data names them.
+These are the functions' real names: every One-Data function's name starts with Create, Read, Update or Delete, by what it does. The fetch returns each row's settlement and AR posting times, which Settle writes onto the payment as `stlmt_ts` and `ar_pstd_ts`.
 
 Every step is safe to repeat. Settle changes only the rows that still need it, and a Settle that committed and is then retried still finds the payments it moved by their batch ID, so their events go out. Marking runs last, so a row is `DONE` only once its payment's event has gone out, and RTF's consumers already accept a repeated event.
 
@@ -70,7 +70,7 @@ When something goes wrong:
 
 - If RTF is down, the run waits on its batch. Later triggers are skipped, and new rows wait in the inbox.
 - A run terminated by hand between Settle and the announcement leaves its payments `PAID` without their event. The batch ID, in the run's history and on their timeline rows, says which payments to re-send.
-- An `UNMATCHED` row, for a payment or leg that doesn't exist or isn't `PROCESSED` yet, comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED` and raises an alert.
+- An `UNMATCHED` row, for a payment or leg that doesn't exist or isn't `PROCESSED` yet, comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED`, and One-Data's own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert.
 
 A split payment turns `PAID` leg by leg: a leg's row is `READY` once the leg has posted and its payment has settled, and the parent stays `PROCESSED`. One corporate parent's settlement can make up to 100K legs ready at once, and the drain takes them 500 at a time.
 
@@ -84,7 +84,7 @@ One run settles an estimated 1,000 payments a second, at about half a second a b
 
 - It finds payments, and legs of split payments, that have been `PROCESSED` for more than 48 hours without turning `PAID`. Split parents are skipped, since only their legs turn `PAID`.
 - It asks MR/M3 and GAR for the payment's current state (for a leg, its payment's settlement and its own posting) and hands any event it finds to its One-Data handler, so events reach the inbox only one way. An event still missing raises an alert, and the payment's inbox row shows which one.
-- A row that has been `UNMATCHED` for 48 hours is left for a person. Replaying an event can't bring it back, because the inbox only moves rows that are still waiting, so the alert names it.
+- A row that has been `UNMATCHED` for 48 hours is left for a person. Replaying an event can't bring it back, because the inbox only moves rows that are still waiting, so One-Data's alert names it.
 
 ## Purge Transaction Data
 

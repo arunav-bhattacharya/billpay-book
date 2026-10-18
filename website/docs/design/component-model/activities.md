@@ -18,7 +18,7 @@ export const ACTIVITIES = [
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
     queue: "The workflow's queue: Payment Instruments has no rate limit",
-    calledBy: "Verify, Reverify, Represent; at confirm, Verify also checks the instrument's verification token",
+    calledBy: "Verify, Reverify, Represent; at confirm, Verify also asks it whether the instrument's verification token is valid",
   },
   {
     name: 'OptionsActivities',
