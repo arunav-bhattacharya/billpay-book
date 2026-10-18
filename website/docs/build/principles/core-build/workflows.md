@@ -55,7 +55,7 @@ A corporate payment starts no child at all. It can have 100K legs, so its alloca
 
 Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor aren't pinned: they move to the new build when they continue-as-new.
 
-Config is pinned the same way. The plan key carries the resolved behaviors and the config version, so a replay finds the same stages. A scheduled payment gets a new plan key on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
+Config is pinned the same way. The plan key carries the resolved behaviors, the config version and the market's rule settings, so a replay finds the same stages and the same thresholds. A scheduled payment gets a new plan key on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
 
 ## A worked example: Create Immediate Payment
 

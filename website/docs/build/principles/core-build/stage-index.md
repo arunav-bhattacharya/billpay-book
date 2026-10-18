@@ -39,15 +39,15 @@ What it writes is plain Kotlin. For Verify, it looks something like this:
 ```kotlin
 // Written by the processor: the most specific match first, the default last.
 // s holds the activity stubs the workflow has just made on its own thread.
-internal fun verifyFor(plan: PlanKey, s: Stubs, rules: RuleSettings): PaymentVerifyStage = when {
+internal fun verifyFor(plan: PlanKey, s: Stubs): PaymentVerifyStage = when {
     plan.requiresMandateAuthorization && plan.requiresBankConfirmation ->
-        PaymentVerifyStageWithMandateAndBankConfirmation(s.instruments, s.options, s.plans, rules, s.store)
+        PaymentVerifyStageWithMandateAndBankConfirmation(s.instruments, s.options, s.plans, plan.ruleSettings, s.store)
     plan.requiresMandateAuthorization ->
-        PaymentVerifyStageWithMandate(s.instruments, s.options, s.plans, rules, s.store)
+        PaymentVerifyStageWithMandate(s.instruments, s.options, s.plans, plan.ruleSettings, s.store)
     plan.requiresBankConfirmation ->
-        PaymentVerifyStageWithBankConfirmation(s.instruments, s.options, rules, s.store)
+        PaymentVerifyStageWithBankConfirmation(s.instruments, s.options, plan.ruleSettings, s.store)
     else ->
-        DefaultPaymentVerifyStage(s.instruments, s.options, rules, s.store)
+        DefaultPaymentVerifyStage(s.instruments, s.options, plan.ruleSettings, s.store)
 }
 ```
 

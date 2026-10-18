@@ -117,7 +117,7 @@ class MandateCheck(private val plans: PlansActivities) : Check<MandateDetails> {
 /** A pure condition over the facts: no calls, no clock. */
 val mandateActive = Rule(
     id = "MANDATE_ACTIVE",
-    declineCode = DeclineCode.MANDATE_INACTIVE,   // codes for mandate failures are an open item
+    declineCode = DeclineCode.MANDATE_INACTIVE,   // illustrative: the closest existing code, until mandate codes are agreed
     priority = 300,                               // the highest-priority failure decides
     steps = setOf(Step.VERIFY, Step.REVERIFY),
     needs = setOf(CheckKey.MANDATE),
@@ -128,7 +128,7 @@ class PaymentVerifyStageWithMandate(
     instruments: InstrumentActivities,
     options: OptionsActivities,
     plans: PlansActivities,                       // all three on the workflow's queue
-    private val settings: RuleSettings,           // the market's thresholds, from the plan key (Proposed)
+    private val settings: RuleSettings,           // the market's thresholds, from the plan key
     private val store: PaymentStore,
 ) : PaymentVerifyStage {
 
@@ -150,4 +150,4 @@ class PaymentVerifyStageWithMandate(
 - `fetchAll` waits for every check. An activity returns what its system said, such as a closed account or an expired mandate, as data, and throws only on an error, which Temporal retries. So an outage never declines a payment, and a "no" is never retried.
 - Rules live in one catalog, `core/lib/verification/rules/`, each with the steps it runs in. `PaymentReverifyStageWithMandate` runs the same mandate rule on the due date. Represent calls none of these three systems: it will add checks and rules of its own once they are defined.
 - A rule reads only the facts, never `Instant.now()` or a service. That is what makes it safe inside the workflow, where a replay must reach the same decision.
-- The report keeps every rule's result. The commit's timeline row stores the IDs of the rules that failed, and a metric counts declines by step and rule.
+- The report keeps every rule's result. The commit's timeline row keeps the IDs of the rules that failed in its event JSON, and `billpay_verification_declines_total` counts declines by step and rule.

@@ -118,7 +118,7 @@ flowchart TB
 - The checks' calls go out in parallel. What a system says, such as a closed account or no valid mandate, comes back as a fact. Only an error fails the call, and Temporal retries it, so an outage never declines a payment and a business "no" is never retried.
 - A rule makes no calls and never reads the clock, so a replay reaches the same decision. Every rule that applies runs, except one whose check didn't run or whose earlier rule failed, such as the instrument rules after "instrument not found".
 - The highest-priority failure decides: `DECLINED` with that rule's code, or `DISALLOWED` for a push payment. There is no outcome that sends a payment to review, because the state model has no state for one.
-- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, so they change with a release and no deploy. A rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed.
+- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, and the Router hands them to the workflow in the plan key. So a threshold changes with a release and no deploy, while a rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed, and a metric counts declines by step and rule.
 
 ## Capture
 
