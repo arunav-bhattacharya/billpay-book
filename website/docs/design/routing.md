@@ -17,7 +17,7 @@ A request reaches Billpay through a One-Data function. Most then call a core API
 
 The Router runs the same six steps for every request.
 
-1. Admit the request. The market, account type and API must be live in this environment. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them.
+1. Admit the request. The market, account type and API must be live in this environment, which the Router checks against billpay-core's in-memory copy of the onboarding config, so admission adds no call. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them. One create is never refused: a create One-Data held while billpay-core was slow, which arrives after its market was taken out of service, is captured and declined instead, so the customer is told.
 2. Pick the journey from the routing table below.
 3. Resolve the behaviors from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel. Bank confirmation set to BOTH follows the request's payment method instead: a method that needs the customer to confirm at their bank gets Y.
 4. Pin the plan key: the journey, the resolved behaviors and the config version. The workflow looks up its stages from it at runtime (see [Principles](./principles.md#how-a-workflow-finds-its-stages)).
@@ -37,7 +37,8 @@ How a workflow starts depends on who is waiting for it.
 
 Update-With-Start is what keeps the online journeys fast. It starts the workflow and sends it an update in one call. The update returns as soon as there is an answer, such as Verify's decision on a new payment or `CANCELLED` for a cancel, and the rest of the workflow carries on without the caller.
 
-- `PENDING` in a reply means the payment is captured but not yet decided. The API waits at most 3 seconds for the decision; a payment not decided by then is answered `PENDING` and finishes on its own. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link, and the confirm's reply carries the decision. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits.
+- `PENDING` in a reply means the payment is captured but not yet decided. The API waits at most 2.5 seconds for the decision, so its answer reaches One-Data inside One-Data's own 3 seconds; a payment not decided by then is answered `PENDING` and finishes on its own. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link, and the confirm's reply carries the decision. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A payment held for the customer's go-ahead also comes back `PENDING`, and One-Data adds the pending payments to the reply.
+- A create repeated after its `{paymentId}-init` run has closed starts a new run under the default reuse policy, and Capture's idempotency check decides whether it carries on ([Creates that arrive late or twice](./component-model/workflows/core.md#creates-that-arrive-late-or-twice)).
 - Eager workflow start isn't used: the server refuses it with Update-With-Start. Online latency comes from Update-With-Start and local activities instead.
 - For pulled work and async starts, the workflow ID comes from the request: the payment ID in its idempotency key, or for a return, the returned payment and its sequence number. A repeated request finds the same workflow. A start that fails as already started counts as done, and reuse policy `REJECT_DUPLICATE` stops a second run after the first one closes.
 
@@ -69,11 +70,11 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
               notes: ['CreateImmediatePayment stops at ACCEPTED. Dispatchers start every later step.'],
             },
             {
-              term: 'Bank confirmation',
+              term: 'Bank confirmation, or a go-ahead',
               via: 'uws',
               detail: "the caller's confirm",
               flow: [{name: 'ConfirmPayment', cluster: 'Online', caption: ['Verify, Execute, Fulfil']}],
-              notes: ['CreateImmediatePayment stops at PENDING and returns the redirect link.', 'Never confirmed: cancelled when the window closes.'],
+              notes: ['CreateImmediatePayment stops at PENDING, with the redirect link or the pending list.', "A no, or no answer before the window closes: cancelled."],
             },
           ],
         },
@@ -114,6 +115,13 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
                 {via: 'row', detail: 'one per leg, once it clears', name: 'ExecuteSplitPayment', cluster: 'Offline'},
               ],
               notes: ['No cancel or update once ALLOCATING.', 'Reverify runs first, on the due date.'],
+            },
+            {
+              term: 'A go-ahead',
+              via: 'uws',
+              detail: "the caller's confirm",
+              flow: [{name: 'ConfirmPayment', cluster: 'Online', caption: ['Verify: SCHEDULED (Proposed)']}],
+              notes: ['CreateScheduledPayment stops at PENDING with the pending list.', "A no, or no answer before the window closes: cancelled."],
             },
           ],
         },
@@ -158,11 +166,14 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
     },
     {
       term: 'Cancel payment',
-      routes: [{desc: 'SCHEDULED, inside the window', flow: [{via: 'uws', name: 'CancelPayment', cluster: 'Online'}]}],
+      routes: [
+        {desc: 'SCHEDULED, inside the window', flow: [{via: 'uws', name: 'CancelPayment', cluster: 'Online'}]},
+        {desc: "PENDING, on the customer's no to a go-ahead", flow: [{via: 'uws', name: 'CancelPayment', cluster: 'Online'}]},
+      ],
     },
     {
       term: 'Confirm payment',
-      routes: [{desc: 'PENDING, confirmed at the bank', flow: [{via: 'uws', name: 'ConfirmPayment', cluster: 'Online'}]}],
+      routes: [{desc: 'PENDING, confirmed at the bank or given the go-ahead', flow: [{via: 'uws', name: 'ConfirmPayment', cluster: 'Online'}]}],
     },
     {
       term: 'Confirmation window closes',
@@ -227,12 +238,12 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 
 ## Child workflows
 
-The behaviors pick the branch at each fork: `accountType` for consumer and corporate, and `requiresBankConfirmation` for a payment the customer confirms at their bank. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
+The behaviors pick the branch at each fork: `accountType` for consumer and corporate, and `requiresBankConfirmation` for a payment the customer confirms at their bank. A go-ahead is the one fork no behavior picks: One-Data asks for it, by sending other pending payments' IDs with the create. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
 - A request with several instructions never takes bank confirmation, and neither does Pay & Plan: one that would need it gets 422 before any workflow starts.
-- A payment that needs bank confirmation starts no child either. `CreateImmediatePaymentWorkflow` replies `PENDING` with the provider's redirect link and ends. The caller's confirm starts `ConfirmPaymentWorkflow`, and if no confirm comes in time, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster.
+- A payment that needs bank confirmation starts no child either. `CreateImmediatePaymentWorkflow` replies `PENDING` with the provider's redirect link and ends. The caller's confirm starts `ConfirmPaymentWorkflow`, and if no confirm comes in time, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster. A payment held for a go-ahead goes the same way, today or future-dated, with the pending list in place of the link, and the customer's no starts `CancelPaymentWorkflow` on the Online cluster.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
 

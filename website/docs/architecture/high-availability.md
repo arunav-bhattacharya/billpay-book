@@ -10,7 +10,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 # High Availability
 
-<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against **two self-hosted Temporal clusters** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: the app, the write side of the database and each Temporal cluster have a standby that does nothing until someone promotes it. And when the core APIs can't be reached, One-Data parks the request in **Redis** rather than turning the caller away, for **RTF** to replay later.</Lead>
+<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against **two self-hosted Temporal clusters** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: the app, the write side of the database and each Temporal cluster have a standby that does nothing until someone promotes it. And when the core APIs are slow or can't be reached, One-Data holds a new payment in **Redis** rather than turning the caller away, for **RTF** to retry later.</Lead>
 
 ## Topology
 
@@ -20,9 +20,10 @@ import HADiagram from '@site/src/components/HADiagram';
 
 - One-Data Functions run active in both sites, so losing a site doesn't close the front door.
 - Both of them call the same core APIs, the ones in IPC2's app. IPC1's One-Data routes across.
-- Each site also has a **Redis** store that sits empty most of the time. It's there for one case: the core APIs can't be reached.
-- When that happens, One-Data writes the request into Redis instead of failing the caller. **RTF** (the Reliable Transaction Framework) then picks it up from Redis and replays it into the core once the core is healthy again.
-- The two Redis instances are one active-active database (Redis calls this a CRDB), so a request parked on one site is visible from the other.
+- Each site also has a **Redis** store. The two are one active-active database (Redis calls this a CRDB), so what one site writes, the other can read.
+- One-Data writes every new payment to Redis before it calls the core APIs, in the same call that checks the card account for other pending payments. If one is still pending, the customer is asked to confirm the new payment before it goes ahead. That stops a customer who wasn't sure the first payment went through from paying twice by mistake. [Pay while another payment is pending](../design/journeys/index.md#pay-while-another-payment-is-pending) walks through it.
+- If the core APIs don't answer within 3 seconds, or answer with an error, One-Data hands the stored payment to **RTF** (the Reliable Transaction Framework) instead of failing the caller. RTF retries it into the core, with the same payment ID, until it lands. Only new payments are held this way. A confirm, an update or a cancel needs the core.
+- When a payment's workflow ends, billpay-core tells One-Data, which clears the payment out of Redis. Persistence is on and nothing is evicted, so a restart or a full memory can't lose an entry.
 - The trade is on purpose. The caller gets an answer now and the payment processes a little later. An outage in the core becomes a delay instead of a dropped payment.
 
 ## The app
@@ -80,8 +81,9 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
 
 | What fails | What happens |
 | --- | --- |
-| **The app in IPC2** | Both One-Data instances keep answering callers and park their requests in **Redis**, and work nobody waits for keeps landing in One-Data's inbox. Dispatchers stop and the workers go quiet, so dated work waits in Oracle and running payments pause where they are. Nothing is dropped: **RTF** replays the parked requests and work resumes once the app is back, or once an operator promotes the IPC1 standby. |
-| **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and parking in Redis until an operator promotes the app and the **Data Guard** standby there. |
+| **The app in IPC2** | Both One-Data instances keep taking new payments and hold them in **Redis**, and work nobody waits for keeps landing in One-Data's inbox. A confirm, an update or a cancel gets an error until the app is back. Dispatchers stop and the workers go quiet, so dated work waits in Oracle and running payments pause where they are. Nothing is dropped: **RTF** retries the held payments and work resumes once the app is back, or once an operator promotes the IPC1 standby. |
+| **A whole site** | Losing IPC1 costs the front door on that side and nothing else, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and holding new payments in Redis until an operator promotes the app and the **Data Guard** standby there. |
+| **Redis** | One-Data still creates payments, with no pending check and nothing stored, so a customer could pay twice while it lasts. That is the working rule until product confirms it. The fix is to restore Redis. |
 | **Oracle primary** | `PaymentStore` waits out a short outage or a patch on its own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
 | **One-Data's inbox** | Nothing new can be stored, so senders of bulk intake, inbound payments, returns, settlement and posting get an error and retry. Payments stay `PROCESSED` until the inbox is back. Nothing is lost: the dispatchers and `PAID` catch up on their own. |
 | **The Online cluster** | Journeys where a caller waits can't start until the cluster returns or an operator promotes its us-west-1 standby. The Offline cluster carries on, since nothing calls across. |

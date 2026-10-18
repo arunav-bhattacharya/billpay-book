@@ -92,7 +92,7 @@ These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The map d
 
 1. `PROCESSING` → `RETURNED`, for a payment and a leg: `toReturnedFullPayment(returnedInfo)` and `toReturnedSplitPayment(returnedInfo)`.
 2. The corporate states: `AllocatingPayment` and `AllocatedPayment`, their two full classes, the six moves into and out of them, and the two status values.
-3. `PENDING` → `CANCELLED`, for a payment never confirmed at its bank, with `CancelledFullPayment` accepting a missing amount and a plain `Timeline`.
+3. `PENDING` → `CANCELLED`, for a payment never confirmed or one the customer said no to, with `CancelledFullPayment` accepting a missing amount and a plain `Timeline`.
 4. `bankConfirmation` on `PendingFullPayment`, holding the provider's reference and the redirect link.
 5. `DisallowedFullPayment`, for push payments only.
 6. A second return's details: `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)`, and the same for a leg. Today that move keeps the first return's.

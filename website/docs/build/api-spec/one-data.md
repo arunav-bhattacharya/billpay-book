@@ -8,14 +8,14 @@ import Lead from '@site/src/components/Lead';
 import ApiTable from '@site/src/components/ApiTable';
 
 export const CORE = [
-  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link, or `DECLINED` if the provider gives none.'},
+  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link, or `DECLINED` if the provider gives none. A payment made while another on the account is pending comes back `PENDING` with the pending payments, and waits for the customer\'s go-ahead.'},
   {fn: 'UpdatePayment.v1', method: 'PUT', path: '/payments/{payment-id}', purpose: 'Updates a `SCHEDULED` payment inside the market\'s cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
-  {fn: 'DeletePayment.v1', method: 'DELETE', path: '/payments/{payment-id}', purpose: 'Cancels a `SCHEDULED` payment inside the cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
-  {fn: 'ReadPayments.v1', method: 'GET', path: '/payments/account/{account-id}', purpose: 'Lists the payments on a card account.'},
+  {fn: 'DeletePayment.v1', method: 'DELETE', path: '/payments/{payment-id}', purpose: 'Cancels a `SCHEDULED` payment inside the cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested. It also cancels a `PENDING` payment that waits for a confirmation, when the customer says no.'},
+  {fn: 'ReadPayments.v1', method: 'GET', path: '/payments/account/{account-id}', purpose: 'Lists the payments on a card account, from One-Data\'s Redis and billpay-core together, with duplicates removed and Oracle winning.'},
   {fn: 'ReadPaymentEventsById.v1', method: 'GET', path: '/payments/{payment-id}', purpose: 'Lists the lifecycle states one payment has been through.'},
   {fn: 'CreateCreditBalanceRefund.v1', method: 'POST', path: '/refunds', purpose: 'Refunds a credit balance on a card account.'},
   {fn: 'CreateInboundPayment.v1', api: "None (One-Data's inbox)", link: false, purpose: 'Takes a payment a third party pushed. One-Data stores it and replies 202, and the inbound dispatcher starts its workflow.'},
-  {fn: 'ConfirmPendingPayment.v1', method: 'POST', path: '/payments/{payment-id}/confirm', link: false, purpose: "Confirms a payment that waited for the customer's bank, with the same payment ID, once the customer has confirmed their bank details on the provider's site. It starts processing the payment. Channels call it."},
+  {fn: 'ConfirmPendingPayment.v1', method: 'POST', path: '/payments/{payment-id}/confirm', link: false, purpose: "Confirms a payment that waited for the customer, with the same payment ID: once the customer has confirmed their bank details on the provider's site, or has given the go-ahead for a payment made while another was pending. It starts processing the payment. Channels call it."},
   {fn: 'CreatePaymentAllocations.v1', method: 'POST', path: '/payments/{payment-id}/allocations', link: false, purpose: 'The allocations callback for corporate payments, one numbered batch at a time. Replies 202 once the batch is stored and its workflow has started.'},
 ];
 
@@ -33,6 +33,24 @@ Every linked name opens its contract in the One-Data explorer. Names the explore
 ## Core functions
 
 <ApiTable rows={CORE} />
+
+## Stored creates and the pending check
+
+One-Data makes each payment's ID, a ULID, and every retry of a create carries it, so a retry always lands on the payment billpay-core already has. Two things live in One-Data's Redis, one active-active database across IPC1 and IPC2 that each One-Data writes at its own site: every create, stored as Pending, and one hash per card account listing the account's pending payments, each with its amount, date and time created. Persistence is on and eviction is off, so a restart or memory pressure can't drop either.
+
+- On every pay-today or scheduled create, before it calls billpay-core, One-Data reads the account's hash, adds the new payment and stores the create, in one MULTI/EXEC transaction through the Java Redis SDK. That is one Redis call, and it puts the create in Redis before billpay-core's delete can arrive (Proposed).
+- If the account already has pending payments, One-Data sends their IDs with the create. billpay-core holds the new payment at `PENDING` for the customer's go-ahead, and One-Data adds the pending payments to the reply. Any pending payment triggers it. Only the new payment waits: the earlier one carries on by itself, and the step offers no way to cancel it.
+- If billpay-core doesn't answer within 3 seconds, or answers with a 5xx, One-Data hands the stored create to RTF, which retries it into billpay-core with exponential backoff and the same payment ID. The channel gets the payment ID and `PENDING`. A `PENDING` reply in time is an answer, so it never goes to RTF. Only creates are stored and held: confirms, updates and cancels go straight to billpay-core.
+- At the end of each create's workflow, billpay-core calls One-Data's delete API with the payment and account IDs, and retries until it lands. One-Data removes the stored create and the account's hash entry. When the payment still waits for a confirmation, billpay-core says so, and One-Data removes only the stored create; the confirm or cancel workflow removes the hash entry when it ends. One-Data removes either only on billpay-core's word: the delete, or billpay-core refusing the create with a 4xx. The delete API's name and contract are still to come.
+- `ReadPayments.v1` reads Redis and billpay-core, removes duplicates on payment ID and customer account, and Oracle wins. A payment shows from the moment it is made, and shows one `PENDING`, whatever it waits for.
+
+Three edge cases have a working answer:
+
+- If Redis is down, One-Data creates the payment anyway, with no check and nothing stored, so a customer can pay twice while it lasts. Product is to confirm this.
+- Two creates for one account that reach different Redis sites within the replication lag miss each other, and both go through with no go-ahead. The window is narrow, so it is accepted, and such pairs are counted from Oracle. If they show up, billpay-core can run the same check against Oracle, at one query per create (Proposed).
+- A held pay-by-bank create would get a redirect link nobody sees. One-Data can probably tell such a create from its instrument type, when it carries bank details, which One-Data is to confirm. Proposed: One-Data doesn't hold it, and the channel asks the customer to try again.
+
+[Pay while another payment is pending](../../design/journeys/index.md#pay-while-another-payment-is-pending) walks through the go-ahead, and [Creates that arrive late or twice](../../design/component-model/workflows/core.md#creates-that-arrive-late-or-twice) covers what billpay-core does with a repeat.
 
 ## Composite functions
 

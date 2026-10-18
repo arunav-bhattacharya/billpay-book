@@ -130,7 +130,7 @@ export const IFACES = [
     system: 'One-Data',
     queue: "the workflow's queue",
     at: [],
-    note: 'no stage: the PAID drain and the inbox dispatchers',
+    note: 'no stage: the PAID drain, the inbox dispatchers and the delete call that ends a create from a channel',
   },
 ];
 
@@ -236,6 +236,38 @@ export const BANDS = [
               {to: 'expire', text: 'or the confirmation window closes first'},
             ],
           },
+          {
+            id: 'goahead',
+            wf: 'CreateImmediatePayment',
+            tag: 'go-ahead',
+            lead: 'Pay today while another payment on the account is pending.',
+            stages: ['Capture'],
+            own: ['RequestConfirmation'],
+            journey:
+              'Create payment, today, one instruction. One-Data sends the IDs of the pending payments it found, and the payment waits for a go-ahead',
+            wfId: '{paymentId}-init',
+            answer: 'with PENDING, and One-Data adds the pending payments',
+            chips: five('CONSUMER', 'Y', 'N'),
+            behave:
+              'Example values. A go-ahead is not a behavior: One-Data asks for it per payment, and the Router marks it on the plan key (Proposed).',
+            move: {RequestConfirmation: 'PENDING, unchanged'},
+            notes: {
+              RequestConfirmation:
+                'Its go-ahead implementation runs after Capture, in place of Verify. It commits a CONFIRM_EXPIRY row with the IDs of the payments the customer is shown, guarded on PENDING. The caller gets PENDING, and the PENDING event goes out.',
+            },
+            exc: {
+              'RequestConfirmation|BankConfirmationActivities': {kind: 'skip', note: 'no provider call for a go-ahead'},
+            },
+            stop: {
+              title: 'The workflow ends here.',
+              text: "Nothing waits in Temporal while the customer decides. The payment waits in Oracle, PENDING, and stays on the account's pending list.",
+            },
+            then: [
+              {to: 'confirm', text: 'the customer says yes, with the same payment ID'},
+              {to: 'no', text: 'or says no'},
+              {to: 'expire', text: 'or the confirmation window closes first'},
+            ],
+          },
         ],
       },
       {
@@ -273,7 +305,7 @@ export const BANDS = [
         fn: ['DeletePayment.v1'],
         from: 'a channel',
         calls: 'A channel calls',
-        does: 'cancel a SCHEDULED payment, inside the cancellation window',
+        does: 'cancel a SCHEDULED payment inside the cancellation window, or a PENDING one the customer says no to',
         api: ['DELETE', '/payments/{payment-id}'],
         roads: [
           {
@@ -292,25 +324,43 @@ export const BANDS = [
             },
             end: 'CANCELLED is final.',
           },
+          {
+            id: 'no',
+            wf: 'CancelPayment',
+            tag: 'a no',
+            lead: 'Cancel a payment the customer said no to, made while another was pending.',
+            own: ['Cancel'],
+            journey: "Cancel payment, PENDING and waiting for a go-ahead, on the customer's no",
+            wfId: '{paymentId}-cancel',
+            answer: 'CANCELLED, and CANCELLED again for a repeat',
+            chips: five('CONSUMER', 'Y', 'N'),
+            behave: 'Example values. Cancel varies by account type and AR posting.',
+            move: {Cancel: 'PENDING to CANCELLED'},
+            notes: {
+              Cancel:
+                'No window check. One guarded update on PENDING also cancels the CONFIRM_EXPIRY row. A no and a yes from two tabs race on that guard: one wins, and the other gets 409. The event and message go out after the reply.',
+            },
+            end: 'CANCELLED is final.',
+          },
         ],
       },
       {
         fn: ['ConfirmPending|Payment.v1'],
         from: 'a channel',
         calls: 'A channel calls',
-        does: "go ahead with a payment that waited for the customer's bank, with the same payment ID",
+        does: 'go ahead with a payment that waited for the customer, with the same payment ID',
         api: ['POST', '/payments/{payment-id}/confirm'],
         roads: [
           {
             id: 'confirm',
             wf: 'ConfirmPayment',
-            lead: 'Go ahead with a payment once the customer has confirmed their bank details.',
+            lead: 'Go ahead with a payment once the customer has confirmed their bank details, or given the go-ahead.',
             stages: ['Verify', 'Execute', 'Fulfil'],
-            journey: 'Confirm payment, PENDING and waiting for bank confirmation, inside the confirmation window',
+            journey: 'Confirm payment, PENDING and waiting for bank confirmation or a go-ahead, inside the confirmation window',
             wfId: '{paymentId}-confirm',
             answer: 'once Verify decides',
             chips: five('CONSUMER', 'Y', 'Y'),
-            behave: "Example values. Bank confirmation picks Verify's bank-confirmation implementation.",
+            behave: "Example values. Bank confirmation picks Verify's bank-confirmation implementation, and a go-ahead its go-ahead implementation.",
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
@@ -672,7 +722,7 @@ export const BANDS = [
         ctl: 'ctl-expiry',
         runs: 'A Schedule every minute',
         writer: 'CreateImmediatePayment',
-        wrote: ['bank'],
+        wrote: ['bank', 'goahead'],
         written: 'at RequestConfirmation',
         origin: ['CreatePayment.v3'],
         due: "when the market's confirmation window closes",
@@ -681,7 +731,7 @@ export const BANDS = [
             id: 'expire',
             wf: 'CancelPayment',
             tag: 'expiry',
-            lead: 'A payment the customer never confirmed at their bank.',
+            lead: 'A payment the customer never confirmed, at their bank or with a go-ahead.',
             own: ['Cancel'],
             journey: 'Confirmation window closes, a CONFIRM_EXPIRY row and the payment still PENDING',
             wfId: '{paymentId}-cancel',
@@ -931,10 +981,15 @@ export function calls(j, f) {
   return out;
 }
 
-/* how a road reaches One-Data's inbox, which no stage calls */
+/* roads whose workflow ends with the delete call to One-Data: a create from
+   a channel, and the confirm or cancel that ends a payment's wait */
+const DELETES = new Set(['immediate', 'scheduled', 'bank', 'goahead', 'confirm', 'no', 'expire']);
+
+/* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
   if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
   if (j.band.key === 'pulled') return 'its dispatcher reads the request, and marks it once started';
+  if (DELETES.has(j.id)) return "calls the delete API at the end, so the payment leaves One-Data's Redis";
   return null;
 }
 

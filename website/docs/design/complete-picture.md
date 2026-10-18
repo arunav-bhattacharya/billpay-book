@@ -18,7 +18,7 @@ Each of the other Design pages covers one stretch of that road. [Routing](./rout
 
 ## How it works
 
-1. Pick a road. The index lists all 21, grouped by how the work arrives. Each row shows the trigger, where it lands, the Router's choice of cluster and start, and the stages the road runs. With nothing picked, every road looks the same. Pick one and the rest grey out.
+1. Pick a road. The index lists all 23, grouped by how the work arrives. Each row shows the trigger, where it lands, the Router's choice of cluster and start, and the stages the road runs. With nothing picked, every road looks the same. Pick one and the rest grey out.
 2. Read its card. The card opens beside the road and follows it from the trigger, through the Router's six steps, to every activity its stages call and the system behind each one. Click an activity to open it in place: where it runs, what this call does on this road, and what happens when it fails. Expand all, at the top of the card, opens every one. On pay today and on a scheduled payment, switch the account type to CORPORATE to follow a corporate payment through every later step.
 3. See every call. Under the index, the activities show each interface with its system, its task queue and the stages that call it, and a picked road's calls are lit. Pick an activity instead, and the roads that call it stay lit while its card lists them by stage.
 
@@ -28,7 +28,7 @@ Pick the road again, press Esc or use Show all to bring every road back. Inside 
 
 Roads are grouped by how the work arrives. When a caller waits for an answer, the core API starts the workflow on the Online cluster with Update-With-Start. Work nobody waits for is stored first, in One-Data's inbox or as a Work Tracker row in Oracle, and a dispatcher starts it on the Offline cluster at the pace the governor sets. The allocations callback is the one request that starts its workflow asynchronously, before it replies.
 
-One request can lead to several roads. `CreatePayment.v3` has four. The Router reads the date and the number of instructions to pick pay today, multiple instructions or a scheduled payment, and a payment that needs the customer to confirm at their bank takes the pay-today road but stops at `PENDING` until the confirm arrives.
+One request can lead to several roads. `CreatePayment.v3` has five. The Router reads the date and the number of instructions to pick pay today, multiple instructions or a scheduled payment. A payment that needs the customer to confirm at their bank takes the pay-today road but stops at `PENDING` until the confirm arrives, and so does one made while another payment on the account is pending, until the customer gives the go-ahead.
 
 The squares are the stages a road runs, in order: Capture, Verify, Reverify, Execute and Fulfil, then one square for a stage only that kind of road has, such as Cancel, Return or Settle. A pale square means a child workflow runs that stage: multiple instructions runs one `CreateImmediatePaymentWorkflow` per instruction, and an update cancels the old payment and leaves the new one to a child. A small square means the stage runs only in some cases, like a corporate payment's Reverify, which pay today skips.
 

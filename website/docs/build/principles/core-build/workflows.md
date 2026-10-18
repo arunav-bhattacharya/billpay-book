@@ -56,7 +56,7 @@ A child always runs on its parent's cluster. These journeys use them:
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
 
-A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation starts no child either: the caller's confirm starts `ConfirmPaymentWorkflow`, and a payment never confirmed is cancelled from a Work Tracker row.
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a go-ahead starts no child either: the caller's confirm starts `ConfirmPaymentWorkflow`, the customer's no starts `CancelPaymentWorkflow`, and a payment never confirmed is cancelled from a Work Tracker row.
 
 ## Versioning
 
@@ -87,9 +87,9 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
         val stages = StageIndex.lookup(plan)
 
         stages.capture.run(paymentId)                  // PENDING, idempotent
-        if (plan.requiresBankConfirmation) {
-            // The caller gets the provider's redirect link; the payment waits in Oracle, not here.
-            decided = stages.requestConfirmation.run(paymentId)  // PENDING with the link and a CONFIRM_EXPIRY row,
+        if (plan.requiresBankConfirmation || plan.waitsForGoAhead) {
+            // The caller gets the redirect link or the pending list; the payment waits in Oracle, not here.
+            decided = stages.requestConfirmation.run(paymentId)  // PENDING with a CONFIRM_EXPIRY row (and the link, for a bank),
                                                                   // or DECLINED if the provider gave no link
             stages.capture.announce(paymentId)
             if (decided == PaymentDecision.DECLINED) stages.requestConfirmation.announce(paymentId)
@@ -118,7 +118,7 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
 
 The workflow never names a market: `StageIndex.lookup(plan)` is the only place its stages come from. Capture and Verify commit back to back, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
-A payment that needs bank confirmation never reaches Verify here. RequestConfirmation gets the provider's redirect link, with one try, and writes it with a `CONFIRM_EXPIRY` row, the caller's update returns `PENDING` with the link, and the workflow ends; `ConfirmPaymentWorkflow` runs Verify later, when the caller confirms. If no link comes back, RequestConfirmation declines the payment instead, and the workflow announces `DECLINED` before it ends. That branch reads the plan key, the same way the corporate stop does.
+A payment that needs bank confirmation never reaches Verify here. RequestConfirmation gets the provider's redirect link, with one try, and writes it with a `CONFIRM_EXPIRY` row, the caller's update returns `PENDING` with the link, and the workflow ends; `ConfirmPaymentWorkflow` runs Verify later, when the caller confirms. If no link comes back, RequestConfirmation declines the payment instead, and the workflow announces `DECLINED` before it ends. A payment made while another is pending takes the same branch: the Router marks the plan key when One-Data sends other pending payments' IDs with the create, and RequestConfirmation's go-ahead implementation writes the `CONFIRM_EXPIRY` row with no provider call (Proposed). That branch reads the plan key, the same way the corporate stop does.
 
 A declined payment ends after Verify, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
 
@@ -133,6 +133,6 @@ The Router decides, when it places the start, and the workflow has no say. Work 
 | Create Scheduled Payment | From a channel | From AR, through the AR intake dispatcher |
 | Execute Split Payment | A consumer leg of an Online parent | A corporate leg, or a consumer leg of an Offline parent |
 | Create Balance Refund | From a channel | A refund AR raises, through the AR intake dispatcher |
-| Cancel Payment | A caller's cancel | A payment never confirmed at its bank, through the confirmation-expiry dispatcher |
+| Cancel Payment | A caller's cancel, or the customer's no to a go-ahead | A payment never confirmed, through the confirmation-expiry dispatcher |
 
 [Design → Workflows](../../../design/component-model/workflows/index.md) has every workflow with its cluster, workflow ID and behaviors.

@@ -38,7 +38,7 @@ One narrow table in Oracle, `work_tracker`, holds every piece of dated work. A r
 | `ALLOC_EXEC` | Corporate payment, written once it is `ALLOCATED` | At once for pay today; the execution time on the due date for a scheduled payment, or at once if that has passed | Allocated-payments dispatcher |
 | `ALLOC_LEG` | Allocation leg | When the leg is written, at its parent's release | Leg dispatcher |
 | `REPRESENT` | Representment | The date the market's rules set | Representment dispatcher |
-| `CONFIRM_EXPIRY` | Payment waiting for the customer to confirm at their bank | When the market's confirmation window closes | Confirmation-expiry dispatcher |
+| `CONFIRM_EXPIRY` | Payment waiting for the customer to confirm at their bank, or to give a go-ahead | When the market's confirmation window closes | Confirmation-expiry dispatcher |
 
 A row moves through a short lifecycle:
 

@@ -76,9 +76,9 @@ export const ACTIVITIES = [
   },
   {
     name: 'InboxActivities',
-    system: "One-Data's inbox functions and event handlers",
+    system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel at its end, and the confirm or cancel that ends a payment\'s wait, for the delete (Proposed: One-Data\'s one activity interface makes this call too)',
   },
   {
     name: 'LifecycleEventActivities',

@@ -14,6 +14,7 @@ export const GROUPS = [
     journeys: [
       {label: 'Pay my bill today', to: '#pay-my-bill-today', kind: 'customer'},
       {label: 'Pay by bank', to: '#pay-by-bank', kind: 'customer'},
+      {label: 'Pay while another is pending', to: '#pay-while-another-payment-is-pending', kind: 'customer'},
       {label: 'Pay on a future date', to: '#pay-on-a-future-date', kind: 'customer'},
       {label: 'Pay with several instructions', to: '#pay-with-several-instructions', kind: 'customer'},
       {label: 'Pay & Plan', to: '#pay--plan', kind: 'customer'},
@@ -145,7 +146,7 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
   ]}
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent. A repeated request joins the workflow that is already running, so the customer gets the original answer back and is never charged twice.'},
-    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, and Payment Options confirms the amount they picked. Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. A payment the customer must confirm at their bank goes another way, on [Pay by bank](#pay-by-bank).'},
+    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, and Payment Options confirms the amount they picked. Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. A payment the customer must confirm at their bank goes another way, on [Pay by bank](#pay-by-bank), and so does one made while another is pending, on [Pay while another payment is pending](#pay-while-another-payment-is-pending).'},
     {text: 'Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF after the reply, in order.'},
     {step: 3, text: 'Three calls go out at once: clearing with the bank, the statement balance down in Accounts Receivable, and available credit up in Authorizations. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
     {step: 4, text: 'Accounting, eBNC and risk are told first, in parallel. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
@@ -247,6 +248,105 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
+/>
+
+### Pay while another payment is pending
+
+A customer who isn't sure their first payment went through may pay again, and end up paying twice. So One-Data checks every new payment against the card account's pending payments, which it keeps in Redis. When it finds one, the new payment waits for the customer's go-ahead: the channel shows what is already pending and asks whether to go ahead with this one too. Only the new payment waits. The earlier one carries on by itself, and this step offers no way to cancel it.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Immediate payment, go-ahead"
+  title="Pay while another payment is pending"
+  origin={{
+    actor: 'Cardmember',
+    icon: 'user',
+    channels: [
+      {icon: 'monitor', label: 'Web'},
+      {icon: 'phone', label: 'Mobile app'},
+      {icon: 'headset', label: 'Servicing rep'},
+    ],
+    note: 'One-Data checks the card account for pending payments on every new payment, today or future-dated.',
+  }}
+  entry={[
+    {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData', note: 'checks pending'},
+    {kind: 'function', label: 'ConfirmPendingPayment.v1', logo: 'oneData', note: 'on a yes'},
+    {kind: 'function', label: 'DeletePayment.v1', logo: 'oneData', note: 'on a no'},
+  ]}
+  core={[
+    {kind: 'api', label: 'POST /payments'},
+    {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
+    {kind: 'api', label: 'DELETE /payments/{payment-id}'},
+  ]}
+  workflow={[
+    {label: 'CreateImmediatePaymentWorkflow'},
+    {label: 'ConfirmPaymentWorkflow', via: 'then, on a yes'},
+    {label: 'CancelPaymentWorkflow', via: 'or, on a no'},
+  ]}
+  steps={[
+    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
+    {
+      icon: 'lock',
+      name: 'Hold',
+      state: 'PENDING',
+      mode: 'live',
+      caption: 'caller gets the pending list',
+    },
+    {
+      icon: 'user',
+      name: 'Customer decides',
+      state: 'PENDING',
+      mode: 'awaiting',
+      caption: 'yes or no',
+      exit: {state: 'CANCELLED'},
+    },
+    {
+      icon: 'shieldCheck',
+      name: 'Verify',
+      state: 'ACCEPTED',
+      mode: 'live',
+      caption: 'caller confirms, gets a response',
+      systems: ['Payment Instruments', 'Payment Options'],
+      exit: {state: 'DECLINED'},
+      handoffAfter: true,
+    },
+    {
+      icon: 'parallelArrows',
+      name: 'Execute',
+      state: 'PROCESSING',
+      mode: 'background',
+      systems: ['MR/M3', 'GAR', 'AMP'],
+      parallel: true,
+    },
+    {
+      icon: 'broadcast',
+      name: 'Fulfil',
+      state: 'PROCESSED',
+      mode: 'background',
+      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+    },
+    {
+      icon: 'doubleCheck',
+      name: 'Paid',
+      state: 'PAID',
+      mode: 'awaiting',
+      caption: 'settled and posted',
+      systems: ['MR/M3', 'GAR'],
+      exit: {state: 'RETURNED'},
+    },
+  ]}
+  detail={[
+    {text: 'One-Data checks before it calls the core. In one Redis call it reads the card account\'s pending payments, adds this one to the list and stores the create. Another payment is still pending, so One-Data sends that payment\'s ID with the create.'},
+    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment.'},
+    {step: 2, text: 'Because the create came with other pending payments\' IDs, RequestConfirmation runs in place of Verify, with its go-ahead implementation. It calls no provider. It commits a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes, with the IDs of the payments the customer is shown. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow ends. A payment that also needs bank confirmation waits only once: the reply carries the redirect link and the list, and confirming at the bank is the go-ahead.'},
+    {step: 3, text: 'The channel shows the pending payments and asks whether to go ahead. A no comes in through `DeletePayment.v1`, and `CancelPaymentWorkflow` moves the new payment to `CANCELLED`, guarded on `PENDING`. So does the confirmation window closing with no answer. Either way, RTF gets the event, the customer gets the message through Raven, and the payment leaves the account\'s pending list.'},
+    {step: 4, text: 'A yes comes in through `ConfirmPendingPayment.v1` with the same payment ID, and `ConfirmPaymentWorkflow` runs Verify: the usual checks, with no provider call. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and closes the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A yes and a no from two tabs race on that guard: one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment waits for its date (Proposed).'},
+    {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
+    {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
+    {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, and the payment leaves the account\'s pending list.'},
+    {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
+  ]}
+  reference={{to: '/docs/design/sequence-diagrams#15-a-new-payment-while-another-is-pending', label: 'Sequence diagram'}}
 />
 
 ### Pay on a future date
@@ -486,7 +586,7 @@ Nothing is edited in place. Billpay cancels the original and raises a new paymen
 
 ### Cancel a payment
 
-A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled. A corporate payment can close sooner: it leaves `SCHEDULED` for `ALLOCATING` when its allocations are requested, and from then on a cancel gets 409.
+A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled. A corporate payment can close sooner: it leaves `SCHEDULED` for `ALLOCATING` when its allocations are requested, and from then on a cancel gets 409. The same call also carries a customer's no to a payment made while another was pending, with no window check, on [Pay while another payment is pending](#pay-while-another-payment-is-pending).
 
 <JourneyMap
   kind="customer"

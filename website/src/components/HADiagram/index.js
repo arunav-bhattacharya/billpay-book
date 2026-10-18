@@ -216,7 +216,7 @@ const ORA_Y = 227;
 const OFF_CL_Y = 270;
 
 const LABEL =
-  'High-availability topology. On the far left, outside both estates, a caller near each on-prem site. Next, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: the caller reaches the One-Data gateway, active, which calls the core APIs in the app. billpay-core is one app, active there: it runs the core APIs, the Router, the dispatchers, the governor and the workers for both Temporal clusters, with a client for each, and it reads and writes the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis fallback store: One-Data parks a request there when the core APIs cannot be reached, and RTF replays it later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to the app in IPC2, it holds a standby of the same billpay-core app, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. On the right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with OpenSearch 2 visibility and its own Aurora PostgreSQL database. Over gRPC, billpay-core talks to both clusters. us-west-1 holds a passive standby of each cluster, each with its own PostgreSQL database replicated from the east, and each promoted on its own.';
+  'High-availability topology. On the far left, outside both estates, a caller near each on-prem site. Next, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: the caller reaches the One-Data gateway, active, which calls the core APIs in the app. billpay-core is one app, active there: it runs the core APIs, the Router, the dispatchers, the governor and the workers for both Temporal clusters, with a client for each, and it reads and writes the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis store of pending payments: One-Data writes every new payment there and checks the other pending payments on the card account, and when the core APIs are slow or cannot be reached, RTF retries the stored payment later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to the app in IPC2, it holds a standby of the same billpay-core app, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. On the right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with OpenSearch 2 visibility and its own Aurora PostgreSQL database. Over gRPC, billpay-core talks to both clusters. us-west-1 holds a passive standby of each cluster, each with its own PostgreSQL database replicated from the east, and each promoted on its own.';
 
 export default function HADiagram() {
   const eastOD = {x: OD.x, y: ROW - OD.h / 2};
@@ -291,7 +291,7 @@ export default function HADiagram() {
           markerEnd="url(#had-req)"
         />
 
-        {/* One-Data parks in Redis; RTF replays */}
+        {/* One-Data stores in Redis; RTF retries */}
         <path d={`M${REDIS_X},${eastOD.y + OD.h + 2} V${ROW + 64}`} className={styles.buf} markerStart="url(#had-buf)" markerEnd="url(#had-buf)" />
         <path d={`M${REDIS_X},${westOD.y - 2} V${m(ROW + 64)}`} className={styles.buf} markerStart="url(#had-buf)" markerEnd="url(#had-buf)" />
         {/* the two Redis stores are one active-active database */}
@@ -362,12 +362,14 @@ export default function HADiagram() {
         {/* ---- Redis ---- */}
         <Redis cx={REDIS_X} cy={ROW + 93} />
         <Label x={REDIS_X + 27} y={ROW + 91} cls="markLabel" anchor="start">Redis</Label>
-        <Label x={REDIS_X + 27} y={ROW + 107} cls="markSub" anchor="start">fallback store</Label>
+        <Label x={REDIS_X + 27} y={ROW + 107} cls="markSub" anchor="start">pending</Label>
+        <Label x={REDIS_X + 27} y={ROW + 121} cls="markSub" anchor="start">payments</Label>
         <Redis cx={REDIS_X} cy={m(ROW + 93)} />
         <Label x={REDIS_X + 27} y={m(ROW + 93) - 2} cls="markLabel" anchor="start">Redis</Label>
-        <Label x={REDIS_X + 27} y={m(ROW + 93) + 14} cls="markSub" anchor="start">fallback store</Label>
-        <Label x={REDIS_X + 11} y={ROW + 55} cls="bufLabel" anchor="start">park · RTF replay</Label>
-        <Label x={REDIS_X + 11} y={m(ROW + 55) + 9} cls="bufLabel" anchor="start">park · RTF replay</Label>
+        <Label x={REDIS_X + 27} y={m(ROW + 93) + 14} cls="markSub" anchor="start">pending</Label>
+        <Label x={REDIS_X + 27} y={m(ROW + 93) + 28} cls="markSub" anchor="start">payments</Label>
+        <Label x={REDIS_X + 11} y={ROW + 55} cls="bufLabel" anchor="start">hold · RTF retry</Label>
+        <Label x={REDIS_X + 11} y={m(ROW + 55) + 9} cls="bufLabel" anchor="start">hold · RTF retry</Label>
 
         {/* ---- billpay-core: one app, active in IPC2, its standby in IPC1 ---- */}
         <AppBox x={APP.x} y={APP.y} w={APP.w} h={APP.h} />
@@ -424,7 +426,7 @@ export default function HADiagram() {
           <text x={PREM.x + 60} y={805}>request path, and gRPC to Temporal</text>
           <path d={`M${PREM.x + 356},800 H${PREM.x + 392}`} className={styles.buf} markerEnd="url(#had-buf)" />
           <text x={PREM.x + 402} y={805}>
-            fallback: One-Data parks the request in Redis when the core APIs can&apos;t be reached, and RTF replays it
+            hold: One-Data stores each new payment in Redis, and RTF retries it when the core APIs are slow or down
           </text>
           <path d={`M${PREM.x + 14},830 H${PREM.x + 50}`} className={styles.rep} markerEnd="url(#had-rep)" />
           <text x={PREM.x + 60} y={835}>replication</text>

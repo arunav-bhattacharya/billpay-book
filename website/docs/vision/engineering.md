@@ -164,7 +164,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
     },
     {
       term: 'Multi-layer resiliency',
-      desc: `No single layer is trusted to stay up. One-Data parks requests in Redis and replays them when the core is back, and the Reliable Transaction Framework (RTF) keeps retrying an event it could not deliver. Temporal holds the workflow history, each cluster has a standby in another region, and Oracle Data Guard keeps a standby copy of the data.`,
+      desc: `No single layer is trusted to stay up. When the core is slow or down, One-Data holds a new payment in Redis, and the Reliable Transaction Framework (RTF) retries it into the core with the same payment ID, as it keeps retrying any event it could not deliver. Temporal holds the workflow history, each cluster has a standby in another region, and Oracle Data Guard keeps a standby copy of the data.`,
     },
   ]}
 />
