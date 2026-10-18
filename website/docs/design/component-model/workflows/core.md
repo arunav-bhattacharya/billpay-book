@@ -157,7 +157,7 @@ The same workflow cancels a payment the customer never confirmed at their bank. 
 1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify checks the verification token Payment Instruments holds for the instrument, to guard against fraud. A payment without a valid token is `DECLINED`.
 2. Execute, then Fulfil, as for pay today.
 
-A repeated confirm joins the running workflow. A confirm for a payment that was cancelled when its window closed gets 409; Proposed: once the workflow has closed, a repeated confirm gets the payment's current state.
+A repeated confirm is a retry, usually because the caller lost the reply to a confirm that worked. While the workflow runs, the repeat joins it and gets the same answer. Once the workflow has closed, the API reads the payment and answers with its current state, such as `PROCESSED` or `DECLINED`, so the channel never shows a failure for a payment that went through. Only a confirm for a payment that was cancelled, such as one whose confirmation window closed, gets 409.
 
 ## Create Balance Refund
 

@@ -23,6 +23,8 @@ Pay & Plan combines a payment today with a plan of future installments, across B
 2. The Installments API, to set up the plan.
 3. An optional update to the customer's Autopay.
 
+Proposed: Pay & Plan doesn't take bank confirmation either, so a request that would need it gets 422.
+
 ## Create Payment with Multiple Instructions
 
 <WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from POST /payments with several instructions" />
@@ -31,3 +33,5 @@ Pay & Plan combines a payment today with a plan of future installments, across B
 
 1. Validate the composite payment as a whole.
 2. Run one `CreateImmediatePaymentWorkflow` per instruction, so each gets its own payment, its own lifecycle and its own outcome.
+
+It never takes bank confirmation, because one request would need several redirect links and several confirms. A request with several instructions that would need it gets 422 before any workflow starts.

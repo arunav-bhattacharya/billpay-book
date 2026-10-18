@@ -103,7 +103,7 @@ Every write API admits the request first, through the Router (see [Routing and S
 
 - **422** when the market, account type or API is not live in this environment. Senders do not retry a 422.
 - **429** with `Retry-After` when an allocation callback arrives over its traffic class's budget. The allocations manager retries on 429.
-- **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED` (a corporate payment leaves it when its allocations are requested), or after the cancellation window has closed; and when a confirm arrives for a payment that is no longer `PENDING`, such as one cancelled when its confirmation window closed.
+- **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED` (a corporate payment leaves it when its allocations are requested), or after the cancellation window has closed; and when a confirm arrives for a payment that has been cancelled, such as one whose confirmation window closed. A confirm repeated after its workflow has closed gets the payment's current state instead ([ConfirmPaymentWorkflow](#12-confirmpaymentworkflow)).
 - **503** with `Retry-After` for an allocation callback or a provisioning request while the Offline cluster is down.
 
 AR intake, returns and inbound payments never reach these APIs. One-Data stores them, and dispatchers pull them at the governor's pace (see [Dispatchers](#dispatchers)).
@@ -115,7 +115,7 @@ AR intake, returns and inbound payments never reach these APIs. One-Data stores 
 | `POST /payments` | Pays today or schedules for a future date. A payment that needs bank confirmation stops at `PENDING` | Update-With-Start | PENDING, ACCEPTED, SCHEDULED or DECLINED; PENDING with the redirect link when the customer must confirm at their bank. The API waits at most 3 s for a decision, then replies PENDING |
 | `PUT /payments/{payment-id}` | Updates a `SCHEDULED` payment inside the cancellation window | Update-With-Start | The new payment's result; 409 outside the window |
 | `DELETE /payments/{payment-id}` | Cancels a `SCHEDULED` payment inside the cancellation window | Update-With-Start | CANCELLED; a repeated cancel gets CANCELLED again; 409 otherwise |
-| `POST /payments/{payment-id}/confirm` | Confirms a `PENDING` payment once the customer has confirmed their bank details, then executes it | Update-With-Start | ACCEPTED or DECLINED; 409 once the payment is no longer `PENDING` |
+| `POST /payments/{payment-id}/confirm` | Confirms a `PENDING` payment once the customer has confirmed their bank details, then executes it | Update-With-Start | ACCEPTED or DECLINED. A repeated confirm gets the same answer, or the payment's current state once the workflow has closed; 409 for a cancelled payment |
 | `POST /payments/{payment-id}/allocations` | Takes one batch of allocations for a corporate payment | Stores the batch, then async start | 202 |
 | `POST /refunds` | Refunds a credit balance | Update-With-Start | The refund's result |
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
@@ -438,7 +438,7 @@ A market profile is one market and one account type. Onboarding picks the Billpa
 | `requiresMandateAuthorization` | Y, N or BOTH: a mandate is verified before processing |
 | `requiresBankConfirmation` | Y, N or BOTH: the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
 
-**BOTH** means required for some journeys and not others. Onboarding stores which journeys get Y, and the Router resolves BOTH to Y or N per journey. For realtime clearing only pay-today payments from channels get Y: every future-dated payment clears in batch, whether it came from a channel or from AR. Future-dated payments never clear in real time. For bank confirmation, BOTH is resolved from the request's payment method: a method that needs the customer to confirm at their bank gets Y. Only consumer payments made today take bank confirmation.
+**BOTH** means required for some journeys and not others. Onboarding stores which journeys get Y, and the Router resolves BOTH to Y or N per journey. For realtime clearing only pay-today payments from channels get Y: every future-dated payment clears in batch, whether it came from a channel or from AR. Future-dated payments never clear in real time. For bank confirmation, BOTH is resolved from the request's payment method: a method that needs the customer to confirm at their bank gets Y. Only consumer payments made today take bank confirmation, and only with one instruction: a request with several instructions that would need bank confirmation gets 422 (agreed 2026-10-18). Proposed: the same for Pay & Plan.
 
 A combination that is not onboarded for a market is rejected with 422 before any workflow starts.
 
@@ -639,7 +639,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 - The caller confirms with the same payment ID once the customer has confirmed their bank details on the provider's site.
 - **Verify:** `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING` that also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider does the verification, so Verify doesn't call it. Before it accepts the payment, Verify's bank-confirmation implementation checks the verification token Payment Instruments holds for the payment's instrument, to guard against fraud (agreed 2026-10-17). A payment without a valid token is `DECLINED` (agreed 2026-10-18).
 - **Execute**, then **Fulfil**, as for pay today.
-- A repeated confirm joins the running workflow (conflict policy `USE_EXISTING`). A confirm for a payment cancelled when its window closed gets 409; Proposed: after the workflow has closed, a repeated confirm gets the payment's current state.
+- A repeated confirm is a retry of a confirm that already reached Billpay, usually because the caller lost the reply. While the workflow runs, the repeat joins it (conflict policy `USE_EXISTING`) and gets the same answer. Once the workflow has closed, the API reads the payment and answers with its current state, such as `PROCESSED` or `DECLINED`, so the channel never shows a failure for a payment that went through (agreed 2026-10-18). A confirm for a payment that was cancelled, such as one whose confirmation window closed, gets 409.
 
 #### 13. CreateBalanceRefundWorkflow
 
@@ -652,7 +652,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 > `{paymentId}-init` · Online · Update-With-Start; their children run on the same cluster
 
 1. **Pay & Plan (Create Payment & Installments):** `CreateImmediatePaymentWorkflow` as a child, then the Installments API, then an optional Autopay update.
-2. **Multiple instructions** (`CreatePaymentWithMultipleInstructionsWorkflow`): validates the composite payment, then runs one `CreateImmediatePaymentWorkflow` per instruction.
+2. **Multiple instructions** (`CreatePaymentWithMultipleInstructionsWorkflow`): validates the composite payment, then runs one `CreateImmediatePaymentWorkflow` per instruction. It never takes bank confirmation: a request that would need it gets 422 before any workflow starts (agreed 2026-10-18).
 
 ### Sketch
 
@@ -1165,9 +1165,9 @@ Until each downstream's owner agrees its own number, every downstream is taken a
 ### Must-succeed calls: clearing, AR, OTB, accounting, eBNC, risk, Raven
 
 - **One choke point.** One activity task queue per downstream endpoint on the Offline cluster: `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-comms` and `ds-allocations`. Its server-side rate limit is the overall limit for the queue, across all pods. The governor changes it at runtime through the task queue config API.
-- **Online's use, measured (Proposed).** Online's calls share one queue, so Temporal can't count them per downstream. Online workers count their calls and 429s per downstream in Prometheus, and the governor reads Online's use as the peak of the last minute.
+- **Online's use, measured (OK for now, 2026-10-18).** Online's calls share one queue, so Temporal can't count them per downstream. Online workers count their calls and 429s per downstream, and billpay-core publishes them with its other metrics. The Prometheus server that scrapes Temporal's metrics scrapes billpay-core's pods too, and the governor reads Online's use as the peak of the last minute. That server has to be sized for the extra volume; how to scale it is a separate discussion ([Open Items](#open-items)).
 - **Offline share** = agreed TPS − Online's use − headroom, recomputed every 15 s. There is no fixed split: with an agreed TPS of 100, Online at 25 leaves Offline 65, Online at 80 leaves it 10, and an idle Online leaves it 90.
-- **Headroom (Proposed).** Offline reacts up to about 45 s late: one 15 s check plus about 30 s of metric lag. The headroom is the larger of 10% of the agreed TPS and the biggest rise in Online's use within 45 s over the last 4 weeks and in the load test. It is the online margin in `downstream_limit`.
+- **Headroom (OK for now, 2026-10-18; to revisit).** Offline reacts up to about 45 s late. The governor checks every 15 s, and the numbers it reads are about 30 s old: the scrape interval plus the window a rate is computed over. So after Online's traffic jumps, Offline can keep its old share for up to 45 s, and the headroom has to cover the biggest rise Online can make in that time. It is the larger of 10% of the agreed TPS and the biggest rise in Online's use within 45 s over the last 4 weeks and in the load test, and it is the online margin in `downstream_limit`. A faster scrape shortens the lag, and the headroom with it.
 - **Admission.** Across all classes, the sum of start rate × calls per workflow to a downstream stays within its offline share, handed out in priority order. Admitting more only parks tasks in the queue backlog, and that backlog is DB rows.
 - **Reaction.** One call waits out `Retry-After`. If the 429 rate passes 1% or p99 doubles, the queue limit drops ×0.7, then probes back up 5% at a time. A 429 on an Online call means Offline took room Online needed, so one halves that downstream's offline share at the next check. Neither ever takes a SEPA run below its need. In an outage the queue trickles at 1 RPS to probe, and admissions for classes that need it pause; only work already in flight waits.
 - **Worker slots** ≈ queue limit × call latency: 100 RPS at 1 s needs about 100 slots across pods. More slots won't add throughput.
@@ -1282,12 +1282,12 @@ A step in billpay-ui. Each setting drives something at runtime.
 | Cutoff, if any | The governor's cutoff floor and alert |
 | Allocation fetch timing and alert point | When a scheduled payment's `ALLOC_REQUEST` row falls due (on the due date, or a set number of hours or days before it), and when a payment still `ALLOCATING` raises an alert |
 | Representment rules: which returns are eligible, how many times a payment can be represented, and the representment date | The return workflow, which decides whether a return is represented and when |
-| Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's (Proposed: the most specific wins) | Every stage's announcement: a status that is switched off sends no Raven message |
+| Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's: the account type's setting wins (agreed 2026-10-18) | Every stage's announcement: a status that is switched off sends no Raven message |
 | Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18) | Which provider RequestConfirmation asks for the redirect link, and when a payment still waiting for confirmation is cancelled |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
 
-A market and an account type can disagree on Raven only when billpay-ui keeps both settings: one for the whole market and one for an account type. For example, the US turns the `SCHEDULED` message off for the whole market, and US Corporate turns it back on. A US corporate payment then follows US Corporate, since the most specific setting wins (Proposed). If billpay-ui keeps the setting only in each profile, a market and account type pair filled in from the default, the two never meet.
+A market and an account type disagree on Raven when billpay-ui holds a setting for the whole market and another for one of its account types. For example, the US turns the `SCHEDULED` message off for the whole market, and US Corporate turns it back on. A US corporate payment then follows US Corporate, because the account type's setting wins (agreed 2026-10-18). A US consumer payment follows the market's setting, since US Consumer has none of its own, and a market with no setting follows the default.
 
 ### Capability manifest
 
@@ -1472,6 +1472,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Offline cluster down | Dated work waits in Oracle and pulled work in One-Data's inbox; allocation callbacks get 503 with `Retry-After` and are retried; running offline payments pause, announcements included, and resume on the restored cluster; the Online cluster keeps serving | Restore the cluster, or promote its standby |
 | Cancel at the window's edge | The guarded update lets one side win; a late cancel gets 409 | Nothing |
 | Confirm at the window's edge | Verify and the expiry's Cancel are both guarded on `PENDING`, so one wins; a late confirm gets 409 | Nothing |
+| A confirm's reply is lost | The channel repeats the confirm. It gets the same answer while `ConfirmPaymentWorkflow` runs, or the payment's current state once it has closed | Nothing |
 | The customer never confirms at their bank | The `CONFIRM_EXPIRY` row falls due and the payment is cancelled | Nothing |
 | Validation fails | `DECLINED`, with notifications | Nothing |
 | Retries run out | Work Tracker row `FAILED`; the payment goes on the exception list in its last state | Review the list |
@@ -1605,8 +1606,11 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | AR intake time of day | Business hours, outside the midnight windows (OK for now, 2026-10-17) | Overlap with execution changes the budget split |
 | Representment eligibility | A market setting, with a maximum number of representments | How eligibility is expressed, for example by return reason |
 | Verification token check | Payment Instruments holds the token and Verify checks it at confirm; a payment without a valid token is declined (agreed 2026-10-18) | What makes a token valid, and the Payment Instruments call that returns it |
-| Raven setting precedence | A default, a market override and an account-type override; the most specific wins (Proposed). Or the setting lives only in each market and account type's profile, filled in from the default, so no two settings meet | Which setting wins when a market and an account type disagree |
 | Provider link lifetime | About 10 minutes for every provider (OK for now, 2026-10-18) | Sets the longest confirmation window a market can have |
+| Confirmation expiries during an Online outage | Proposed: they pause until Online is back, plus a grace period, since a customer can't confirm while Online is down. To brainstorm (2026-10-18) | Without it, a payment whose short window runs out during the outage is cancelled although the customer couldn't confirm. To settle: how the expiry dispatcher learns of the outage, how long the grace is, and what the customer sees |
+| Bank confirmation for Pay & Plan | Proposed: none. A request that would need it gets 422, the rule agreed for several instructions on 2026-10-18 | Whether channels offer Pay & Plan with pay by bank |
+| Prometheus capacity | The server that scrapes Temporal's metrics also scrapes billpay-core's pods (OK for now, 2026-10-18) | It has to be sized for the volume of metrics; how to scale it is a separate discussion |
+| Headroom window | 45 s: one 15 s check plus about 30 s of metric lag (OK for now, 2026-10-18) | Revisit once the scrape interval and the load test are known |
 | Open-to-buy event handler | Events stored by One-Data; a placeholder handler in Billpay | Its details are still to be defined |
 | Balance refund steps | They follow the payment path. Skipped for now | Detailed stages are still to be defined |
 

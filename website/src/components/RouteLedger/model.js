@@ -189,7 +189,8 @@ export const BANDS = [
             journey: 'Create payment, today, several instructions',
             wfId: '{paymentId}-init',
             chips: five('CONSUMER', 'Y', 'N'),
-            behave: 'Example values.',
+            behave:
+              'Example values. A request with several instructions never takes bank confirmation: one that would need it gets 422.',
             first:
               'It validates the composite payment, then runs one CreateImmediatePayment per instruction, each a child on the Online cluster.',
             then: [{to: 'immediate', text: 'each instruction runs as a child'}],

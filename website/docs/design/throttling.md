@@ -35,10 +35,10 @@ There is no fixed split. Every 15 seconds the [governor](./pacing.md#the-governo
 
 Say clearing has agreed to 100 calls a second. Online at 25 leaves offline 65, online at 80 leaves it 10, and an idle online cluster leaves it 90.
 
-The sum needs two inputs, both Proposed:
+The sum needs two inputs. Both are settled for now, and both will be looked at again:
 
-- Online's calls all run on one queue, so Temporal can't count them per downstream. Online workers count their own calls and 429s per downstream in Prometheus, which the governor already reads.
-- Offline reacts up to about 45 seconds late: one 15-second check plus about 30 seconds of metric delay. So the headroom is the larger of 10% of the agreed rate and the biggest 45-second jump in online traffic seen over the last 4 weeks and in the load test.
+- Online's calls all run on one queue, so Temporal can't count them per downstream. Online workers count their own calls and 429s per downstream, and billpay-core publishes them with its other metrics. The Prometheus server that already scrapes Temporal's metrics scrapes billpay-core's pods too, and the governor reads it there. That server has to be sized for the extra volume, and how to scale it is a discussion of its own.
+- The headroom covers how late offline can react, which is up to about 45 seconds. The governor checks every 15 seconds, and the numbers it reads are about 30 seconds old: the scrape interval plus the window a rate is computed over. So after online traffic jumps, offline can keep its old share for up to 45 seconds. The headroom is the larger of 10% of the agreed rate and the biggest 45-second jump in online traffic seen over the last 4 weeks and in the load test. A faster scrape shortens the lag, and the headroom with it, which is why the 45 seconds will be revisited.
 
 ## When the cutoff wins
 

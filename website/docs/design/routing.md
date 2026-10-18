@@ -231,6 +231,7 @@ The behaviors pick the branch at each fork: `accountType` for consumer and corpo
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
+- A request with several instructions never takes bank confirmation: one that would need it gets 422 before any workflow starts.
 - A payment that needs bank confirmation starts no child either. `CreateImmediatePaymentWorkflow` replies `PENDING` with the provider's redirect link and ends. The caller's confirm starts `ConfirmPaymentWorkflow`, and if no confirm comes in time, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
