@@ -58,9 +58,9 @@ The retries exhausted alert fires when a Work Tracker row goes `FAILED` or a pay
 Billpay has already tried: every call retries from 1 second, doubling to at most 60, until its schedule-to-close runs out. Then `PaymentStore` marks the row `FAILED` and puts the payment on the exception list in the state it stopped in. Business failures never get here, because they end in `DECLINED`. Nor do RTF or Raven outages, because payments wait for those.
 
 1. Read the payment's row in `exception_list`: the stage and status it stopped in, and the last error.
-2. Fix the cause, which is often a downstream that kept failing. A row the Router refused, because nothing live matched it, needs the market profile fixed instead.
-3. For a corporate leg, its parent stays `PROCESSING` until the leg is resolved.
-4. Record who resolved it and when, on the row. How a resolved payment is put back on its way is still to be defined.
+2. Fix the cause, which is often a downstream that kept failing. A row the Router refused is different: its market was taken out of service after the row was written.
+3. Resolve the payment by hand. Reprocess its workflow so the payment carries on, or terminate the workflow to stop the payment where it is.
+4. Record who resolved it and when, on the row. For a corporate leg, its parent stays `PROCESSING` until the leg is resolved.
 
 ## Offline cluster down
 
@@ -110,10 +110,13 @@ The event without a payment alert fires when an event that carries no payment ID
 
 ## A rejected request
 
-The rejected request alert fires when a dispatcher marks a pulled request `REJECTED`, because nothing live matches its market, account type or API. The sender is not told: only operations hear of it.
+The rejected request alert fires when a dispatcher marks a pulled request `REJECTED`, because nothing live matches its market, account type or API. The request stays `REJECTED`, and the sender is not told: only operations hear of it.
+
+In production this shouldn't happen. Market profiles change rarely, every change is tested in the lower environments before it reaches production, and a new market's traffic is enabled only once its release is live there. So a rejection means traffic arrived out of step with that order.
 
 1. Find which market, account type or API the request asked for.
-2. Fix the market profile in billpay-ui, through a release, so the next request is admitted. What happens to the rejected request itself once the profile is fixed is still to be defined.
+2. Find out why it was sent: a sender sending for a market before its traffic was enabled, or asking for an account type or API the market's profile doesn't take.
+3. If the profile is what has to change, the change goes out as a release like any other: tested in E1 and E2, then live in production.
 
 ## One-Data's inbox down
 

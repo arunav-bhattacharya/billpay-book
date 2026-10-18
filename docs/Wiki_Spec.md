@@ -547,7 +547,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 
 - **Business failures** found by Verify or Reverify (closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses) are non-retryable. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
 - **429 with Retry-After:** throw `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
-- **Other errors:** retry from 1 s, doubling, capped at 60 s, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED` and the payment goes onto the exception list in its last state.
+- **Other errors:** retry from 1 s, doubling, capped at 60 s, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED` and the payment goes onto the exception list in its last state. Operations resolve each one by hand: someone reprocesses the payment's workflow, or terminates it (agreed 2026-10-18).
 - **RTF and Raven** get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
 - **Start-to-close** is about 2 to 3 times the call's p99, so a hung call frees its slot fast.
 - **No HTTP-client retries** inside activities (for example MicroProfile `@Retry`). One task is one call, so a queue's limit stays the real call rate.
@@ -1011,7 +1011,7 @@ Oracle holds no inbox. The handlers and functions write three tables in One-Data
 | `billpay_paid_ready` | Payment or leg, and presentment: `pymt_id`, `prsnt_seq_no` | `prnt_pymt_id` (the ID before any `_`), `acct_id`, `stlmt_ts`, `ar_pstd_ts`, `sta_cd`, `creat_ts`, `lst_updt_ts` |
 | `billpay_start_rqst` | Request to start, by its idempotency key: `rqst_id` | `rqst_type` (AR payment, AR refund, return or inbound), `rqst_body`, `sta_cd`, `creat_ts`, `lst_updt_ts` |
 
-A start request is `READY` as soon as it is stored. Its dispatcher starts the workflow and marks it `DONE`. A request the Router can't admit, because nothing live matches its market, account type or API, is marked `REJECTED` and raises an alert for operations. The sender is not told. A repeated request, with the same idempotency key, is stored once and answered 202 again.
+A start request is `READY` as soon as it is stored. Its dispatcher starts the workflow and marks it `DONE`. A request the Router can't admit, because nothing live matches its market, account type or API, is marked `REJECTED` and raises an alert for operations. The sender is not told, and the request stays `REJECTED`. In production this shouldn't happen: market profiles change rarely, and a market's traffic is enabled only once its release has been tested in the lower environments and is live in production (agreed 2026-10-18). A repeated request, with the same idempotency key, is stored once and answered 202 again.
 
 A PAID row is `READY` once it has an AR posting and a settlement: its own, or for a leg, its payment's. Every payment gets both, even where `requiresArPosting` is N. A split payment's own row holds only its settlement, which its legs take.
 
@@ -1110,7 +1110,7 @@ Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update
 | `rate_allocation` | Traffic class, market or corporate payment | The governor writes it; dispatchers read it every few seconds; manual overrides live here |
 | `downstream_limit` | Downstream endpoint | Agreed TPS, online margin, current offline share, Online cap and when it ends, last 429 |
 | `governor_decision` | Governor check, every 15 s | Inputs and outputs, to explain any rate later |
-| `exception_list` (new) | Payment or leg whose retries ran out | Operations' review: the stage and status it stopped in, the last error, and who resolved it and when. Billpay keeps this list itself (agreed 2026-10-18), and `PaymentStore` adds the row in the commit that gives up |
+| `exception_list` (new) | Payment or leg whose retries ran out | Operations' review: the stage and status it stopped in, the last error, and who resolved it and when. Billpay keeps this list itself (agreed 2026-10-18), and `PaymentStore` adds the row in the commit that gives up. Each row is resolved by hand: someone reprocesses the payment's workflow or terminates it (agreed 2026-10-18) |
 
 [^ Top](#table-of-contents)
 
@@ -1315,6 +1315,7 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 3. **Track.** A deployment row per release and environment follows the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
 4. **Sign off.** When someone signs off in the UI, the backend sends the sign-off through the same API. In E3 the RFC must pass the ServiceNow check first.
 5. **Promote.** Once vN is active and signed off in E1, the same vN goes to E2, then E3.
+6. **Enable traffic.** A new market's traffic is enabled only once vN is live in E3. Market profiles change rarely, and every change is tested in the lower environments before it reaches production (agreed 2026-10-18).
 
 There are two human checks: approval once, on the content (maker-checker), and sign-off in each environment after its test payments pass.
 
@@ -1517,8 +1518,8 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | Creates held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-core and the Online cluster: this is usually the first sign |
 | Delete calls failing | billpay-core's delete calls to One-Data keep failing | Fix One-Data's delete API; until then, customers get needless go-ahead steps |
 | Redis memory or write errors | Redis memory is near its limit, or a write fails | Fix it before One-Data has to create payments without the check |
-| Rejected request | A dispatcher marks a pulled request `REJECTED`: nothing live matches its market, account type or API | Fix the market profile. The sender is not told |
-| Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list |
+| Rejected request | A dispatcher marks a pulled request `REJECTED`: nothing live matches its market, account type or API | Find why traffic reached something that isn't live, since traffic is enabled only after a release is live in production. The sender is not told |
+| Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list, then reprocess or terminate each payment's workflow by hand |
 | Downstream outage | A `ds-*` queue drops to its 1 RPS probe | Contact the downstream's owner if it lasts |
 | RTF or Raven down | Their calls have failed for 5 minutes, so payments are waiting in Fulfil | Contact the owner; payments resume when they are back |
 | Offline DB hot | Offline Aurora CPU stays above the governor's cut band for 15 minutes | Look at what is running and whether the bands need tuning |
@@ -1551,11 +1552,11 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | The customer never confirms at their bank | The `CONFIRM_EXPIRY` row falls due and the payment is cancelled. RTF gets the `CANCELLED` event, and the customer gets the `CANCELLED` message through Raven | Nothing |
 | The provider is down or slow when a pay-by-bank payment is created | RequestConfirmation's one try gets no link, so the payment is `DECLINED`, and the caller gets `DECLINED` instead of a link | Nothing |
 | Validation fails | `DECLINED`, with notifications | Nothing |
-| Retries run out | Work Tracker row `FAILED`; the payment goes on the exception list in its last state | Review the list |
+| Retries run out | Work Tracker row `FAILED`; the payment goes on the exception list in its last state | Review the list; reprocess or terminate each workflow by hand |
 | Allocations late | The payment waits in `ALLOCATING`: nothing clears and no leg runs until the last batch arrives; an alert fires at the market's alert point | Chase the allocation source |
 | A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
 | A burst of AR intake, returns or inbound | Requests wait in One-Data's inbox; their dispatchers take them at the governor's rate | Nothing |
-| A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires; the sender is not told | Fix the market profile |
+| A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires; the sender is not told | Find why it was sent before its market was live |
 | billpay-core slow or down for creates | One-Data hands the creates it stored to RTF, which retries them with the same payment ID; channels get `PENDING` | Nothing; RTF delivers once billpay-core is back |
 | A held create arrives after its market went out of service | billpay-core captures and declines it, so the customer is told and the delete runs | Nothing |
 | Redis down | One-Data creates payments with no pending check and nothing stored (for product to confirm) | Restore Redis |

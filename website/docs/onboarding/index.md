@@ -29,6 +29,7 @@ A market is onboarded one **market profile** at a time: one market and one accou
 3. Track. A deployment row per release and environment follows the workflow through requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
 4. Sign off. Once its test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. In E3, which is production, the change request (RFC) must pass the ServiceNow check first.
 5. Promote. Once vN is active and signed off in E1, the same vN goes to E2, then to E3.
+6. Enable traffic. A new market's traffic is enabled only once vN is live in E3. Market profiles change rarely, and every change is tested in the lower environments before it reaches production.
 
 There are only two human checks: approval once, on the content, by a maker and a different checker; and sign-off in each environment, after its test payments pass.
 

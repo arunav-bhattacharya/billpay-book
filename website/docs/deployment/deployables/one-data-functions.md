@@ -34,7 +34,7 @@ Billpay never reads these tables directly. It sees only rows that are ready, thr
 
 ### Start requests
 
-A start request is `READY` as soon as it is stored, and its dispatcher marks it `DONE` once the workflow has started. A request with the same idempotency key is stored once and answered 202 again. A request the Router can't admit, because nothing live matches its market, account type or API, is marked `REJECTED` and raises an alert for operations. The sender is not told.
+A start request is `READY` as soon as it is stored, and its dispatcher marks it `DONE` once the workflow has started. A request with the same idempotency key is stored once and answered 202 again. A request the Router can't admit, because nothing live matches its market, account type or API, is marked `REJECTED` and raises an alert for operations. It stays `REJECTED`, and the sender is not told ([A rejected request](../../operations/sops.md#a-rejected-request)).
 
 ### Rows for PAID
 

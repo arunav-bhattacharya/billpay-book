@@ -19,7 +19,7 @@ Every piece of dated work is a row in `work_tracker`, and its status says where 
 - `DISPATCHING`: claimed by a dispatcher run, named in `run_id`. A row left here by a run that died is picked up by that run's sweep or by the next run.
 - `DISPATCHED`: its workflow has started, so look in the Offline cluster's [Temporal Web UI](./temporal-web-ui.md).
 - `DONE`: the workflow's last commit closed it.
-- `FAILED`: retries ran out, or the Router refused to start it because nothing live matched. Either way the retries-exhausted alert fires.
+- `FAILED`: retries ran out, or the Router refused to start it because its market was taken out of service after the row was written. Either way the retries-exhausted alert fires.
 - `CANCELLED`: the payment was cancelled, or, for a confirmation expiry, the customer confirmed in time.
 
 `dispatch_run` has a row per dispatcher run: its counts, its current rate, and whether it is paused. It is the quickest answer to "is the scheduled-payments run for DE moving?".
@@ -56,4 +56,4 @@ Billpay keeps its own list of payments and legs whose retries ran out, in `excep
 - Neither do RTF or Raven outages. Their calls have a long schedule-to-close, so payments wait for them instead.
 - A corporate leg on the list keeps its parent in `PROCESSING` until operations resolve it.
 
-How a resolved payment is put back on its way is still to be defined. [Retries exhausted](../sops.md#retries-exhausted) has the review steps.
+Each row is resolved by hand. Once the cause is fixed, someone reprocesses the payment's workflow so it carries on, or terminates the workflow to stop the payment where it is, and the row records who resolved it and when. [Retries exhausted](../sops.md#retries-exhausted) has the steps.
