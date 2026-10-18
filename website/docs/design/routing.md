@@ -243,7 +243,7 @@ Two guardrails keep that safe. The plan key carries the resolved behaviors and t
 
 ## Workflow IDs
 
-Every workflow ID is the payment ID plus a suffix, so any payment can be traced from its ID alone. The Work Tracker doesn't store workflow IDs at all.
+The payment ID is a ULID, and every workflow ID is the payment ID plus a suffix, such as `{paymentId}-init`, so any payment can be traced from its ID alone. The Work Tracker doesn't store workflow IDs at all.
 
 | Thing | Workflow ID |
 | --- | --- |

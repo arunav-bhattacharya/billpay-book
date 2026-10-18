@@ -75,7 +75,7 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 | Allocated payments | `ALLOC_EXEC` rows due | A Schedule every minute | `ExecuteScheduledPaymentWorkflow` |
 | Allocation legs | `ALLOC_LEG` rows, fair across parents | A Schedule every minute | `ExecuteSplitPaymentWorkflow` |
 | Representments, one per market | `REPRESENT` rows due | A Schedule every few minutes | `ProcessRepresentmentWorkflow` |
-| Confirmation expiries | `CONFIRM_EXPIRY` rows due | A Schedule every minute (Proposed) | `CancelPaymentWorkflow`, for a payment never confirmed |
+| Confirmation expiries | `CONFIRM_EXPIRY` rows due | A Schedule every minute | `CancelPaymentWorkflow`, for a payment never confirmed |
 | AR intake | `READY` AR requests in One-Data's inbox, payments and refunds | A Schedule every minute | `CreateScheduledPaymentWorkflow`, `CreateBalanceRefundWorkflow` |
 | Returns | `READY` returns in One-Data's inbox | A Schedule every minute | `ProcessReturnedPaymentWorkflow` |
 | Inbound | `READY` inbound payments in One-Data's inbox | A Schedule every minute | `ProcessInboundPaymentWorkflow` |
@@ -160,7 +160,7 @@ CPU over 70%, or online p99 over its SLO, halves the budget outright. Persistenc
 2. The SEPA cutoff floor: remaining payments ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
 3. The US execution floor: 50 TPS.
 4. AR intake: its demand, the requests waiting in One-Data's inbox.
-5. The rest by priority, up to demand: SEPA and US execution above their floors, then corporate (split evenly across the active corporate payments), then inbound, then representments, then returns, then confirmation expiries (Proposed), and the PAID drain last.
+5. The rest by priority, up to demand: SEPA and US execution above their floors, then corporate (split evenly across the active corporate payments), then inbound, then representments, then confirmation expiries, then returns, and the PAID drain last.
 
 Every class is also capped by the downstream systems it calls (see [Throttling](./throttling.md)). The inbox dispatchers have no in-flight cap, so while RTF calls fail or a downstream they call is out, they get no rate at all.
 
@@ -168,7 +168,7 @@ Every class is also capped by the downstream systems it calls (see [Throttling](
 
 Projected finish = now + remaining ÷ current rate. The governor alerts when that passes the cutoff minus 15 minutes, or when the floor no longer fits in the budget, which gives operations time to raise a downstream limit or set a rate override.
 
-An hour before each SEPA run, it also warns when online traffic is likely to be capped: when online's usual peak for those hours, over the last 4 weeks, won't fit under a downstream's agreed rate less the run's need (Proposed).
+Two hours before each SEPA run, it also warns when online traffic is likely to be capped: when online's usual peak for those hours, over the last 4 weeks, won't fit under a downstream's agreed rate less the run's need.
 
 ### Guardrails
 

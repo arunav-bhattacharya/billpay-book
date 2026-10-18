@@ -46,9 +46,9 @@ A SEPA run has to reach the bank before its cutoff, and when it collides with on
 
 If online traffic would leave less than that, online is capped on that downstream at the agreed rate minus the run's need, until the cutoff passes. With clearing at 100 calls a second, the cap is 44. The US run has no cutoff, so it never caps online traffic.
 
-The cap works the same way as offline's limits (Proposed). The Online cluster has a `ds-*` queue for each downstream a cutoff run calls, and the governor sets the cap as that queue's limit. While a cap is on, the Router places that downstream's calls for each new online payment on the capped queue. The rest of the time they run on `online-wf` with eager dispatch, so normal traffic pays nothing for this. A cap lifts by itself at the cutoff, so a stopped governor can't leave customers capped.
+The cap works the same way as offline's limits. The Online cluster has a `ds-*` queue for each downstream a cutoff run calls, and the governor sets the cap as that queue's limit. While a cap is on, the Router places that downstream's calls for each new online payment on the capped queue. The rest of the time they run on `online-wf` with eager dispatch, so normal traffic pays nothing for this. A cap lifts by itself at the cutoff, so a stopped governor can't leave customers capped.
 
-The cost falls on customers, and only during the run. Some online payments wait for the downstream, and one the API can't decide in time gets a PENDING reply and finishes shortly after. Because a cap raises online p99 on purpose, online p99 never cuts a SEPA run below its floor. An hour before each run, the governor warns when online traffic is likely to be capped (Proposed).
+The cost falls on customers, and only during the run. Some online payments wait for the downstream, and one the API can't decide in time gets a PENDING reply and finishes shortly after. Because a cap raises online p99 on purpose, online p99 never cuts a SEPA run below its floor. Two hours before each run, the governor warns when online traffic is likely to be capped.
 
 ## Admitting only what fits
 
@@ -60,7 +60,7 @@ Calls per second to a downstream is the sum over classes of rate times calls per
 
 - A single call that gets 429 waits out `Retry-After`, plus a little jitter, and tries again.
 - If the 429 rate passes 1%, or the downstream's p99 doubles, the governor drops the queue's limit by multiplying it by 0.7, then probes back up 5% at a time.
-- A 429 on an online call means offline took room online needed, so it halves that downstream's offline share at the next check (Proposed). Neither cut takes a SEPA run below its need.
+- A 429 on an online call means offline took room online needed, so it halves that downstream's offline share at the next check. Neither cut takes a SEPA run below its need.
 - In an outage the queue trickles at 1 call a second, just enough to notice when the downstream is back. Admissions for the classes that need it pause, and only the work already in flight waits.
 
 Worker slots follow the limit, not the other way round. A queue needs roughly its limit times the call latency in slots: 100 calls a second at 1 second each needs about 100 slots across all pods. Adding more slots adds no throughput.
@@ -85,8 +85,8 @@ A queue's limit says how much gets through. Priority says who goes first on a sh
 | Corporate: parent execution, allocation requests, legs | 2 | Parent payment ID | The queue's default per-key RPS, so one payment can't take the whole queue |
 | Inbound | 3 | `inbound` | None in effect: weight 100 |
 | Representments | 4 | Market | None in effect: weight 100 |
+| Confirmation expiries | 4 | `expiry` | None in effect: weight 100 |
 | Returns | 5, the lowest | `returns` | None in effect: weight 100 |
-| Confirmation expiries (Proposed) | 5 | `expiry` | None in effect: weight 100 |
 
 - Priority keys run from 1, first, to 5.
 - Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is fine for work nobody is waiting on, and an alert on their backlog age keeps a long wait visible.

@@ -106,7 +106,7 @@ Activities take IDs, not payment objects, and load what they need. RTF lifecycle
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` is a Proposed name. Billpay asks the provider only for the redirect link.
+`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself.
 
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 

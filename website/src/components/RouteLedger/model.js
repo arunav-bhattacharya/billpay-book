@@ -69,7 +69,7 @@ export const IFACES = [
     fails: 'decline',
     queue: "the workflow's queue",
     at: ['Verify', 'Reverify', 'Represent'],
-    note: 'its own queue once it has an agreed limit',
+    note: 'it has no rate limit',
   },
   {
     name: 'OptionsActivities',
@@ -77,7 +77,7 @@ export const IFACES = [
     fails: 'decline',
     queue: "the workflow's queue",
     at: ['Verify', 'Reverify', 'Represent'],
-    note: 'its own queue once it has an agreed limit',
+    note: 'it has no rate limit',
   },
   {
     name: 'ClearingActivities',
@@ -122,8 +122,8 @@ export const IFACES = [
     system: 'Bank-confirmation provider',
     long: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK,",
     queue: "the workflow's queue",
-    at: ['RequestConfirmation', 'Verify'],
-    note: 'a Proposed name. Only the Online cluster calls it',
+    at: ['RequestConfirmation'],
+    note: 'only the Online cluster calls it',
   },
   {
     name: 'InboxActivities',
@@ -316,7 +316,7 @@ export const BANDS = [
                 "One commit, guarded on PENDING, that also cancels the CONFIRM_EXPIRY row. The caller's update returns here. A payment no longer PENDING gets 409, such as one cancelled when its window closed.",
             },
             exc: {
-              'Verify|BankConfirmationActivities': {kind: 'cond', note: 'Proposed: asks whether the customer confirmed'},
+              'Verify|InstrumentActivities': {kind: 'call', note: "also checks the instrument's verification token"},
             },
             then: [PAID],
           },
@@ -669,7 +669,7 @@ export const BANDS = [
         row: 'CONFIRM_EXPIRY',
         by: 'confirmation-expiry dispatcher',
         ctl: 'ctl-expiry',
-        runs: 'A Schedule every minute (Proposed)',
+        runs: 'A Schedule every minute',
         writer: 'CreateImmediatePayment',
         wrote: ['bank'],
         written: 'at RequestConfirmation',
@@ -684,7 +684,7 @@ export const BANDS = [
             own: ['Cancel'],
             journey: 'Confirmation window closes, a CONFIRM_EXPIRY row and the payment still PENDING',
             wfId: '{paymentId}-cancel',
-            prio: [5, '"expiry"', 'Both are Proposed.'],
+            prio: [4, '"expiry"'],
             chips: five('CONSUMER', 'Y', 'Y'),
             behave: 'Example values. Cancel varies by account type and AR posting.',
             move: {Cancel: 'PENDING to CANCELLED'},
@@ -970,7 +970,7 @@ function runsOn(j, f) {
   if (f.queue.startsWith('ds-')) {
     return `${sys}, on ${f.queue}. The governor sets that queue's rate limit, so it is the one choke point for ${f.system}.`;
   }
-  return `${sys}, on the workflow's own queue until it has an agreed limit, then on a queue of its own.`;
+  return `${sys}, on the workflow's own queue: it has no rate limit.`;
 }
 
 /* what other roads do with f, as a count */

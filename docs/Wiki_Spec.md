@@ -637,7 +637,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 > `{paymentId}-confirm` · Online · Update-With-Start, from the Confirm API
 
 - The caller confirms with the same payment ID once the customer has confirmed their bank details on the provider's site.
-- **Verify:** `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING` that also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider does the verification, so Verify doesn't call it. Before it accepts the payment, Verify's bank-confirmation implementation checks the verification token Payment Instruments holds for the payment's instrument, to guard against fraud (agreed 2026-10-17). Proposed: a payment without a valid token is `DECLINED`.
+- **Verify:** `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING` that also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider does the verification, so Verify doesn't call it. Before it accepts the payment, Verify's bank-confirmation implementation checks the verification token Payment Instruments holds for the payment's instrument, to guard against fraud (agreed 2026-10-17). A payment without a valid token is `DECLINED` (agreed 2026-10-18).
 - **Execute**, then **Fulfil**, as for pay today.
 - A repeated confirm joins the running workflow (conflict policy `USE_EXISTING`). A confirm for a payment cancelled when its window closed gets 409; Proposed: after the workflow has closed, a repeated confirm gets the payment's current state.
 
@@ -760,7 +760,7 @@ One activity interface per system, each on that system's task queue. Lifecycle e
 | `BalanceControlActivities` | eBNC (Balance & Control) | `ds-ebnc` | Fulfil, and every leg |
 | `RiskActivities` | Risk | `ds-risk` | Fulfil, and every leg |
 | `AllocationActivities` | Allocations manager | `ds-allocations` | RequestAllocations |
-| `BankConfirmationActivities` (Proposed name) | The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK | The workflow's queue: only the Online cluster calls it | RequestConfirmation, for the redirect link. Verify doesn't call it: the provider verifies the customer's bank details itself |
+| `BankConfirmationActivities` | The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK | The workflow's queue: only the Online cluster calls it | RequestConfirmation, for the redirect link. Verify doesn't call it: the provider verifies the customer's bank details itself |
 | `InboxActivities` | One-Data's inbox functions and event handlers | The workflow's own queue: nobody throttles them | `ProcessPaidEventsWorkflow`, to fetch and to mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests |
 | `LifecycleEventActivities` | RTF, the lifecycle events other systems consume | The workflow's own queue: RTF has no rate limit | Every stage's announcement; Fulfil and the corporate completion check, before their commit; the `PAID` events after Settle |
 | `CommunicationActivities` | Raven, customer messages | `ds-comms` | Announcements the customer is told about; Fulfil and the corporate completion check, before their commit |
@@ -830,7 +830,7 @@ All on the Offline cluster.
 | Allocated payments | The allocated-payments dispatcher | Every minute |
 | Allocation legs | The leg dispatcher | Every minute |
 | Representments, one per market | The representment dispatcher | Every few minutes |
-| Confirmation expiries | The confirmation-expiry dispatcher | Every minute (Proposed) |
+| Confirmation expiries | The confirmation-expiry dispatcher | Every minute |
 | AR intake | The AR intake dispatcher | Every minute |
 | Returns | The returns dispatcher | Every minute |
 | Inbound | The inbound dispatcher | Every minute |
@@ -868,7 +868,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 - PENDING in a reply means the payment is captured but not yet decided; the caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, PENDING comes with the provider's redirect link, and the confirm's reply carries the decision.
 - Eager workflow start is not used: the server refuses it with Update-With-Start, and online latency comes from Update-With-Start and local activities.
 - For pulled work and async starts the workflow ID comes from the request: the payment ID in its idempotency key, or for a return the returned payment and its sequence number. So a repeated request finds the same workflow. A start that fails as already started counts as done, and reuse policy `REJECT_DUPLICATE` stops a second run after it closes.
-- Every workflow ID is the payment ID plus a suffix (see [Platform](#platform)).
+- The payment ID is a ULID (agreed 2026-10-18). Every workflow ID is the payment ID plus a suffix, such as `{paymentId}-init` or `{paymentId}-execute` (see [Platform](#platform)).
 
 ### Routing table
 
@@ -1070,7 +1070,7 @@ One dispatcher per kind of work releases work into Temporal at the governor's ra
 | Allocated payments | `ALLOC_EXEC` rows due | Schedule every minute | `ExecuteScheduledPaymentWorkflow` |
 | Allocation legs | `ALLOC_LEG` rows, fair across parents | Schedule every minute | `ExecuteSplitPaymentWorkflow` |
 | Representments, one per market | `REPRESENT` rows due | Schedule every few minutes | `ProcessRepresentmentWorkflow` |
-| Confirmation expiries | `CONFIRM_EXPIRY` rows due | Schedule every minute (Proposed) | `CancelPaymentWorkflow` |
+| Confirmation expiries | `CONFIRM_EXPIRY` rows due | Schedule every minute | `CancelPaymentWorkflow` |
 | AR intake | `READY` AR requests in One-Data's inbox, payments and refunds | Schedule every minute | `CreateScheduledPaymentWorkflow`, `CreateBalanceRefundWorkflow` |
 | Returns | `READY` returns in One-Data's inbox | Schedule every minute | `ProcessReturnedPaymentWorkflow` |
 | Inbound | `READY` inbound payments in One-Data's inbox | Schedule every minute | `ProcessInboundPaymentWorkflow` |
@@ -1135,13 +1135,13 @@ CPU over 70%, or online p99 over its SLO, halves the budget instead. Persistence
 2. **SEPA cutoff floor:** remaining ÷ (time left − 30 minutes), for each SEPA market in its window, so the run finishes 30 minutes before its cutoff.
 3. **US execution floor:** 50 TPS.
 4. **AR intake:** its demand, the requests waiting in One-Data's inbox.
-5. **The rest by priority, up to demand:** SEPA and US execution above their floors, then corporate (split evenly across active corporate payments), then inbound, then representments, then returns, then confirmation expiries (Proposed), then the PAID drain last.
+5. **The rest by priority, up to demand:** SEPA and US execution above their floors, then corporate (split evenly across active corporate payments), then inbound, then representments, then confirmation expiries, then returns, then the PAID drain last.
 
 Every class is also capped by its downstreams (see [Throttling, Priority and Fairness](#throttling-priority-and-fairness)). The inbox dispatchers have no in-flight cap, so while RTF calls fail or a downstream they call is out, they get no rate at all.
 
 **Cutoff alert.** Projected finish = now + remaining ÷ current rate. The governor alerts when that passes the cutoff minus 15 minutes, or when the floor no longer fits the budget.
 
-**Cap warning (Proposed).** An hour before each SEPA run, the governor compares Online's peak for the run's hours over the last 4 weeks with each downstream's agreed TPS less the run's need, and warns when Online is likely to be capped.
+**Cap warning.** Two hours before each SEPA run, the governor compares Online's peak for the run's hours over the last 4 weeks with each downstream's agreed TPS less the run's need, and warns when Online is likely to be capped.
 
 **Guardrails**
 
@@ -1169,7 +1169,7 @@ Until each downstream's owner agrees its own number, every downstream is taken a
 - **Offline share** = agreed TPS − Online's use − headroom, recomputed every 15 s. There is no fixed split: with an agreed TPS of 100, Online at 25 leaves Offline 65, Online at 80 leaves it 10, and an idle Online leaves it 90.
 - **Headroom (Proposed).** Offline reacts up to about 45 s late: one 15 s check plus about 30 s of metric lag. The headroom is the larger of 10% of the agreed TPS and the biggest rise in Online's use within 45 s over the last 4 weeks and in the load test. It is the online margin in `downstream_limit`.
 - **Admission.** Across all classes, the sum of start rate × calls per workflow to a downstream stays within its offline share, handed out in priority order. Admitting more only parks tasks in the queue backlog, and that backlog is DB rows.
-- **Reaction.** One call waits out `Retry-After`. If the 429 rate passes 1% or p99 doubles, the queue limit drops ×0.7, then probes back up 5% at a time. A 429 on an Online call means Offline took room Online needed, so one halves that downstream's offline share at the next check (Proposed). Neither ever takes a SEPA run below its need. In an outage the queue trickles at 1 RPS to probe, and admissions for classes that need it pause; only work already in flight waits.
+- **Reaction.** One call waits out `Retry-After`. If the 429 rate passes 1% or p99 doubles, the queue limit drops ×0.7, then probes back up 5% at a time. A 429 on an Online call means Offline took room Online needed, so one halves that downstream's offline share at the next check. Neither ever takes a SEPA run below its need. In an outage the queue trickles at 1 RPS to probe, and admissions for classes that need it pause; only work already in flight waits.
 - **Worker slots** ≈ queue limit × call latency: 100 RPS at 1 s needs about 100 slots across pods. More slots won't add throughput.
 
 ### When the cutoff wins
@@ -1178,7 +1178,7 @@ A SEPA run's cutoff comes before Online. The US run has no cutoff, so it never c
 
 - **The need.** During a run with a cutoff, Offline's share of a downstream never drops below the run's need: its cutoff floor ([the governor](#the-governor)) times its calls per payment to that downstream. A full SEPA run needs about 56 RPS of clearing.
 - **The cap.** If Online's use would leave less than the need, Online is capped on that downstream at agreed TPS − the run's need, until the run's cutoff. With an agreed TPS of 100 on clearing, that is 44 RPS.
-- **Enforcing it (Proposed).** The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor sets the cap as that queue's rate limit through the Online cluster's task queue config API, and records the cap and its end time in `downstream_limit`. While a cap is on, the Router places that downstream's calls for each new Online payment on the capped queue; otherwise they run on `online-wf` with eager dispatch, as before. Placement is pinned at start, so a running workflow never switches queues.
+- **Enforcing it.** The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor sets the cap as that queue's rate limit through the Online cluster's task queue config API, and records the cap and its end time in `downstream_limit`. While a cap is on, the Router places that downstream's calls for each new Online payment on the capped queue; otherwise they run on `online-wf` with eager dispatch, as before. Placement is pinned at start, so a running workflow never switches queues.
 - **Lifting it.** The cap ends at the run's cutoff. The Router ignores a cap past its end time and the governor clears it, so a stopped governor can't leave Online capped.
 - **The cost.** While capped, some Online payments wait for that downstream. A payment not decided before the API stops waiting replies PENDING and finishes afterwards.
 
@@ -1200,8 +1200,8 @@ Priority decides who goes first on a shared downstream queue; fairness splits on
 | Corporate: parent execution, allocation requests, legs | 2 | Parent payment ID | The queue's default per-key RPS, so one payment can't take the whole queue |
 | Inbound | 3 | `inbound` | None in effect: weight 100 |
 | Representments | 4 | Market | None in effect: weight 100 |
+| Confirmation expiries | 4 | `expiry` | None in effect: weight 100 |
 | Returns | 5, the lowest | `returns` | None in effect: weight 100 |
-| Confirmation expiries (Proposed) | 5 | `expiry` | None in effect: weight 100 |
 
 - Priority keys run from 1 (first) to 5.
 - Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is acceptable for async work; their backlog age is alerted on so a long wait is visible.
@@ -1263,7 +1263,7 @@ There are two human checks: approval once, on the content (maker-checker), and s
 
 > `provision-{market}-{accountType}-v{N}` · Offline · started by the provisioning API · control queue `ctl-provision`
 
-1. **Check** vN against the deployed build's capability manifest. A combination the build can't run stops here, marked as needing a build.
+1. **Check** vN against the deployed build's capability manifest. A combination the build can't run stops here, marked as needing a build. So does a profile whose cancellation window doesn't close before its execution time (agreed 2026-10-18).
 2. **Save** vN as an inactive version, with the Schedules, dispatcher settings, rate rows and fairness settings it needs, also inactive.
 3. **Test** with payments against vN. The Router accepts a pinned version for test accounts only.
 4. **Wait** for sign-off, and for the RFC in E3.
@@ -1286,6 +1286,8 @@ A step in billpay-ui. Each setting drives something at runtime.
 | Bank confirmation: provider and confirmation window | Which provider RequestConfirmation asks for the redirect link, and when a payment still waiting for confirmation is cancelled |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
+
+A market and an account type can disagree on Raven only when billpay-ui keeps both settings: one for the whole market and one for an account type. For example, the US turns the `SCHEDULED` message off for the whole market, and US Corporate turns it back on. A US corporate payment then follows US Corporate, since the most specific setting wins (Proposed). If billpay-ui keeps the setting only in each profile, a market and account type pair filled in from the default, the two never meet.
 
 ### Capability manifest
 
@@ -1602,8 +1604,8 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Agreed TPS per downstream | 100 TPS for every downstream, until each owner agrees its own (OK for now, 2026-10-17) | Caps every window. During a SEPA run, Online is capped at agreed TPS less the run's need, about 56 RPS of clearing |
 | AR intake time of day | Business hours, outside the midnight windows (OK for now, 2026-10-17) | Overlap with execution changes the budget split |
 | Representment eligibility | A market setting, with a maximum number of representments | How eligibility is expressed, for example by return reason |
-| Verification token check | Payment Instruments holds the token and Verify checks it at confirm; a payment without a valid token is declined (Proposed) | What makes a token valid, and the Payment Instruments call that returns it |
-| Raven setting precedence | A default, a market override and an account-type override; the most specific wins (Proposed) | Which setting wins when a market and an account type disagree |
+| Verification token check | Payment Instruments holds the token and Verify checks it at confirm; a payment without a valid token is declined (agreed 2026-10-18) | What makes a token valid, and the Payment Instruments call that returns it |
+| Raven setting precedence | A default, a market override and an account-type override; the most specific wins (Proposed). Or the setting lives only in each market and account type's profile, filled in from the default, so no two settings meet | Which setting wins when a market and an account type disagree |
 | Open-to-buy event handler | Events stored by One-Data; a placeholder handler in Billpay | Its details are still to be defined |
 | Balance refund steps | They follow the payment path. Skipped for now | Detailed stages are still to be defined |
 

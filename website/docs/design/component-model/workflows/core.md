@@ -154,7 +154,7 @@ The same workflow cancels a payment the customer never confirmed at their bank. 
 
 `ConfirmPaymentWorkflow` picks up a payment that waited for the customer's bank. The caller sends the same payment ID once the customer has confirmed their bank details on the provider's site, and the workflow runs the rest of the pay-today path.
 
-1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify checks the verification token Payment Instruments holds for the instrument, to guard against fraud. Proposed: a payment without a valid token is `DECLINED`.
+1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify checks the verification token Payment Instruments holds for the instrument, to guard against fraud. A payment without a valid token is `DECLINED`.
 2. Execute, then Fulfil, as for pay today.
 
 A repeated confirm joins the running workflow. A confirm for a payment that was cancelled when its window closed gets 409; Proposed: once the workflow has closed, a repeated confirm gets the payment's current state.

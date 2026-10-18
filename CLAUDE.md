@@ -74,6 +74,7 @@ Every doc page under `website/docs/`:
 ## Working conventions
 - No page gets written ad hoc — every page starts from an entry in `CONTENT_PLAN.md`.
 - One phase per session/commit. Don't jump ahead to Design before Vision/Architecture are reviewed and approved.
+- From Build on, a phase doesn't wait for the review of earlier pages. The user reviews drafted pages in their own time and asks for changes (2026-10-18).
 - Commit after every phase, not just at the end.
 - Sub-agents are appropriate for Mermaid diagram generation from spec tables and for checking finished pages against the spec. Keep page authoring on the main thread: every section now follows the spec, and the voice and judgment calls need one author.
 
