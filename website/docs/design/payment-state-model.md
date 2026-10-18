@@ -129,6 +129,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
+| `PENDING` (bank confirmation) | `DECLINED` | RequestConfirmation, when the provider gives no redirect link |
 | `PENDING` (bank confirmation) | `ACCEPTED` or `DECLINED` | Verify, once the caller confirms |
 | `PENDING` (bank confirmation) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |

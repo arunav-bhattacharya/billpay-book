@@ -851,7 +851,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. The create call ends at `PENDING` with the provider's redirect link, and nothing runs in Temporal while the customer is away. The caller's confirm starts a second workflow that verifies, executes and fulfils the payment. If no confirm comes before the market's confirmation window closes, a dispatcher cancels the payment instead. Both sides are guarded on `PENDING`, so only one of them can win.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. The create call ends at `PENDING` with the provider's redirect link, and nothing runs in Temporal while the customer is away. If the provider gives no link, the create ends `DECLINED` instead, so no payment waits without one. The caller's confirm starts a second workflow that verifies, executes and fulfils the payment, and a repeated confirm gets the same answer, or the payment's current state once that workflow has closed. If no confirm comes before the market's confirmation window closes, a dispatcher cancels the payment instead. Both sides are guarded on `PENDING`, so only one of them can win.
 
 ```mermaid
 ---
@@ -891,18 +891,24 @@ sequenceDiagram
     Note over WF,PS: Online cluster
     Note over WF: Capture first: PENDING
     WF->>RQC: run
-    RQC->>BP: ask for the customer's<br/>redirect link
-    rect rgba(102,169,226,0.40)
-      RQC->>PS: the provider's reference and the<br/>CONFIRM_EXPIRY row, guarded on PENDING
+    RQC->>BP: ask for the customer's<br/>redirect link, one try
+    alt the link comes back
+      rect rgba(102,169,226,0.40)
+        RQC->>PS: the link, the provider's reference and the<br/>CONFIRM_EXPIRY row, guarded on PENDING
+      end
+    else no link: the provider is down or too slow
+      rect rgba(102,169,226,0.40)
+        RQC->>PS: state → DECLINED,<br/>guarded on PENDING
+      end
     end
   end
 
   WF-->>R: update result
-  R-->>OD: PENDING, with the<br/>redirect link
+  R-->>OD: PENDING with the redirect link,<br/>or DECLINED with none
 
   rect rgba(0,111,207,0.12)
     Note over WF,RTF: Online cluster, after the reply. Then the workflow ends
-    WF->>RTF: PENDING event
+    WF->>RTF: PENDING event, then with no link<br/>the DECLINED event and Raven message
   end
 
   rect rgba(83,86,90,0.14)
@@ -922,7 +928,7 @@ sequenceDiagram
       end
     end
     CW-->>R: update result
-    R-->>OC: ACCEPTED or DECLINED,<br/>or 409 if no longer PENDING
+    R-->>OC: ACCEPTED or DECLINED. A repeat gets the same,<br/>or the current state once the workflow has closed.<br/>409 if the payment was cancelled
     rect rgba(0,111,207,0.12)
       Note over CW,RAV: Online cluster, after the reply
       CW->>RTF: ACCEPTED or DECLINED event

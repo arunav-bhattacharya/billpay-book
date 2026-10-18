@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 import ApiTable from '@site/src/components/ApiTable';
 
 export const CORE = [
-  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link.'},
+  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link, or `DECLINED` if the provider gives none.'},
   {fn: 'UpdatePayment.v1', method: 'PUT', path: '/payments/{payment-id}', purpose: 'Updates a `SCHEDULED` payment inside the market\'s cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
   {fn: 'DeletePayment.v1', method: 'DELETE', path: '/payments/{payment-id}', purpose: 'Cancels a `SCHEDULED` payment inside the cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
   {fn: 'ReadPayments.v1', method: 'GET', path: '/payments/account/{account-id}', purpose: 'Lists the payments on a card account.'},

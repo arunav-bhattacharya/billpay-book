@@ -67,7 +67,7 @@ The Oracle tables these types are persisted into, and how the code maps onto the
 The code does not yet cover everything the [spec's state model](../../design/payment-state-model.md) defines. These gaps are tracked deliberately rather than papered over.
 
 - No classes or functions for the corporate states **`ALLOCATING`** and **`ALLOCATED`**, or the moves into and out of them.
-- No move from `PendingFullPayment` to `CancelledFullPayment` for a payment never confirmed at its bank, and no field for the bank-confirmation provider's reference.
+- No move from `PendingFullPayment` to `CancelledFullPayment` for a payment never confirmed at its bank, and no field for the bank-confirmation provider's reference or the redirect link.
 - No first-class **Allocation** entity. Corporate allocations are represented today as `SplitPayment` legs plus `SplitSlice`.
 - The five **processing behaviors** (`accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`, `requiresBankConfirmation`) live in the payment *context* used for routing, not on these domain types.
 - **Idempotency and lifecycle events** are persistence-layer concerns (`idempotency_checker`, `trans_lfcyc_event`) with no domain type of their own.

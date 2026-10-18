@@ -16,7 +16,7 @@ import Lead from '@site/src/components/Lead';
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference. |
+| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
@@ -70,7 +70,7 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table |
 | A stage commit | The guarded status update, the timeline row with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, together with the note on the batch that its legs are written |
-| Bank confirmation | The provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
+| Bank confirmation | The redirect link, the provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and cancelling the payment's Work Tracker rows |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of up to 500 inbox rows as JDBC batches: each a guarded update from `PROCESSED` to `PAID`, with a `PAID` timeline row tagged with the batch ID wherever the update changed a row |

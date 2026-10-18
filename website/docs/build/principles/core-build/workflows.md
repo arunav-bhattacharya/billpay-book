@@ -89,8 +89,10 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
         stages.capture.run(paymentId)                  // PENDING, idempotent
         if (plan.requiresBankConfirmation) {
             // The caller gets the provider's redirect link; the payment waits in Oracle, not here.
-            decided = stages.requestConfirmation.run(paymentId)  // still PENDING: the link, and a CONFIRM_EXPIRY row
+            decided = stages.requestConfirmation.run(paymentId)  // PENDING with the link and a CONFIRM_EXPIRY row,
+                                                                  // or DECLINED if the provider gave no link
             stages.capture.announce(paymentId)
+            if (decided == PaymentDecision.DECLINED) stages.requestConfirmation.announce(paymentId)
             return
         }
         decided = stages.verify.run(paymentId)         // ACCEPTED or DECLINED, one guarded commit
@@ -116,7 +118,7 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
 
 The workflow never names a market: `StageIndex.lookup(plan)` is the only place its stages come from. Capture and Verify commit back to back, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
-A payment that needs bank confirmation never reaches Verify here. RequestConfirmation gets the provider's redirect link and writes a `CONFIRM_EXPIRY` row, the caller's update returns `PENDING` with the link, and the workflow ends; `ConfirmPaymentWorkflow` runs Verify later, when the caller confirms. That branch reads the plan key, the same way the corporate stop does.
+A payment that needs bank confirmation never reaches Verify here. RequestConfirmation gets the provider's redirect link, with one try, and writes it with a `CONFIRM_EXPIRY` row, the caller's update returns `PENDING` with the link, and the workflow ends; `ConfirmPaymentWorkflow` runs Verify later, when the caller confirms. If no link comes back, RequestConfirmation declines the payment instead, and the workflow announces `DECLINED` before it ends. That branch reads the plan key, the same way the corporate stop does.
 
 A declined payment ends after Verify, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
 

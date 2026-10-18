@@ -936,7 +936,7 @@ function RoadCard({j, corp, setCorp, open, setOpen, go, pickAct, onClear, wide})
 /* --------------------------------------------------- the activity card -- */
 
 const RTF_EXCEPTIONS = [
-  'RequestConfirmation changes no state, so it sends none.',
+  'RequestConfirmation changes no state when it gets the link, so it sends none; with no link it sends DECLINED.',
   'ReceiveAllocations sends one only for the batch that completes the amount.',
   'Fulfil sends its event before its commit, because PROCESSED means it has gone out.',
   'Settle sends the PAID events after the batch commits.',

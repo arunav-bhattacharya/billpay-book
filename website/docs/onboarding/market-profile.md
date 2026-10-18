@@ -34,7 +34,7 @@ BOTH means a behavior applies to some journeys and not others. Onboarding stores
 
 Realtime clearing shows how this works. Only a pay-today payment from a channel gets Y. Every future-dated payment clears in batch, whether it came from a channel or from Accounts Receivable.
 
-Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a request with several instructions that would need it gets 422 (Proposed: Pay & Plan too).
+Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a request with several instructions, or a Pay & Plan request, that would need it gets 422.
 
 ## What the build can run
 

@@ -31,7 +31,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the provider's reference on the payment with its `CONFIRM_EXPIRY` row | Nothing |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment with its `CONFIRM_EXPIRY` row. `PENDING` → `DECLINED` when the provider gives no link | Nothing |
 | Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | All four behaviors, and bank confirmation |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
@@ -72,7 +72,9 @@ Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_d
 
 ## RequestConfirmation
 
-Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link. One commit guarded on `PENDING` stores the provider's reference and writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The payment stays `PENDING`, and the caller's update returns with the link. The provider only checks the customer's bank details. It never moves money: Billpay does that in Execute, once the customer has confirmed.
+Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link, with one try that fits inside the API's wait. One commit guarded on `PENDING` stores the link and the provider's reference and writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The payment stays `PENDING`, and the caller's update returns with the link. The link is stored so that a caller who loses it can get it again, from a repeated create or from `GET /payments/{payment-id}`.
+
+If no link comes back, because the provider is down or too slow, the commit moves the payment to `DECLINED` instead, and the caller gets `DECLINED`. No payment is ever left `PENDING` without a link, so nothing has to end one later. The provider only checks the customer's bank details. It never moves money: Billpay does that in Execute, once the customer has confirmed.
 
 ## Verify
 
@@ -114,7 +116,7 @@ Checks one stored callback batch and writes no legs: every batch waits in `alloc
 
 Moves a `SCHEDULED` payment to `CANCELLED` with one guarded update, inside the market's cancellation window only. A corporate payment leaves `SCHEDULED` once its allocations are requested, so from `ALLOCATING` on there is nothing to cancel. The same commit cancels the payment's Work Tracker rows, so no dispatcher will ever start it. If the update changes nothing, the payment has already moved on.
 
-Cancel also ends a payment the customer never confirmed at their bank. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts Cancel Payment on the Offline cluster, and Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, so a confirm that got there first wins.
+Cancel also ends a payment the customer never confirmed at their bank. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts Cancel Payment on the Offline cluster, and Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, so a confirm that got there first wins. As for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven.
 
 ## Return
 

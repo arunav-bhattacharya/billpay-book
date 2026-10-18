@@ -23,16 +23,16 @@ The Router answers a write before any workflow starts when it can't take it:
 
 | Endpoint | What it does | Start mode | Reply |
 | --- | --- | --- | --- |
-| `POST /payments` | Pays today or schedules for a future date. The Router picks the workflow from the date and the number of instructions. A payment that needs bank confirmation stops at `PENDING`; a request with several instructions that would need it gets 422 | Update-With-Start | `PENDING`, `ACCEPTED`, `SCHEDULED` or `DECLINED`; `PENDING` with the redirect link when the customer must confirm at their bank |
+| `POST /payments` | Pays today or schedules for a future date. The Router picks the workflow from the date and the number of instructions. A payment that needs bank confirmation stops at `PENDING`; a request with several instructions, or a Pay & Plan request, that would need it gets 422 | Update-With-Start | `PENDING`, `ACCEPTED`, `SCHEDULED` or `DECLINED`; `PENDING` with the redirect link when the customer must confirm at their bank, and the same reply, link included, on a repeated create; `DECLINED` if the provider gives no link |
 | `PUT /payments/{payment-id}` | Updates a `SCHEDULED` payment inside the cancellation window, by cancelling it and creating a replacement with the same confirmation number | Update-With-Start | The new payment's result; 409 outside the window |
 | `DELETE /payments/{payment-id}` | Cancels a `SCHEDULED` payment inside the cancellation window | Update-With-Start | `CANCELLED`, again for a repeated cancel; 409 otherwise |
 | `POST /payments/{payment-id}/confirm` | Confirms a `PENDING` payment once the customer has confirmed their bank details, then executes it | Update-With-Start | `ACCEPTED` or `DECLINED`. A repeated confirm gets the same answer, or the payment's current state once the workflow has closed; 409 for a cancelled payment |
 | `POST /payments/{payment-id}/allocations` | Takes one numbered batch of allocations for a corporate payment, from the allocations manager | Stores the batch, then an async start of `ReceiveAllocationsWorkflow` | 202 |
 | `POST /refunds` | Refunds a credit balance, from a channel | Update-With-Start | The refund's result |
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
-| `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment |
+| `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment; with its redirect link while it waits for bank confirmation |
 
-`PENDING` in a reply means the payment is captured but not yet decided: the API waits at most 3 seconds for the decision, then replies `PENDING`. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID.
+`PENDING` in a reply means the payment is captured but not yet decided: the API waits at most 3 seconds for the decision, then replies `PENDING`. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits.
 
 One composite API runs core workflows as children:
 

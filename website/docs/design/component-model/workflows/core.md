@@ -31,7 +31,7 @@ A consumer split payment's commit also writes its legs, and each leg runs `Execu
 
 A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step from rows in Oracle, the same way as for a scheduled corporate payment (see [Corporate Allocations](../../corporate-allocations.md)).
 
-A payment the customer must confirm at their bank stops even earlier. When `requiresBankConfirmation` resolves to Y, RequestConfirmation runs after Capture in place of Verify: it gets the provider's redirect link and commits a `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. [Confirm Payment](#confirm-payment) takes over when the caller confirms.
+A payment the customer must confirm at their bank stops even earlier. When `requiresBankConfirmation` resolves to Y, RequestConfirmation runs after Capture in place of Verify: it gets the provider's redirect link, with one try, and commits the link with a `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. If the provider gives no link, the payment is `DECLINED` there and then, and the caller gets `DECLINED`. [Confirm Payment](#confirm-payment) takes over when the caller confirms.
 
 ## Create Scheduled Payment
 
@@ -123,7 +123,7 @@ stateDiagram-v2
 2. Cancel: one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
 3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409, which is what a corporate payment gets once it is `ALLOCATING`.
 
-The same workflow cancels a payment the customer never confirmed at their bank. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts it on the Offline cluster. It skips the window check, and Cancel's guard is on `PENDING`, so a payment confirmed first is left alone.
+The same workflow cancels a payment the customer never confirmed at their bank. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts it on the Offline cluster. It skips the window check, and Cancel's guard is on `PENDING`, so a payment confirmed first is left alone. As for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven.
 
 ## Process Returned Payment
 

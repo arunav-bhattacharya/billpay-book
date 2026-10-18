@@ -33,7 +33,7 @@ export const MOVE = {
   Execute: 'PROCESSING',
   Fulfil: 'PROCESSED',
   Cancel: 'CANCELLED',
-  RequestConfirmation: 'PENDING, unchanged',
+  RequestConfirmation: 'PENDING, unchanged; DECLINED with no link',
   RequestAllocations: 'ALLOCATING',
   ReceiveAllocations: 'ALLOCATED',
   Return: 'RETURNED',
@@ -219,13 +219,13 @@ export const BANDS = [
             journey:
               'Create payment, today, one instruction. A payment that needs bank confirmation takes the pay-today route',
             wfId: '{paymentId}-init',
-            answer: 'with PENDING and the redirect link',
+            answer: 'with PENDING and the redirect link, or DECLINED with none',
             chips: five('CONSUMER', 'Y', 'Y'),
             behave:
               'Example values. A BOTH turns bank confirmation to Y when the payment method needs the customer to confirm at their bank. Only consumer payments made today take it.',
             notes: {
               RequestConfirmation:
-                "It runs after Capture, in place of Verify. It gets the provider's redirect link and commits a CONFIRM_EXPIRY row, guarded on PENDING. The caller gets PENDING with the link, and the PENDING event goes out.",
+                "It runs after Capture, in place of Verify. It gets the provider's redirect link, with one try, and commits it with a CONFIRM_EXPIRY row, guarded on PENDING. The caller gets PENDING with the link, and the PENDING event goes out. With no link, the payment is DECLINED instead.",
             },
             stop: {
               title: 'The workflow ends here.',
@@ -689,7 +689,10 @@ export const BANDS = [
             chips: five('CONSUMER', 'Y', 'Y'),
             behave: 'Example values. Cancel varies by account type and AR posting.',
             move: {Cancel: 'PENDING to CANCELLED'},
-            notes: {Cancel: 'No window check. The guard is on PENDING, so a payment confirmed first is left alone.'},
+            notes: {
+              Cancel:
+                'No window check. The guard is on PENDING, so a payment confirmed first is left alone. As for any cancel, the CANCELLED event goes to RTF and the message to the customer through Raven.',
+            },
             end: 'CANCELLED is final. A confirm after this gets 409.',
           },
         ],

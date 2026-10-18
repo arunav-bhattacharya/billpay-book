@@ -68,7 +68,7 @@ const BOXES = [
     extra: 'It carries a declineCode and no confirmation code.'},
 
   {id: 'pendF', col: 'full', row: 0, state: 'PENDING', cls: 'PendingFullPayment', tone: 'mid',
-    extra: "While it waits for the customer's bank it holds bankConfirmation, the provider's reference (not in the code yet)."},
+    extra: "While it waits for the customer's bank it holds bankConfirmation: the provider's reference and the redirect link (not in the code yet)."},
   {id: 'schF', col: 'full', row: 1, state: 'SCHEDULED', cls: 'ScheduledFullPayment', tone: 'mid'},
   {id: 'accF', col: 'full', row: 2, state: 'ACCEPTED', cls: 'AcceptedFullPayment', tone: 'mid'},
   {id: 'allocF', col: 'full', row: 3, state: 'ALLOCATING', cls: 'AllocatingFullPayment', tone: 'mid', corp: true, todo: true},
@@ -295,7 +295,10 @@ const VALUES = [
   {
     term: 'BankConfirmation',
     desc: "On a PendingFullPayment as bankConfirmation, null unless the payment waits for the customer's bank. Not in the code yet.",
-    lines: [['providerReference', "the bank-confirmation provider's reference"]],
+    lines: [
+      ['providerReference', "the bank-confirmation provider's reference"],
+      ['redirectLink', 'the link the customer follows; a Proposed name'],
+    ],
   },
 ];
 
