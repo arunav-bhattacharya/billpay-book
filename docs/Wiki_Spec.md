@@ -552,7 +552,7 @@ A scheduled payment is a row in Oracle from intake to its due date. Temporal see
 - **Fulfil:** `PROCESSED`. Accounting, eBNC and risk run in parallel; then the RTF event and the Raven message; then the commit. Comms go last, so the customer hears only once everything else has succeeded.
 - **Consumer split:** the parent's commit writes its split legs, and each runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster.
 - **Corporate:** Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step, the same way as for a scheduled corporate payment (see [Corporate Allocations](#corporate-allocations)).
-- **Bank confirmation:** when `requiresBankConfirmation` resolves to Y, **RequestConfirmation** runs after Capture in place of Verify. It asks the market's provider for the customer's redirect link, then commits the provider's reference on the payment and its `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. Nothing waits in Temporal while the customer is on the provider's site: `ConfirmPaymentWorkflow` takes over when the caller confirms.
+- **Bank confirmation:** when `requiresBankConfirmation` resolves to Y, **RequestConfirmation** runs after Capture in place of Verify. It asks the market's provider for the customer's redirect link, then commits the provider's reference on the payment and its `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. Nothing waits in Temporal while the customer is on the provider's site: `ConfirmPaymentWorkflow` takes over when the caller confirms. The provider only checks the customer's bank details and never moves money; Billpay moves it in Execute, after the confirm (agreed 2026-10-18).
 
 #### 2. CreateScheduledPaymentWorkflow
 
@@ -1283,7 +1283,7 @@ A step in billpay-ui. Each setting drives something at runtime.
 | Allocation fetch timing and alert point | When a scheduled payment's `ALLOC_REQUEST` row falls due (on the due date, or a set number of hours or days before it), and when a payment still `ALLOCATING` raises an alert |
 | Representment rules: which returns are eligible, how many times a payment can be represented, and the representment date | The return workflow, which decides whether a return is represented and when |
 | Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's (Proposed: the most specific wins) | Every stage's announcement: a status that is switched off sends no Raven message |
-| Bank confirmation: provider and confirmation window | Which provider RequestConfirmation asks for the redirect link, and when a payment still waiting for confirmation is cancelled |
+| Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18) | Which provider RequestConfirmation asks for the redirect link, and when a payment still waiting for confirmation is cancelled |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
 
@@ -1606,6 +1606,7 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Representment eligibility | A market setting, with a maximum number of representments | How eligibility is expressed, for example by return reason |
 | Verification token check | Payment Instruments holds the token and Verify checks it at confirm; a payment without a valid token is declined (agreed 2026-10-18) | What makes a token valid, and the Payment Instruments call that returns it |
 | Raven setting precedence | A default, a market override and an account-type override; the most specific wins (Proposed). Or the setting lives only in each market and account type's profile, filled in from the default, so no two settings meet | Which setting wins when a market and an account type disagree |
+| Provider link lifetime | About 10 minutes for every provider (OK for now, 2026-10-18) | Sets the longest confirmation window a market can have |
 | Open-to-buy event handler | Events stored by One-Data; a placeholder handler in Billpay | Its details are still to be defined |
 | Balance refund steps | They follow the payment path. Skipped for now | Detailed stages are still to be defined |
 

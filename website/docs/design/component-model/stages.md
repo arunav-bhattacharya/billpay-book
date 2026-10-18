@@ -72,7 +72,7 @@ Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_d
 
 ## RequestConfirmation
 
-Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link. One commit guarded on `PENDING` stores the provider's reference and writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The payment stays `PENDING`, and the caller's update returns with the link.
+Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link. One commit guarded on `PENDING` stores the provider's reference and writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The payment stays `PENDING`, and the caller's update returns with the link. The provider only checks the customer's bank details. It never moves money: Billpay does that in Execute, once the customer has confirmed.
 
 ## Verify
 
