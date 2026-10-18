@@ -15,7 +15,7 @@ import StateLegend from '@site/src/components/StateLegend';
 
 ## The lifecycle
 
-Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal. A payment that waits for the customer, to confirm at their bank or to give the go-ahead for a payment made while another was pending, stays `PENDING` the same way, until the caller confirms it, the customer says no, or the market's confirmation window closes.
+Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal. A payment that waits for the customer, to confirm at their bank or to give the go-ahead for a payment made while another was pending, stays `PENDING`, with its own workflow waiting on a timer, until the caller confirms it, the customer says no, or the market's confirmation window closes.
 
 <Tabs groupId="payment-type" className="toggle-tabs">
 <TabItem value="consumer" label="Consumer" default>
@@ -177,7 +177,7 @@ UPDATE trans_dtl SET status = 'CANCELLED'
 
 A payment that has been represented has a row per presentment, so Return's guard names the presentment too. When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm races the end of the confirmation window too: Verify and the expiry's Cancel are both guarded on `PENDING`, and a confirm that loses gets 409. So do a yes and a no from two tabs, when the customer is asked for a go-ahead: one wins, and the other gets 409.
+A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm doesn't race the end of the confirmation window, or a no from another tab, in the database: the payment's own workflow takes one answer, and a confirm or a no that comes after it, or after the timer has fired, gets 409. Its commits are still guarded on `PENDING`, like every other.
 
 ## Split payments
 

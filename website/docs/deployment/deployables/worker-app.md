@@ -24,7 +24,7 @@ The governor checks every 15 seconds and only stops new starts. The caps protect
 
 Each worker in the app polls one task queue on one cluster.
 
-- On the Online cluster, `online-wf` carries the workflow tasks and their activities, with eager dispatch on. Each downstream a cutoff run calls also has a `ds-*` queue there, used only while a SEPA run caps Online on that downstream, and its worker's slots are sized to the cap.
+- On the Online cluster, `online-wf` carries the workflow tasks and their regular activities, with eager dispatch on. The calls that make Verify's decision run as local activities, inside the worker that runs the workflow task. Each downstream a cutoff run calls also has a `ds-*` queue there, used only while a SEPA run caps Online on that downstream, and its worker's slots are sized to the cap.
 - On the Offline cluster, `offline-wf` carries the workflow tasks, a `ctl-*` queue per dispatcher kind carries the control activities (the governor and provisioning have one each too), and every downstream has one rate-limited `ds-*` queue. [Throttling](../../design/throttling.md#the-offline-clusters-task-queues) lists them all.
 - A `ds-*` worker's slots are sized to its queue's limit times the call's latency: 100 calls a second at 1 second each needs about 100 slots across all pods. More slots add no throughput.
 

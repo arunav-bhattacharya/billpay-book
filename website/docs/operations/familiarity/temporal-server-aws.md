@@ -31,7 +31,7 @@ Three kinds of queue, each with its own job:
 
 ## Priorities
 
-Work on the Offline cluster runs at five priority levels, 1 first and 5 last. Execution and AR intake sit at 1, corporate work at 2, inbound payments at 3, representments and confirmation expiries at 4, and returns at 5. On a shared queue, a level waits until every level above it drains, so returns can wait through a whole execution window. Corporate payments also carry a fairness key per parent, which stops one payment with 100K allocations from taking a whole queue. [Priority and fairness](../../design/throttling.md#priority-and-fairness) has the full table.
+Work on the Offline cluster runs at five priority levels, 1 first and 5 last. Execution and AR intake sit at 1, corporate work at 2, inbound payments at 3, representments at 4, and returns at 5. On a shared queue, a level waits until every level above it drains, so returns can wait through a whole execution window. Corporate payments also carry a fairness key per parent, which stops one payment with 100K allocations from taking a whole queue. [Priority and fairness](../../design/throttling.md#priority-and-fairness) has the full table.
 
 ## Schedules
 

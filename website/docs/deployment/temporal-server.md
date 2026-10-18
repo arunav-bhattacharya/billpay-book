@@ -11,7 +11,7 @@ import Lead from '@site/src/components/Lead';
 
 ## Two clusters
 
-The Online cluster runs journeys where a caller waits for an answer, at a peak of 100 TPS (transactions per second). The Offline cluster runs work that can be paced: scheduled execution, AR intake, corporate allocations, returns, inbound payments, representments, confirmation expiries, the periodic jobs and the control workflows. [Two clusters](../design/component-model/workflows/index.md#two-clusters) explains the split.
+The Online cluster runs journeys where a caller waits for an answer, including a payment that waits minutes for its customer, at a peak of 100 TPS (transactions per second). The Offline cluster runs work that can be paced: scheduled execution, AR intake, corporate allocations, returns, inbound payments, representments, the periodic jobs and the control workflows. [Two clusters](../design/component-model/workflows/index.md#two-clusters) explains the split.
 
 Nothing calls across the clusters. A payment accepted or scheduled on Online reaches Offline as a Work Tracker row in Oracle, written in the same commit as its state change, so either cluster can go down while the other keeps working.
 

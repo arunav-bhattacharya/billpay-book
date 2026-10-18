@@ -17,19 +17,19 @@ export const ACTIVITIES = [
   {
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
-    queue: "The workflow's queue: Payment Instruments has no rate limit",
+    queue: "Verify's calls on the Online cluster: a local activity. Otherwise the workflow's queue: Payment Instruments has no rate limit",
     calledBy: "Verify, Reverify; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call",
   },
   {
     name: 'OptionsActivities',
     system: 'Payment Options',
-    queue: "The workflow's queue: Payment Options has no rate limit",
+    queue: "Verify's calls on the Online cluster: a local activity. Otherwise the workflow's queue: Payment Options has no rate limit",
     calledBy: 'Verify, Reverify',
   },
   {
     name: 'PlansActivities',
     system: "Plans, which holds the payment's mandate details; the verification rules check them where the profile requires mandate authorization",
-    queue: "The workflow's queue, like Payment Instruments and Payment Options",
+    queue: "Like Payment Instruments and Payment Options: a local activity in Verify on the Online cluster, otherwise the workflow's queue",
     calledBy: "Verify and Reverify",
   },
   {
@@ -83,14 +83,14 @@ export const ACTIVITIES = [
   {
     name: 'BankConfirmationActivities',
     system: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
-    queue: "The workflow's queue: only the Online cluster calls it",
+    queue: "A local activity, inside the create's first workflow task: only the Online cluster calls it",
     calledBy: "RequestConfirmation, for the redirect link, with one try. Verify doesn't call it: the provider verifies the customer's bank details itself",
   },
   {
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel at its end, and the confirm or cancel that ends a payment\'s wait, for the delete (Proposed: One-Data\'s one activity interface makes this call too)',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel at its end, and `CreatePaymentIntentWorkflow` once after its reply and again at its end, for the delete (Proposed: One-Data\'s one activity interface makes this call too)',
   },
   {
     name: 'LifecycleEventActivities',
@@ -112,7 +112,7 @@ export const ACTIVITIES = [
 
 The task queue is how Billpay throttles. A downstream system with an agreed rate gets its own `ds-*` queue, and the queue's server-side rate limit holds across every pod, so the system never sees more than it agreed to. Calls that nobody throttles run on the workflow's own queue, and Oracle is reached only through `PaymentStore`, which runs inside the workflow task itself. [Throttling](../throttling.md) covers how the limits are set and changed.
 
-Activities take IDs, not payment objects, and load what they need. Data from Payment Options and Payment Instruments is the one exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, such as Execute's open-to-buy call and Fulfil's notifications. Workflow history keeps it encrypted by the payload codec. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
+Activities take IDs, not payment objects, and load what they need. Capture's write is where a payment starts: `PaymentStore` takes the request the workflow was started with and writes it with insert-if-absent, so nothing reaches Oracle before the workflow starts. Data from Payment Options and Payment Instruments is the one other exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, such as Execute's open-to-buy call and Fulfil's notifications. Workflow history keeps it encrypted by the payload codec. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
 
 ## The catalogue
 
@@ -133,7 +133,7 @@ A corporate payment is never declined because its allocations are slow. It waits
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before |
 | A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once |
-| Bank confirmation | The redirect link, the provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
+| Bank confirmation | The redirect link and the provider's reference, or for a go-ahead the IDs the customer was shown, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and the cancellation of the payment's Work Tracker rows |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of inbox rows as JDBC batches in one transaction: a guarded update from `PROCESSED` to `PAID` on `trans_dtl` for a payment or on `split_trans_dtl` for a leg, and a `PAID` timeline row tagged with the batch ID wherever the update changed a row. Then a read-back by batch ID |
@@ -151,10 +151,11 @@ It runs as a local activity, which is what lets a payment ride out an Oracle out
 | Call | Runs as | Why |
 | --- | --- | --- |
 | Oracle reads and writes | A local activity (`PaymentStore`) | No task round trip, and one marker in history when the workflow task completes |
+| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation | A local activity | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
 | Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 
-Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the third row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans. Raven has an agreed rate, so its calls run on `ds-comms`.
+Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the last row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans everywhere except Verify on the Online cluster. Raven has an agreed rate, so its calls run on `ds-comms`.
 
 ## Retries and timeouts
 

@@ -137,8 +137,8 @@ The split comes from one question: is anyone waiting? A cardmember paying their 
 
 <ClusterMap />
 
-- The Online cluster runs the journeys where a caller is waiting: paying today, scheduling, updating or cancelling from a channel, confirming a payment the customer has confirmed at their bank, refunds a customer asks for, and the composite flows. At its busiest it handles about 100 payments a second.
-- The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, cancelling payments nobody confirmed at their bank, the periodic jobs, and the control workflows that do the pacing.
+- The Online cluster runs the journeys where a caller is waiting: paying today, scheduling, updating or cancelling from a channel, refunds a customer asks for, and the composite flows. A payment that waits for its customer to confirm runs there too, in one workflow from the create to the customer's answer. At its busiest the cluster handles about 100 payments a second.
+- The Offline cluster runs everything that can be paced: scheduled execution, bulk intake from Accounts Receivable, corporate allocations, returns, inbound payments, representments, the periodic jobs, and the control workflows that do the pacing.
 - Each cluster has its own Aurora database, so no amount of midnight work on Offline can slow a payment on Online inside Temporal. What the two share is Oracle, the downstream systems and the app that runs their workers. The governor watches online response times as well as Oracle and the downstreams, so when any of them comes under pressure, offline work slows down and online traffic doesn't.
 - Nothing calls across. A payment scheduled on Online reaches Offline as a Work Tracker row, written in the same Oracle commit as its `SCHEDULED` state. On the due date a dispatcher on Offline claims the row and starts the execution there.
 - One app hosts it all: the core APIs, the Router, the dispatchers, the governor and the workers for both clusters, with a Temporal client for each. Offline work gets its own Oracle connection pool and a cap on how much runs at once, so it can't crowd out online work. Where it physically runs is on [High Availability](./high-availability.md).
@@ -148,9 +148,9 @@ The split comes from one question: is anyone waiting? A cardmember paying their 
 We looked at several durable execution engines and picked Temporal as the best fit for long-running business processes. The layering above rests on what it guarantees.
 
 - Money movement must not lose state across restarts, deploys or downstream outages. A workflow replays from its event history back to a deterministic state, so we never hand-rolled a checkpoint table.
-- A caller who is waiting gets the answer at the decision point. Update-With-Start starts the workflow and waits on one update in a single call, so a channel hears `ACCEPTED` or `DECLINED` while the workflow carries on with clearing.
+- A caller who is waiting gets the answer at the decision point. Update-With-Start starts the workflow and waits on one update in a single call, so a channel hears `ACCEPTED` or `DECLINED` while the workflow carries on with clearing. On the Online cluster, the calls behind that decision run as local activities, which the worker makes directly instead of queueing them through the cluster, so the answer comes out of the workflow's first step.
 - Downstream systems flap and push back with 429s. Retries with backoff, a retry delay taken from `Retry-After`, rate-limited task queues, priority and fairness all come with Temporal, so none of that is ours to build.
 - Schedules start the dispatchers and the periodic jobs, and Worker Versioning pins a running payment to the build it started on.
 - Temporal requires deterministic workflow code. That constraint is why the work is factored the way it is: workflows orchestrate, activities do the I/O.
 
-Waiting is the one thing we keep out of Temporal. Sleeping on a timer for days costs its database real work, so a payment due next month waits in Oracle as a row, and a dispatcher starts its workflow on the day.
+Waiting for a date is the one thing we keep out of Temporal. Sleeping on a timer for days costs its database real work, so a payment due next month waits in Oracle as a row, and a dispatcher starts its workflow on the day. A wait of minutes is different: a payment waiting for its customer to confirm stays in its own workflow, on a timer, so the whole wait shows in one place.

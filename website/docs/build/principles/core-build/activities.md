@@ -44,7 +44,7 @@ class ClearingActivitiesImpl(
 
 Three things in that sketch are rules, not style:
 
-- The activity takes the payment ID and loads what it needs. Its inputs are recorded in workflow history, so passing whole payment objects would bloat every history and freeze old data into it. Data from Payment Options and Payment Instruments is the exception: a later call that needs it, such as open-to-buy or the notifications in Fulfil, gets it from the stage, and the payload codec keeps it encrypted in history.
+- The activity takes the payment ID and loads what it needs. Its inputs are recorded in workflow history, so passing whole payment objects would bloat every history and freeze old data into it. Two calls are different. Capture's `PaymentStore` call takes the request the workflow was started with, because nothing is in Oracle yet. And data from Payment Options and Payment Instruments reaches a later call that needs it, such as open-to-buy or the notifications in Fulfil, from the stage, with the payload codec keeping it encrypted in history.
 - Every HTTP call carries an idempotency key such as `{paymentId}-{step}`. An activity can be retried after a timeout even when its call went through, and the key is what makes the second call harmless.
 - The HTTP client has its own retries off. One task is one call, so a queue's rate limit stays the real call rate, and Temporal decides when to try again.
 
@@ -68,6 +68,29 @@ private val clearing = Workflow.newActivityStub(
 ```
 
 On the Offline cluster, a call to a throttled system runs on that system's `ds-*` queue, whose server-side limit is the throttle. A call nobody throttles, such as RTF or Payment Instruments, runs on the workflow's own queue with eager dispatch. A short start-to-close frees a hung call's slot fast; the schedule-to-close limit decides when to give up.
+
+## The decision's calls on the Online cluster
+
+A caller on the Online cluster waits for Verify's decision, so the calls that make it run as local activities: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation. A local activity runs in the worker that holds the workflow task, with no trip through a task queue. Capture, Verify's calls and Verify's commit all finish inside the workflow's first task, and the caller's answer comes straight out of it. Together they cost about 2 history writes, where Verify's k calls as regular activities would cost about 2k + 3.
+
+Only a system without a rate limit can be called this way, because a local activity skips the queue and with it the queue's limit. None of these four has one. The stage picks the stub by the cluster it runs on:
+
+```kotlin
+private val instruments: InstrumentActivities =
+    if (Workflow.getInfo().taskQueue == "online-wf") {
+        Workflow.newLocalActivityStub(
+            InstrumentActivities::class.java,
+            LocalActivityOptions.newBuilder()
+                .setStartToCloseTimeout(instrumentsTimeout)      // about 2 to 3 times the system's p99
+                .setScheduleToCloseTimeout(decisionCallsLimit)   // Proposed: a few hours, as for PaymentStore
+                .build(),
+        )
+    } else {
+        Workflow.newActivityStub(InstrumentActivities::class.java, workflowQueueOptions)   // eager dispatch
+    }
+```
+
+The schedule-to-close is what makes "retried in the worker" true: a Java local activity with neither a schedule-to-close nor a maximum number of attempts isn't retried at all. With it, a short failure is retried in place, and a payment caught by a long outage is answered `PENDING` at 2.5 seconds and carries on when the system is back. The provider's stub sets a maximum of one attempt instead, because RequestConfirmation gets one try that fits inside the caller's wait. Everything after the decision, Execute and Fulfil included, stays on regular activities.
 
 ## One interface, three queues
 

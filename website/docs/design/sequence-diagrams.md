@@ -15,7 +15,7 @@ import Lead from '@site/src/components/Lead';
 
 - The group on the left is whoever starts the flow: a One-Data contract such as `CreatePayment.v3`, or One-Data's inbox when Billpay pulls the work. The light-blue group is the Billpay Platform.
 - Every payment workflow starts through the Router, and its note names the hops: admit, pin the plan key, then place the work on a cluster. The PAID drain and the missing-events check start from Schedules instead.
-- A Bright Blue band is the Online cluster, where a caller is waiting. A Deep Blue band is the Offline cluster, where dispatchers pace the work. A grey, dashed band is time when nothing runs in Temporal, because the work is waiting in Oracle or in One-Data's inbox.
+- A Bright Blue band is the Online cluster, where a caller is waiting. A Deep Blue band is the Offline cluster, where dispatchers pace the work. A grey, dashed band is time when nothing runs, because the work is waiting in Oracle, in One-Data's inbox, or on a workflow's timer.
 - The participants are the workflow and its stages, such as Capture, Verify and Execute. The systems a stage calls, such as clearing and Accounts Receivable, appear in its notes rather than as participants.
 - A pale-blue chip, such as `state → ACCEPTED`, is a commit through `PaymentStore`: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
 - RTF and Raven are drawn because their timing matters. Each change is announced to RTF, and to Raven where the customer is told, after the commit that makes it. Fulfil is the exception: it tells both before it commits `PROCESSED`.
@@ -25,7 +25,7 @@ import Lead from '@site/src/components/Lead';
 
 ## 1. Pay today, one instruction
 
-The caller is waiting for one answer: did the payment go through? So the workflow replies as soon as Verify commits, and only then announces the change and moves the money. Execute and Fulfil finish on Online after the reply, and Fulfil tells RTF and Raven before it commits `PROCESSED`, so nothing is marked processed until both know.
+The caller is waiting for one answer: did the payment go through? So the workflow replies as soon as Verify commits, Temporal's early-return pattern, and only then announces the change and moves the money. Capture, Verify's calls and its commit run as local activities, inside the worker, so the answer comes out of the workflow's first task. Execute and Fulfil finish on Online after the reply, and Fulfil tells RTF and Raven before it commits `PROCESSED`, so nothing is marked processed until both know.
 
 ```mermaid
 ---
@@ -58,12 +58,13 @@ sequenceDiagram
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster. Capture and Verify commit back to back
+    Note over WF,PS: Online cluster, the first workflow task: local activities only
     WF->>CAP: run
     rect rgba(102,169,226,0.40)
       CAP->>PS: state → PENDING, idempotency checked
     end
     WF->>VER: run
+    Note over VER: Instruments, Options, and Plans<br/>for a mandate, in parallel
     rect rgba(102,169,226,0.40)
       VER->>PS: state → ACCEPTED or DECLINED
     end
@@ -851,7 +852,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. The create call ends at `PENDING` with the provider's redirect link, and nothing runs in Temporal while the customer is away. If the provider gives no link, the create ends `DECLINED` instead, so no payment waits without one. The caller's confirm starts a second workflow that verifies, executes and fulfils the payment, and a repeated confirm gets the same answer, or the payment's current state once that workflow has closed. If no confirm comes before the market's confirmation window closes, a dispatcher cancels the payment instead. Both sides are guarded on `PENDING`, so only one of them can win.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
 
 ```mermaid
 ---
@@ -869,14 +870,11 @@ sequenceDiagram
 
   box rgba(0,111,207,0.05) Billpay Platform
     participant R as Billpay Router
-    participant WF as CreateImmediate<br/>PaymentWorkflow
+    participant WF as CreatePaymentIntent<br/>Workflow
     participant RQC as Request<br/>Confirmation
-    participant PS as PaymentStore (Oracle)
-    participant CW as ConfirmPayment<br/>Workflow
     participant VER as Verify
-    participant ED as Confirmation-expiry<br/>dispatcher
-    participant XW as CancelPayment<br/>Workflow
     participant CAN as Cancel
+    participant PS as PaymentStore (Oracle)
   end
 
   participant BP as Bank provider
@@ -884,17 +882,17 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: POST /payments,<br/>today, bank confirmation
-  Note over R: admit, resolve requiresBankConfirmation<br/>to Y, pin plan key, place on Online
+  Note over R: admit, resolve requiresBankConfirmation<br/>to Y, pick the intent journey,<br/>pin plan key, place on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster
+    Note over WF,PS: Online cluster, the first workflow task
     Note over WF: Capture first: PENDING
     WF->>RQC: run
     RQC->>BP: ask for the customer's<br/>redirect link, one try
     alt the link comes back
       rect rgba(102,169,226,0.40)
-        RQC->>PS: the link, the provider's reference and the<br/>CONFIRM_EXPIRY row, guarded on PENDING
+        RQC->>PS: the link and the provider's reference,<br/>guarded on PENDING
       end
     else no link: the provider is down or too slow
       rect rgba(102,169,226,0.40)
@@ -907,58 +905,49 @@ sequenceDiagram
   R-->>OD: PENDING with the redirect link,<br/>or DECLINED with none
 
   rect rgba(0,111,207,0.12)
-    Note over WF,RTF: Online cluster, after the reply. Then the workflow ends
-    WF->>RTF: PENDING event, then with no link<br/>the DECLINED event and Raven message
+    Note over WF,RTF: Online cluster, after the reply
+    WF->>RTF: PENDING event. With no link, the DECLINED event<br/>and Raven message, and the workflow ends
   end
 
   rect rgba(83,86,90,0.14)
-    Note over WF,BP: The customer confirms on the provider's site. The payment waits in Oracle as PENDING, and nothing runs in Temporal
+    Note over WF,BP: The customer confirms on the provider's site. The workflow waits on its timer: the confirmation window and a short grace
   end
 
-  alt the caller confirms inside the window
+  alt the caller confirms in time
     OC->>R: POST /payments/<br/>{payment-id}/confirm
-    Note over R: admit, pin plan key, place on Online
-    R->>CW: Update-With-Start,<br/>{paymentId}-confirm
+    Note over R: admit, then an update<br/>to the running workflow
+    R->>WF: update confirm,<br/>ID {paymentId}-confirm
     rect rgba(0,111,207,0.12)
-      Note over CW,PS: Online cluster
-      CW->>VER: run
+      Note over WF,PS: Online cluster, the same workflow
+      WF->>VER: run
       Note over VER: asks Payment Instruments whether<br/>the instrument's token is valid
       rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED or DECLINED, guarded on PENDING,<br/>and the CONFIRM_EXPIRY row cancelled, one commit
+        VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
       end
     end
-    CW-->>R: update result
-    R-->>OC: ACCEPTED or DECLINED. A repeat gets the same,<br/>or the current state once the workflow has closed.<br/>409 if the payment was cancelled
+    WF-->>R: update result
+    R-->>OC: ACCEPTED or DECLINED. A repeat gets the same,<br/>or the current state once the workflow has closed.<br/>409 once the workflow no longer waits
     rect rgba(0,111,207,0.12)
-      Note over CW,RAV: Online cluster, after the reply
-      CW->>RTF: ACCEPTED or DECLINED event
-      Note over CW,VER: ACCEPTED: Execute, then Fulfil, as for pay today.<br/>DECLINED: the Raven message, then the workflow ends
+      Note over WF,RAV: Online cluster, after the reply
+      WF->>RTF: ACCEPTED or DECLINED event
+      Note over WF,VER: ACCEPTED: Execute, then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
     end
-  else no confirm before the window closes
-    rect rgba(0,23,90,0.12)
-      Note over ED,RAV: Offline cluster, once the CONFIRM_EXPIRY row falls due
-      ED->>PS: claim due CONFIRM_EXPIRY<br/>rows: DISPATCHING
-      ED->>R: route the expiry
-      Note over R: admit, pin plan key, place on Offline
-      R->>XW: dispatcher start, {paymentId}-cancel
-      Note over XW,CAN: no window check
-      XW->>CAN: run
-      alt still PENDING
-        rect rgba(102,169,226,0.40)
-          CAN->>PS: state → CANCELLED, guarded on PENDING,<br/>and the row DONE, one commit
-        end
-        XW->>RTF: CANCELLED event
-        XW->>RAV: CANCELLED message
-      else confirmed first
-        Note over CAN,PS: zero rows updated: the row is marked DONE, and nothing else changes
+  else no confirm before the timer fires
+    rect rgba(0,111,207,0.12)
+      Note over WF,PS: Online cluster, the same workflow. A timer that fires late gives one more window first
+      WF->>CAN: run
+      rect rgba(102,169,226,0.40)
+        CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
       end
+      WF->>RTF: CANCELLED event
+      WF->>RAV: CANCELLED message
     end
   end
 ```
 
 ## 15. A new payment while another is pending
 
-One-Data checks every new payment against the card account's pending payments in Redis, in the same call that adds the new one to the list and stores the create. When the account already has a pending payment, One-Data sends its ID with the create, and the create stops at `PENDING` for the customer's go-ahead: RequestConfirmation writes the `CONFIRM_EXPIRY` row with no provider call, and One-Data adds the pending payments to the reply. A yes starts `ConfirmPaymentWorkflow`, which verifies, executes and fulfils the payment, and a no cancels it. Both are guarded on `PENDING`, so a yes and a no from two tabs can't both win. If neither comes before the market's confirmation window closes, the confirmation-expiry dispatcher cancels the payment, as in diagram 14. Every workflow here ends with a call to One-Data's delete API: the create's call leaves the account's entry in place while the payment waits, and the confirm's or the cancel's call removes it.
+One-Data checks every new payment against the card account's pending payments in Redis, in the same call that adds the new one to the list and stores the create. When the account already has a pending payment, One-Data sends its ID with the create, and the Router starts `CreatePaymentIntentWorkflow`. RequestConfirmation stores the IDs the customer is shown, with no provider call, and One-Data adds the pending payments to the reply. The customer's yes and no are both updates to that workflow, so the first one it accepts wins and the other gets 409. If neither comes before the window and its grace have passed, the timer fires and the workflow cancels the payment, as in diagram 14. The workflow calls One-Data's delete API twice: after its reply, which leaves the account's entry in place while the payment waits, and at its end, which removes it.
 
 ```mermaid
 ---
@@ -978,13 +967,11 @@ sequenceDiagram
 
   box rgba(0,111,207,0.05) Billpay Platform
     participant R as Billpay Router
-    participant WF as CreateImmediate<br/>PaymentWorkflow
+    participant WF as CreatePaymentIntent<br/>Workflow
     participant RQC as Request<br/>Confirmation
-    participant PS as PaymentStore (Oracle)
-    participant CW as ConfirmPayment<br/>Workflow
     participant VER as Verify
-    participant XW as CancelPayment<br/>Workflow
     participant CAN as Cancel
+    participant PS as PaymentStore (Oracle)
   end
 
   participant RTF
@@ -993,7 +980,7 @@ sequenceDiagram
   OD->>RD: one MULTI/EXEC: read the account's pending<br/>payments, add this one, store the create
   RD-->>OD: another payment is pending
   OD->>R: POST /payments, today,<br/>with the pending payment's ID
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pick the intent journey,<br/>pin plan key, place on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -1002,7 +989,7 @@ sequenceDiagram
     WF->>RQC: run, go-ahead<br/>implementation
     Note over RQC: no provider call
     rect rgba(102,169,226,0.40)
-      RQC->>PS: the CONFIRM_EXPIRY row and the IDs the<br/>customer is shown, guarded on PENDING
+      RQC->>PS: the IDs the customer is shown,<br/>guarded on PENDING
     end
   end
 
@@ -1010,53 +997,51 @@ sequenceDiagram
   R-->>OD: PENDING, and One-Data adds<br/>the pending payments to the reply
 
   rect rgba(0,111,207,0.12)
-    Note over WF,RTF: Online cluster, after the reply. Then the workflow ends
+    Note over WF,RTF: Online cluster, after the reply
     WF->>RTF: PENDING event
     WF->>RD: DeletePendingPayment.v1, still waiting:<br/>only the stored create goes
   end
 
   rect rgba(83,86,90,0.14)
-    Note over OD,CAN: The channel shows the pending payments and asks the customer. The payment waits in Oracle as PENDING, and nothing runs in Temporal
+    Note over OD,PS: The channel shows the pending payments and asks the customer. The workflow waits on its timer
   end
 
   alt the customer says yes
     OC->>R: POST /payments/<br/>{payment-id}/confirm
-    Note over R: admit, pin plan key, place on Online
-    R->>CW: Update-With-Start,<br/>{paymentId}-confirm
+    R->>WF: update confirm,<br/>ID {paymentId}-confirm
     rect rgba(0,111,207,0.12)
-      Note over CW,PS: Online cluster
-      CW->>VER: run, go-ahead<br/>implementation
+      Note over WF,PS: Online cluster, the same workflow
+      WF->>VER: run, go-ahead<br/>implementation
       Note over VER: the usual checks,<br/>no provider call
       rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED or DECLINED, guarded on PENDING,<br/>and the CONFIRM_EXPIRY row cancelled, one commit
+        VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
       end
     end
-    CW-->>R: update result
-    R-->>OC: ACCEPTED or DECLINED.<br/>409 if a no won the race
+    WF-->>R: update result
+    R-->>OC: ACCEPTED or DECLINED.<br/>409 if a no came first
     rect rgba(0,111,207,0.12)
-      Note over CW,RAV: Online cluster, after the reply
-      CW->>RTF: ACCEPTED or DECLINED event
-      Note over CW,VER: ACCEPTED: Execute, then Fulfil, as for pay today.<br/>DECLINED: the Raven message
-      CW->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
+      Note over WF,RAV: Online cluster, after the reply
+      WF->>RTF: ACCEPTED or DECLINED event
+      Note over WF,VER: ACCEPTED: Execute, then Fulfil, in the same workflow.<br/>DECLINED: the Raven message
+      WF->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
     end
   else the customer says no
     OX->>R: DELETE /payments/<br/>{payment-id}
-    Note over R: admit, pin plan key, place on Online
-    R->>XW: Update-With-Start,<br/>{paymentId}-cancel
+    R->>WF: update decline,<br/>ID {paymentId}-no
     rect rgba(0,111,207,0.12)
-      Note over XW,CAN: Online cluster, no window check
-      XW->>CAN: run
+      Note over WF,PS: Online cluster, the same workflow, no window check
+      WF->>CAN: run
       rect rgba(102,169,226,0.40)
-        CAN->>PS: state → CANCELLED, guarded on PENDING,<br/>and the CONFIRM_EXPIRY row cancelled, one commit
+        CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
       end
     end
-    XW-->>R: CANCELLED
-    R-->>OX: CANCELLED.<br/>409 if a yes won the race
+    WF-->>R: CANCELLED
+    R-->>OX: CANCELLED.<br/>409 if a yes came first
     rect rgba(0,111,207,0.12)
-      Note over XW,RAV: Online cluster, after the reply
-      XW->>RTF: CANCELLED event
-      XW->>RAV: CANCELLED message
-      XW->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
+      Note over WF,RAV: Online cluster, after the reply
+      WF->>RTF: CANCELLED event
+      WF->>RAV: CANCELLED message
+      WF->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
     end
   end
 ```

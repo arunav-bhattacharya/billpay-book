@@ -17,11 +17,13 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 
 ## Create Immediate Payment
 
-<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization', 'requiresBankConfirmation']} />
+<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization']} />
 
-`CreateImmediatePaymentWorkflow` pays a bill today. The caller waits only until Verify decides.
+`CreateImmediatePaymentWorkflow` pays a bill today, with Temporal's early-return pattern: the caller waits only until Verify decides, and the same workflow carries on with Execute and Fulfil after the reply.
 
-1. Capture writes `PENDING`, with the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`). One that comes after the workflow has closed starts a new run, and Capture's check decides what it does ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)).
+On the Online cluster, the decision's calls run as local activities, inside the worker. Capture, Verify's calls to Payment Instruments, Payment Options and Plans, and Verify's commit all happen in the workflow's first task, so nothing makes a round trip through the Temporal server before the caller has its answer.
+
+1. Capture writes the request, which arrives as the workflow's start input, as `PENDING`, with the idempotency check. Nothing is written before the workflow starts, so the caller's path has no extra database call. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`). One that comes after the workflow has closed starts a new run, and Capture's check decides what it does ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)).
 2. Verify fetches what it needs from Payment Instruments and Payment Options, and from Plans where the profile requires a mandate, runs the verification rules over the answers, then decides `ACCEPTED` or `DECLINED` in one guarded commit, and the caller's update returns here. The announcements for both changes follow the reply, in order.
 3. If the payment is `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
 4. Execute moves it to `PROCESSING`: clearing, AR and open-to-buy in parallel. Open-to-buy first fetches the instrument's clear-text details from Payment Instruments, and Fulfil reuses them.
@@ -31,11 +33,9 @@ A consumer split payment's legs are written by Verify's `ACCEPTED` commit, and e
 
 A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step from rows in Oracle, the same way as for a scheduled corporate payment (see [Corporate Allocations](../../corporate-allocations.md)).
 
-A payment the customer must confirm at their bank stops even earlier. When `requiresBankConfirmation` resolves to Y, RequestConfirmation runs after Capture in place of Verify: it gets the provider's redirect link, with one try, and commits the link with a `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The caller's update returns `PENDING` with the link, the `PENDING` event goes out, and the workflow ends. If the provider gives no link, the payment is `DECLINED` there and then, and the caller gets `DECLINED`. [Confirm Payment](#confirm-payment) takes over when the caller confirms.
+A create that has to wait for its customer, for their bank or for their go-ahead because another payment is pending on the card account, runs as [Create Payment Intent](#create-payment-intent) instead.
 
-A payment made while another is pending on the same card account stops at the same point. When One-Data sends other pending payments' IDs with the create, RequestConfirmation runs after Capture with its go-ahead implementation. It makes no provider call: it commits a `CONFIRM_EXPIRY` row, due when the market's confirmation window closes, with the IDs of the payments the customer was shown. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow ends. A payment that needs both waits once: the reply carries the link and the list, and confirming at the bank is the go-ahead. [Confirm Payment](#confirm-payment) takes over on a yes, and [Cancel Payment](#cancel-payment) on a no.
-
-Every create from a channel ends with a call to One-Data's delete API, `DeletePendingPayment.v1`, which clears the payment out of One-Data's Redis. When the payment still waits for a confirmation, the call says so: One-Data drops only the stored create, and the account's pending entry stays until Confirm Payment or Cancel Payment ends.
+Every create from a channel ends with a call to One-Data's delete API, `DeletePendingPayment.v1`, which clears the payment out of One-Data's Redis. Create Payment Intent calls it twice, because its payment keeps its pending entry while it waits.
 
 ## Create Scheduled Payment
 
@@ -47,7 +47,7 @@ Every create from a channel ends with a call to One-Data's delete API, `DeletePe
 2. The `SCHEDULED` commit writes the `SCHED_EXEC` Work Tracker row, due at the market's execution time on the due date. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time, and its execution row comes once it is `ALLOCATED`.
 3. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
 
-A create from a channel that One-Data sends with other pending payments' IDs takes the same branch as pay today: Capture, then RequestConfirmation, and `PENDING`. At confirm, Verify commits `SCHEDULED` with its `SCHED_EXEC` row, and the workflow stops (Proposed). A create from a channel ends with the same delete call as [Create Immediate Payment](#create-immediate-payment).
+A create from a channel that One-Data sends with other pending payments' IDs runs as [Create Payment Intent](#create-payment-intent) instead. At the customer's yes, Verify commits `SCHEDULED` with its `SCHED_EXEC` row, and that workflow stops (Proposed). A create from a channel ends with the same delete call as [Create Immediate Payment](#create-immediate-payment).
 
 ## Execute Scheduled Payment
 
@@ -121,7 +121,7 @@ stateDiagram-v2
 
 ## Cancel Payment
 
-<WorkflowMeta cluster="Online / Offline" id="{paymentId}-cancel" start="Update-With-Start, on Online; the confirmation-expiry dispatcher, on Offline" behaviors={['accountType', 'requiresArPosting']} />
+<WorkflowMeta cluster="Online" id="{paymentId}-cancel" start="Update-With-Start" behaviors={['accountType', 'requiresArPosting']} />
 
 `CancelPaymentWorkflow` withdraws a `SCHEDULED` payment inside the market's cancellation window. A corporate payment can be withdrawn only until its allocations are requested, when it moves to `ALLOCATING`.
 
@@ -129,9 +129,7 @@ stateDiagram-v2
 2. Cancel: one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
 3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409, which is what a corporate payment gets once it is `ALLOCATING`.
 
-The same workflow cancels a payment the customer never confirmed, at their bank or with a go-ahead. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts it on the Offline cluster. It skips the window check, and Cancel's guard is on `PENDING`, so a payment confirmed first is left alone. As for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven.
-
-It also takes a customer's no to a payment made while another was pending. The channel calls `DeletePayment.v1` with the new payment's ID, and Cancel takes the `PENDING` payment with no window check, guarded on `PENDING`. Its commit cancels the `CONFIRM_EXPIRY` row. A no and a yes from another tab race on that guard: one wins, the other gets 409, and a repeated no gets `CANCELLED` again. When the workflow ends, it calls One-Data's delete API, and the payment leaves the account's pending list.
+A `PENDING` payment that waits for its customer isn't cancelled here. [Create Payment Intent](#create-payment-intent) cancels it itself, on the customer's no or when its window closes.
 
 ## Process Returned Payment
 
@@ -156,18 +154,26 @@ It also takes a customer's no to a payment made while another was pending. The c
 
 `ProcessInboundPaymentWorkflow` takes a push payment: one a third party sends in. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil. A push payment is the only kind that can end `DISALLOWED`.
 
-## Confirm Payment
+## Create Payment Intent
 
-<WorkflowMeta cluster="Online" id="{paymentId}-confirm" start="Update-With-Start, from the Confirm API" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization', 'requiresBankConfirmation']} />
+<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels; the confirm and the no arrive as updates" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization', 'requiresBankConfirmation']} />
 
-`ConfirmPaymentWorkflow` picks up a payment that waited for the customer: for their bank, or for their go-ahead on a payment made while another was pending. The caller sends the same payment ID once the customer has confirmed, and the workflow runs the rest of the pay-today path. The confirm is admitted only for a `PENDING` payment with an open `CONFIRM_EXPIRY` row. Anything else gets 409, so a confirm never races the create's own Verify.
+`CreatePaymentIntentWorkflow` runs a payment that has to wait for its customer: for their bank, when `requiresBankConfirmation` resolves to Y, or for their go-ahead, when One-Data sends other pending payments' IDs with the create. One workflow holds the whole wait, from the create to the payment's end, so its history in the Temporal UI tells the payment's whole story.
 
-1. Verify decides `ACCEPTED` or `DECLINED` in one commit guarded on `PENDING`, which also cancels the payment's `CONFIRM_EXPIRY` row. The caller's update returns here. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
+1. Capture writes `PENDING`. RequestConfirmation then gets the provider's redirect link, with one try, and stores it on the payment. For a go-ahead it makes no provider call and stores the IDs of the payments the customer was shown. The caller's update returns `PENDING` with the link or the pending list, and the `PENDING` event goes out. If the provider gives no link, the payment is `DECLINED` there and then, and the caller gets `DECLINED`. A payment that needs both waits once: the reply carries the link and the list, and confirming at the bank is the go-ahead.
+2. The workflow waits on a timer for the market's confirmation window plus a short grace (Proposed: 30 seconds), so a confirm sent at the last moment still lands.
+3. The confirm arrives as an update. Verify decides in one commit guarded on `PENDING`, and the confirm's reply carries the decision: the same early return as the create's. The provider has already verified the customer's bank details, so Verify doesn't call it. Before it accepts the payment, it asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud, and a payment without a valid token is `DECLINED`. For a go-ahead, Verify runs the usual checks, and the payment goes through even if the earlier one was decided while the customer looked.
+4. Execute, then Fulfil, as for pay today, in the same workflow. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row and stops there (Proposed), and a corporate one stops at `ACCEPTED` with its `ALLOC_REQUEST` row.
 
-   For a go-ahead, Verify runs the usual pay-today checks with no provider call, and the payment goes through even if the earlier one was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row, and the workflow stops there (Proposed).
-2. Execute, then Fulfil, as for pay today. When the workflow ends, it calls One-Data's delete API, and the payment leaves the account's pending list.
+The customer's no is an update too. Cancel moves the payment from `PENDING` to `CANCELLED`, with no window check. A yes and a no from two browser tabs are two updates to one workflow, so the first one it accepts wins and the other gets 409. If the timer fires with no answer, Cancel runs the same way, and as for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven. The workflow never ends by a terminate or a timeout, because either would leave the payment `PENDING` with nobody told.
 
-A repeated confirm is a retry, usually because the caller lost the reply to a confirm that worked. While the workflow runs, the repeat joins it and gets the same answer. Once the workflow has closed, the API reads the payment and answers with its current state, such as `PROCESSED` or `DECLINED`, so the channel never shows a failure for a payment that went through. Only a confirm for a payment that was cancelled, such as one whose confirmation window closed, gets 409.
+The confirm and the no are updates rather than signals because a signal can't answer the caller, and the channel needs the decision in the confirm's reply. An update can also be turned away before anything is written: once the workflow has an answer, or its timer has fired, it refuses a second one, and the API answers 409.
+
+A timer that fires more than a minute late (Proposed) means the Online cluster or its workers were down while the customer was meant to confirm. The workflow then gives the customer one more confirmation window before it cancels.
+
+Each update carries a fixed ID, `{paymentId}-confirm` or `{paymentId}-no`, so a repeat whose reply was lost attaches to the same update and gets the same answer. Once the workflow has closed, the API reads the payment and answers with its current state, such as `PROCESSED` or `DECLINED`, so the channel never shows a failure for a payment that went through. Only a confirm for a payment that was cancelled, such as one whose window closed, gets 409.
+
+The workflow calls One-Data's delete API twice: once after its reply, saying the payment still waits, so One-Data drops only the stored create, and again at its end, when the payment leaves the account's pending list.
 
 ## Create Balance Refund
 

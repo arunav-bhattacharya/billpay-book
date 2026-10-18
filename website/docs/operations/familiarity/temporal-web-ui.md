@@ -13,6 +13,8 @@ import Lead from '@site/src/components/Lead';
 
 Every workflow ID is the payment ID plus a suffix: `{paymentId}-init` for the create, `{paymentId}-execute` for a scheduled execution, `{paymentId}_{seq}-execute` for a leg, and so on. [Workflow IDs](../../design/routing.md#workflow-ids) lists them all. So with a payment ID and the cluster, you can open the workflow directly, without searching.
 
+A payment that waits for its customer, to confirm their bank details or to give the go-ahead, has one workflow from the create to its end: `{paymentId}-init` on the Online cluster. Its history shows the wait as a timer, and the customer's answer as an update with the ID `{paymentId}-confirm` or `{paymentId}-no`. When the timer fires first, the history shows the cancel that followed.
+
 Histories are kept for 30 days. After that the workflow is gone from the UI, but Oracle still has the payment and every step of its timeline.
 
 ## Searching
@@ -30,6 +32,6 @@ Dispatcher runs are named for their Schedule, such as `dispatch-sched-DE`, plus 
 
 - A scheduled payment before its due date. It has no workflow yet: it waits in Oracle as a Work Tracker row, and the scheduled-payments dispatcher starts its workflow on the day. Look in Oracle instead ([Oracle DB](./oracle-db.md)).
 - Work waiting in One-Data's inbox, such as a return that hasn't been pulled yet.
-- Signals. No payment workflow takes one. A confirm or a cancel is a workflow of its own, such as `{paymentId}-confirm`, not a message to a workflow that is already running.
+- Signals. No payment workflow takes one. The confirm and the no reach a waiting payment as updates, and a cancel of a scheduled payment is a workflow of its own, `{paymentId}-cancel`.
 
 Workflow payloads show as plain data because the [Codec Server](../../deployment/deployables/codec-server-app.md) decrypts them.

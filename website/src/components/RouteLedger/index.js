@@ -227,7 +227,7 @@ function Strip({j, act, only}) {
 
 function roadLabel(j) {
   const head = `${j.name}${j.tag ? `, ${j.tag}` : ''}. ${j.lead}`;
-  const how = j.band.drain ? 'Not routed: a Schedule starts it' : `${j.cluster} cluster, ${j.band.start}`;
+  const how = j.band.drain ? 'Not routed: a Schedule starts it' : `${j.cluster} cluster, ${j.start || j.band.start}`;
   return `${head} ${how}. Stages: ${seq(j).join(', ')}.`;
 }
 
@@ -252,7 +252,7 @@ function RoadRow({j, on, dim, act, only, onRoad, rowRef}) {
           'no Router, a Schedule'
         ) : (
           <>
-            <b>{j.cluster}</b>, {j.band.start}
+            <b>{j.cluster}</b>, {j.start || j.band.start}
           </>
         )}
       </span>
@@ -701,7 +701,9 @@ function StagesStep({j, n, stages, corp, corpRow, open, onToggle, pickAct}) {
       <p className={styles.stepNote}>
         {offline
           ? "Each call runs on its system's task queue, shown beside it."
-          : "Every call runs on online-wf, the Online cluster's main task queue, unless a SEPA run has capped its downstream."}
+          : j.stages.includes('Verify') || j.own.includes('RequestConfirmation')
+            ? "The decision's calls run as local activities, inside one workflow task. Every other call runs on online-wf, the Online cluster's main task queue, unless a SEPA run has capped its downstream."
+            : "Every call runs on online-wf, the Online cluster's main task queue, unless a SEPA run has capped its downstream."}
       </p>
       {!corp && j.first && <p className={styles.stepText}>{j.first}</p>}
       {!corp && j.tbd && <p className={styles.stepText}>{j.tbd}</p>}

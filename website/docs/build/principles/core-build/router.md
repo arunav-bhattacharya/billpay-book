@@ -18,6 +18,8 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 - The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch.
 - The dispatchers, once for each Work Tracker row or inbox request they release.
 
+The confirm, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, as an update, so there is nothing to pick, pin or place ([6. Start](#6-start) shows the call).
+
 Calling it is a plain function call inside billpay-core. The app holds a Temporal client for each cluster, and the Router takes the one its placement names. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
 
 Control workflows don't go through the Router. The dispatchers, the governor and market provisioning start from their Schedules or their own API.
@@ -37,6 +39,7 @@ data class PlanKey(
     val requiresBankConfirmation: Boolean,
     val configVersion: Int,                       // the market config version they came from
     val ruleSettings: RuleSettings,               // the verification rules' thresholds, from that version
+    val confirmationWindow: Duration? = null,     // for a payment that waits for the customer
     val waitsForGoAhead: Boolean = false,         // Proposed: other payments were pending
 )
 
@@ -62,7 +65,7 @@ fun route(request: RouteRequest): Routed {
     if (request is AllocationsCallback && !budget.allows(request)) {
         return Routed.OverBudget(budget.retryAfter())                     // 429 with Retry-After
     }
-    val journey = pickJourney(request)                                    // 2
+    val journey = pickJourney(request, version)                           // 2
     val behaviors = resolve(version, journey, request)                    // 3
     val plan = PlanKey.of(journey, behaviors, version)                    // 4
     val placement = place(journey, plan, request)                         // 5
@@ -88,16 +91,16 @@ The allocations callback has one more check: its start must fit inside its traff
 The routing table on [Design → Routing](../../../design/routing.md) is the spec for this function, and the code should read like it:
 
 ```kotlin
-fun pickJourney(r: RouteRequest): Journey = when (r) {
+fun pickJourney(r: RouteRequest, version: MarketVersion): Journey = when (r) {
     is CreatePayment -> when {
+        r.waitsForCustomer(version) -> Journey.CREATE_INTENT    // bank confirmation, or other pending payments' IDs
         r.isFutureDated -> Journey.CREATE_SCHEDULED
         r.instructions.size > 1 -> Journey.MULTIPLE_INSTRUCTIONS
-        else -> Journey.CREATE_IMMEDIATE              // bank confirmation takes this journey too
+        else -> Journey.CREATE_IMMEDIATE
     }
     is PayAndPlan -> Journey.PAY_AND_PLAN
     is UpdatePayment -> Journey.UPDATE
-    is CancelPayment -> Journey.CANCEL
-    is ConfirmPayment -> Journey.CONFIRM
+    is CancelPayment -> Journey.CANCEL                // a SCHEDULED payment; the no to a waiting one is an update
     is Refund -> Journey.BALANCE_REFUND
     is AllocationsCallback -> Journey.RECEIVE_ALLOCATIONS
     is DueRow -> when (r.itemType) {                  // a Work Tracker row
@@ -105,7 +108,6 @@ fun pickJourney(r: RouteRequest): Journey = when (r) {
         ALLOC_REQUEST -> Journey.REQUEST_ALLOCATIONS
         ALLOC_LEG -> Journey.EXECUTE_SPLIT
         REPRESENT -> Journey.REPRESENT
-        CONFIRM_EXPIRY -> Journey.CANCEL              // on the Offline cluster
     }
     is StartRequest -> when (r.type) {                // pulled from One-Data's inbox
         AR_PAYMENT -> Journey.CREATE_SCHEDULED
@@ -116,7 +118,7 @@ fun pickJourney(r: RouteRequest): Journey = when (r) {
 }
 ```
 
-A payment that needs bank confirmation isn't a journey of its own. It takes the pay-today journey, and its resolved behavior tells the workflow to run RequestConfirmation in place of Verify. Nor is a create that waits for the customer's go-ahead because other payments on the card account are pending: it takes its usual journey, pay today or scheduled, and the plan key marks the wait (step 4).
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or One-Data sent other pending payments' IDs with the create; for a go-ahead the plan key also marks the wait (step 4). A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead.
 
 ### 3. Resolve the behaviors
 
@@ -146,7 +148,7 @@ val stages = StageIndex.lookup(plan)              // inside the workflow
 
 `StageIndex` is generated by KSP (Kotlin Symbol Processing) at build time, from the stage implementations, and the most specific match wins, so a market override beats the default for its market. The same generated code produces the build's capability manifest, which `GET /provisioning/capabilities` returns and provisioning checks every release against. [Building Stages](./stages.md#how-a-stage-gets-picked) shows how an implementation declares what it serves, and [Building the Stage Index](./stage-index.md) how KSP turns those declarations into the index.
 
-The key also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with.
+The key also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the key carries the market's confirmation window too, which the workflow's timer uses.
 
 When One-Data sends a create with the IDs of other pending payments on the card account, the plan key also marks that the payment waits for a go-ahead, so the index picks RequestConfirmation's and Verify's go-ahead implementations (Proposed). [Design → Journeys](../../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
 
@@ -174,20 +176,18 @@ val options = WorkflowOptions.newBuilder()
     .setTypedSearchAttributes(searchAttributes(request, plan))
     .build()
 val wf = onlineClient.newWorkflowStub(CreateImmediatePaymentWorkflow::class.java, options)
+val start = WithStartWorkflowOperation(wf::run, request.body, plan)   // the request itself: nothing is written first
 
-val handle = WorkflowClient.startUpdateWithStart(
-    wf::decision,
-    UpdateOptions.newBuilder<PaymentDecision>().setWaitForStage(WorkflowUpdateStage.ACCEPTED).build(),
-    WithStartWorkflowOperation(wf::run, request.paymentId, plan),
-)
 val reply = try {
-    handle.resultAsync.get(2500, TimeUnit.MILLISECONDS)         // Verify's decision
+    CompletableFuture.supplyAsync({                             // the bound covers the whole call
+        WorkflowClient.executeUpdateWithStart(wf::decision, UpdateOptions.newBuilder<PaymentDecision>().build(), start)
+    }, temporalCalls).get(2500, TimeUnit.MILLISECONDS)          // Verify's decision
 } catch (e: TimeoutException) {
     PaymentDecision.PENDING                                     // captured; it finishes on its own
 }
 ```
 
-`USE_EXISTING` makes a repeated request join the running workflow instead of starting a second one. The API waits for the update to be accepted, then for its result with a 2.5-second timeout, which is how it keeps its promise: a payment not decided by then is answered `PENDING`, and the workflow carries on without the caller.
+The request itself is the start input, so the API writes nothing before the start: Capture writes it in the workflow's first task, and the caller's path has no extra database call. `USE_EXISTING` makes a repeated request join the running workflow instead of starting a second one. The 2.5-second bound covers the whole call, not just its result. On the Online cluster the decision runs as local activities inside the workflow's first task, and the worker reports the update as accepted only when that task completes, so the acceptance and the answer arrive together. A payment not decided in 2.5 seconds is answered `PENDING`, and the workflow carries on without the caller.
 
 The options set no reuse policy, so the default, `ALLOW_DUPLICATE`, applies once a run has closed. A create repeated after that starts a new run, and Capture's idempotency check decides what it does (agreed 2026-10-18). If the payment is still `PENDING` with nothing waiting on it, because the last run died before deciding, the new run carries on from the next stage. Otherwise it returns the payment as it stands and ends, so no stage runs twice. Workflows and activities are idempotent, so this needs no special policy.
 
@@ -206,7 +206,7 @@ val options = WorkflowOptions.newBuilder()
     .build()
 val wf = offlineClient.newWorkflowStub(ExecuteScheduledPaymentWorkflow::class.java, options)
 try {
-    WorkflowClient.start(wf::run, request.paymentId, plan)
+    WorkflowClient.start(wf::run, request.paymentId, plan)  // a row names a payment already in Oracle
 } catch (e: WorkflowExecutionAlreadyStarted) {
     // A repeated tick or a retried activity already started it. That counts as done.
 }
@@ -214,7 +214,34 @@ try {
 
 `REJECT_DUPLICATE` refuses a second run once the first has closed, so a row released twice can't execute a payment twice. The allocations callback starts the same way and also sets conflict policy `USE_EXISTING`. Its API replies 202 only after the start returns, so the workflow exists before the allocations manager hears back. While the Offline cluster is down, that start fails, and the API answers 503 with `Retry-After`.
 
-Neither cluster uses eager workflow start: the server refuses it with Update-With-Start, and online latency comes from Update-With-Start and local activities instead.
+The confirm, and the no to a payment that waits, start nothing. They are updates to the payment's running `CreatePaymentIntentWorkflow`:
+
+```kotlin
+val stub = onlineClient.newUntypedWorkflowStub("$paymentId-init")
+val options = UpdateOptions.newBuilder(PaymentDecision::class.java)
+    .setUpdateName("confirm")
+    .setUpdateId("$paymentId-confirm")                          // a repeat attaches to the same update
+    .setWaitForStage(WorkflowUpdateStage.COMPLETED)
+    .build()
+val reply = try {
+    CompletableFuture.supplyAsync({ stub.startUpdate(options).result }, temporalCalls)
+        .get(2500, TimeUnit.MILLISECONDS)                       // Verify's decision, under the same bound
+} catch (e: TimeoutException) {
+    PaymentDecision.PENDING                                     // it finishes on its own
+} catch (e: ExecutionException) {
+    when (e.cause) {
+        is WorkflowUpdateException -> answerFromOracle(paymentId)     // turned away: 409 for a cancelled payment
+        is WorkflowNotFoundException -> answerFromOracle(paymentId)   // closed: a retry whose reply was lost
+        else -> throw e
+    }
+}
+```
+
+*(A sketch: the API names are the Java SDK's, the rest illustrative.)*
+
+The workflow's validator turns away a confirm that comes after it has an answer, or after its timer has fired, before anything is written to its history.
+
+Neither cluster uses eager workflow start: the server refuses it with Update-With-Start (`RequestEagerExecution is not supported`), and online latency comes from Update-With-Start and local activities instead. On the Online cluster, Verify's calls run as local activities, so the whole decision happens in the workflow's first task.
 
 ## Re-routing on the due date
 

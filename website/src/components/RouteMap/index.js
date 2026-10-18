@@ -10,7 +10,8 @@ import styles from './styles.module.css';
  * a workflow is Bright Blue for Online and the deeper navy for Offline. How a
  * workflow starts is drawn on the line into it, never in colour:
  *
- *   solid line    it starts at once (Update-With-Start, or an async start)
+ *   solid line    it starts at once (Update-With-Start, or an async start),
+ *                 or an update reaches it while it runs
  *   dashed line   it waits for a dispatcher (from One-Data's inbox, or from
  *                 a Work Tracker row)
  *   elbow         a child, started by its parent on the parent's cluster
@@ -27,7 +28,8 @@ import styles from './styles.module.css';
  *   {desc, flow, fork?, note?, across?}
  * `flow` lists the workflows in order, each {via, detail?, name, cluster,
  * caption?}, where `via` says how it starts: 'uws', 'async', 'inbox', 'row'
- * or 'child', and `caption` is a line or two of what that workflow runs.
+ * or 'child', or 'update' for a message to a workflow already running, and
+ * `caption` is a line or two of what that workflow runs.
  * The first one's `via` is the line from the trigger. `fork` lists branches,
  *   {term, via, detail?, flow, notes?}   or   {term, self: [caption, ...]}
  * hanging from the last workflow in `flow`. `note` sits beside the last
@@ -41,12 +43,13 @@ const VIA = {
   inbox: {label: 'From the inbox', waits: true},
   row: {label: 'Work Tracker row', waits: true},
   child: {label: 'Child'},
+  update: {label: 'Update, to the running workflow'},
 };
 
 const SELF = 'Runs it all itself';
 
 const LABEL =
-  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A payment made today also forks for bank confirmation, which waits for the caller\'s confirm.';
+  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A create that waits for the customer, for bank confirmation or a go-ahead, starts CreatePaymentIntent, and the confirm and the no reach that same workflow as updates.';
 
 const offline = (cluster) => String(cluster).trim().toLowerCase() === 'offline';
 const tone = (cluster) => (offline(cluster) ? styles.off : styles.on);
@@ -229,7 +232,7 @@ function Key() {
             Offline cluster
           </span>
         </span>
-        <span className={styles.keyHead}>Starts at once</span>
+        <span className={styles.keyHead}>At once</span>
         <span className={styles.keyItems}>
           <span className={styles.keyItem}>
             <i className={styles.kLine} aria-hidden="true" />
@@ -238,6 +241,10 @@ function Key() {
           <span className={styles.keyItem}>
             <i className={styles.kLine} aria-hidden="true" />
             Async start
+          </span>
+          <span className={styles.keyItem}>
+            <i className={styles.kLine} aria-hidden="true" />
+            Update, to the running workflow
           </span>
         </span>
         <span className={styles.keyHead}>Waits for a dispatcher</span>

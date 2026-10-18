@@ -160,7 +160,7 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
 
 ### Pay by bank
 
-Some markets let a customer pay from a bank account they confirm on the bank's own side: Plaid in the US, Pay with Bank Transfer in the UK. The customer starts the payment as usual, gets sent to the provider's site to confirm their bank details, and comes back. Billpay holds the payment at `PENDING` in Oracle meanwhile, so nothing waits in Temporal while the customer is away.
+Some markets let a customer pay from a bank account they confirm on the bank's own side: Plaid in the US, Pay with Bank Transfer in the UK. The customer starts the payment as usual, gets sent to the provider's site to confirm their bank details, and comes back. Billpay holds the payment at `PENDING` meanwhile, and one workflow, `CreatePaymentIntentWorkflow`, waits for the customer on a timer, so the payment's whole story shows in one place in the Temporal UI.
 
 <JourneyMap
   kind="customer"
@@ -183,10 +183,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {kind: 'api', label: 'POST /payments'},
     {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
   ]}
-  workflow={[
-    {label: 'CreateImmediatePaymentWorkflow'},
-    {label: 'ConfirmPaymentWorkflow', via: "then, on the caller's confirm"},
-  ]}
+  workflow={{label: 'CreatePaymentIntentWorkflow', note: "the caller's confirm arrives as an update"}}
   steps={[
     {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
     {
@@ -245,10 +242,10 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   ]}
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
-    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and commits the link with a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes. The caller\'s update returns `PENDING` with the link, the `PENDING` event goes to RTF, and `CreateImmediatePaymentWorkflow` ends. If the provider gives no link, the payment is `DECLINED` instead.'},
-    {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the payment waits in Oracle. If no confirm comes before the window closes, the confirmation-expiry dispatcher starts `CancelPaymentWorkflow` on the Offline cluster, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
-    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. A payment without a valid token is `DECLINED`. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
-    {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
+    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`, and RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and stores it on the payment. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If the provider gives no link, the payment is `DECLINED` instead.'},
+    {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the workflow waits on its timer: the market\'s confirmation window and a short grace. If no confirm comes in that time, the workflow runs Cancel itself, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
+    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409.'},
+    {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
     {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
     {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
@@ -284,11 +281,7 @@ A customer who isn't sure their first payment went through may pay again, and en
     {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
     {kind: 'api', label: 'DELETE /payments/{payment-id}'},
   ]}
-  workflow={[
-    {label: 'CreateImmediatePaymentWorkflow'},
-    {label: 'ConfirmPaymentWorkflow', via: 'then, on a yes'},
-    {label: 'CancelPaymentWorkflow', via: 'or, on a no'},
-  ]}
+  workflow={{label: 'CreatePaymentIntentWorkflow', note: 'the yes and the no arrive as updates'}}
   steps={[
     {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
     {
@@ -347,10 +340,10 @@ A customer who isn't sure their first payment went through may pay again, and en
   detail={[
     {text: 'One-Data checks before it calls the core. In one Redis call it reads the card account\'s pending payments, adds this one to the list and stores the create. Another payment is still pending, so One-Data sends that payment\'s ID with the create.'},
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment.'},
-    {step: 2, text: 'Because the create came with other pending payments\' IDs, RequestConfirmation runs in place of Verify, with its go-ahead implementation. It calls no provider. It commits a `CONFIRM_EXPIRY` row, due when the market\'s confirmation window closes, with the IDs of the payments the customer is shown. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow ends. A payment that also needs bank confirmation waits only once: the reply carries the redirect link and the list, and confirming at the bank is the go-ahead.'},
-    {step: 3, text: 'The channel shows the pending payments and asks whether to go ahead. A no comes in through `DeletePayment.v1`, and `CancelPaymentWorkflow` moves the new payment to `CANCELLED`, guarded on `PENDING`. So does the confirmation window closing with no answer. Either way, RTF gets the event, the customer gets the message through Raven, and the payment leaves the account\'s pending list.'},
-    {step: 4, text: 'A yes comes in through `CreateConfirmPendingPayment.v1` with the same payment ID, and `ConfirmPaymentWorkflow` runs Verify: the usual checks, with no provider call. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and closes the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A yes and a no from two tabs race on that guard: one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment waits for its date (Proposed).'},
-    {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
+    {step: 2, text: 'Because the create came with other pending payments\' IDs, the Router starts `CreatePaymentIntentWorkflow`, and RequestConfirmation runs in place of Verify, with its go-ahead implementation. It calls no provider. It stores the IDs of the payments the customer is shown. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow waits. A payment that also needs bank confirmation waits only once: the reply carries the redirect link and the list, and confirming at the bank is the go-ahead.'},
+    {step: 3, text: 'The channel shows the pending payments and asks whether to go ahead. A no comes in through `DeletePayment.v1` as an update to the waiting workflow, and Cancel moves the new payment to `CANCELLED`, guarded on `PENDING`. So does the workflow\'s timer, if no answer comes before the window and its grace have passed. Either way, RTF gets the event, the customer gets the message through Raven, and the payment leaves the account\'s pending list.'},
+    {step: 4, text: 'A yes comes in through `CreateConfirmPendingPayment.v1` with the same payment ID, as an update to the same workflow, and Verify runs the usual checks, with no provider call. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the caller\'s update returns here. A yes and a no from two tabs are two updates to one workflow: the first one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment waits for its date (Proposed).'},
+    {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
     {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, and the payment leaves the account\'s pending list.'},
     {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},

@@ -68,7 +68,7 @@ export const IFACES = [
     system: 'Payment Instruments',
     fails: 'decline',
     failsAt: {Execute: 'must'},
-    queue: "the workflow's queue",
+    queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify', 'Execute'],
     note: 'it has no rate limit',
   },
@@ -76,7 +76,7 @@ export const IFACES = [
     name: 'OptionsActivities',
     system: 'Payment Options',
     fails: 'decline',
-    queue: "the workflow's queue",
+    queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify'],
     note: 'it has no rate limit',
   },
@@ -85,7 +85,7 @@ export const IFACES = [
     system: 'Plans',
     long: 'Plans, for the mandate details',
     fails: 'mandate',
-    queue: "the workflow's queue",
+    queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify'],
     note: 'only where the profile requires mandate authorization',
   },
@@ -140,7 +140,7 @@ export const IFACES = [
     name: 'BankConfirmationActivities',
     system: 'Bank-confirmation provider',
     long: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
-    queue: "the workflow's queue",
+    queue: 'local activity',
     at: ['RequestConfirmation'],
     note: 'only the Online cluster calls it',
   },
@@ -172,7 +172,7 @@ export const BANDS = [
   {
     key: 'caller',
     term: 'A caller waits',
-    desc: 'Update-With-Start',
+    desc: 'Update-With-Start, or an update',
     cluster: 'Online',
     start: 'Update-With-Start',
     requests: [
@@ -230,13 +230,12 @@ export const BANDS = [
           },
           {
             id: 'bank',
-            wf: 'CreateImmediatePayment',
+            wf: 'CreatePaymentIntent',
             tag: 'bank confirmation',
             lead: 'Pay today, once the customer confirms their bank details.',
             stages: ['Capture'],
             own: ['RequestConfirmation'],
-            journey:
-              'Create payment, today, one instruction. A payment that needs bank confirmation takes the pay-today route',
+            journey: 'Create payment, today, one instruction, with bank confirmation: a payment that waits for the customer',
             wfId: '{paymentId}-init',
             answer: 'with PENDING and the redirect link, or DECLINED with none',
             chips: five('CONSUMER', 'Y', 'Y'),
@@ -244,26 +243,23 @@ export const BANDS = [
               'Example values. A BOTH turns bank confirmation to Y when the payment method needs the customer to confirm at their bank. Only consumer payments made today take it.',
             notes: {
               RequestConfirmation:
-                "It runs after Capture, in place of Verify. It gets the provider's redirect link, with one try, and commits it with a CONFIRM_EXPIRY row, guarded on PENDING. The caller gets PENDING with the link, and the PENDING event goes out. With no link, the payment is DECLINED instead.",
+                "It runs after Capture, in place of Verify. It gets the provider's redirect link, with one try, and stores it on the payment, guarded on PENDING. The caller gets PENDING with the link, and the PENDING event goes out. With no link, the payment is DECLINED instead.",
             },
             stop: {
-              title: 'The workflow ends here.',
-              text: "Nothing waits in Temporal while the customer is on the provider's site. The payment waits in Oracle, PENDING.",
+              title: 'The workflow waits here.',
+              text: "On its own timer: the market's confirmation window and a short grace. The confirm arrives as an update to this same workflow. If none comes in time, the timer runs Cancel, and the payment ends CANCELLED.",
             },
-            then: [
-              {to: 'confirm', text: 'the caller confirms, with the same payment ID'},
-              {to: 'expire', text: 'or the confirmation window closes first'},
-            ],
+            then: [{to: 'confirm', text: 'the caller confirms, with the same payment ID'}],
           },
           {
             id: 'goahead',
-            wf: 'CreateImmediatePayment',
+            wf: 'CreatePaymentIntent',
             tag: 'go-ahead',
             lead: 'Pay today while another payment on the account is pending.',
             stages: ['Capture'],
             own: ['RequestConfirmation'],
             journey:
-              'Create payment, today, one instruction. One-Data sends the IDs of the pending payments it found, and the payment waits for a go-ahead',
+              'Create payment, today, one instruction. One-Data sends the IDs of the pending payments it found, so the payment waits for the customer',
             wfId: '{paymentId}-init',
             answer: 'with PENDING, and One-Data adds the pending payments',
             chips: five('CONSUMER', 'Y', 'N'),
@@ -272,19 +268,18 @@ export const BANDS = [
             move: {RequestConfirmation: 'PENDING, unchanged'},
             notes: {
               RequestConfirmation:
-                'Its go-ahead implementation runs after Capture, in place of Verify. It commits a CONFIRM_EXPIRY row with the IDs of the payments the customer is shown, guarded on PENDING. The caller gets PENDING, and the PENDING event goes out.',
+                'Its go-ahead implementation runs after Capture, in place of Verify. It stores the IDs of the payments the customer is shown, guarded on PENDING. The caller gets PENDING, and the PENDING event goes out.',
             },
             exc: {
               'RequestConfirmation|BankConfirmationActivities': {kind: 'skip', note: 'no provider call for a go-ahead'},
             },
             stop: {
-              title: 'The workflow ends here.',
-              text: "Nothing waits in Temporal while the customer decides. The payment waits in Oracle, PENDING, and stays on the account's pending list.",
+              title: 'The workflow waits here.',
+              text: "On its own timer, while the customer decides. The payment stays PENDING and on the account's pending list. The yes and the no arrive as updates to this same workflow. If neither comes in time, the timer runs Cancel.",
             },
             then: [
               {to: 'confirm', text: 'the customer says yes, with the same payment ID'},
               {to: 'no', text: 'or says no'},
-              {to: 'expire', text: 'or the confirmation window closes first'},
             ],
           },
         ],
@@ -345,19 +340,21 @@ export const BANDS = [
           },
           {
             id: 'no',
-            wf: 'CancelPayment',
+            wf: 'CreatePaymentIntent',
             tag: 'a no',
+            update: '{paymentId}-no',
+            start: 'an update to the running workflow',
             lead: 'Cancel a payment the customer said no to, made while another was pending.',
             own: ['Cancel'],
-            journey: "Cancel payment, PENDING and waiting for a go-ahead, on the customer's no",
-            wfId: '{paymentId}-cancel',
+            journey: "Cancel payment, PENDING and waiting for the customer, on the customer's no",
+            wfId: '{paymentId}-init',
             answer: 'CANCELLED, and CANCELLED again for a repeat',
             chips: five('CONSUMER', 'Y', 'N'),
             behave: 'Example values. Cancel varies by account type and AR posting.',
             move: {Cancel: 'PENDING to CANCELLED'},
             notes: {
               Cancel:
-                'No window check. One guarded update on PENDING also cancels the CONFIRM_EXPIRY row. A no and a yes from two tabs race on that guard: one wins, and the other gets 409. The event and message go out after the reply.',
+                "No window check. One guarded update on PENDING. A yes and a no from two tabs are two updates to one workflow: the first one it accepts wins, and the other gets 409. The same Cancel runs if the workflow's timer fires with no answer. The event and message go out after the reply.",
             },
             end: 'CANCELLED is final.',
           },
@@ -372,18 +369,21 @@ export const BANDS = [
         roads: [
           {
             id: 'confirm',
-            wf: 'ConfirmPayment',
+            wf: 'CreatePaymentIntent',
+            tag: 'the confirm',
+            update: '{paymentId}-confirm',
+            start: 'an update to the running workflow',
             lead: 'Go ahead with a payment once the customer has confirmed their bank details, or given the go-ahead.',
             stages: ['Verify', 'Execute', 'Fulfil'],
             journey: 'Confirm payment, PENDING and waiting for bank confirmation or a go-ahead, inside the confirmation window',
-            wfId: '{paymentId}-confirm',
+            wfId: '{paymentId}-init',
             answer: 'once Verify decides',
             chips: five('CONSUMER', 'Y', 'Y'),
             behave: "Example values. Bank confirmation picks Verify's bank-confirmation implementation, and a go-ahead its go-ahead implementation.",
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "One commit, guarded on PENDING, that also cancels the CONFIRM_EXPIRY row. The caller's update returns here. A payment no longer PENDING gets 409, such as one cancelled when its window closed.",
+                "One commit, guarded on PENDING, and the confirm's reply returns here: the same early return as the create's. Once the workflow no longer waits, such as after its timer cancelled the payment, the confirm gets 409.",
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'call', note: "also asks whether the instrument's verification token is valid"},
@@ -736,37 +736,6 @@ export const BANDS = [
           },
         ],
       },
-      {
-        row: 'CONFIRM_EXPIRY',
-        by: 'confirmation-expiry dispatcher',
-        ctl: 'ctl-expiry',
-        runs: 'A Schedule every minute',
-        writer: 'CreateImmediatePayment',
-        wrote: ['bank', 'goahead'],
-        written: 'at RequestConfirmation',
-        origin: ['CreatePayment.v3'],
-        due: "when the market's confirmation window closes",
-        roads: [
-          {
-            id: 'expire',
-            wf: 'CancelPayment',
-            tag: 'expiry',
-            lead: 'A payment the customer never confirmed, at their bank or with a go-ahead.',
-            own: ['Cancel'],
-            journey: 'Confirmation window closes, a CONFIRM_EXPIRY row and the payment still PENDING',
-            wfId: '{paymentId}-cancel',
-            prio: [4, '"expiry"'],
-            chips: five('CONSUMER', 'Y', 'Y'),
-            behave: 'Example values. Cancel varies by account type and AR posting.',
-            move: {Cancel: 'PENDING to CANCELLED'},
-            notes: {
-              Cancel:
-                'No window check. The guard is on PENDING, so a payment confirmed first is left alone. As for any cancel, the CANCELLED event goes to RTF and the message to the customer through Raven.',
-            },
-            end: 'CANCELLED is final. A confirm after this gets 409.',
-          },
-        ],
-      },
     ],
   },
   {
@@ -1008,14 +977,18 @@ export function calls(j, f) {
   return out;
 }
 
-/* roads whose workflow ends with the delete call to One-Data: a create from
-   a channel, and the confirm or cancel that ends a payment's wait */
-const DELETES = new Set(['immediate', 'scheduled', 'bank', 'goahead', 'confirm', 'no', 'expire']);
+/* roads whose workflow calls the delete API at One-Data: a create from a
+   channel at its end; a payment that waits, once after its reply and again
+   when the confirm or the no ends the wait */
+const DELETES = new Set(['immediate', 'scheduled', 'bank', 'goahead', 'confirm', 'no']);
 
 /* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
   if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
   if (j.band.key === 'pulled') return 'its dispatcher reads the request, and marks it once started';
+  if (j.id === 'bank' || j.id === 'goahead') {
+    return "calls the delete API after its reply, saying the payment still waits, so only the stored create leaves One-Data's Redis";
+  }
   if (DELETES.has(j.id)) return "calls the delete API at the end, so the payment leaves One-Data's Redis";
   return null;
 }
@@ -1041,8 +1014,15 @@ const FAILS = {
   mandate: 'A mandate that fails its check declines the payment and is never retried.',
 };
 
-/* where a call runs, on road j's cluster */
-function runsOn(j, f) {
+/* the decision's calls on the Online cluster run as local activities */
+function localOnOnline(j, f, s) {
+  if (j.cluster !== 'Online') return false;
+  if (f.name === 'BankConfirmationActivities') return true;
+  return s === 'Verify' && ['InstrumentActivities', 'OptionsActivities', 'PlansActivities'].includes(f.name);
+}
+
+/* where a call runs, on road j's cluster, at stage s */
+function runsOn(j, f, s) {
   if (f.name === 'PaymentStore') {
     return 'Oracle, through a local activity, so there is no task round trip. If Oracle is down, the payment pauses and carries on when it is back.';
   }
@@ -1053,6 +1033,9 @@ function runsOn(j, f) {
     return "One-Data's inbox functions, on the workflow's own queue, since nobody throttles them.";
   }
   const sys = f.long || f.system;
+  if (localOnOnline(j, f, s)) {
+    return `${sys}, as a local activity, inside the workflow task that makes the decision, so the caller's answer needs no task round trip. It has no rate limit for a local activity to skip.`;
+  }
   if (f.name === 'TransactionNotificationActivities' && j.cluster !== 'Online') {
     return 'One method per system, each on its own queue: TFNE on ds-tfne, GPHDB on ds-gphdb and B2Notifier on ds-b2notifier. The governor sets each queue\'s rate limit, so each system keeps its own.';
   }
@@ -1071,7 +1054,7 @@ export function otherRoads(j, f) {
 /* The lines an activity shows when it is opened in road j's card, at stage
    s with call c. With no stage, it is one of the calls every stage makes. */
 export function callDetail(j, f, s, c) {
-  const out = [runsOn(j, f)];
+  const out = [runsOn(j, f, s)];
   if (!s) {
     if (f.name === 'PaymentStore') {
       out.push('Every stage on this road commits here: its new state, a timeline entry and any Work Tracker rows, in one guarded transaction.');
@@ -1165,6 +1148,25 @@ export function router(j) {
     },
   }[band.key];
 
+  if (j.update) {
+    return [
+      {name: 'Admit', ...admit},
+      {
+        name: 'Pick the journey',
+        main: `${j.journey}.`,
+        note: `Nothing to pick: the answer goes as an update to the payment's running ${j.full}, on the ${j.cluster} cluster. The Router only admits it.`,
+      },
+      {name: 'Resolve behaviors', chips: j.chips || [], note: 'Nothing new to resolve: the workflow kept the behaviors it was started with.'},
+      {name: 'Pin the plan key', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that plan, and its build, to the end.'},
+      {name: 'Place', main: `Online cluster, the running ${j.wfId}.`, note: 'Nothing new is placed: the update goes to the workflow that is already waiting.'},
+      {
+        name: 'Start',
+        main: `No start: an update with the update ID ${j.update}.`,
+        note: `A repeat attaches to the same update and gets the same answer.${j.answer ? ` The caller's answer returns ${j.answer}.` : ''} Once the workflow no longer waits, the answer is 409, or the payment's current state for a repeat.`,
+      },
+    ];
+  }
+
   return [
     {name: 'Admit', ...admit},
     {name: 'Pick the journey', main: `${j.journey}.`, note: `So ${j.full}, on the ${j.cluster} cluster.`},
@@ -1183,5 +1185,5 @@ export function router(j) {
 
 /* one line for the Router's outcome, where the six steps are folded away */
 export function routerLine(j) {
-  return `${j.cluster}, ${j.band.start}, as ${j.wfId}`;
+  return `${j.cluster}, ${j.start || j.band.start}, as ${j.wfId}`;
 }

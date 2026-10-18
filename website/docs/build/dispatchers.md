@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Building Dispatchers and the Governor
 
-<Lead>A dispatcher is a small workflow that turns due work into workflow starts, at the rate the governor sets. Nine of them share one shape, and this page builds it: the loop, the activity that claims and starts, the heartbeat that makes a crash harmless, and the governor's check that feeds them all.</Lead>
+<Lead>A dispatcher is a small workflow that turns due work into workflow starts, at the rate the governor sets. Eight of them share one shape, and this page builds it: the loop, the activity that claims and starts, the heartbeat that makes a crash harmless, and the governor's check that feeds them all.</Lead>
 
 [Design → Pacing](../design/pacing.md) explains why offline work is paced, what each dispatcher releases and how a tick runs. This page is about writing the code. The table it claims from, its indexes and the claim's SQL are on [Database](./database.md#the-work-tracker).
 
@@ -99,7 +99,7 @@ The AR intake, returns and inbound dispatchers run the same loop against One-Dat
 | Marks rows `DISPATCHED` | Marks requests `DONE` with `UpdateStartRequests.v1` once started, or `REJECTED` when the Router can't admit them, which raises an alert for operations |
 | Caps its in-flight work | Has no in-flight cap, because no Work Tracker row counts its work. The governor's rate paces it, and drops to zero while RTF calls fail or a downstream it calls is out |
 
-The workflow ID comes from the request: the payment ID in its idempotency key, or for a return, the returned payment and its presentment sequence. A request that arrives twice finds the same workflow.
+The workflow ID comes from the request: the payment ID in its idempotency key, or for a return, the returned payment and its presentment sequence. A request that arrives twice finds the same workflow. The request's body is the workflow's start input, so the workflow never reads the inbox itself.
 
 ## Rates and overrides
 

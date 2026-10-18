@@ -85,7 +85,6 @@ A queue's limit says how much gets through. Priority says who goes first on a sh
 | Corporate: parent execution, allocation requests, legs | 2 | Parent payment ID | The queue's default per-key RPS, so one payment can't take the whole queue |
 | Inbound | 3 | `inbound` | None in effect: weight 100 |
 | Representments | 4 | Market | None in effect: weight 100 |
-| Confirmation expiries | 4 | `expiry` | None in effect: weight 100 |
 | Returns | 5, the lowest | `returns` | None in effect: weight 100 |
 
 - Priority keys run from 1, first, to 5.
@@ -102,9 +101,9 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 | Task queue | Carries | Workers |
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
-| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-expiry`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
+| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
 | `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
 
-On the Online cluster, the main queue is `online-wf`, which carries the workflow tasks and their regular activities, with eager dispatch on. Its `ds-*` queues carry calls only while a SEPA run caps online traffic on a downstream ([When the cutoff wins](#when-the-cutoff-wins)). Online workers poll them, with slots sized to the cap.
+On the Online cluster, the main queue is `online-wf`, which carries the workflow tasks and their regular activities, with eager dispatch on. The decision's calls, to Payment Instruments, Payment Options and Plans in Verify and to the provider in RequestConfirmation, skip the queue altogether: they run as local activities, inside the worker. None of those systems has a rate limit, so running outside the queue skips nothing. Its `ds-*` queues carry calls only while a SEPA run caps online traffic on a downstream ([When the cutoff wins](#when-the-cutoff-wins)). Online workers poll them, with slots sized to the cap.

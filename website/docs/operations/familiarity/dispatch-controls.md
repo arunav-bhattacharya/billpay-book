@@ -20,7 +20,7 @@ Every piece of dated work is a row in `work_tracker`, and its status says where 
 - `DISPATCHED`: its workflow has started, so look in the Offline cluster's [Temporal Web UI](./temporal-web-ui.md).
 - `DONE`: the workflow's last commit closed it.
 - `FAILED`: retries ran out, or the Router refused to start it because its market was taken out of service after the row was written. Either way the retries-exhausted alert fires.
-- `CANCELLED`: the payment was cancelled, or, for a confirmation expiry, the customer confirmed in time.
+- `CANCELLED`: the payment was cancelled while its row waited, in the same commit that cancelled it.
 
 `dispatch_run` has a row per dispatcher run: its counts, its current rate, and whether it is paused. It is the quickest answer to "is the scheduled-payments run for DE moving?".
 

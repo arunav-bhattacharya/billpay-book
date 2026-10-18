@@ -18,7 +18,7 @@ export const CLUSTERS = [
       'Create Scheduled Payment, from channels',
       'Update Payment',
       'Cancel Payment',
-      'Confirm Payment',
+      'Create Payment Intent, for a payment that waits for the customer',
       'Create Balance Refund, from channels',
       'Composites',
       'Execute Split Payment, consumer legs',
@@ -39,7 +39,6 @@ export const CLUSTERS = [
       'Process Representment',
       'Process Inbound Payment',
       'Create Balance Refund, from AR',
-      'Cancel Payment, when a confirmation window closes',
       'Periodic jobs',
       'Dispatchers and the governor',
       'Market provisioning',
@@ -58,7 +57,7 @@ export const CLUSTERS = [
     {
       term: 'Core',
       to: '/docs/design/component-model/workflows/core',
-      desc: `One business journey each: pay today, schedule, execute, split, allocate, update, cancel, confirm, return, represent, inbound and refund.`,
+      desc: `One business journey each: pay today, schedule, execute, split, allocate, update, cancel, a payment that waits for the customer, return, represent, inbound and refund.`,
     },
     {
       term: 'Composite',
@@ -79,7 +78,7 @@ export const CLUSTERS = [
 
 Each cluster has its own Aurora PostgreSQL database and its own OpenSearch, so a burst of offline work can never slow the customer-facing path inside Temporal. Nothing calls across the two. A payment scheduled on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as its `SCHEDULED` state, and no child workflow ever starts on the other cluster.
 
-Four workflows appear on both sides, and what starts them decides where they run. `CreateScheduledPaymentWorkflow` and `CreateBalanceRefundWorkflow` run on the Online cluster when a channel calls, and on the Offline cluster when Accounts Receivable raises them. `ExecuteSplitPaymentWorkflow` runs consumer legs as children on their parent's cluster, and corporate legs only on the Offline cluster, where the leg dispatcher starts them. `CancelPaymentWorkflow` runs on the Online cluster for a caller's cancel or a customer's no, and on the Offline cluster when the confirmation-expiry dispatcher cancels a payment never confirmed.
+Three workflows appear on both sides, and what starts them decides where they run. `CreateScheduledPaymentWorkflow` and `CreateBalanceRefundWorkflow` run on the Online cluster when a channel calls, and on the Offline cluster when Accounts Receivable raises them. `ExecuteSplitPaymentWorkflow` runs consumer legs as children on their parent's cluster, and corporate legs only on the Offline cluster, where the leg dispatcher starts them. A payment that waits for the customer never leaves the Online cluster: `CreatePaymentIntentWorkflow` holds the wait itself, on a timer, and cancels the payment if no answer comes.
 
 The clusters are separate, but the app isn't. One app, billpay-core, runs the workers for both, with a Temporal client for each. Offline work has its own Oracle connection pool and its own cap on how many tasks run at once, so it can never take a whole pod, and the governor cuts offline rates as soon as online response times climb. It ships as one app, and more capacity means more pods of it. The [billpay-core deployable page](../../../deployment/deployables/worker-app.md) has the detail.
 

@@ -30,7 +30,7 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg, a representment or a confirmation expiry, and when it is due. Written in the same commit as the state change that creates it. |
+| `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg or a representment, and when it is due. Written in the same commit as the state change that creates it. |
 | `market_config_version` (new) | Published version of a market profile | Immutable once saved. |
 | `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketProvisioningWorkflow` writes it. |
 | `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
@@ -44,10 +44,10 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | Column | Holds |
 | --- | --- |
 | `item_id` | Primary key: a deterministic business key such as `exec:{paymentId}`, so a retried insert can't create duplicate work |
-| `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_EXEC`, `ALLOC_LEG`, `REPRESENT` or `CONFIRM_EXPIRY` |
+| `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_EXEC`, `ALLOC_LEG` or `REPRESENT` |
 | `ref_id` | The payment or leg ID in the payment tables |
 | `group_key` | The market, or the parent payment ID for a leg |
-| `due_at` | The earliest start: the execution time, the fetch time, the time a leg is written, the representment date, or the end of a confirmation window |
+| `due_at` | The earliest start: the execution time, the fetch time, the time a leg is written, or the representment date |
 | `priority` | Claim order inside a type |
 | `status` | `SCHEDULED`, `DISPATCHING`, `DISPATCHED`, `DONE`, `FAILED` or `CANCELLED` |
 | `run_id`, `claimed_at` | Which dispatcher run claimed it, and when |
@@ -71,8 +71,8 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table |
 | A stage commit | The guarded status update, the timeline row with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, together with the note on the batch that its legs are written |
-| Bank confirmation | The redirect link, the provider's reference and the `CONFIRM_EXPIRY` row, guarded on `PENDING` |
-| Go-ahead | The `CONFIRM_EXPIRY` row and the IDs of the pending payments the customer was shown, guarded on `PENDING` |
+| Bank confirmation | The redirect link and the provider's reference, guarded on `PENDING` |
+| Go-ahead | The IDs of the pending payments the customer was shown, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and cancelling the payment's Work Tracker rows |
 | Giving up | The Work Tracker row to `FAILED`, and the payment or leg onto `exception_list` in the status it stopped in |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |

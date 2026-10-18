@@ -18,7 +18,7 @@ The layers exist so that a difference between markets lives in exactly one place
 When a design choice is unclear, these rules decide it.
 
 1. Oracle is the source of truth. Every status change is a conditional update that applies only if the status is still what the writer expects. Whoever loses backs off.
-2. Work that waits for a date waits in Oracle, as a Work Tracker row. It never waits in a sleeping workflow or on a Temporal timer.
+2. Work that waits for a date waits in Oracle, as a Work Tracker row. It never waits in a sleeping workflow or on a Temporal timer. The one wait that stays in a workflow is a payment waiting minutes for its customer's confirmation, which `CreatePaymentIntentWorkflow` holds on a durable timer.
 3. Nothing calls across clusters. Oracle is the only hand-off between the Online and Offline clusters.
 4. Every payment workflow starts through the Router. No API or dispatcher starts one on its own. Control workflows (the dispatchers, the governor and provisioning) start from Schedules or their own APIs.
 5. Pace at the door. Admit only what a cluster and its downstream systems can carry. Big bursts wait in Oracle or in One-Data's inbox, not in Temporal.
@@ -82,7 +82,7 @@ Naming an implementation for its behavior rather than its market means a rule th
 
 - There is one implementation of each workflow. A workflow is composed from stage implementations and never copied per market.
 - Workflows and stages are never `abstract`.
-- Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs. Data from Payment Options and Payment Instruments is the exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec.
+- Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs. A whole request travels only once, into a workflow that creates a payment: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. Data from Payment Options and Payment Instruments is the other exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec.
 
 ## How a workflow finds its stages
 
@@ -100,6 +100,6 @@ Temporal retries work that fails, and sometimes work that didn't. A local activi
 
 - Every HTTP call carries an idempotency key, such as `{paymentId}-{step}`.
 - Every Oracle write is insert-if-absent, or a conditional update on the current state.
-- Search attributes are set once, at start. There are no signals or queries on the hot path.
+- Search attributes are set once, at start. There are no signals or queries on the hot path. What a caller sends a running workflow, the confirm and the no for a payment that waits, goes in as an update, which answers the caller.
 
 The [Component Model](./component-model/index.md) lists what exists at each layer. The [Payment State Model](./payment-state-model.md) shows the states those stages move a payment between.

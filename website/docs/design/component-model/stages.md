@@ -31,7 +31,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment with its `CONFIRM_EXPIRY` row. `PENDING` → `DECLINED` when the provider gives no link. For a go-ahead, no provider call: the `CONFIRM_EXPIRY` row and the IDs the customer was shown | What the payment waits for: the bank, or a go-ahead |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the provider gives no link. For a go-ahead, no provider call: it stores the IDs the customer was shown | What the payment waits for: the bank, or a go-ahead |
 | Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | All four behaviors; at confirm, what the payment waited for |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
@@ -50,15 +50,15 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 
 | Workflow | Stages, in order |
 | --- | --- |
-| Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate payment stops after Verify; one that needs bank confirmation or a go-ahead runs Capture and RequestConfirmation, then stops |
-| Create Scheduled Payment | Capture, Verify; for a go-ahead, Capture and RequestConfirmation, then it stops |
+| Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate payment stops after Verify |
+| Create Scheduled Payment | Capture, Verify |
+| Create Payment Intent | Capture, RequestConfirmation, then the wait. On a yes: Verify, Execute, Fulfil, or Verify alone for a future-dated payment (Proposed). On a no, or when the window closes: Cancel |
 | Execute Scheduled Payment | Reverify, Execute, Fulfil. A corporate parent has no Fulfil, and one paid today skips Reverify |
 | Execute Split Payment | Execute, Fulfil |
 | Request Allocations | RequestAllocations |
 | Receive Allocations | ReceiveAllocations |
 | Update Payment | Cancel, then the child runs Capture and Verify |
-| Cancel Payment | Cancel, from a caller, on the customer's no, or when a confirmation window closes |
-| Confirm Payment | Verify, Execute, Fulfil; a future-dated payment stops after Verify (Proposed) |
+| Cancel Payment | Cancel, from a caller |
 | Process Returned Payment | Return, QueueRepresentment |
 | Process Representment | Represent |
 | Process Inbound Payment | Capture, Verify, Execute, Fulfil |
@@ -126,11 +126,11 @@ Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_d
 
 ## RequestConfirmation
 
-Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link, with one try that fits inside the API's wait. One commit guarded on `PENDING` stores the link and the provider's reference and writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes. The payment stays `PENDING`, and the caller's update returns with the link. The link is stored so that a caller who loses it can get it again, from a repeated create or from `GET /payments/{payment-id}`.
+Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y). It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link, with one try that fits inside the API's wait. One commit guarded on `PENDING` stores the link and the provider's reference. The payment stays `PENDING`, the caller's update returns with the link, and [Create Payment Intent](./workflows/core.md#create-payment-intent) waits for the customer. The link is stored so that a caller who loses it can get it again, from a repeated create or from `GET /payments/{payment-id}`.
 
-If no link comes back, because the provider is down or too slow, the commit moves the payment to `DECLINED` instead, and the caller gets `DECLINED`. No payment is ever left `PENDING` without a link, so nothing has to end one later. The provider only checks the customer's bank details. It never moves money: Billpay does that in Execute, once the customer has confirmed.
+If no link comes back, because the provider is down or too slow, the commit moves the payment to `DECLINED` instead, and the caller gets `DECLINED`. No payment is ever left `PENDING` without a link. The provider only checks the customer's bank details. It never moves money: Billpay does that in Execute, once the customer has confirmed.
 
-RequestConfirmation also holds a payment for the customer's go-ahead, when One-Data sends other pending payments' IDs with the create. Its go-ahead implementation makes no provider call. One commit, guarded on `PENDING`, writes the payment's `CONFIRM_EXPIRY` row, due when the market's confirmation window closes, with the IDs of the payments the customer was shown. The caller gets `PENDING`, and One-Data adds the pending payments to the reply. A payment that needs both waits once: the reply carries the link and the list, and confirming at the bank is the go-ahead.
+RequestConfirmation also holds a payment for the customer's go-ahead, when One-Data sends other pending payments' IDs with the create. Its go-ahead implementation makes no provider call. One commit, guarded on `PENDING`, stores the IDs of the payments the customer was shown. The caller gets `PENDING`, and One-Data adds the pending payments to the reply. A payment that needs both waits once: the reply carries the link and the list, and confirming at the bank is the go-ahead.
 
 ## Verify
 
@@ -140,8 +140,8 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
-- A payment that waited for bank confirmation is verified in Confirm Payment, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
-- A payment that waited for a go-ahead is verified in Confirm Payment too, with the usual checks and no provider call, guarded on `PENDING`, and the same commit cancels its `CONFIRM_EXPIRY` row. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
+- A payment that waited for bank confirmation is verified in Create Payment Intent, when the confirm arrives, guarded on `PENDING`. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
+- A payment that waited for a go-ahead is verified there too, with the usual checks and no provider call, guarded on `PENDING`. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
 
 Verify varies by all four behaviors and, at confirm, by what the payment waited for. Where the profile requires mandate authorization, Verify also fetches the mandate details from Plans, in parallel with its other two calls, and a mandate that fails its check is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`.
 
@@ -175,9 +175,7 @@ Checks one stored callback batch and writes no legs: every batch waits in `alloc
 
 Moves a `SCHEDULED` payment to `CANCELLED` with one guarded update, inside the market's cancellation window only. A corporate payment leaves `SCHEDULED` once its allocations are requested, so from `ALLOCATING` on there is nothing to cancel. The same commit cancels the payment's Work Tracker rows, so no dispatcher will ever start it. If the update changes nothing, the payment has already moved on.
 
-Cancel also ends a payment the customer never confirmed, at their bank or with a go-ahead. When its `CONFIRM_EXPIRY` row falls due, the confirmation-expiry dispatcher starts Cancel Payment on the Offline cluster, and Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, so a confirm that got there first wins. As for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven.
-
-And Cancel takes the customer's no to a payment made while another was pending. The channel calls `DeletePayment.v1` with the new payment's ID, and Cancel moves it from `PENDING` to `CANCELLED` with no window check, guarded on `PENDING`, cancelling its `CONFIRM_EXPIRY` row in the same commit. A no and a yes from two tabs race on that guard: one wins, the other gets 409, and a repeated no gets `CANCELLED` again.
+Cancel also ends a payment that waited for its customer, inside Create Payment Intent: on the customer's no, which arrives as an update, or when the workflow's timer fires with no answer. It moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, with no window check. As for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven.
 
 ## Return
 

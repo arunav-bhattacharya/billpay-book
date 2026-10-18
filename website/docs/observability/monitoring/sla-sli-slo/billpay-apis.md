@@ -88,5 +88,5 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 Two APIs have no targets yet:
 
-- `POST /payments/{payment-id}/confirm`, which confirms a payment that waited for its customer. It answers through Update-With-Start like a create.
+- `POST /payments/{payment-id}/confirm`, which confirms a payment that waited for its customer. It answers through an update to the payment's waiting workflow, so it needs no workflow start.
 - `POST /payments/{payment-id}/allocations`, the allocations callback. It replies 202 once the batch is stored and its workflow has started, or 429 with `Retry-After` when its traffic class is over budget.
