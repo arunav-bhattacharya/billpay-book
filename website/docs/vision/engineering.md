@@ -214,7 +214,7 @@ A new way of processing a payment is a new stage implementation behind one combi
     },
     {
       term: 'Efficiency',
-      desc: `Every write to Temporal's database is capacity the midnight run needs. A stage makes its calls in parallel and commits once, and the database calls run as local activities, so an executed payment costs an estimated 45 writes, a figure the first load test is there to confirm.`,
+      desc: `Every write to Temporal's database is capacity the midnight run needs. A stage makes its calls in parallel and commits once, and the database calls run as local activities, so an executed payment costs an estimated 49 writes, a figure the first load test is there to confirm.`,
     },
   ]}
 />

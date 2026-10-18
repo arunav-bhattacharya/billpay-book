@@ -63,6 +63,18 @@ export const ACTIVITIES = [
     calledBy: 'Fulfil, and every leg',
   },
   {
+    name: 'TransactionNotificationActivities',
+    system: 'TFNE, the Transaction Notification Engine, a legacy system told when a payment is processed',
+    queue: 'ds-tfne',
+    calledBy: 'Fulfil, and every leg',
+  },
+  {
+    name: 'PaymentHistoryActivities',
+    system: 'GPHDB, the legacy Payments History Database, told when a payment is processed',
+    queue: 'ds-gphdb',
+    calledBy: 'Fulfil, and every leg',
+  },
+  {
     name: 'AllocationActivities',
     system: 'Allocations manager',
     queue: 'ds-allocations',
@@ -106,7 +118,7 @@ Activities take IDs, not payment objects, and load what they need. RTF lifecycle
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself.
+`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself. The names of the TFNE and GPHDB interfaces and their queues are Proposed.
 
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 

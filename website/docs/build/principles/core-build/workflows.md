@@ -106,7 +106,7 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
 
         stages.execute.run(paymentId)                  // PROCESSING: clearing, AR and OTB in parallel
         stages.execute.announce(paymentId)             // the PROCESSING event
-        stages.fulfil.run(paymentId)                   // accounting, eBNC and risk; then RTF and Raven; then PROCESSED
+        stages.fulfil.run(paymentId)                   // accounting, eBNC, risk, TFNE, GPHDB; then RTF and Raven; then PROCESSED
     }
 
     override fun decision(): PaymentDecision {

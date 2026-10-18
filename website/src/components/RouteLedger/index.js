@@ -1206,7 +1206,9 @@ function Matrix({j, only, actName, onAct}) {
                 onClick={() => onAct(f.name)}>
                 <span className={styles.mxIf}>
                   <i className={styles.mxBar} />
-                  {f.name}
+                  <span>
+                    <Name text={f.name.replace(/(.)Activities$/, '$1|Activities')} />
+                  </span>
                 </span>
                 <span className={styles.mxSys}>{f.system}</span>
                 {f.rail && (

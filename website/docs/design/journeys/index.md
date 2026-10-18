@@ -132,7 +132,7 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'RTF', 'Raven'],
     },
     {
       icon: 'doubleCheck',
@@ -149,7 +149,7 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
     {step: 2, text: 'Payment Instruments confirms the way the customer is paying, and Payment Options confirms the amount they picked. Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. A payment the customer must confirm at their bank goes another way, on [Pay by bank](#pay-by-bank), and so does one made while another is pending, on [Pay while another payment is pending](#pay-while-another-payment-is-pending).'},
     {text: 'Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF after the reply, in order.'},
     {step: 3, text: 'Three calls go out at once: clearing with the bank, the statement balance down in Accounts Receivable, and available credit up in Authorizations. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
-    {step: 4, text: 'Accounting, eBNC and risk are told first, in parallel. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
+    {step: 4, text: 'Accounting, eBNC, risk and two legacy systems, the Transaction Notification Engine (TFNE) and the Payments History Database (GPHDB), are told first, in parallel. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
     {step: 5, text: 'The payment waits at `PROCESSED` for two confirmations: the bank\'s settlement and Accounts Receivable\'s posting. Both land in One-Data\'s inbox, and a periodic workflow marks the payments that have both `PAID`, in batches. [A payment is paid](#a-payment-is-paid) shows how.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#1-pay-today-one-instruction', label: 'Sequence diagram'}}
@@ -225,7 +225,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'RTF', 'Raven'],
     },
     {
       icon: 'doubleCheck',
@@ -244,7 +244,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` starts `ConfirmPaymentWorkflow` with Update-With-Start. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, closing the `CONFIRM_EXPIRY` row in the same commit. A payment without a valid token is `DECLINED`. The caller\'s update returns here. A confirm that arrives after the payment was cancelled gets 409.'},
     {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
-    {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`.'},
+    {step: 6, text: 'Accounting, eBNC, risk, TFNE and GPHDB first, then the RTF event and the Raven message, then `PROCESSED`.'},
     {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
@@ -323,7 +323,7 @@ A customer who isn't sure their first payment went through may pay again, and en
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'RTF', 'Raven'],
     },
     {
       icon: 'doubleCheck',
@@ -343,7 +343,7 @@ A customer who isn't sure their first payment went through may pay again, and en
     {step: 4, text: 'A yes comes in through `CreateConfirmPendingPayment.v1` with the same payment ID, and `ConfirmPaymentWorkflow` runs Verify: the usual checks, with no provider call. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and closes the `CONFIRM_EXPIRY` row in the same commit. The caller\'s update returns here. A yes and a no from two tabs race on that guard: one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment waits for its date (Proposed).'},
     {text: 'Everything after this runs with nobody waiting, exactly as on [Pay my bill today](#pay-my-bill-today).'},
     {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once.'},
-    {step: 6, text: 'Accounting, eBNC and risk first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, and the payment leaves the account\'s pending list.'},
+    {step: 6, text: 'Accounting, eBNC, risk, TFNE and GPHDB first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, and the payment leaves the account\'s pending list.'},
     {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#15-a-new-payment-while-another-is-pending', label: 'Sequence diagram'}}
@@ -414,7 +414,7 @@ The customer picks a date, up to 30 days out. Billpay checks the payment now, so
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'RTF', 'Raven'],
     },
     {
       icon: 'doubleCheck',
@@ -778,7 +778,7 @@ The customer gets the same quick answer a consumer does. Behind it, the payment 
       state: 'PROCESSED',
       mode: 'background',
       caption: 'written, then a workflow each',
-      systems: ['GAR', 'AMP', 'Accounting', 'eBNC', 'Risk'],
+      systems: ['GAR', 'AMP', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB'],
     },
     {
       icon: 'doubleCheck',
@@ -794,7 +794,7 @@ The customer gets the same quick answer a consumer does. Behind it, the payment 
     {step: 3, text: 'The allocation-request dispatcher starts `RequestAllocationsWorkflow` on the Offline cluster. It moves the payment to `ALLOCATING`, asks the allocations manager for the breakdown, and ends. No workflow sits waiting for the answer.'},
     {step: 4, text: 'The allocations manager calls back with the batches, as [Allocations arrive by callback](#allocations-arrive-by-callback) shows. The batch that completes the amount moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row, due at once.'},
     {step: 5, text: 'The allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow`, the same workflow a scheduled corporate payment runs, without Reverify. Execute clears the parent once, at payment level, and its commit releases the legs. Clearing never runs per allocation.'},
-    {step: 6, text: 'The leg dispatcher writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED` with a Work Tracker row of its own, then starts one `ExecuteSplitPaymentWorkflow` per leg: the statement balance and available credit for that account, then accounting, eBNC and risk, then the leg\'s RTF event and Raven message. Legs run at priority 2 with the parent\'s ID as their fairness key, so one big payment can\'t starve the others.'},
+    {step: 6, text: 'The leg dispatcher writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED` with a Work Tracker row of its own, then starts one `ExecuteSplitPaymentWorkflow` per leg: the statement balance and available credit for that account, then accounting, eBNC, risk, TFNE and GPHDB, then the leg\'s RTF event and Raven message. Legs run at priority 2 with the parent\'s ID as their fairness key, so one big payment can\'t starve the others.'},
     {step: 7, text: 'Every 60 seconds the leg dispatcher counts each parent\'s legs. Once every leg is `PROCESSED` or `PAID`, it sends the parent\'s RTF event and Raven message, then moves the parent to `PROCESSED`.'},
     {text: 'From there each leg turns `PAID` on its own, once the parent has settled and that leg has posted. The parent stays `PROCESSED`.'},
   ]}
@@ -884,7 +884,7 @@ The same path, started by the date. The allocations are fetched on the due date 
       state: 'PROCESSED',
       mode: 'background',
       caption: 'a workflow per leg',
-      systems: ['GAR', 'AMP', 'Accounting', 'eBNC', 'Risk'],
+      systems: ['GAR', 'AMP', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB'],
     },
   ]}
   detail={[
@@ -1171,7 +1171,7 @@ Someone other than the cardmember pushes money at the account. Amex didn't ask f
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'RTF', 'Raven'],
     },
     {
       icon: 'doubleCheck',
@@ -1253,7 +1253,7 @@ Some payments start inside Amex. Accounts Receivable raises them on the customer
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'RTF', 'Raven'],
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'RTF', 'Raven'],
     },
     {
       icon: 'doubleCheck',

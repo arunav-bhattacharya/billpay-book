@@ -55,6 +55,8 @@ const SYSTEMS = {
   eBNC: 'Balance and Control (eBNC), which audits that no payment is missed',
   Accounting: 'Accounting, which matches the payment across Amex platforms',
   Risk: 'Risk platform, kept current with payment activity',
+  TFNE: 'Transaction Notification Engine (TFNE), a legacy system told when a payment is processed',
+  GPHDB: 'The legacy Payments History Database (GPHDB), told when a payment is processed',
   'Payment Instruments': 'Payment Instruments, which owns and verifies the way a customer pays',
   'Payment Options': 'Payment Options, which resolves the amount a customer chose',
   Installments: 'Installments, which owns the instalment plan',

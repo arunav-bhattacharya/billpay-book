@@ -70,7 +70,7 @@ export const GROUPS = [
         title: 'External Systems',
         role: 'Where the money and the side effects land',
         icon: 'external',
-        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider'],
+        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider'],
       },
     ],
   },
@@ -121,7 +121,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 ### External systems
 
 - Clearing moves the money out to the customer's bank. Accounts Receivable reduces the statement balance, and Authorization raises open-to-buy. These three run in parallel in the Execute stage.
-- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, and last of all the customer's message (Raven) and the lifecycle event other systems consume (RTF). All eight must succeed before the payment is `PROCESSED`.
+- Accounting, balance and control (eBNC) and risk follow in the Fulfil stage, together with two legacy systems that need to know a payment is done: the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB). Last of all come the customer's message (Raven) and the lifecycle event other systems consume (RTF). All ten must succeed before the payment is `PROCESSED`.
 - Every other state change sends its lifecycle event, and a customer message where one is due, straight after its commit. A workflow waits for them before its next step, so each payment's events arrive in order.
 - A corporate payment asks the allocations manager for its breakdown first, and the allocations arrive by callback. Once they are all in, the payment clears once, at payment level, and each allocation then posts as a leg of its own.
 - A payment the customer confirms at their bank asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for a redirect link first. The payment waits at `PENDING` until the caller confirms it, and only then is it verified and executed.
