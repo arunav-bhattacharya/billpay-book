@@ -183,10 +183,9 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 | Corporate | Up to 50K payments and 500K allocations a day; up to 100K allocations in one payment | Only for pay today, until `ACCEPTED` | The parent clears once `ALLOCATED`: at once for pay today, at the execution time for a scheduled payment | Offline; pay today starts on Online |
 | Returns | Bursts of 100 TPS, up to 100K a day | No: stored by One-Data; pulled at the governor's pace | None | Offline |
 | Inbound, pushed by a third party | 100 TPS, up to 500K a day, arriving around 8 PM MST | No: stored by One-Data, then 202; pulled at the governor's pace | None | Offline |
-| AR posting events, which move payments to `PAID` | Arrive in the US early morning hours | No: stored by One-Data; drained at the governor's pace | None | Offline |
 | Representments | A share of returns | No | The date market rules set | Offline |
 | Confirmation expiry | Only payments the customer never confirms | No | The end of the market's confirmation window | Offline |
-| Settlement and AR posting | A settlement per payment and an AR posting per payment or leg, in bursts of up to 1,000 a second. They wait in One-Data's inbox, and Billpay reads one `READY` row per payment, or per leg of a split payment | No | None; paced last of all | Offline |
+| Settlement and AR posting | A settlement per payment and an AR posting per payment or leg, in bursts of up to 1,000 a second; the AR postings, which move payments to `PAID`, arrive in the US early morning. They wait in One-Data's inbox, and Billpay reads one `READY` row per payment, or per leg of a split payment | No | None; paced last of all | Offline |
 
 ### Kinds of workflow
 
