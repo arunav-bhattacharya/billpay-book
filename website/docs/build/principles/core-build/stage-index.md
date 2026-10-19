@@ -42,7 +42,7 @@ KSP picks each row's class in this order:
 
 1. A class is a candidate when everything it declares matches the row.
 2. If the row has a value the step's default can't handle, such as mandate authorization for Verify, the class must declare that value. A class that doesn't would skip a check the payment needs.
-3. In a market that has a class of its own, that class beats the shared ones.
+3. In a market that has a class of its own, that class beats the shared ones. A row in that market with a value the market's class declares runs only on one of the market's classes; if none can take it, the row is left out of that market's manifest (Proposed).
 4. Of the classes left, the one that declares the most wins.
 5. If two are still level, the build fails and names the row. If none is left, the row isn't written, so the build can't run that combination.
 
@@ -58,6 +58,8 @@ These are Verify's classes and what each one declares. The interface also says i
 | `PaymentVerifyStageWithMandateAndBankConfirmation` | Mandate authorization, bank confirmation |
 | `PaymentVerifyStageWithBankConfirmationInGb` | Bank confirmation, in GB |
 
+GB has a class of its own because a Pay with Bank Transfer payment there needs one more check: whether the customer's bank account holds enough money for the payment. That is what a market override is for, a check that only one market makes. The GB class runs the shared bank-confirmation checks and adds the funds check.
+
 Two things that could look like reasons for a Verify class are deliberately not. A go-ahead only makes the workflow wait for the customer's yes, and picks no stage. The account type changes what Verify's commit writes, not which checks run: a corporate payment gets its `ALLOC_REQUEST` row from its account type, the way a future-dated payment gets its `SCHED_EXEC` row from its date, whichever Verify runs.
 
 Run the rules over the four rows and each gets one class. In this table and the next, a class goes by what follows `PaymentVerifyStage` in its name, so `WithMandate` is `PaymentVerifyStageWithMandate`, and `Default` is `DefaultPaymentVerifyStage`.
@@ -69,19 +71,19 @@ Run the rules over the four rows and each gets one class. In this table and the 
 | N | Y | `WithBankConfirmation` |
 | Y | Y | `WithMandateAndBankConfirmation` |
 
-Rule 2 does the work here. The default can't take a row with a mandate or bank confirmation, and a class that declares only one of the two can't take a row with both, so every row is left with exactly one class. GB has one row of its own, bank confirmation without a mandate, where its class wins by rule 3. A GB payment with both stays on the shared class, because the GB class doesn't declare mandate authorization.
+Rule 2 does the work here. The default can't take a row with a mandate or bank confirmation, and a class that declares only one of the two can't take a row with both, so every row is left with exactly one class. GB has one row of its own, bank confirmation without a mandate, where its class wins by rule 3. A GB payment with both is the case to watch. The GB class can't take it, because it doesn't declare mandate authorization, and the shared class would skip the funds check. So rule 3 leaves that row out of GB's manifest, and a GB release that needs it is refused until GB has a class that declares both (Proposed).
 
 At runtime the workflow builds Verify's key from its plan key (mandate, bank confirmation) and reads one row, looking in its market's own rows first:
 
 | Payment | Key | Class |
 | --- | --- | --- |
 | A US consumer pays by bank (Plaid) | N, Y | `WithBankConfirmation` |
-| A GB consumer pays by bank | N, Y | `WithBankConfirmationInGb` |
+| A GB consumer pays by bank | N, Y | `WithBankConfirmationInGb`, with the funds check |
 | A consumer in a market with mandates | Y, N | `WithMandate` |
 | A corporate payment in a market with mandates | Y, N | `WithMandate` |
 | A GB consumer says yes to a go-ahead, with no bank confirmation | N, N | `Default` |
 
-The first two payments have the same key and run different classes, because only GB has a row of its own. The corporate payment runs the same class as the consumer one, and its commit also writes the `ALLOC_REQUEST` row. The go-ahead changes nothing here: it only made the workflow wait.
+The first two payments have the same key and run different classes, because only GB has a row of its own: the GB payment also has its bank balance checked. The corporate payment runs the same class as the consumer one, and its commit also writes the `ALLOC_REQUEST` row. The go-ahead changes nothing here: it only made the workflow wait.
 
 ## What the build writes
 

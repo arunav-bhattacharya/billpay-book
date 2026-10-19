@@ -38,7 +38,7 @@ A verification rule is a plain condition over the facts the checks gathered, so 
 A workflow finds its stages by reading the row for its plan key in a table that KSP (Kotlin Symbol Processing) generates at build time ([Building the Stage Index](../../build/principles/core-build/stage-index.md)). The table is code like any other, so it is tested like any other:
 
 - Every combination in the build's capability manifest resolves to an implementation for every step its journey runs.
-- The most specific match wins. A market override in `market/{m}/stages/` beats the default for its own market, and nowhere else.
+- The most specific match wins. A market override in `market/{m}/stages/` beats the default for its own market, and nowhere else. A row in that market with a value the override declares, which none of the market's classes can take, is left out of that market's manifest (Proposed).
 - A row with a value a default can't handle goes only to a class that declares it. A payment that needs both a mandate and bank confirmation gets `PaymentVerifyStageWithMandateAndBankConfirmation`, never a class that checks only one of them. With no Verify that declares mandate authorization, no combination with mandate authorization is in the manifest.
 - The report the build writes matches the checked-in one. A change to which class a combination runs fails this test until the same pull request updates the report, so the reviewer sees every row that moved.
 

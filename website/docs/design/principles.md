@@ -86,7 +86,7 @@ Naming an implementation for its behavior rather than its market means a rule th
 
 ## How a workflow finds its stages
 
-A workflow is never handed its stages. When the Router starts it, the Router pins a **plan key**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market override can match (Proposed). The workflow reads its plan key and looks up its stage implementations at runtime.
+A workflow is never handed its stages. When the Router starts it, the Router pins a **plan key**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market override can match, such as GB's extra check for Pay with Bank Transfer. The workflow reads its plan key and looks up its stage implementations at runtime.
 
 The lookup uses an index built at compile time with KSP (Kotlin Symbol Processing). For every combination of behaviors, KSP works out which implementation of each stage runs, and the most specific match wins, so a market override beats the default for that market. It writes the answers as a table, so a running workflow reads one row per stage and decides nothing. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
 
