@@ -84,7 +84,7 @@ export const ACTIVITIES = [
     name: 'BankConfirmationActivities',
     system: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
     queue: "A local activity, inside the create's first workflow task: only the Online cluster calls it",
-    calledBy: "RequestConfirmation, for the redirect link, with one try. Verify doesn't call it for the bank details, which the provider verifies itself. In GB, Verify asks it whether the customer's bank account holds enough money for the payment (Proposed)",
+    calledBy: "RequestConfirmation, for the redirect link, with one try. Verify doesn't call it for the bank details, which the provider verifies itself. In GB, Verify asks it whether the customer's bank account holds enough money for the payment",
   },
   {
     name: 'InboxActivities',
