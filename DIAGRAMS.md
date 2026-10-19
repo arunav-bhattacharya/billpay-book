@@ -14,10 +14,10 @@ Four kinds of diagram, in the order you should reach for them.
 
 | Kind | Built with | Examples |
 | --- | --- | --- |
-| **Mermaid** | A fenced ` ```mermaid ` block in the page | Sequence diagrams, the payment state model, the domain model, and the UML class diagrams of stages and rules (Build: Stage Index and Stages) |
-| **Data-driven components** | React, props | `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, and the table set |
+| **Mermaid** | A fenced ` ```mermaid ` block in the page | Sequence diagrams, the payment state model and the domain model |
+| **Data-driven components** | React, props | `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, `ClassMap`, and the table set |
 | **CSS box diagrams** | React, CSS grid or flex | `LandscapeMap`, `ClusterMap`, `RouteLedger` |
-| **Coordinate SVG** | React, hand-placed coordinates | `LegacyEstateMap`, `HADiagram`, `CorporateTracks`, `DomainModelMap`, `OnboardingFlow` |
+| **Coordinate SVG** | React, hand-placed coordinates | `LegacyEstateMap`, `HADiagram`, `CorporateTracks`, `DomainModelMap`, `OnboardingFlow`, `PacingFlow`, `RowLifecycle`, `ProfileToStages` |
 
 Nothing on the site uses a charting or graph-layout library. Everything is either
 Mermaid or plain React with CSS and SVG.
@@ -32,6 +32,7 @@ row that fits.
 | If the diagram is… | Do this | Effort |
 | --- | --- | --- |
 | A sequence, state or flowchart diagram | A fenced ` ```mermaid ` block. Theming and the full-screen control are already wired up. | Minutes |
+| A UML class diagram | `ClassMap`, with the classes and links as data. See [3.2](#32-components-that-already-take-your-data). | An hour |
 | A plain table | Write markdown. The house table chrome is applied automatically, see [3.1](#31-you-may-not-need-a-component-at-all). | Minutes |
 | A card grid, a section index, an API list, a route list, a journey | Call a component that already exists and pass it your data. See [3.2](#32-components-that-already-take-your-data). | Minutes |
 | Boxes, groups and short connectors, laid out in rows and columns | Recipe A, a CSS component. See [Part 4](#part-4-recipe-a-boxes-and-connectors-in-css). | An hour or two |
@@ -199,6 +200,7 @@ Pass the array, get the component.
 | `WorkerChip` | `worker`, `children` | The Online or Offline tag, inline. |
 | `Lead` | `children` | The thesis paragraph at the top of a page. With the H1 it forms the page banner. |
 | `ClusterMap` | none | The two Temporal clusters, Oracle as the only hand-off between them, and the shared downstreams. |
+| `ClassMap` | `classes: [{id, kind, name, x, y, w, note?, members?, market?}]`, `links: [{type, points, head?, label?, at?, align?, step?}]`, `texts?`, `width`, `height`, `label`, `caption?`, `legend?` | A UML class diagram in the house style. `kind` is `interface`, `class` or `data`; `type` is `extends`, `implements`, `holds`, `uses` or `makes`, and keeps its UML end. Points are hand-placed against the card heights the component documents, and the legend lists the line types drawn. The Build pages' diagrams live in `ClassMap/diagrams.js`. |
 
 Two of these are worth a second look before you build anything new.
 
@@ -307,8 +309,13 @@ picture. So do the newer ones:
 | `CorporateTracks` | A corporate payment from intake to `PROCESSED`: pay today and scheduled lanes joining one shared path | Design → Corporate Allocations |
 | `DomainModelMap` | The payment classes, one row per state, with the transition functions as arrows; what the supplied code doesn't have yet is dashed | Design → Domain Model |
 | `OnboardingFlow` | A market release travelling from billpay-ui through the provisioning API to the three environments | Market Onboarding |
+| `PacingFlow` | The control loop over the work line: the governor, `rate_allocation`, where work waits, the dispatchers, the Router as the one door, the Offline cluster and the `ds-*` queues | Design → Pacing |
+| `RowLifecycle` | One Work Tracker row's states, in the payment lifecycle tones | Design → Pacing |
+| `ProfileToStages` | One pay-today payment from its profile, through the Router and the plan key, to the classes the stage index picks | Design → Routing |
  For a new diagram, copy the file into a new folder, replace the arrays, and
 delete what you do not need. The structure is worth keeping; the data is not.
+
+The four newest, `ClassMap`, `PacingFlow`, `RowLifecycle` and `ProfileToStages`, scale with the column instead of panning. Each is drawn on a viewBox 700 units wide, which is 1:1 in a 1440-pixel window, with one type scale: names at 13, labels and notes at 11.5, members at 11 and tracked kickers at 9.5, and an HTML legend at `0.72rem` under the picture. Below 600 pixels the frame scrolls sideways. Keep to that scale when you add one, so the diagrams read alike from page to page.
 
 ---
 

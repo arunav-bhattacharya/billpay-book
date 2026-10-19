@@ -5,6 +5,8 @@ sidebar_label: Pacing
 ---
 
 import Lead from '@site/src/components/Lead';
+import PacingFlow from '@site/src/components/PacingFlow';
+import RowLifecycle from '@site/src/components/RowLifecycle';
 
 # Pacing
 
@@ -12,20 +14,7 @@ import Lead from '@site/src/components/Lead';
 
 The design rests on one rule: pace at the door. Big bursts never wait inside Temporal. Work that is due later waits in Oracle, work nobody is waiting for waits in One-Data's inbox, and dispatchers let it into the Offline cluster at a rate the governor resets every 15 seconds.
 
-```mermaid
-flowchart LR
-  subgraph WAIT["Where work waits"]
-    WT["Work Tracker rows in Oracle<br/>dated work"]
-    IN["One-Data's inbox<br/>AR intake, returns, inbound"]
-  end
-  GOV["GovernorWorkflow<br/>a check every 15 s"] -- "rates" --> RA[("rate_allocation")]
-  RA --> D["Dispatchers<br/>one per kind of work"]
-  WT --> D
-  IN --> D
-  D -- "start through the Router" --> OFF["Offline cluster<br/>payment workflows"]
-  OFF --> DS["ds-* queues<br/>one per downstream"]
-  GOV -- "queue limits" --> DS
-```
+<PacingFlow />
 
 ## The Work Tracker
 
@@ -41,17 +30,7 @@ One narrow table in Oracle, `work_tracker`, holds every piece of dated work. A r
 
 A row moves through a short lifecycle:
 
-```mermaid
-stateDiagram-v2
-  direction LR
-  [*] --> SCHEDULED: written by the producer
-  SCHEDULED --> DISPATCHING: claimed
-  DISPATCHING --> DISPATCHED: workflow started
-  DISPATCHING --> FAILED: Router refused it
-  DISPATCHED --> DONE: last commit
-  DISPATCHED --> FAILED: retries ran out
-  SCHEDULED --> CANCELLED: the payment is cancelled
-```
+<RowLifecycle />
 
 | Status | Set by |
 | --- | --- |

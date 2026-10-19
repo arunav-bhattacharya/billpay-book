@@ -1,0 +1,120 @@
+/* ProfileToStages: four numbered cards, read left to right. Blue Box rules:
+   filled cards on the panel, the house number badge, no outlines. The one
+   value the Router changes is the one Bright Blue chip. Every colour is a
+   token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --ps-accent: var(--amex-blue);
+  --ps-card: color-mix(in srgb, var(--amex-indigo) 6%, var(--amex-panel));
+  --ps-chip: color-mix(in srgb, var(--amex-indigo) 13%, var(--amex-panel));
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 1rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --ps-accent: var(--amex-blue-bright);
+  --ps-card: color-mix(in srgb, var(--amex-indigo) 14%, var(--amex-panel));
+  --ps-chip: color-mix(in srgb, var(--amex-indigo) 30%, var(--amex-panel));
+}
+
+.frame {
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+.card {
+  fill: var(--ps-card);
+}
+
+/* the house number badge: white digits on Bright Blue */
+.num {
+  fill: var(--amex-blue);
+}
+.numText {
+  font-size: 11.5px;
+  font-weight: 700;
+  fill: var(--amex-banner-block-ink);
+}
+.title {
+  font-size: 14px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.sub {
+  font-size: 11.5px;
+  fill: var(--amex-mut);
+}
+
+.step {
+  fill: none;
+  stroke: var(--ps-accent);
+  stroke-width: 1.6;
+}
+.head {
+  fill: var(--ps-accent);
+}
+
+/* ---- rows ---- */
+.rowLabel {
+  font-size: 11.5px;
+  fill: var(--amex-txt);
+}
+
+.chipBox {
+  fill: var(--ps-chip);
+}
+.chipText {
+  font-family: var(--amex-font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.c_open .chipBox {
+  fill: color-mix(in srgb, var(--amex-sky) 30%, var(--amex-panel));
+}
+.c_set .chipBox {
+  fill: var(--ps-accent);
+}
+.c_set .chipText {
+  fill: var(--amex-banner-block-ink);
+}
+
+.lineage {
+  fill: none;
+  stroke: var(--ps-accent);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 2.5;
+}
+
+.keyText {
+  font-family: var(--amex-font-mono);
+  font-size: 11.5px;
+  fill: var(--amex-txt-strong);
+}
+
+.stepName {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  fill: var(--amex-mut);
+}
+.cls {
+  font-family: var(--amex-font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.with {
+  font-size: 11.5px;
+  fill: var(--ps-accent);
+}

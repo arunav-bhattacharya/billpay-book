@@ -6,6 +6,7 @@ sidebar_label: Routing
 
 import Lead from '@site/src/components/Lead';
 import RouteMap from '@site/src/components/RouteMap';
+import ProfileToStages from '@site/src/components/ProfileToStages';
 
 # Routing
 
@@ -28,16 +29,13 @@ The confirm, and the customer's no to a payment that waits, are only admitted. T
 
 ## From profile to stages
 
-A market and an account type never pick code directly. Their profile sets five behaviors, the Router resolves those for the journey, and the resolved behaviors pick the stages and the checks and methods they use. Follow one profile through.
+A market and an account type never pick code directly. Their profile sets five behaviors, the Router resolves those for the journey, and the resolved behaviors pick the stages and the checks and methods they use.
 
-```mermaid
-flowchart LR
-  P["Profile<br/>market +<br/>account type"] --> R["Router<br/>behaviors<br/>to Y or N"]
-  R --> K["Plan key"]
-  K --> I["Stage index<br/>for each job, the most<br/>specific class that applies"]
-```
+Follow one profile through. Say a market's consumer profile sets AR posting to Y, mandate authorization to Y, bank confirmation to N, and realtime clearing to BOTH, with Y for pay today. This is a payment made today from a channel:
 
-Say a market's consumer profile sets AR posting to Y, mandate authorization to Y, bank confirmation to N, and realtime clearing to BOTH, with Y for pay today. Two payments from that profile resolve differently:
+<ProfileToStages />
+
+A payment scheduled for its due date resolves differently. The two side by side:
 
 | | Pay today, from a channel | Scheduled, on its due date |
 | --- | --- | --- |

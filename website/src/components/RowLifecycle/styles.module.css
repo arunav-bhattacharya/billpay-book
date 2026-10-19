@@ -1,0 +1,73 @@
+/* RowLifecycle: one Work Tracker row's states, in the lifecycle tones the
+   payment state diagrams use. Filled boxes with a block down the left edge,
+   no outlines. Every colour is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --rl-card: var(--amex-panel);
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 1rem 1rem 0.9rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --rl-card: var(--amex-card);
+}
+
+.frame {
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+.t_mid {
+  --tone: var(--amex-state-intermediate);
+}
+.t_ok {
+  --tone: var(--amex-state-success);
+}
+.t_stop {
+  --tone: var(--amex-state-failure);
+}
+
+.body {
+  fill: color-mix(in srgb, var(--tone) 12%, var(--rl-card));
+}
+.block {
+  fill: var(--tone);
+}
+.name {
+  font-family: var(--amex-font-mono);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  fill: var(--tone);
+}
+
+.start {
+  fill: var(--amex-state-intermediate);
+}
+
+.line {
+  fill: none;
+  stroke: var(--amex-mut);
+  stroke-width: 1.3;
+}
+.lineStop {
+  stroke-dasharray: 4.5 3;
+}
+.head {
+  fill: var(--amex-mut);
+}
+.label {
+  font-size: 11.5px;
+  font-weight: 600;
+  fill: var(--amex-mut);
+}

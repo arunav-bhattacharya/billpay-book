@@ -26,10 +26,10 @@ The site has nine sections: Vision, Architecture, Design, Market Onboarding, Bui
 
 ## Diagrams
 Four kinds, in the order to reach for them. Authoring guide: `DIAGRAMS.md`.
-- **Mermaid** fenced blocks for sequence, state and flowchart diagrams. Theming in `website/src/css/mermaid.css`, expand control in `website/src/theme/Mermaid/`.
-- **Components that take data as props**: `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
+- **Mermaid** fenced blocks for sequence, state and flowchart diagrams. Theming in `website/src/css/mermaid.css`, expand control in `website/src/theme/Mermaid/`. A UML class diagram uses `ClassMap` instead.
+- **Components that take data as props**: `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, `ClassMap`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
 - **CSS box diagrams** for grouped boxes and short connectors, as in `LandscapeMap`.
-- **Coordinate SVG** for dense wiring that needs pan, zoom and layer spotlight, as in `LegacyEstateMap` and `HADiagram`.
+- **Coordinate SVG** for dense wiring that needs pan, zoom and layer spotlight, as in `LegacyEstateMap` and `HADiagram`, or for one fixed picture that scales with the column, as in `PacingFlow`, `RowLifecycle` and `ProfileToStages`.
 
 Reuse before building. Take colour from the `--amex-*` tokens so both themes work, sit the diagram on the `panel` recipe, and give it a `role="img"` with an `aria-label` that describes the picture in prose.
 

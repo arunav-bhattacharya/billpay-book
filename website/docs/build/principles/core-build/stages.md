@@ -5,6 +5,8 @@ sidebar_label: Stages
 ---
 
 import Lead from '@site/src/components/Lead';
+import ClassMap from '@site/src/components/ClassMap';
+import {rulePieces} from '@site/src/components/ClassMap/diagrams';
 
 # Building Stages
 
@@ -124,47 +126,9 @@ A name says what a class does, never what it calls. A market that needs a mandat
 
 Verify, Reverify and Represent decide the same way. Each runs its checks, gathers the answers into one set of facts, runs the rules that apply, and commits once. [Design → Stages](../../../design/component-model/stages.md#how-verification-decides) explains the model, and this is the code it turns into.
 
-Here are the pieces of a rule as a class diagram. A dashed arrow with a hollow head means "implements", a hollow diamond means "holds", and a plain arrow means "uses":
+Here are the pieces of a rule as a class diagram:
 
-```mermaid
-classDiagram
-  direction TB
-  class RuleRegistry {
-    +evaluate(plan, step, facts)
-  }
-  class RuleSet {
-    <<interface>>
-    +rules
-  }
-  class Rule {
-    +id
-    +appliesTo
-    +steps
-    +runsWhen Spec
-    +passes Spec
-    +declineCode
-    +priority
-  }
-  class Spec~T~ {
-    <<interface>>
-    +isSatisfiedBy(t)
-    +and(other)
-    +or(other)
-    +not()
-  }
-  class VerificationFacts {
-    +each check's answer
-    +settings
-    +asOf
-  }
-  RuleRegistry o-- RuleSet : every bean
-  RuleSet <|.. InstrumentRules
-  RuleSet <|.. MandateRules
-  RuleSet <|.. GBRules
-  RuleSet o-- Rule : holds
-  Rule --> Spec : runsWhen, passes
-  Spec ..> VerificationFacts : asks about
-```
+<ClassMap {...rulePieces} />
 
 `GBRules` lives in GB's module and holds GB's funds rule. The rule registry gets every `RuleSet` bean the way the stage registries get every check.
 

@@ -1,0 +1,188 @@
+/* ClassMap: UML class diagrams in the Blue Box style. Filled cards and
+   tinted fields, no outlines. Depth follows abstraction: an interface takes
+   the deepest fill, a class a pale tint with a Bright Blue block, plain data a
+   neutral tint. Every colour is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --cm-accent: var(--amex-blue);
+  --cm-card: var(--amex-panel);
+  --cm-iface: var(--amex-midnight);
+  --cm-iface-ink: var(--amex-banner-block-ink);
+  --cm-iface-kicker: var(--amex-sky);
+  --cm-line: var(--amex-mut);
+  --cm-halo: var(--amex-panel);
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 1rem 1rem 0.85rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --cm-accent: var(--amex-blue-bright);
+  --cm-card: var(--amex-card);
+  --cm-iface: var(--amex-banner-block);
+  --cm-iface-kicker: var(--amex-deep-200);
+  --cm-halo: var(--amex-panel);
+}
+
+.frame {
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+/* ---- cards ---- */
+.k_interface .body {
+  fill: var(--cm-iface);
+}
+.k_interface .band {
+  fill: color-mix(in srgb, var(--amex-black) 22%, var(--cm-iface));
+}
+.k_interface .kicker {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  fill: var(--cm-iface-kicker);
+}
+.k_interface .name {
+  fill: var(--cm-iface-ink);
+}
+.k_interface .member {
+  fill: color-mix(in srgb, var(--cm-iface-ink) 80%, transparent);
+}
+
+.k_class .body {
+  fill: color-mix(in srgb, var(--cm-accent) 13%, var(--cm-card));
+}
+.k_class .band {
+  fill: color-mix(in srgb, var(--cm-accent) 6%, var(--cm-card));
+}
+.block {
+  fill: var(--cm-accent);
+}
+
+.k_data .body {
+  fill: color-mix(in srgb, var(--amex-indigo) 12%, var(--cm-card));
+}
+.k_data .band {
+  fill: color-mix(in srgb, var(--amex-indigo) 5%, var(--cm-card));
+}
+
+.name {
+  font-family: var(--amex-font-mono);
+  font-size: 13px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.note {
+  font-size: 11.5px;
+  fill: var(--amex-mut);
+}
+.member {
+  font-family: var(--amex-font-mono);
+  font-size: 11px;
+  fill: var(--amex-txt);
+}
+
+/* a market's own class: its code in the house square */
+.market {
+  fill: var(--cm-accent);
+}
+.marketText {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  fill: var(--amex-banner-block-ink);
+}
+
+/* ---- relations ---- */
+.line {
+  fill: none;
+  stroke: var(--cm-line);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.dashed {
+  stroke-dasharray: 4.5 3;
+}
+.hollow {
+  fill: var(--cm-card);
+  stroke: var(--cm-line);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.solid {
+  fill: var(--cm-line);
+}
+
+.label {
+  font-size: 11.5px;
+  font-weight: 600;
+  fill: var(--amex-mut);
+  paint-order: stroke;
+  stroke: var(--cm-halo);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* the house number badge: white digits on Bright Blue */
+.stepBox {
+  fill: var(--amex-blue);
+}
+.stepText {
+  font-size: 10.5px;
+  font-weight: 700;
+  fill: var(--amex-banner-block-ink);
+}
+
+/* ---- legend and caption ---- */
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  --legend-gap: 0.4rem 1.3rem;
+  margin: 0.75rem 0.15rem 0;
+}
+
+.li {
+  composes: legendItem from '../../css/recipes.module.css';
+  --legend-fs: 0.72rem;
+}
+
+.swatch {
+  display: block;
+  overflow: visible;
+}
+
+.marketSw {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: var(--amex-badge-radius);
+  background: var(--cm-accent);
+  color: var(--amex-banner-block-ink);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.caption {
+  margin: 0.55rem 0.15rem 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--amex-mut);
+}
+
+.aside {
+  font-size: 11.5px;
+  font-style: italic;
+  fill: var(--amex-mut);
+}

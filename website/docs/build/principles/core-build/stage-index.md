@@ -5,6 +5,8 @@ sidebar_label: Stage Index
 ---
 
 import Lead from '@site/src/components/Lead';
+import ClassMap from '@site/src/components/ClassMap';
+import {strategyFamily, pickingClasses} from '@site/src/components/ClassMap/diagrams';
 
 # Building the Stage Index
 
@@ -43,74 +45,15 @@ Think of airport security. Every traveler goes through the same lane in the same
 | Registry | One small class, written once and used for every kind of strategy. It gets every strategy of its kind, works out the winners for every combination when the app starts, and after that answers each payment with a lookup |
 | Stage index | The workflow's one way in. On the workflow's own thread it makes the activity stubs, the handles through which a workflow calls other systems, picks each step's stage and hands back stages that are ready to run |
 
-Every class the registries pick is a strategy. In this class diagram, drawn for Verify and Execute's clearing, a solid arrow with a hollow head means "is a kind of" and a dashed one means "implements":
+Every class the registries pick is a strategy. This class diagram shows it for Verify and for Execute's clearing:
 
-```mermaid
-classDiagram
-  direction LR
-  class Strategy~K~ {
-    <<interface>>
-    +key K
-    +appliesTo AppliesTo
-  }
-  class PaymentVerifyStage {
-    <<interface>>
-    +run(ctx, paymentId)
-  }
-  class Check {
-    <<interface>>
-    +steps Set~Step~
-    +fetch(ctx, paymentId)
-  }
-  class ClearingMethod {
-    <<interface>>
-    +clear(ctx, paymentId)
-  }
-  class DefaultPaymentVerifyStage
-  class MandateCheck
-  class GBFundsCheck
-  class RealtimeClearing
-  class BatchClearing
-  Strategy <|-- PaymentVerifyStage
-  Strategy <|-- Check
-  Strategy <|-- ClearingMethod
-  PaymentVerifyStage <|.. DefaultPaymentVerifyStage
-  Check <|.. MandateCheck
-  Check <|.. GBFundsCheck
-  ClearingMethod <|.. RealtimeClearing
-  ClearingMethod <|.. BatchClearing
-```
+<ClassMap {...strategyFamily} />
 
 `InstrumentCheck`, `OptionsCheck` and `TokenCheck` sit beside `MandateCheck` and look the same. `GBFundsCheck` is the one that lives in GB's module.
 
-These are the classes that do the picking. A plain arrow means "uses", and a dashed one means "makes":
+These are the classes that do the picking, numbered in the order they act:
 
-```mermaid
-classDiagram
-  direction TB
-  class StageIndex {
-    +lookup(plan) Stages
-  }
-  class StageContext {
-    +plan PlanKey
-    +stubs Stubs
-  }
-  class Registry~S~ {
-    +forPlan(plan) List~S~
-    +one(plan) S
-  }
-  class DefaultPaymentVerifyStage {
-    +run(ctx, paymentId)
-  }
-  class RuleRegistry {
-    +evaluate(plan, step, facts)
-  }
-  StageIndex ..> StageContext : makes
-  StageIndex --> Registry : picks the stage
-  StageIndex --> DefaultPaymentVerifyStage : binds to ctx
-  DefaultPaymentVerifyStage --> Registry : asks for its checks
-  DefaultPaymentVerifyStage --> RuleRegistry : asks for its rules
-```
+<ClassMap {...pickingClasses} />
 
 ## The one rule
 
