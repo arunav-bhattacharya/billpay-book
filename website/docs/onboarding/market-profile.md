@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Market Profile
 
-<Lead>A market profile is one market and one account type: the APIs it takes, and five answers about how its payments behave. Those answers decide which stage implementations its payments run, so the same workflow code serves every market.</Lead>
+<Lead>A market profile is one market and one account type: the APIs it takes, and five answers about how its payments behave. Those answers decide what each step of its payments does, so the same workflow code serves every market.</Lead>
 
 Consumer accounts and corporate accounts in the same market are two profiles, because they behave differently: a corporate payment's legs come from allocations that arrive later by callback, while a consumer split writes its legs with the payment itself. Each profile is authored, released and switched on separately.
 
@@ -38,7 +38,7 @@ Bank confirmation is resolved by how the customer pays rather than by the journe
 
 ## What the build can run
 
-Each combination of behaviors needs stage implementations that handle it. Every stage has a default, but a default can't handle everything: the default Verify doesn't check a mandate, so a combination with mandate authorization runs only once a Verify that does is in the build. The build lists the combinations it can run in its **capability manifest**, which the provisioning API returns from `GET /provisioning/capabilities`. The manifest comes from the same compile-time index the workflows use to look up their stages, so the two can't disagree.
+Each combination of behaviors needs classes in the build that handle it. Verify, for example, handles mandate authorization with `MandateCheck`, so a combination with mandate authorization runs only once that check is in the build. The build lists the combinations it can run in its **capability manifest**, which the provisioning API returns from `GET /provisioning/capabilities`. The manifest comes from the same lookup the workflows use to find their stages, so the two can't disagree.
 
 - A profile built only from combinations in the manifest goes live with config alone, no deploy needed.
 - A new combination is flagged as needing a build while it is being authored, so the gap shows up early.

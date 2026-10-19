@@ -36,7 +36,7 @@ The squares are the stages a road runs, in order: Capture, Verify, Reverify, Exe
 
 A few things are easier to see here than anywhere else.
 
-- Execute sits on ten roads and Fulfil on nine, but there is one Execute stage and one Fulfil stage. The behaviors the Router resolves decide which implementation runs.
+- Execute sits on ten roads and Fulfil on nine, but there is one Execute stage and one Fulfil stage. The behaviors the Router resolves decide which of their methods run.
 - Every stage commits through `PaymentStore`, and every state change goes out to RTF, which is why those two run the full width of the activities. Raven is narrower. It is called only where the customer is told, such as a scheduled or declined payment at Verify, a processed one at Fulfil, or a cancellation.
 - A corporate payment's own execution clears once, for the whole payment, and does nothing else. Its legs make the AR and open-to-buy calls and do Fulfil's work, and a corporate leg never clears.
 - Nothing One-Data stores ever reaches a core API. AR intake, returns and inbound payments wait in its inbox until their dispatcher pulls them, so a burst of returns waits its turn instead of competing with a customer who is paying today.

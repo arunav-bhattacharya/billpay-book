@@ -9,7 +9,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>A stage is one business step, named for the journey step it performs: Verify, Execute, Settle. It makes its calls, in parallel where they don't depend on each other, commits the result in one guarded Oracle transaction, and returns its outcome.</Lead>
 
-Stages are the only layer that changes between markets. Verify in a market that checks a mandate is a different implementation from Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its plan key, and the most specific match wins. Thirteen stages cover every journey.
+Stages are the only layer that changes between markets, and they change through the checks and methods they are made of. Verify in a market that checks a mandate runs one more check than Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its plan key, and every check and method says where it applies. Thirteen stages cover every journey.
 
 ## What every stage does
 
@@ -44,7 +44,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
 
-"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and which Verify implementation confirms the payment. A go-ahead is not a behavior, and no stage has a version for it. It is a market setting, off by default: where it is on, a create that One-Data sends with other pending payments' IDs waits in Create Payment Intent, and Capture stores the IDs.
+"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and adds the token check to Verify. A go-ahead is not a behavior, and no stage or check is picked for it. It is a market setting, off by default: where it is on, a create that One-Data sends with other pending payments' IDs waits in Create Payment Intent, and Capture stores the IDs.
 
 ## Which workflow runs which stages
 
@@ -66,37 +66,40 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 
 Create Balance Refund follows the payment path; its detailed stages are still being defined.
 
-## Naming implementations
+## How a step picks its classes
 
-A stage interface is named for its step, with `Payment` in front: `PaymentVerifyStage`, `PaymentExecuteStage`. An implementation keeps that name whole and adds what it serves after it, so it always reads as one version of a step, never as a step of its own. The parts come from the implementation's index declaration, in this order:
+No code maps a payment to classes. Each stage, check and method says which job it does and where it applies: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, and a class tied to a market beats a shared one, so a market is the exception only where it has a class of its own. Different jobs add up, which is how one payment gets several checks. [Building the Stage Index](../../build/principles/core-build/stage-index.md#the-complete-picture) draws the complete picture, from the plan key to the commit, and the classes behind it.
 
-1. `For` and the account type: `ForConsumer`, `ForCorporate` or `ForBusinessTravel`.
-2. `With` and each behavior it needs, joined with `And`, in the profile's order: `ArPosting`, `RealtimeClearing` (`BatchClearing` when it is N), `Mandate`, then `BankConfirmation`. A behavior it needs to be N follows as `Without`, such as `WithoutArPosting`.
-3. `In` and the market, for a market override only, such as `InGb`.
+## Naming
 
-The implementation that declares nothing is `DefaultPayment{Step}Stage`, and it runs for every combination nothing more specific matches. A name never lists the activities an implementation calls. The mandate check, for example, is a call to Plans that Verify makes, so a market that needs one runs a Verify that makes that call:
+A stage interface is named for its step, with `Payment` in front: `PaymentVerifyStage`, `PaymentExecuteStage`. A step's variations are not more stages. They are the checks and methods its stage uses, each saying where it applies, so names stay short:
 
-| Verify implementation | What it does |
+- The stage every market runs is `DefaultPayment{Step}Stage`.
+- A market whose flow for a step really differs gets a stage of its own, with the market's code first: `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. GB doesn't need one today.
+- A check or a method is named for its job, such as `MandateCheck` or `RealtimeClearing`. A market's own starts with its code, such as `GBFundsCheck`.
+
+A name never lists the activities a class calls. The mandate check, for example, is a call to Plans that Verify makes, so a market that needs one gets `MandateCheck` in its Verify:
+
+| A market... | What its Verify runs |
 | --- | --- |
-| `DefaultPaymentVerifyStage` | Instruments and Options checks only: Payment Instruments and Payment Options |
-| `PaymentVerifyStageWithMandate` | Mandate authorization: Payment Instruments, Payment Options and Plans |
-| `PaymentVerifyStageWithBankConfirmation` | Bank confirmation: Payment Instruments, with the verification token check, and Payment Options |
-| `PaymentVerifyStageWithMandateAndBankConfirmation` | Both: Payment Instruments, with the token check, Payment Options and Plans |
-| `PaymentVerifyStageWithBankConfirmationInGb` | GB's Pay with Bank Transfer: the bank-confirmation checks, plus whether the customer's bank account holds enough money for the payment. Kept in `market/gb/stages/` |
+| Checks instruments and options only | `DefaultPaymentVerifyStage`, with `InstrumentCheck` (Payment Instruments) and `OptionsCheck` (Payment Options) |
+| Also requires mandate authorization | The same stage, plus `MandateCheck`, which asks Plans for the mandate details |
+| Also takes bank confirmation | The same stage, plus `TokenCheck`, which asks Payment Instruments whether the verification token is valid |
+| GB, Pay with Bank Transfer | The same stage, with `TokenCheck` and `GBFundsCheck`: whether the customer's bank account holds enough money for the payment. Kept in `market/gb/` |
 
-*(Examples of the rule, agreed on 2026-10-18.)*
+*(Examples of the rule, agreed on 2026-10-19.)*
 
-On the due date, a payment that needs a mandate runs `PaymentReverifyStageWithMandate`, which asks Plans again. Execute works the same way: `DefaultPaymentExecuteStage` clears in batch, and `PaymentExecuteStageWithRealtimeClearing` clears in real time.
+On the due date, Reverify runs the same `MandateCheck` again for a payment that needs a mandate. Execute works the same way: `RealtimeClearing` clears in real time and `BatchClearing` in batch, and the payment's behaviors pick one.
 
 Three rules keep the names straight:
 
-- The build checks every name. KSP, the code generator that builds the stage index, works out the expected name from each declaration and fails the build when a class is named anything else.
-- Calls that every implementation of a step makes, such as Verify's Instruments and Options calls, live in a plain helper function, never in a base class.
-- A step's implementations sit together in one folder, such as `core/lib/stages/impl/verify/`.
+- Names are for people: the lookup reads where a class applies, never its name. A test fails for a class tied to a market whose name doesn't start with that market's code.
+- Calls that every stage of a step makes the same way live in a plain helper function, never in a base class.
+- Shared stages sit in `core/lib/stages/impl/{step}/` and shared checks in `core/lib/verification/checks/`. A market's own classes sit in its module under `market/{m}/`.
 
 ## How verification decides
 
-Verify, Reverify and Represent each decide whether a payment can go ahead, and they decide it the same way. The stage first asks the systems that know about the payment, then runs a set of rules over their answers. Keeping the two apart makes each rule a plain condition over data, and lets the three stages share one catalog of rules.
+Verify, Reverify and Represent each decide whether a payment can go ahead, and they decide it the same way. The stage first asks the systems that know about the payment, then runs a set of rules over their answers. Keeping the two apart makes each rule a plain condition over data, and lets the three stages share their rules.
 
 ```mermaid
 flowchart TB
@@ -105,17 +108,18 @@ flowchart TB
     I["Payment<br/>Instruments"]
     O["Payment<br/>Options"]
     P["Plans<br/>for a mandate"]
+    B["The provider<br/>for GB funds"]
   end
   C --> F["Facts<br/>answers, settings<br/>and the time"]
-  F --> R["Rules<br/>one shared catalog"]
+  F --> R["Rules<br/>the ones that apply"]
   R --> D{"Did a rule fail?"}
   D -- "No" --> M["The payment<br/>moves on"]
   D -- "Yes" --> X["DECLINED<br/>with the code of<br/>the top failure"]
 ```
 
-- A check is one system and the rules about its answer. A version of a stage is its list of checks: the default Verify runs the Instrument and Options checks, and `PaymentVerifyStageWithMandate` adds the Mandate check, which asks Plans. In GB, `PaymentVerifyStageWithBankConfirmationInGb` adds the Funds check: does the customer's bank account hold enough money for the payment. Represent will run checks of its own, still to be defined.
+- A check is one system and the rules about its answer, and each check says where it applies. Verify runs every check that applies to the payment: the Instrument and Options checks always, `TokenCheck` with bank confirmation, `MandateCheck`, which asks Plans, where the profile requires mandate authorization, and in GB, for Pay with Bank Transfer, `GBFundsCheck`: does the customer's bank account hold enough money for the payment. Represent will run checks of its own, still to be defined.
 - The checks' calls go out in parallel. What a system says, such as a closed account or no valid mandate, comes back as a fact. Only an error fails the call, and Temporal retries it, so an outage never declines a payment and a business "no" is never retried.
-- A rule makes no calls and never reads the clock, so a replay reaches the same decision. Every rule that applies runs, except one whose check didn't run or whose earlier rule failed, such as the instrument rules after "instrument not found".
+- A rule makes no calls and never reads the clock, so a replay reaches the same decision. Each rule says where it applies, as a check does ([the classes behind a rule](../../build/principles/core-build/stages.md#writing-verification-rules)), and asks two yes/no questions of the facts: does it make sense here, and does the payment pass. "Instrument open" only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed. A market can add a rule of its own, or replace a shared one, without touching shared code.
 - The highest-priority failure decides: `DECLINED` with that rule's code, or `DISALLOWED` for a push payment. There is no outcome that sends a payment to review, because the state model has no state for one.
 - A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, and the Router hands them to the workflow in the plan key. So a threshold changes with a release and no deploy, while a rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed, and a metric counts declines by step and rule.
 
@@ -140,9 +144,9 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Create Payment Intent, when the confirm arrives, guarded on `PENDING`. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`. In GB, a Pay with Bank Transfer payment is also `DECLINED` when the customer's bank account doesn't hold enough money for it.
-- A payment that waited for a go-ahead is verified there too, guarded on `PENDING`, by the Verify its behaviors pick, as for any payment. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
+- A payment that waited for a go-ahead is verified there too, guarded on `PENDING`, with the checks its behaviors pick, as for any payment. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
 
-Verify's versions differ only in their checks. Where the profile requires mandate authorization, Verify also fetches the mandate details from Plans, in parallel with its other two calls, and a mandate that fails its check is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`. Where it requires bank confirmation, the Instruments check adds the token check. Nothing else picks a Verify: the corporate `ALLOC_REQUEST` row comes from the account type, the way the `SCHED_EXEC` row comes from the date, and what a payment waited for picks nothing.
+Verify has one flow, and only its checks vary. Where the profile requires mandate authorization, `MandateCheck` fetches the mandate details from Plans, in parallel with the other calls, and a mandate that fails its check is `DECLINED`. Where it requires bank confirmation, `TokenCheck` asks Payment Instruments about the verification token. Nothing else changes Verify: the corporate `ALLOC_REQUEST` row comes from the account type, the way the `SCHED_EXEC` row comes from the date, and what a payment waited for picks nothing.
 
 ## Reverify
 

@@ -11,7 +11,7 @@ import Highlights from '@site/src/components/Highlights';
 
 <Lead>Billpay keeps business decisions apart from transport. Four layers handle every journey, each with one job and a strict rule about what it may call.</Lead>
 
-The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is one version of the Verify stage, `PaymentVerifyStageWithMandate`, which also fetches the mandate details from Plans and checks them. The workflow above it and the activities below it stay the same in both markets.
+The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is one class, `MandateCheck`, which Verify runs where the profile requires a mandate: it fetches the mandate details from Plans, and the rules check them. The workflow above it and the activities below it stay the same in both markets.
 
 ## Eight rules behind every choice
 
@@ -63,7 +63,7 @@ Work flows one way: workflow, stage, activity, client, external system. Nothing 
 | Layer | May call | Must not call |
 | --- | --- | --- |
 | Workflow | Stages; child workflows on its own cluster | Activities, clients, external systems, anything on the other cluster |
-| Stage | Activities; plain helper functions | Workflows, other stages, clients, external systems |
+| Stage | Activities; the checks and methods the stage index gives it; plain helper functions | Workflows, other stages, clients, external systems |
 | Activity | Clients | Workflows, stages, other activities, external systems |
 | Client | Its one system | Other clients, workflows, stages, activities |
 
@@ -72,26 +72,26 @@ Work flows one way: workflow, stage, activity, client, external system. Nothing 
 | Layer | Name | Lives in |
 | --- | --- | --- |
 | Workflow | `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow` | `core/lib/workflows/impl/` |
-| Stage | A `Payment{Step}Stage` interface, named for the journey step, such as `PaymentVerifyStage`. An implementation adds what it serves after that name, such as `PaymentVerifyStageWithMandate` ([the full rule](./component-model/stages.md#naming-implementations)) | `core/lib/stages/impl/{step}/`; a market override in `market/{m}/stages/` |
+| Stage | A `Payment{Step}Stage` interface, named for the journey step, such as `PaymentVerifyStage`. The stage every market runs is `DefaultPayment{Step}Stage`; its checks and methods are named for their jobs, such as `MandateCheck`, and a market's own class starts with the market's code, such as `GBFundsCheck` ([the full rule](./component-model/stages.md#naming)) | `core/lib/stages/impl/{step}/`; a market's own classes in `market/{m}/` |
 | Activity | `{System}Activities`, such as `ClearingActivities`. Oracle reads and writes are in `PaymentStore` | `core/lib/activities/` and `impl/` |
 | Client | `{System}Client` | `core/lib/clients/` |
 
-Naming an implementation for its behavior rather than its market means a rule that several markets share is written once.
+Naming a class for its job rather than its market means a check that several markets share is written once.
 
 ## Composition, not inheritance
 
-- There is one implementation of each workflow. A workflow is composed from stage implementations and never copied per market.
+- There is one implementation of each workflow. A workflow gets its stages from the stage index and is never copied per market.
 - Workflows and stages are never `abstract`.
 - Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs. A whole request travels only once, into a workflow that creates a payment: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. Data from Payment Options and Payment Instruments is the other exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec.
 
 ## How a workflow finds its stages
 
-A workflow is never handed its stages. When the Router starts it, the Router pins a **plan key**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market override can match, such as GB's extra check for Pay with Bank Transfer. The workflow reads its plan key and looks up its stage implementations at runtime.
+A workflow is never handed its stages. When the Router starts it, the Router pins a **plan key**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market's own classes can apply, such as GB's extra check for Pay with Bank Transfer. The workflow reads its plan key and looks up its stages at runtime.
 
-The lookup uses an index built at compile time with KSP (Kotlin Symbol Processing). For every combination of behaviors, KSP works out which implementation of each stage runs, and the most specific match wins, so a market override beats the default for that market. It writes the answers as a table, so a running workflow reads one row per stage and decides nothing. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
+Nothing maps a plan key to classes by hand. Each stage, and each check or method a stage uses, says what job it does and where it applies: a market or every market, an account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, so a market's own class beats the shared one in that market, and different jobs add up. Quarkus finds every class when the code is built, and a registry works out every combination when the app starts, so a running workflow reads its answers and decides nothing. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
 
-- Every stage has a default implementation, but a default can't handle everything. Each stage lists the behavior values its default can't handle, such as mandate authorization for Verify, and a combination with one of those values runs only on an implementation that declares it. A combination the build can't run can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
-- The same index produces the build's **capability manifest**, the list of every combination the build can run. Provisioning checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
+- Each step names the behaviors it must act on, such as mandate authorization for Verify. A combination where one of them is Y and no class that applies handles it can't run, so it can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
+- The same registries produce the build's **capability manifest**, the list of every combination the build can run. Provisioning checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
 - Payment workflows are pinned to their build with Worker Versioning, and the plan key carries the config version. A deploy never changes the code under a running payment, and a new market release never changes its config.
 
 ## Writing a step that is safe to repeat

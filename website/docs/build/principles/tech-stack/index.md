@@ -15,7 +15,7 @@ import Lead from '@site/src/components/Lead';
 Four choices sit underneath everything and are not revisited per component:
 
 - Kotlin is the platform language, top to bottom. The domain model leans hard on sealed hierarchies and null-safety, and the [Domain Model](../../domain-model/index.md) pages show why.
-- Quarkus (ArC/CDI) does the dependency injection and app wiring. We use it lightly: `@ApplicationScoped` beans and constructor injection, and none of the rest of the framework.
+- Quarkus (ArC/CDI) does the dependency injection and app wiring. We use it lightly: `@ApplicationScoped` and `@Singleton` beans, constructor injection, and `@All List<T>` to hand the stage registries every class of a kind, and none of the rest of the framework.
 - Gradle builds everything from one multi-module monorepo. The [code layout](../core-build/code-layout.md) page shows how the modules map to the component model.
 - Temporal is the workflow engine: two self-hosted clusters, Online and Offline, each with its own Aurora PostgreSQL database and OpenSearch 2 for visibility, on server 1.30.1 or later. Billpay leans on Update-With-Start, Schedules, Worker Versioning, and task queue priority and fairness, and its guarantees (durable state, replay, retries) are why the [core build rules](../core-build/index.md) look the way they do.
 
@@ -28,7 +28,7 @@ Four choices sit underneath everything and are not revisited per component:
 | [ORM](./orm.md) | **Exposed** | SQL stays visible, Kotlin-native, no session magic anywhere near payments. |
 | [HTTP client](./http-client.md) | **OkHttp** | Pooling, HTTP/2, and four independent timeouts that respect the activity deadline above them. |
 | [Serialization](./serialization.md) | **Jackson** | Polymorphic `type` discriminators carry our sealed domain model across every boundary, and Temporal's own converter already speaks it. |
-| [Code generation](../core-build/stage-index.md) | **KSP** | Builds the index that maps each behavior combination to its stages, and the build's capability manifest, at compile time, so a mistake stops the build at the class that caused it. |
+| [Stage lookup](../core-build/stage-index.md) | **Quarkus CDI (ArC)** | Finds every stage, check and method at build time and hands them to the stage registries, so a market's own variation is one new class, with no mapping code and no code generator. |
 
 ## Under evaluation
 

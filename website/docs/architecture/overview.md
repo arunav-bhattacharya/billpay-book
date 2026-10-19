@@ -108,7 +108,7 @@ The core REST APIs shape the request, and the payment's first step checks it aga
 1. Admit the request. The market, account type and API must be live in this environment, or the answer is 422. A request a dispatcher pulled is marked `REJECTED` instead, and only operations hear of it. An allocation callback over its budget gets 429 with `Retry-After`.
 2. Pick the journey from the routing table.
 3. Resolve the behaviors from the market's active release. A behavior set to BOTH becomes Y or N for this journey.
-4. Pin the plan key: the market, the journey, the resolved behaviors and the config version (the market is Proposed, so a market's own override can be found).
+4. Pin the plan key: the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes, such as GB's funds check, can apply).
 5. Place the work: cluster, task queue, priority and workflow ID.
 6. Start it. When a caller is waiting that means Update-With-Start: the caller gets the payment's state back, the decision once Verify has made it or `PENDING` until then, while the workflow carries on. When nobody is waiting, a dispatcher starts it at the governor's pace, as dated work falls due in Oracle or as it pulls requests from One-Data's inbox. Only an allocation callback is an async start, answered 202 once the workflow exists.
 

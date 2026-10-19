@@ -19,7 +19,7 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 ## Rules for workflow code
 
 - One workflow per journey, with one implementation. Create Immediate Payment, Execute Scheduled Payment and Process Returned Payment exist once each, and no market has a workflow of its own.
-- Never `abstract`. Variation comes from composing different stage implementations, per the [composition rules](../../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
+- Never `abstract`. Variation comes from the stages, checks and methods the stage index picks, per the [composition rules](../../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
 - Call stages and, on the workflow's own cluster, child workflows. Nothing else: no activity, no client, no outside system and nothing on the other cluster. The [four layers](../../../design/principles.md#the-four-layers) have the full call rules.
 - Pass the payment ID, not the payment. Stages and activities load what they need. There are two exceptions. A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle, so nothing is written before the workflow starts and the caller's path has no extra database call. And data from Payment Options and Payment Instruments, clear text included, travels on in the workflow to the later stages that need it, with the payload codec keeping it encrypted in history.
 - Set search attributes once, at start. Use no signals or queries on the hot path. What a caller sends a running workflow, the confirm and the no, goes in as an update.
@@ -27,9 +27,9 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 
 ## How a workflow finds its stages
 
-The Router pins a plan key when it starts the workflow: the market, the journey, the resolved behaviors and the market's config version (the market is there so a market override can match). The workflow reads its plan key and looks up its stages at runtime, in an index that KSP (Kotlin Symbol Processing) generates at build time. The most specific match wins, and a market override is a more specific match for that market. Stage objects are never passed into a workflow.
+The Router pins a plan key when it starts the workflow: the market, the journey, the resolved behaviors and the market's config version (the market is there so a market's own classes can apply). The workflow reads its plan key and looks up its stages at runtime, through the stage index it was given when the worker registered it. Each stage, check and method says where it applies, and for each job the most specific one wins, so a market's own class beats a shared one with the same key in that market, while classes with different keys add up. Stages are never passed into a workflow, and the workflow never sees an activity stub: the index makes the stubs on the workflow's thread and binds them to the stages it returns.
 
-Every stage has a default implementation, but a market whose behaviors need more, such as Verify's mandate check, runs only once an implementation that declares them is in the build. A combination the build can't run can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts. [Building the Stage Index](./stage-index.md#the-capability-manifest) has the rule.
+Every step has a default stage, but a market whose behaviors need more, such as Verify's mandate check, runs only once a class that handles them is in the build. A combination the build can't run can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts. [Building the Stage Index](./stage-index.md#the-capability-manifest) has the rule.
 
 ## How a workflow starts
 
@@ -74,14 +74,17 @@ interface CreateImmediatePaymentWorkflow {
     fun decision(): PaymentDecision
 }
 
-class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
+class CreateImmediatePaymentWorkflowImpl(
+    private val stageIndex: StageIndex,              // passed in by the factory the worker registers
+) : CreateImmediatePaymentWorkflow {
     private var decided: PaymentDecision? = null
 
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        // Stage implementations come from the plan key, looked up at runtime. On the Online cluster
-        // the stubs it builds for Payment Instruments, Payment Options and Plans are local activities,
-        // so Capture, Verify and its commit all run inside this first workflow task.
-        val stages = StageIndex.lookup(plan)
+        // Each step's stage, and the checks and methods it uses, come from the plan key at runtime.
+        // On the Online cluster the stubs the index makes for Payment Instruments, Payment Options
+        // and Plans are local activities, so Capture, Verify and its commit all run inside this
+        // first workflow task.
+        val stages = stageIndex.lookup(plan)
         val paymentId = request.paymentId              // One-Data made it
 
         stages.capture.run(request)                    // PENDING: writes the request, insert-if-absent
@@ -110,7 +113,7 @@ class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
 }
 ```
 
-The workflow never names a market: `StageIndex.lookup(plan)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
+The workflow never names a market: `stageIndex.lookup(plan)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
 A payment that needs bank confirmation or a go-ahead never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
 
@@ -123,14 +126,14 @@ Nothing in the method touches a database, a clock or a wire. The stages and thei
 A payment that waits for its customer keeps one workflow from the create to its end. This is the spec's sketch, trimmed: the stages and `PaymentStore` are real names, the rest illustrative.
 
 ```kotlin
-class CreatePaymentIntentWorkflowImpl : CreatePaymentIntentWorkflow {
+class CreatePaymentIntentWorkflowImpl(private val stageIndex: StageIndex) : CreatePaymentIntentWorkflow {
     private var decided: PaymentDecision? = null     // the create's answer
     private var answer: Answer? = null               // YES or NO: the first one accepted wins
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        val stages = StageIndex.lookup(plan)
+        val stages = stageIndex.lookup(plan)
         val paymentId = request.paymentId
         stages.capture.run(request)                              // PENDING: the request, and any pending IDs
         decided = if (plan.requiresBankConfirmation)

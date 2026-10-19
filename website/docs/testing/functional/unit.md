@@ -7,11 +7,11 @@ import Lead from '@site/src/components/Lead';
 
 # Unit Tests
 
-<Lead>A unit test checks one stage, one workflow or one activity on its own, with everything around it stubbed. Most of them test stages, because that is where behavior lives: every way one market differs from another is a stage implementation, so every implementation needs tests of its own.</Lead>
+<Lead>A unit test checks one stage, one workflow or one activity on its own, with everything around it stubbed. Most of them test stages and the checks and methods they use, because that is where behavior lives: every way one market differs from another is one of those classes, so each needs tests of its own.</Lead>
 
 This is the innermost layer of [functional testing](./index.md). The tests use the test support that ships with the Temporal SDK, and nothing outside the unit under test runs. Real dependencies first appear in [integration tests](./integration.md).
 
-## Stages, one implementation at a time
+## Stages, checks and methods
 
 A stage makes its calls, commits once through `PaymentStore`, and returns its outcome ([Building Stages](../../build/principles/core-build/stages.md)). Its test stubs the activities and checks three things:
 
@@ -21,28 +21,30 @@ A stage makes its calls, commits once through `PaymentStore`, and returns its ou
 
 The announcement gets its own case: the RTF event names the state that was committed, and a Raven message goes out only where the market's setting turns it on. Fulfil is the one stage that announces before its commit, so its test checks that order too.
 
-A new implementation, such as `PaymentVerifyStageWithMandate` for markets that check a mandate, arrives with these tests for the behaviors it serves. For Verify, Reverify and Represent, the decision itself comes from the verification rules, which are tested on their own (below). Their stage tests check that each version runs the right checks and commits the decision the rules gave.
+A new check or method, such as `MandateCheck` for markets that check a mandate, arrives with tests of its own: the call it makes and where it applies. For Verify, Reverify and Represent, the decision itself comes from the verification rules, which are tested on their own (below). Their stage tests check that the stage runs the checks it is given and commits the decision the rules gave.
 
 ## Verification rules
 
-A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the catalog for one step and checks the report ([Writing verification rules](../../build/principles/core-build/stages.md#writing-verification-rules)):
+A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the rules for one plan key and step, and checks the report ([Writing verification rules](../../build/principles/core-build/stages.md#writing-verification-rules)):
 
-- Each rule gets a table of cases, facts in and pass or fail out. The mandate rule needs a case for an active mandate and one for each status that isn't.
+- Each small specification, such as `instrumentFound`, gets a table of cases once, facts in and yes or no out. Each rule then gets its own cases: the mandate rule needs one for an active mandate and one for each status that isn't.
 - Priority decides. When two rules fail, the decision carries the code of the higher-priority one, and the report names both.
-- A rule whose check didn't run is skipped, not failed. The default Verify gathers no mandate details, so no mandate rule runs for it. A rule whose earlier rule failed is skipped the same way.
-- A rule runs only in the steps it lists.
+- A rule whose `runsWhen` is false is skipped, not failed. A payment that didn't run `MandateCheck` skips the mandate rule, and after "instrument not found", the rule that checks the instrument is open is skipped too.
+- A rule runs only in the steps it lists, and only where its `appliesTo` matches. A market's rule with a shared rule's ID replaces it in that market and nowhere else.
 - The time is part of the facts. A test sets it, so a rule about dates gives the same answer on every run.
 
 ## The plan-key lookup
 
-A workflow finds its stages by reading the row for its plan key in a table that KSP (Kotlin Symbol Processing) generates at build time ([Building the Stage Index](../../build/principles/core-build/stage-index.md)). The table is code like any other, so it is tested like any other:
+A workflow finds its stages through the stage index, and every stage, check and method says where it applies ([Building the Stage Index](../../build/principles/core-build/stage-index.md)). The registries behind the index are plain Kotlin, so a unit test builds them from a list of classes, without Quarkus, and checks:
 
-- Every combination in the build's capability manifest resolves to an implementation for every step its journey runs.
-- The most specific match wins. A market override in `market/{m}/stages/` beats the default for its own market, and nowhere else. A row in that market with a value the override declares, which none of the market's classes can take, is left out of that market's manifest (Proposed).
-- A row with a value a default can't handle goes only to a class that declares it. A payment that needs both a mandate and bank confirmation gets `PaymentVerifyStageWithMandateAndBankConfirmation`, never a class that checks only one of them. With no Verify that declares mandate authorization, no combination with mandate authorization is in the manifest.
-- The report the build writes matches the checked-in one. A change to which class a combination runs fails this test until the same pull request updates the report, so the reviewer sees every row that moved.
+- Each registry builds without a tie. Two classes level for one job fail with an error that names both and the combination.
+- The most specific class wins. A market's own class beats the shared one with the same key in that market, and nowhere else, and a class that names more behaviors beats one that names fewer.
+- Every behavior a step must act on is handled. Delete `MandateCheck`, and no combination with mandate authorization is in the manifest, while combinations without one are unaffected.
+- Every combination in the capability manifest gets a stage, and a class for every key it must fill, for every step its journey runs.
+- The classes come back sorted by key, whatever order they were given in, so a replay makes the same calls in the same order.
+- The report matches the checked-in one. A change to what a combination runs fails this test until the same pull request updates the report, so the reviewer sees every row that moved.
 
-The processor itself is tested by compiling small sets of sample classes with it. Each of these must fail the compile, at the class: two classes that tie for a combination, with that combination named in the error; a stage interface with no default; a class without the annotation; and a class whose name doesn't match its declaration.
+Two more tests run against the built app. Every stage, check and method class on the classpath must be in a registry, so a module without its `META-INF/beans.xml` can't drop a class silently. And every class tied to a market must start with that market's code.
 
 Provisioning checks every market release against the manifest, so a gap the tests miss turns into a release that can't go live.
 

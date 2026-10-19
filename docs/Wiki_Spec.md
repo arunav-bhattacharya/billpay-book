@@ -492,7 +492,7 @@ Four layers handle every journey: **Workflow → Stage → Activity → Client**
 | Layer | What it does | May call | Must not call | Location | Naming |
 | --- | --- | --- | --- | --- | --- |
 | **Workflow** | Runs one journey. No market logic | Stages; child workflows on its own cluster | Activities, clients, external systems, anything on the other cluster | `core/lib/workflows/impl/` | `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow` |
-| **Stage** | One business step: parallel calls, then one Oracle commit. Returns its outcome. The only layer that varies by behavior | Activities; plain helper functions | Workflows, other stages, clients, external systems | `core/lib/stages/impl/`; a market override in `market/{m}/stages/` | A `Payment{Step}Stage` interface, such as `PaymentVerifyStage`; implementations add what they serve after it, such as `PaymentVerifyStageWithMandate` ([Naming stage implementations](#naming-stage-implementations), agreed 2026-10-18) |
+| **Stage** | One business step: parallel calls, then one Oracle commit. Returns its outcome. The only layer that varies, through the strategies it is made of: its checks and its methods (agreed 2026-10-19) | Activities, through the stubs in its `StageContext`; strategies; plain helper functions | Workflows, other stages, clients, external systems | `core/lib/stages/impl/{step}/`; a market's own in its module under `market/{m}/` | A `Payment{Step}Stage` interface, such as `PaymentVerifyStage`. The stage every market runs is `DefaultPayment{Step}Stage`, and a market's own flow is `{Market}Payment{Step}Stage` ([Naming stages and strategies](#naming-stages-and-strategies), agreed 2026-10-19) |
 | **Activity** | The calls to one system, on that system's task queue | Clients | Workflows, stages, other activities, external systems | `core/lib/activities/` and `impl/` | `{System}Activities`, such as `ClearingActivities`; Oracle reads and writes in `PaymentStore` |
 | **Client** | Talks to one external system and maps its contract | That one system | Other clients, workflows, stages, activities | `core/lib/clients/` | `{System}Client` |
 
@@ -523,16 +523,16 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 `READY` inbox rows | Nothing |
 
-"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior; it decides whether RequestConfirmation runs, and which Verify implementation confirms the payment.
+"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior; it decides whether RequestConfirmation runs, and adds the Token check to Verify (agreed 2026-10-19).
 
 ### Verification rules
 
 Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 
-1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Options check (Payment Options) and the Mandate check (Plans, which holds the mandate details). A stage implementation is a list of checks: a market that checks only instruments and options runs the first two, and one that requires mandate authorization adds the third. In GB, a Pay with Bank Transfer payment also runs the Funds check: whether the customer's bank account holds enough money for the payment, and a rule declines a payment the account can't cover (agreed 2026-10-18). The bank-confirmation provider answers it (agreed 2026-10-18). Represent runs checks of its own, still to be defined.
+1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Token check (Payment Instruments again: whether the verification token it holds for the payment's instrument is valid), the Options check (Payment Options) and the Mandate check (Plans, which holds the mandate details). Each check says where it applies, and Verify runs every check that applies to the payment: the Instrument and Options checks everywhere, the Token check with bank confirmation, and the Mandate check where the profile requires mandate authorization ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). In GB, a Pay with Bank Transfer payment also runs GB's Funds check: whether the customer's bank account holds enough money for the payment, and a rule declines a payment the account can't cover (agreed 2026-10-18). The bank-confirmation provider answers it (agreed 2026-10-18). Represent runs checks of its own, still to be defined.
 2. **Facts.** The checks' calls run in parallel, and their answers go into one read-only `VerificationFacts`, with the payment, the market's rule settings and the time, read once from `Workflow.currentTimeMillis()`. A check that didn't run leaves its part empty. These are the facts Verify passes on to Execute and Fulfil, encrypted in history.
-3. **Rules.** A rule is a pure condition over the facts, with an ID, a decline code, a priority, the steps it runs in and the checks it needs. It makes no calls and never reads the clock. Rules live in one catalog the three steps share, and a rule may read more than one check's answer.
-4. **Evaluation.** Every rule that applies runs. A rule is skipped when a check it needs didn't run, or when a rule it depends on failed, such as the instrument rules after "instrument not found". The highest-priority failure decides, and the report keeps every rule's result.
+3. **Rules.** A rule is a pure condition over the facts, built with the Specification pattern: a specification is a named yes/no question about the facts, `Spec<VerificationFacts>`, and specifications combine with `and`, `or` and `not`. A rule has an ID, a decline code, a priority, the steps it runs in, an `appliesTo` like a check's, and two specifications: `runsWhen`, whether the rule makes sense for these facts, such as "the instrument was found", and `passes`, whether the payment passes it. It makes no calls and never reads the clock. Small specifications such as `instrumentFound` and `mandateActive` are written once and shared, and a rule may read more than one check's answer. A rule keeps one decline code, so specifications are combined inside a rule only when one code fits the whole condition (agreed 2026-10-19).
+4. **Evaluation.** A rule registry picks the payment's rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins, so a market can add a rule, or replace a shared one by reusing its ID, without touching shared code. A picked rule is skipped when its `runsWhen` is false, and otherwise passes or fails on `passes`. "Instrument open" runs only when "instrument found" holds, so after "instrument not found" it is skipped, not failed, and there is no list of rule dependencies to keep. The highest-priority failure decides, and the report keeps every rule's result (agreed 2026-10-19).
 5. **Decision.** With no failure the payment moves on: `ACCEPTED`, `SCHEDULED`, or the representment. A failure is `DECLINED` with that rule's decline code, or `DISALLOWED` for a push payment. There is no review outcome, since the state model has no state for one.
 6. **Commit.** One guarded commit, whose timeline row in `trans_lfcyc_event` keeps the failed rules' IDs in its event JSON. A metric, `billpay_verification_declines_total`, counts declines by step and rule (agreed 2026-10-18).
 
@@ -540,72 +540,71 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 - An activity returns what a system said, such as a closed account or no valid mandate, as a fact. Only an error throws, and errors are retried, so an outage never declines a payment and a business "no" is never retried.
 - A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, so they change with a release and no deploy. The Router passes them to the workflow in the plan key, as values from the config version it pins (agreed 2026-10-18).
 - A rule's logic changes with a deploy. Worker Versioning keeps a running payment on the rules it started with, and Reverify uses the build and config of the due date, which is what a recheck should use.
-- The stage implementation picks the checks and rules, never a flag inside a rule: `PaymentVerifyStageWithMandate` adds the Mandate check and its rules.
-- Verify's implementations differ only in their checks: the Instrument check (with the verification token check for bank confirmation), the Options check, and the Mandate check. Nothing else picks a Verify: not what the payment waited for, and not its account type (agreed 2026-10-18).
-- The checks and the rule catalog sit in `core/lib/verification/`, the rules in `core/lib/verification/rules/`. Like stage code, they depend only on activity interfaces.
-- Conditions don't change without a deploy for now. If business teams need that later, simple conditions could move into the release as expressions, such as CEL, pinned with the config version.
+- Nothing inside a check or a rule asks which market or behaviors apply: their `appliesTo` picks them. A rule's `runsWhen` starts with the check it reads, such as `ran(MANDATE)`, so the Mandate check's rules are skipped for a payment that didn't run it. GB's funds rule names GB and bank confirmation in its own `appliesTo`, as `GBFundsCheck` does (agreed 2026-10-19).
+- Verify has one flow, and only its checks vary: the Instrument and Options checks, the Token check for bank confirmation, the Mandate check, and GB's Funds check. Nothing else changes Verify: not what the payment waited for, and not its account type (agreed 2026-10-18).
+- The shared checks sit in `core/lib/verification/checks/`, and the shared rules, grouped in `RuleSet` beans with the specifications they use, in `core/lib/verification/rules/`. A market's own checks and rules sit in its module, such as `GBFundsCheck` and GB's funds rule in `market/gb/`. Like stage code, they depend only on activity interfaces (agreed 2026-10-19).
+- Conditions don't change without a deploy for now. If business teams need that later, simple conditions could move into the release as expressions, such as CEL, pinned with the config version. A CEL expression would be one more kind of specification.
 
 ### Plan keys and stage lookup
 
-- The Router pins a **plan key** at start: the market, the journey, the resolved behaviors and the market's config version. The market is there so a market override can match, such as GB's for Pay with Bank Transfer (agreed 2026-10-18). The key also carries the market's rule settings from that version, for the [verification rules](#verification-rules), and for a payment that waits for the customer, the market's confirmation window, which its timer uses (agreed 2026-10-18).
-- A KSP-built index maps each behavior combination to its stage implementations, and the most specific match wins. A market override is a more specific match for that market. KSP works out the winner for every combination while the code compiles and writes the result as a table: for each step, one row per combination, keyed only by the behaviors that step's implementations declare, and rows of their own for a market with overrides. The workflow reads its plan key and, for each step, reads one row: its market's own row if there is one, otherwise the shared row (agreed 2026-10-18). Stage objects are never passed into a workflow.
-- KSP picks each row's implementation in this order. An implementation must match everything it declares, and must declare every value in the row that the step's default can't handle. A market's own implementation beats the shared ones in that market, and a row in that market with a value the market's own implementation declares runs only on one of the market's implementations: if none can take it, the row is left out of that market's manifest, so provisioning refuses a release that needs it instead of running a shared implementation that skips the market's check (Proposed). Then the one that declares the most behaviors wins. Two left level fail the build, naming the row; a row with none left is not written, so the build can't run that combination (agreed 2026-10-18).
+- The Router pins a **plan key** at start: the market, the journey, the resolved behaviors and the market's config version. The market is there so a market's own classes can apply, such as GB's Funds check (agreed 2026-10-18). The key also carries the market's rule settings from that version, for the [verification rules](#verification-rules), and for a payment that waits for the customer, the market's confirmation window, which its timer uses (agreed 2026-10-18).
+- Nothing maps a plan key to classes by hand: no `when`, no `if` and no list to edit. Each step's stage, and each check or method a stage uses, such as Execute's realtime or batch clearing, is a **strategy**: a small class that names its job, its **key**, and says where it applies, its **`appliesTo`** (agreed 2026-10-19).
+- `appliesTo` holds a market or none, an account type or none, the behaviors that must be Y and the behaviors that must be N. Empty means everywhere. It is data, never code, so the registry can compare two of them (agreed 2026-10-19).
+- One rule picks the strategies: for each key, the most specific strategy that applies wins. A strategy tied to a market beats one that isn't; after that, the one that names more behaviors wins. Strategies with different keys add up, so Verify runs every check that applies. Strategies with the same key compete: Execute's clearing key has a realtime and a batch strategy, and exactly one applies to any payment (agreed 2026-10-19).
+- Every strategy is a `@Singleton` bean, so Quarkus finds them all at build time and hands each kind over as `@All List<T>`. A **registry** for each kind, written once, works out the winners for every combination of market and behaviors when the app starts, so a lookup at runtime is a map read. Two strategies level for one key stop the app at start, and the error names them and the combination. A registry returns its strategies sorted by key, so a replay makes the same calls in the same order (agreed 2026-10-19).
+- Strategies hold no state. The workflow calls the **stage index**, `stageIndex.lookup(plan)`, on its own thread, where Temporal requires activity stubs to be made. The index makes the stubs there, picks each step's stage, and binds it to a `StageContext` that holds the plan key and the stubs, so workflow code calls `stages.verify.run(paymentId)` and never touches a stub. The worker passes the index to each workflow through the factory it registers the workflow with (agreed 2026-10-19).
 - The lookup runs inside the workflow, never in the Router: during a rolling deploy the Router and the workers can run different builds, so only the workflow's own build picks its classes (agreed 2026-10-18).
-- KSP also writes a report of every combination and the implementation each step gets for it. The report is checked in, and a test compares it with the build's, so a change to which class a combination runs is reviewed as a diff (agreed 2026-10-18).
-- The same tables are the build's **capability manifest**: a combination the build can run has a row in every step its journey runs. Provisioning checks each market profile against it. For a market with implementations of its own, the manifest says what that market can run (Proposed).
-- Every stage interface has a default implementation, and lists the behavior values its default can't handle, such as mandate authorization Y for Verify or a corporate account for Execute. A row with one of those values runs only on an implementation that declares it, so a market can't go live on an implementation that skips a check it needs (agreed 2026-10-18). A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
-- Every class that implements a `Payment{Step}Stage` interface carries the index annotation; KSP fails the build for one that doesn't, so no implementation is silently left out (agreed 2026-10-18).
+- Each step names the behaviors it must act on, such as mandate authorization and bank confirmation for Verify, and the keys it must fill, such as clearing for Execute. A combination can't run where one of those behaviors is Y but no strategy that applies names it, or where one of those keys is empty. From this the registries work out the build's **capability manifest** when the app starts: every combination that every step of its journey can run (agreed 2026-10-19). Provisioning checks each market profile against it. A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- A test writes a report: for each step, market and combination, the stage and the strategies it gets. The report is checked in, and the test fails when the build's differs, so a change to what a combination runs is reviewed as a diff (agreed 2026-10-18).
+- Quarkus only sees beans in modules that carry an index, so each module that holds strategies has an empty `META-INF/beans.xml`. A test compares the strategy classes on the classpath with what the registries hold, so a class Quarkus can't see fails the build (agreed 2026-10-19).
 - Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes code under a running payment.
 
-### Naming stage implementations
+### Naming stages and strategies
 
-Every stage interface is `Payment{Step}Stage`, such as `PaymentVerifyStage` and `PaymentReverifyStage`. An implementation keeps that name whole and adds what it serves after it, taken from its index declaration in this order (agreed 2026-10-18):
+Every stage interface is `Payment{Step}Stage`, such as `PaymentVerifyStage` and `PaymentReverifyStage`. Names are for people: the registry reads `appliesTo`, never a name (agreed 2026-10-19).
 
-1. `For{AccountType}`: `ForConsumer`, `ForCorporate` or `ForBusinessTravel`.
-2. `With{Behavior}` for each behavior it needs, joined with `And`, in the profile's order: `ArPosting`, `RealtimeClearing` (`BatchClearing` for N), `Mandate`, then `BankConfirmation`. A behavior it declares as N follows as `Without{Behavior}`, such as `WithoutArPosting`.
-3. `In{Market}`, for a market override only, such as `InGb`.
+- The stage every market runs is `DefaultPayment{Step}Stage`.
+- A market whose flow for a step really differs gets a stage of its own, named with the market's code first, `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`, in its module under `market/{m}/`. GB doesn't need one today: its Funds check is enough.
+- A check or a method is named for its job, such as `MandateCheck`, `TokenCheck`, `RealtimeClearing` and `BatchClearing`. A market's own starts with the market's code, such as `GBFundsCheck`.
+- A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code.
 
-The implementation that declares nothing is `DefaultPayment{Step}Stage`; it runs for every combination no other implementation matches. A name says what an implementation serves, never which activities it calls: the mandate check, for example, is a `PlansActivities` call inside Verify and Reverify, not a stage of its own.
+| A market... | What runs at Verify |
+| --- | --- |
+| Checks instruments and options only | `DefaultPaymentVerifyStage`, with `InstrumentCheck` and `OptionsCheck` |
+| Also requires mandate authorization | The same stage, plus `MandateCheck`, which asks Plans for the mandate details |
+| Also takes bank confirmation | The same stage, plus `TokenCheck`, which asks Payment Instruments whether the verification token is valid |
+| GB, Pay with Bank Transfer | The same stage, with `TokenCheck` and `GBFundsCheck`: whether the customer's bank account holds enough money for the payment (agreed 2026-10-18) |
 
-| Market does | Verify implementation (examples) | Activities it calls |
-| --- | --- | --- |
-| Instruments and Options checks only | `DefaultPaymentVerifyStage` | Payment Instruments, Payment Options |
-| Also mandate authorization | `PaymentVerifyStageWithMandate` | Payment Instruments, Payment Options, Plans |
-| Also bank confirmation | `PaymentVerifyStageWithBankConfirmation` | Payment Instruments, with the verification token check; Payment Options |
-| Both | `PaymentVerifyStageWithMandateAndBankConfirmation` | Payment Instruments, with the verification token check; Payment Options; Plans |
-| GB, Pay with Bank Transfer | `PaymentVerifyStageWithBankConfirmationInGb`, in `market/gb/stages/` | As for bank confirmation, plus the Funds check: whether the customer's bank account holds enough money for the payment (agreed 2026-10-18) |
+On the due date, Reverify runs `MandateCheck` again for a payment whose profile requires mandate authorization: the same class, which lists both steps. Execute works the same way: `RealtimeClearing` applies when realtime clearing is Y, and `BatchClearing` when it is N.
 
-On the due date, a payment whose profile requires mandate authorization runs `PaymentReverifyStageWithMandate`, which asks Plans again. Execute follows the same rule: `DefaultPaymentExecuteStage` clears in batch, and `PaymentExecuteStageWithRealtimeClearing` clears in real time.
+- A name says what a class does, never which activities it calls: the mandate check is a `PlansActivities` call inside Verify and Reverify, not a stage of its own.
+- Calls that every stage of a step makes the same way live in plain helper functions, never in a base class.
+- Shared stages sit in `core/lib/stages/impl/{step}/` and shared checks in `core/lib/verification/checks/`. A market's own classes sit in its module under `market/{m}/`.
 
-- KSP builds each implementation's expected name from its declaration and fails the build when the class name differs.
-- Calls that every implementation of a step makes, such as Verify's Instruments and Options calls, live in a plain helper function, never in a base class.
-- Each step's implementations sit in one folder, such as `core/lib/stages/impl/verify/`.
+### Why strategies and a registry
 
-### Why KSP builds the index
+The first design gave every combination of behaviors a stage class of its own, and KSP, a compiler plugin, worked out the most specific class for each combination. Classes multiply that way: two optional checks need up to four Verify classes, and three need eight. With one strategy per job, three optional checks are three classes, and every combination of them comes free. The registry needs no tool to own, and a market's own variation is one new class (agreed 2026-10-19).
 
-KSP (Kotlin Symbol Processing) runs while the code compiles. It reads each stage class's annotation and constructor, writes the `StageIndex` tables, the capability manifest and the report, and fails the build at the class for a tie, a missing default, a missing annotation or a name that doesn't match its declaration. A tie's error names the combination where two implementations are level. A combination with a value no implementation declares is left out of the manifest (agreed 2026-10-18). It was chosen because:
+| Option | Why not |
+| --- | --- |
+| A stage class per combination, picked by KSP | Classes grow with every combination, and a processor on an experimental KSP API has to work out the winners |
+| A hand-written index: a `when`, a map or a table | Every new market or variation means editing it, and a forgotten line silently runs the default |
+| Java SPI (`ServiceLoader`) | It finds classes listed in `META-INF/services` at runtime, through reflection, but doesn't choose between them, and a class left out of the file is never found |
+| A classpath scan at startup | Reflection, and ClassGraph finds nothing in a native image |
+| `if` or `when` on behaviors inside a stage | A step's variation spreads through its code instead of living in one class per job |
 
-- Mistakes stop the compile, at the class that caused them.
-- The lookup at runtime is one read from a generated table, with no branches, reflection, I/O or container call, so replay finds the same classes. Worker Versioning pins the build, so a running payment keeps its index.
-- Stages are built on the workflow's own thread, where Temporal requires activity stubs to be made. Quarkus's CDI never sees them, and if workers ever move to a GraalVM native image, the index needs no reflection config there.
-- Adding an implementation is one edit: the annotated class.
+What the design costs:
 
-| Alternative | When a mistake shows up | Why not |
-| --- | --- | --- |
-| A hand-written registry, as a map or a small DSL | Never: a forgotten line silently runs the default | Every class needs a second edit |
-| A registry plus a ClassGraph test | In tests | The close second: simpler, but every class still needs a second edit. The one to switch to if nobody owns the processor |
-| A classpath scan at startup, then reflection | At boot, per environment | It needs reflection config, and ClassGraph finds nothing in a native image |
-| A Quarkus extension, a `@BuildStep` over Jandex | At build, but not at a source line | A module missing from the index silently drops out. Two extension modules to maintain |
-| CDI `Instance<T>` with qualifiers | At runtime | Stages can't be beans: their activity stubs must be made on the workflow's thread |
-| `ServiceLoader` | At runtime | A missing entry is skipped silently |
-| kapt | At compile | The same model as KSP, but slower, and Android's guidance lists it as in maintenance mode |
-
-KSP processes one Gradle module at a time: each module that holds implementations writes the declarations it found, and the app joins them, works out the winners and writes the table, the manifest and the report, with an experimental KSP API, which a KSP upgrade can change. KSP's supported Kotlin versions need checking against the build's, and whether KSP reruns in Quarkus dev mode hasn't been checked.
+- A strategy holds no state, so a stage takes its stubs through a `StageContext`.
+- A mistake such as a tie shows up when the app starts and in unit tests, not in the compiler. Both happen before a merge.
+- A module that holds strategies must carry an index for Quarkus to see it, and a test checks that none is missed.
 
 ### Rules
 
 - Workflows and stages are never `abstract`: composition over inheritance.
-- There is one implementation of each workflow. Workflows are composed from different stage implementations, never copied per market.
+- Strategies, the stages, checks and methods the registries pick, hold no state: everything a payment needs arrives in its `StageContext` (agreed 2026-10-19).
+- `appliesTo` is data: a market, an account type and behaviors, never a function (agreed 2026-10-19).
+- There is one implementation of each workflow. A workflow gets its stages from the stage index and is never copied per market.
 - Activities are shared across markets. Pass IDs, not payment objects; activities load what they need. The one exception is data from Payment Options and Payment Instruments: what a stage gets there, clear text included, travels in the workflow to the later calls of the same run that need it, such as Execute's and Fulfil's. Workflow history holds it encrypted by the payload codec (agreed 2026-10-18).
 - A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle. Nothing is written before the workflow starts, so the caller's path has no extra database call. From Capture on, stages pass the ID. A workflow that a Work Tracker row starts takes the payment ID, since the payment is already in Oracle (agreed 2026-10-18).
 - Set search attributes once, at start. No signals or queries on the hot path: what a caller sends a running workflow, the confirm and the no, goes in as an update, which answers the caller (agreed 2026-10-18).
@@ -761,8 +760,8 @@ A create that needs the customer to confirm their bank details, or that One-Data
 
 - **Capture**, which also stores the IDs of the pending payments the customer was shown, for a go-ahead, since they came with the request. Then, for bank confirmation only, **RequestConfirmation** asks the market's provider for the customer's redirect link, with one try that fits inside the API's wait, and stores the link and the provider's reference on the payment (agreed 2026-10-18). The caller's update returns `PENDING` with the link or the pending list, and the `PENDING` event goes out. If the provider gives no link, because it is down or too slow, the payment is `DECLINED` instead, and the workflow ends after its announcement. A payment that needs both waits once: the reply carries the link and the list, and the bank confirm is the go-ahead. The provider only checks the customer's bank details and never moves money; Billpay moves it in Execute, after the confirm (agreed 2026-10-18).
 - **The wait:** a durable timer for the market's confirmation window plus a short grace (Proposed: 30 s), so a confirm sent at the last moment still lands. Nothing else runs while the workflow waits.
-- **The confirm:** `POST /payments/{payment-id}/confirm` sends the `confirm` update with the update ID `{paymentId}-confirm`, so a repeated confirm attaches to the same update and gets the same answer. The update's validator turns a confirm away once the workflow has an answer or its timer has fired, which writes nothing to history, and the API answers 409. Verify runs the implementation the payment's behaviors pick, as for any payment: with bank confirmation, the one below, and after a go-ahead, the usual checks (agreed 2026-10-18). A go-ahead still goes through if the earlier payment was decided while the customer looked.
-- **Verify:** `ACCEPTED`, `SCHEDULED` for a scheduled create's go-ahead, or `DECLINED`, in one commit guarded on `PENDING`. The confirm's update returns here: the same early return as the create's. The provider does the verification, so Verify doesn't call it. Before it accepts the payment, Verify's bank-confirmation implementation asks Payment Instruments whether the verification token it holds for the payment's instrument is valid, to guard against fraud (agreed 2026-10-17). Payment Instruments decides what makes a token valid (agreed 2026-10-18). A payment without a valid token is `DECLINED` (agreed 2026-10-18). In GB, Verify also checks that the customer's bank account holds enough money for the payment, and declines it if not (agreed 2026-10-18).
+- **The confirm:** `POST /payments/{payment-id}/confirm` sends the `confirm` update with the update ID `{paymentId}-confirm`, so a repeated confirm attaches to the same update and gets the same answer. The update's validator turns a confirm away once the workflow has an answer or its timer has fired, which writes nothing to history, and the API answers 409. Verify runs the checks the payment's behaviors pick, as for any payment: with bank confirmation, the Token check below, and after a go-ahead, the usual checks (agreed 2026-10-18). A go-ahead still goes through if the earlier payment was decided while the customer looked.
+- **Verify:** `ACCEPTED`, `SCHEDULED` for a scheduled create's go-ahead, or `DECLINED`, in one commit guarded on `PENDING`. The confirm's update returns here: the same early return as the create's. The provider has already verified the customer's bank details, so Verify doesn't ask it about them. Before it accepts the payment, Verify's Token check asks Payment Instruments whether the verification token it holds for the payment's instrument is valid, to guard against fraud (agreed 2026-10-17). Payment Instruments decides what makes a token valid (agreed 2026-10-18). A payment without a valid token is `DECLINED` (agreed 2026-10-18). In GB, GB's Funds check also asks the provider whether the customer's bank account holds enough money for the payment, and a rule declines the payment if not (agreed 2026-10-18).
 - Then **Execute** and **Fulfil**, as for pay today, in the same workflow. A scheduled payment stops at `SCHEDULED` with its `SCHED_EXEC` row (Proposed), and a corporate one at `ACCEPTED` with its `ALLOC_REQUEST` row, as in their usual journeys.
 - **The no:** `DeletePayment.v1` sends the `decline` update with the update ID `{paymentId}-no`. Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, with no window check. A no and a yes from two tabs are two updates to one workflow: the first one it accepts wins, and the validator turns the other away with 409. A repeated no gets `CANCELLED` again (agreed 2026-10-18).
 - **The timer:** when it fires with no answer, Cancel moves the payment to `CANCELLED`, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven, as for any cancel. The workflow never relies on a terminate or an execution timeout: either would leave the payment `PENDING`, with nobody told.
@@ -799,14 +798,17 @@ interface CreateImmediatePaymentWorkflow {
     fun decision(): PaymentDecision
 }
 
-class CreateImmediatePaymentWorkflowImpl : CreateImmediatePaymentWorkflow {
+class CreateImmediatePaymentWorkflowImpl(
+    private val stageIndex: StageIndex,              // passed in by the factory the worker registers
+) : CreateImmediatePaymentWorkflow {
     private var decided: PaymentDecision? = null
 
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        // Stage implementations come from the plan key, looked up at runtime. On the Online cluster
-        // the stubs it builds for Payment Instruments, Payment Options and Plans are local activities,
-        // so Capture, Verify and its commit all run inside this first workflow task.
-        val stages = StageIndex.lookup(plan)
+        // Each step's stage, and the checks and methods it uses, come from the plan key at runtime.
+        // On the Online cluster the stubs the index makes for Payment Instruments, Payment Options
+        // and Plans are local activities, so Capture, Verify and its commit all run inside this
+        // first workflow task.
+        val stages = stageIndex.lookup(plan)
         val paymentId = request.paymentId              // One-Data made it
 
         stages.capture.run(request)                    // PENDING: writes the request, insert-if-absent
@@ -859,14 +861,14 @@ interface CreatePaymentIntentWorkflow {
     fun checkDecline()
 }
 
-class CreatePaymentIntentWorkflowImpl : CreatePaymentIntentWorkflow {
+class CreatePaymentIntentWorkflowImpl(private val stageIndex: StageIndex) : CreatePaymentIntentWorkflow {
     private var decided: PaymentDecision? = null     // the create's answer
     private var answer: Answer? = null               // YES or NO: the first one accepted wins
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        val stages = StageIndex.lookup(plan)
+        val stages = stageIndex.lookup(plan)
         val paymentId = request.paymentId
         stages.capture.run(request)                                    // PENDING: the request, and any pending IDs
         decided = if (plan.requiresBankConfirmation)
@@ -1064,7 +1066,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 1. **Admit.** The market, account type and API must be live in this environment, checked against billpay-core's in-memory copy of the onboarding config, so admission adds no call; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. A held create that arrives after its market was taken out of service is captured and declined instead ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). A Work Tracker row is refused only if its market was taken out of service after the row was written: its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
 2. **Pick the journey** from the routing table. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18). A create that comes with other pending payments' IDs waits for a go-ahead only when the market's go-ahead setting is on; otherwise the Router ignores the IDs (agreed 2026-10-18).
 3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
-4. **Pin the plan key:** the market, the journey, the resolved behaviors and the config version (the market is there so a market override can match, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window (agreed 2026-10-18). A go-ahead adds nothing to the plan key: the workflow the Router picks is what makes the payment wait, and no stage is picked for it (agreed 2026-10-18).
+4. **Pin the plan key:** the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes can apply, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window (agreed 2026-10-18). A go-ahead adds nothing to the plan key: the workflow the Router picks is what makes the payment wait, and no stage is picked for it (agreed 2026-10-18).
 5. **Place:** cluster, task queue, priority, fairness key and workflow ID. While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
 6. **Start** with the journey's start mode.
 
@@ -1509,7 +1511,7 @@ A market and an account type disagree on Raven when billpay-ui holds a setting f
 
 ### Capability manifest
 
-Every build ships a manifest of the behavior combinations it can run, returned by `GET /provisioning/capabilities`. A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and provisioning stops at step 1 until that build is deployed.
+Every build ships a manifest of the behavior combinations it can run, returned by `GET /provisioning/capabilities`. The stage registries work it out when the app starts, from the strategies in the build ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and provisioning stops at step 1 until that build is deployed.
 
 ### What changes in today's billpay-ui code
 

@@ -14,7 +14,7 @@ Four kinds of diagram, in the order you should reach for them.
 
 | Kind | Built with | Examples |
 | --- | --- | --- |
-| **Mermaid** | A fenced ` ```mermaid ` block in the page | Sequence diagrams, the payment state model, the domain model |
+| **Mermaid** | A fenced ` ```mermaid ` block in the page | Sequence diagrams, the payment state model, the domain model, and the UML class diagrams of stages and rules (Build: Stage Index and Stages) |
 | **Data-driven components** | React, props | `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, and the table set |
 | **CSS box diagrams** | React, CSS grid or flex | `LandscapeMap`, `ClusterMap`, `RouteLedger` |
 | **Coordinate SVG** | React, hand-placed coordinates | `LegacyEstateMap`, `HADiagram`, `CorporateTracks`, `DomainModelMap`, `OnboardingFlow` |

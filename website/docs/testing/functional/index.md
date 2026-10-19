@@ -17,7 +17,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Unit',
       to: '/docs/testing/functional/unit',
-      desc: `Workflow, stage and activity tests on Temporal's testing primitives, with each stage implementation and the plan-key lookup.`,
+      desc: `Workflow, stage and activity tests on Temporal's testing primitives, with each stage, check and method, and the plan-key lookup.`,
     },
     {
       term: 'Integration',

@@ -374,7 +374,7 @@ export const BANDS = [
             wfId: '{paymentId}-init',
             answer: 'once Verify decides',
             chips: five('CONSUMER', 'Y', 'Y'),
-            behave: "Example values. Bank confirmation picks Verify's bank-confirmation implementation. After a go-ahead, the payment's behaviors pick Verify as for any payment.",
+            behave: "Example values. Bank confirmation adds the token check to Verify. After a go-ahead, the payment's behaviors pick Verify's checks as for any payment.",
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
@@ -526,7 +526,7 @@ export const BANDS = [
             wfId: '{paymentId}-init',
             prio: [3, '"inbound"'],
             chips: five('CONSUMER', 'N', 'N'),
-            behave: "Example values. Verify's inbound implementation answers ACCEPTED or DISALLOWED; only a push payment can be disallowed.",
+            behave: "Example values. Verify answers ACCEPTED or DISALLOWED, and only a push payment can be disallowed.",
             move: {Verify: 'ACCEPTED or DISALLOWED'},
             then: [PAID],
           },
@@ -655,7 +655,7 @@ export const BANDS = [
             prio: [2, 'its payment ID', "The queue's default per-key limit, so one payment can't take the whole queue."],
             today: true,
             chips: five('CORPORATE', 'N', 'N'),
-            behave: "Example values, from today's config. Execute's corporate implementation runs.",
+            behave: "Example values, from today's config. For a corporate parent, Execute only clears, once, and releases the legs.",
             move: {Reverify: 'ALLOCATED to ACCEPTED or DECLINED'},
             notes: {
               Execute:

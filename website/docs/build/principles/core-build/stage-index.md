@@ -1,6 +1,6 @@
 ---
 title: Building the Stage Index
-description: 'The stage index is how a workflow finds its stage classes, and how provisioning learns what the build can run.'
+description: 'The stage index is how a workflow finds the stage for each step, and the checks and methods that stage uses.'
 sidebar_label: Stage Index
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Building the Stage Index
 
-<Lead>The stage index is how a workflow finds its stage classes, and how provisioning learns what the build can run. KSP (Kotlin Symbol Processing) works out which class every combination runs while the code compiles, and writes the answers as a table. A mistake stops the build at the class that caused it, and a running payment only reads a row.</Lead>
+<Lead>The stage index is how a workflow finds the stage for each step, and the checks and methods that stage uses. Nothing maps a payment to classes by hand: every class says where it applies, one rule picks the most specific, and a market's own variation is one new class.</Lead>
 
 ## What the index has to do
 
@@ -16,189 +16,451 @@ Three parts of Billpay depend on the index, each at a different moment:
 
 | When | Who uses it | What it must get right |
 | --- | --- | --- |
-| A payment runs | The workflow, through `StageIndex.lookup(plan)` | The same classes on every replay, built on the workflow's own thread |
+| A payment runs | The workflow, through `stageIndex.lookup(plan)` | The same classes, called in the same order, on every replay |
 | A release is provisioned | Provisioning, through `GET /provisioning/capabilities` | Only the combinations the build really runs |
-| The code compiles | Whoever adds or changes a stage | A mistake fails the build, pointing at the class |
+| A change is built | Whoever adds or changes a class | A mistake fails the build before it merges, and names the class |
 
-The lookup runs once, at the top of the workflow's method, and hands back stage objects built inside that execution. They have to be: a stage holds activity stubs, and Temporal only lets a workflow make stubs on its own thread. [Building Stages](./stages.md#how-a-stage-gets-picked) shows the call. This page is about what answers it.
+A step varies by behaviors and by market. If every combination got a class of its own, the classes would multiply: two optional checks need up to four versions of Verify, and three need eight. So each job is one class, and a payment gets the sum of the jobs that apply to it.
 
-## How KSP builds it
+## The idea
 
-Every module that holds stage classes, `core/lib/stages/impl` and each `market/{m}/stages`, runs the processor as part of its compile:
+Think of airport security. Every traveler goes through the same lane in the same order. What changes is which checks they get, and each check has a sign: international flights only, or flights to one country only. Someone reads the boarding pass, collects every check whose sign matches, and sends the traveler through. A new check needs a new sign, and nobody rebuilds the lane.
 
-1. It finds every class that implements a `Payment{Step}Stage` interface, and reads its annotation and its constructor.
-2. It writes down what it found. The app module joins every module's findings, works out the winning class for every combination, and writes three things: the table the workflow reads, the capability manifest, and a report of every combination.
-3. It checks the result, and fails the build at the class when:
-   - two classes tie for a combination, and the error names that combination;
-   - a stage interface has no default;
-   - a class implements a stage interface without the annotation, which would otherwise leave it out of the table without a word;
-   - a class name doesn't match its annotation, under the [naming rule](../../../design/component-model/stages.md#naming-implementations).
+| At the airport | In Billpay |
+| --- | --- |
+| The boarding pass | The plan key, which the [Router](./router.md) pins when the payment starts: the market, the account type and the resolved behaviors |
+| The lane | A stage: one step's fixed flow, such as Verify's, which makes every call at once, applies the rules and commits once |
+| A check and its sign | A strategy and its `appliesTo` |
+| The person reading the pass | A registry, one for each kind of strategy |
 
-## How a row gets its class
+## The pieces
 
-Each step has its own table, keyed only by the behaviors that step's classes declare. A behavior that changes nothing about a step stays out of its key, which keeps the table small. Verify's classes differ only in their checks, so they declare just mandate authorization and bank confirmation, and Verify's key has 2 × 2 = 4 rows. If a Verify class ever declared AR posting, the key would gain it on the next build.
+| Piece | What it is |
+| --- | --- |
+| Strategy | A small class that does one job for a step, such as asking Plans for a mandate. Stages are strategies too, and so are methods such as Execute's realtime or batch clearing. A strategy keeps no state, so one instance serves every payment. The verification rules are picked the same way |
+| Key | The name of the job, such as `MANDATE` or `CLEARING`. Strategies with different keys add up. Strategies with the same key compete, and one wins |
+| `appliesTo` | Where the strategy applies: a market or every market, an account type or every account type, the behaviors that must be Y and the behaviors that must be N. Empty means everywhere. It is plain data, not code, so two of them can be compared |
+| Registry | One small class, written once and used for every kind of strategy. It gets every strategy of its kind, works out the winners for every combination when the app starts, and after that answers each payment with a lookup |
+| Stage index | The workflow's one way in. On the workflow's own thread it makes the activity stubs, the handles through which a workflow calls other systems, picks each step's stage and hands back stages that are ready to run |
 
-KSP picks each row's class in this order:
+Every class the registries pick is a strategy. In this class diagram, drawn for Verify and Execute's clearing, a solid arrow with a hollow head means "is a kind of" and a dashed one means "implements":
 
-1. A class is a candidate when everything it declares matches the row.
-2. If the row has a value the step's default can't handle, such as mandate authorization for Verify, the class must declare that value. A class that doesn't would skip a check the payment needs.
-3. In a market that has a class of its own, that class beats the shared ones. A row in that market with a value the market's class declares runs only on one of the market's classes; if none can take it, the row is left out of that market's manifest (Proposed).
-4. Of the classes left, the one that declares the most wins.
-5. If two are still level, the build fails and names the row. If none is left, the row isn't written, so the build can't run that combination.
+```mermaid
+classDiagram
+  direction LR
+  class Strategy~K~ {
+    <<interface>>
+    +key K
+    +appliesTo AppliesTo
+  }
+  class PaymentVerifyStage {
+    <<interface>>
+    +run(ctx, paymentId)
+  }
+  class Check {
+    <<interface>>
+    +steps Set~Step~
+    +fetch(ctx, paymentId)
+  }
+  class ClearingMethod {
+    <<interface>>
+    +clear(ctx, paymentId)
+  }
+  class DefaultPaymentVerifyStage
+  class MandateCheck
+  class GBFundsCheck
+  class RealtimeClearing
+  class BatchClearing
+  Strategy <|-- PaymentVerifyStage
+  Strategy <|-- Check
+  Strategy <|-- ClearingMethod
+  PaymentVerifyStage <|.. DefaultPaymentVerifyStage
+  Check <|.. MandateCheck
+  Check <|.. GBFundsCheck
+  ClearingMethod <|.. RealtimeClearing
+  ClearingMethod <|.. BatchClearing
+```
+
+`InstrumentCheck`, `OptionsCheck` and `TokenCheck` sit beside `MandateCheck` and look the same. `GBFundsCheck` is the one that lives in GB's module.
+
+These are the classes that do the picking. A plain arrow means "uses", and a dashed one means "makes":
+
+```mermaid
+classDiagram
+  direction TB
+  class StageIndex {
+    +lookup(plan) Stages
+  }
+  class StageContext {
+    +plan PlanKey
+    +stubs Stubs
+  }
+  class Registry~S~ {
+    +forPlan(plan) List~S~
+    +one(plan) S
+  }
+  class DefaultPaymentVerifyStage {
+    +run(ctx, paymentId)
+  }
+  class RuleRegistry {
+    +evaluate(plan, step, facts)
+  }
+  StageIndex ..> StageContext : makes
+  StageIndex --> Registry : picks the stage
+  StageIndex --> DefaultPaymentVerifyStage : binds to ctx
+  DefaultPaymentVerifyStage --> Registry : asks for its checks
+  DefaultPaymentVerifyStage --> RuleRegistry : asks for its rules
+```
+
+## The one rule
+
+For each key, the most specific strategy that applies wins:
+
+1. A strategy applies when the payment matches everything its `appliesTo` names.
+2. A strategy tied to a market beats one that isn't. That is what makes a market the exception.
+3. After that, the strategy that names more behaviors wins.
+4. If two are still level, the app refuses to start, and the error names both and the combination.
+
+A strategy whose key no other strategy shares simply runs wherever it applies. That is how one payment ends up with several checks.
+
+## The complete picture
+
+Here is everything at once for the payment the worked example below follows: a GB customer paying with Pay with Bank Transfer. The workflow finds its stage, the stage finds its checks, the checks make their calls, and the rules decide:
+
+```mermaid
+---
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
+sequenceDiagram
+  autonumber
+  participant W as Workflow
+  participant X as Stage index
+  participant S as Verify stage
+  participant C as Check registry
+  participant A as Activities
+  participant R as Rule registry
+  participant P as PaymentStore
+
+  Note over X,R: When the app starts, Quarkus hands each registry every class of its kind, and each registry works out every combination once. A tie stops the start.
+
+  W->>X: lookup(plan): GB, consumer, bank confirmation Y
+  X->>X: makes the stubs and picks the Verify stage
+  X-->>W: the stages, bound to this payment
+  W->>S: verify.run(paymentId)
+  S->>C: which checks apply?
+  C-->>S: Instrument, Options, Token, GBFunds
+  Note over C: GBFundsCheck is picked because it exists and says GB. Nothing else names GB.
+  par every call at once
+    S->>A: Payment Instruments: the instrument
+  and
+    S->>A: Payment Instruments: the token
+  and
+    S->>A: Payment Options: the amount
+  and
+    S->>A: the provider: the funds
+  end
+  A-->>S: four answers, one set of facts
+  S->>R: which rules apply, and do they pass?
+  Note over R: Each rule: runsWhen first, then passes. A rule that doesn't fit the facts is skipped, not failed.
+  R-->>S: GB's funds rule failed, so DECLINED
+  rect rgba(102,169,226,0.40)
+    S->>P: one guarded commit: DECLINED
+  end
+  S-->>W: the outcome
+```
+
+What the design does for this payment:
+
+- No code maps the payment to classes. Picking the stage (step 2), the checks (step 5) and the rules (step 12) are lookups in answers the registries worked out when the app started.
+- GB's difference is one class in GB's module. The stage, the shared checks and the shared rules are the same code every market runs.
+- The calls run in parallel and the commit happens once, so the customer's answer isn't held up by a list of checks run one after another.
+- The order of the checks is fixed, so a replay of this workflow makes the same calls in the same order.
 
 ## A worked example: Verify
 
-These are Verify's classes and what each one declares. The interface also says its default can't handle mandate authorization or bank confirmation.
+Verify decides whether a payment can go ahead. Its flow never changes: it makes its checks' calls at once, gathers the answers into one set of facts, runs the [verification rules](./stages.md#writing-verification-rules) and commits once. What varies from payment to payment is which checks run.
 
-| Class | Declares |
-| --- | --- |
-| `DefaultPaymentVerifyStage` | Nothing |
-| `PaymentVerifyStageWithMandate` | Mandate authorization |
-| `PaymentVerifyStageWithBankConfirmation` | Bank confirmation |
-| `PaymentVerifyStageWithMandateAndBankConfirmation` | Mandate authorization, bank confirmation |
-| `PaymentVerifyStageWithBankConfirmationInGb` | Bank confirmation, in GB |
+### The checks
 
-GB has a class of its own because a Pay with Bank Transfer payment there needs one more check: whether the customer's bank account holds enough money for the payment. That is what a market override is for, a check that only one market makes. The GB class runs the shared bank-confirmation checks and adds the funds check.
+Five checks exist today. Each is a class, and each says where it applies:
 
-Two things that could look like reasons for a Verify class are deliberately not. A go-ahead only makes the workflow wait for the customer's yes, and picks no stage. The account type changes what Verify's commit writes, not which checks run: a corporate payment gets its `ALLOC_REQUEST` row from its account type, the way a future-dated payment gets its `SCHED_EXEC` row from its date, whichever Verify runs.
+| Check | Key | `appliesTo` | What it asks |
+| --- | --- | --- | --- |
+| `InstrumentCheck` | `INSTRUMENT` | Everywhere | Payment Instruments, about the payment's instrument |
+| `OptionsCheck` | `OPTIONS` | Everywhere | Payment Options, whether it accepts the amount |
+| `TokenCheck` | `TOKEN` | Bank confirmation Y | Payment Instruments, whether the verification token it holds for the instrument is valid |
+| `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
+| `GBFundsCheck` | `FUNDS` | GB, bank confirmation Y | The bank-confirmation provider, whether the customer's bank account holds enough money for the payment |
 
-Run the rules over the four rows and each gets one class. In this table and the next, a class goes by what follows `PaymentVerifyStage` in its name, so `WithMandate` is `PaymentVerifyStageWithMandate`, and `Default` is `DefaultPaymentVerifyStage`.
-
-| Mandate | Bank confirmation | Class |
-| --- | --- | --- |
-| N | N | `Default` |
-| Y | N | `WithMandate` |
-| N | Y | `WithBankConfirmation` |
-| Y | Y | `WithMandateAndBankConfirmation` |
-
-Rule 2 does the work here. The default can't take a row with a mandate or bank confirmation, and a class that declares only one of the two can't take a row with both, so every row is left with exactly one class. GB has one row of its own, bank confirmation without a mandate, where its class wins by rule 3. A GB payment with both is the case to watch. The GB class can't take it, because it doesn't declare mandate authorization, and the shared class would skip the funds check. So rule 3 leaves that row out of GB's manifest, and a GB release that needs it is refused until GB has a class that declares both (Proposed).
-
-At runtime the workflow builds Verify's key from its plan key (mandate, bank confirmation) and reads one row, looking in its market's own rows first:
-
-| Payment | Key | Class |
-| --- | --- | --- |
-| A US consumer pays by bank (Plaid) | N, Y | `WithBankConfirmation` |
-| A GB consumer pays by bank | N, Y | `WithBankConfirmationInGb`, with the funds check |
-| A consumer in a market with mandates | Y, N | `WithMandate` |
-| A corporate payment in a market with mandates | Y, N | `WithMandate` |
-| A GB consumer says yes to a go-ahead, with no bank confirmation | N, N | `Default` |
-
-The first two payments have the same key and run different classes, because only GB has a row of its own: the GB payment also has its bank balance checked. The corporate payment runs the same class as the consumer one, and its commit also writes the `ALLOC_REQUEST` row. The go-ahead changes nothing here: it only made the workflow wait.
-
-## What the build writes
-
-The table itself is data, read by one small class:
+In code, a check is this small:
 
 ```kotlin
-class StageTable<T>(
-    private val keyOf: (PlanKey) -> StageKey,
-    private val rows: Map<StageKey, (Stubs, PlanKey) -> T>,
-    private val overrides: Map<Market, Map<StageKey, (Stubs, PlanKey) -> T>>,
-) {
-    fun build(plan: PlanKey, s: Stubs): T {
-        val key = keyOf(plan)
-        val make = overrides[plan.market]?.get(key) ?: rows.getValue(key)
-        return make(s, plan)
+/** Where a strategy applies. Empty means everywhere. */
+data class AppliesTo(
+    val market: Market? = null,            // null: any market
+    val accountType: AccountType? = null,  // null: any type
+    val on: Set<Behavior> = emptySet(),    // must be Y
+    val off: Set<Behavior> = emptySet(),   // must be N
+)
+
+@Singleton
+class MandateCheck : Check {
+    override val key = CheckKey.MANDATE
+    // the same class checks again on the due date
+    override val steps = setOf(VERIFY, REVERIFY)
+    override val appliesTo =
+        AppliesTo(on = setOf(MANDATE_AUTHORIZATION))
+
+    // starts the call; the stage waits for every check
+    override fun fetch(ctx: StageContext, paymentId: String) =
+        Async.function(
+            ctx.stubs.plans::mandateDetails, paymentId)
+}
+
+// in market/gb/
+@Singleton
+class GBFundsCheck : Check {
+    override val key = CheckKey.FUNDS
+    override val steps = setOf(VERIFY)
+    override val appliesTo =
+        AppliesTo(market = GB, on = setOf(BANK_CONFIRMATION))
+
+    override fun fetch(ctx: StageContext, paymentId: String) =
+        Async.function(
+            ctx.stubs.bankConfirmation::funds, paymentId)
+}
+```
+
+*(A sketch: the names are illustrative.)*
+
+- `@Singleton` makes the class a bean: Quarkus creates one instance and hands it to anything that asks for its type. That is how the check reaches the registry, with no list to edit.
+- `steps` lets one class serve two stages. `MandateCheck` runs at Verify, and again at Reverify on the due date.
+- The check takes the stubs it calls through from `ctx` and keeps nothing between payments.
+- GB's check lives in GB's module. GB needs no Verify class of its own, because this class existing is enough.
+
+### The stage
+
+```kotlin
+@Singleton
+class DefaultPaymentVerifyStage(
+    private val checks: CheckRegistry,
+    private val rules: RuleRegistry,
+) : PaymentVerifyStage {
+    override val key = VERIFY
+    override val appliesTo = AppliesTo()       // every market
+
+    override fun run(
+        ctx: StageContext, paymentId: String,
+    ): VerifyOutcome {
+        // every check that applies, sorted by key
+        val mine = checks.forPlan(ctx.plan, VERIFY)
+        // every call at once, then one set of facts
+        val facts = fetchAll(mine, ctx, paymentId)
+        // the rules that apply decide
+        val report = rules.evaluate(ctx.plan, VERIFY, facts)
+        val outcome = ctx.stubs.store.commitVerify(
+            paymentId, report.decision, report.failedRuleIds)
+        // the facts travel on to Execute and Fulfil
+        return outcome.copy(facts = facts)
     }
 }
 ```
 
-KSP writes the rest. For Verify, it looks something like this:
+*(A sketch.)*
 
-```kotlin
-// Generated. Verify's classes declare only mandate authorization and bank confirmation,
-// so its key has those two: 2 × 2 = 4 rows, each already decided.
-internal val VERIFY = StageTable<PaymentVerifyStage>(
-    keyOf = { p -> key(mandate = p.requiresMandateAuthorization, bank = p.requiresBankConfirmation) },
-    rows = mapOf(
-        key(mandate = N, bank = N) to ::defaultVerify,
-        key(mandate = Y, bank = N) to ::verifyWithMandate,
-        key(mandate = N, bank = Y) to ::verifyWithBankConfirmation,
-        key(mandate = Y, bank = Y) to ::verifyWithMandateAndBankConfirmation,
-    ),
-    overrides = mapOf(
-        GB to mapOf(
-            key(mandate = N, bank = Y) to ::verifyWithBankConfirmationInGb,
-        ),
-    ),
-)
+The stage never asks which market it is in or which behaviors are on. It asks the registries for its checks and its rules and runs the same flow every time, so there is no `if` on a behavior anywhere in Verify.
 
-// One factory per class, written from its constructor. s holds the stubs the workflow just made.
-private fun verifyWithMandate(s: Stubs, p: PlanKey) =
-    PaymentVerifyStageWithMandate(s.instruments, s.options, s.plans, p.ruleSettings, s.store)
-```
+### One payment, start to finish
 
-*(A sketch: the names are illustrative, and the processor's real output differs.)*
+A GB customer pays their bill with Pay with Bank Transfer. The Router pins the plan key: market GB, a consumer account, bank confirmation Y and mandate authorization N.
 
-Every decision was made while the code compiled, so at runtime nothing weighs one class against another, and the order of the rows doesn't matter. There is no reflection, classpath scan or container call either. A replay reads the same row for the same plan key and gets the same class, and Worker Versioning, Temporal's way of keeping a workflow on the build it started on, keeps a running payment on the same table.
+1. The Verify registry holds one stage, `DefaultPaymentVerifyStage`, which applies everywhere, so it runs.
+2. The check registry reads each check's `appliesTo` against the plan key:
 
-## Why the lookup stays in the workflow
+| Check | `appliesTo` | This payment |
+| --- | --- | --- |
+| `InstrumentCheck` | Everywhere | Runs |
+| `OptionsCheck` | Everywhere | Runs |
+| `TokenCheck` | Bank confirmation Y | Runs |
+| `MandateCheck` | Mandate authorization Y | Not picked |
+| `GBFundsCheck` | GB, bank confirmation Y | Runs |
 
-The Router builds the plan key, so it could read the table as well and hand each workflow its class names. It doesn't, because during a rolling deploy the Router and the workers can run different builds. A Router on the new build could name a class the worker's build doesn't have yet, or a worker on the new build could be told to run a class it no longer picks. When the workflow reads the table itself, the build that runs the stages is the build that chose them, and Worker Versioning keeps that pairing for the life of the payment.
+3. Four calls go out at the same time: two to Payment Instruments, one to Payment Options and one to the bank-confirmation provider. The stage waits for all four.
+4. The answers become one set of facts. The rule registry picks the payment's rules the same way it picked the checks: GB's funds rule names GB and bank confirmation, as its check does, and it runs because a funds answer is among the facts. If the account holds less than the payment, the funds rule fails and the payment is `DECLINED`.
+5. One guarded commit writes the decision and the timeline row, with the ID of the rule that failed.
 
-## The checked-in report
+A consumer whose profile requires mandate authorization goes through the same stage and gets the Instrument, Options and Mandate checks. Nothing in the code names a market, except the one class GB owns.
 
-The build also writes a plain text report with one line per row, for every step. Verify's part is all of this:
+### Every combination
+
+A test writes what every combination gets, and the result is checked in. This is Verify's part. Every row runs `DefaultPaymentVerifyStage`, so the stage's column is left out here:
 
 ```text
-VERIFY     mandate=N bank=N  DefaultPaymentVerifyStage
-VERIFY     mandate=Y bank=N  PaymentVerifyStageWithMandate
-VERIFY     mandate=N bank=Y  PaymentVerifyStageWithBankConfirmation
-VERIFY     mandate=Y bank=Y  PaymentVerifyStageWithMandateAndBankConfirmation
-VERIFY GB  mandate=N bank=Y  PaymentVerifyStageWithBankConfirmationInGb
+VERIFY     mandate=N bank=N  Instrument, Options
+VERIFY     mandate=N bank=Y  Instrument, Options, Token
+VERIFY     mandate=Y bank=N  Instrument, Options, Mandate
+VERIFY     mandate=Y bank=Y  Instrument, Options, Token, Mandate
+VERIFY GB  mandate=N bank=N  Instrument, Options
+VERIFY GB  mandate=N bank=Y  Instrument, Options, Token, Funds
+VERIFY GB  mandate=Y bank=N  Instrument, Options, Mandate
+VERIFY GB  mandate=Y bank=Y  Instrument, Options, Token, Mandate, Funds
 ```
 
-The report is checked in, and a test fails when the build's report differs from it. A change to which class a combination runs can't land quietly: the pull request has to update the report, and the reviewer sees exactly which rows moved. These are three changes and what the build does with each:
+One stage serves all eight rows. The last row, a GB payment that needs both a mandate and bank confirmation, gets every check that applies to it, with no class written for that combination.
 
-| Change | What happens |
-| --- | --- |
-| `PaymentVerifyStageWithMandate` is deleted | The row with a mandate and no bank confirmation disappears. The report's diff shows it go, and provisioning refuses any release that needs it |
-| A second class that declares only mandate authorization is added | It and `PaymentVerifyStageWithMandate` tie for that row, so the build fails: `Verify tie at mandate=Y bank=N`, naming both classes. Deleting one, or making it a market's own class, settles it |
-| A Verify class declares AR posting | Verify's key gains AR posting and grows to 8 rows. The report's diff shows only the rows whose class changed |
+### A key with two strategies: Execute's clearing
 
-## The capability manifest
-
-The same tables are the capability manifest: a combination the build can run has a row in every step its journey runs. `GET /provisioning/capabilities` returns it, and provisioning checks every market release against it before anything goes live.
-
-A default can't stand in for everything. Each stage interface lists the values its default can't handle, and a row with one of those values runs only on a class that declares it:
+Checks add up because each has its own key. When a step needs exactly one of several ways to do a job, the strategies share a key instead. Execute clears a payment either in real time or in batch:
 
 ```kotlin
-@StageInterface(
-    step = VERIFY,
-    ownClassFor = [MANDATE_AUTHORIZATION_Y, BANK_CONFIRMATION_Y],
-)
-interface PaymentVerifyStage { /* run, announce */ }
+@Singleton
+class RealtimeClearing : ClearingMethod {
+    override val key = ExecuteKey.CLEARING
+    override val appliesTo =
+        AppliesTo(on = setOf(REALTIME_CLEARING))
+    // ...
+}
+
+@Singleton
+class BatchClearing : ClearingMethod {
+    override val key = ExecuteKey.CLEARING
+    override val appliesTo =
+        AppliesTo(off = setOf(REALTIME_CLEARING))
+    // ...
+}
 ```
 
-*(Illustrative.)*
+*(A sketch.)*
 
-So a market that turns on mandate authorization before `PaymentVerifyStageWithMandate` exists can't go live. Its rows aren't written, so its release is refused, instead of its payments running a Verify that never checks the mandate.
+Realtime clearing is either Y or N for any payment, so exactly one of the two applies. Execute's stage asks the registry for its clearing method and never needs to know which one it got.
+
+## How the registry decides
+
+The registry is the only place where matching happens, and one class serves every kind of strategy. Its core is four steps:
+
+```kotlin
+/** Market first, then how many behaviors a strategy names. */
+val MORE_SPECIFIC = compareBy<AppliesTo>(
+    { it.market != null }, { it.named.size })
+val BY_APPLIES_TO = Comparator<Strategy<*>> { a, b ->
+    MORE_SPECIFIC.compare(a.appliesTo, b.appliesTo) }
+
+// combo: one market, account type and set of behaviors
+private fun resolve(all: List<S>, combo: Combination): List<S> =
+    // 1. the strategies whose appliesTo matches
+    all.filter { it.appliesTo.matches(combo) }
+        // 2. grouped by job
+        .groupBy { it.key }
+        // 3. one winner for each job; a tie stops the app
+        .map { (key, candidates) ->
+            val best = candidates.maxWith(BY_APPLIES_TO)
+            val level = candidates.filter {
+                BY_APPLIES_TO.compare(it, best) == 0
+            }
+            // the error names both and the combination
+            check(level.size == 1) { tie(key, level) }
+            best
+        }
+        // 4. a fixed order, for replay
+        .sortedBy { it.key }
+```
+
+*(A sketch.)*
+
+- When the app starts, the registry runs this for every combination of market, account type and behaviors that any of its strategies names, and keeps the answers in a map. A payment's lookup is one read from that map, so no reflection, I/O or container call happens while a workflow runs.
+- Step 4 matters to Temporal. A workflow must make the same calls in the same order every time it replays, so the order can't depend on the order in which Quarkus happened to find the beans.
+- The registry gets its strategies from Quarkus, which collects every bean of a type at build time and injects them as one list, `@All List<Check>`. It is the job Java's `ServiceLoader` does at runtime, done at build time.
+- The verification rules use the same registry. A rule's ID is its key and it has an `appliesTo` like a check's, so a market can add a rule, or replace a shared one by reusing its ID. [Writing verification rules](./stages.md#writing-verification-rules) shows rules built from small, shared yes/no questions about the facts.
+
+## How a workflow uses it
+
+A workflow sees none of this. It calls the stage index once, at the top of its method, and runs its steps:
+
+```kotlin
+// in the workflow, on its own thread
+val stages = stageIndex.lookup(plan)
+stages.capture.run(request)
+val verified = stages.verify.run(paymentId)
+```
+
+Inside, the index makes the stubs, picks each stage and binds the two:
+
+```kotlin
+fun lookup(plan: PlanKey): Stages {
+    // the activity stubs, made on this thread
+    val ctx = StageContext(plan, Stubs.create())
+    return Stages(
+        // the step's stage, bound to this payment
+        verify = VerifyStep(verifyStages.one(plan), ctx),
+        // ...one line for each step
+    )
+}
+
+class VerifyStep(
+    private val stage: PaymentVerifyStage,
+    private val ctx: StageContext,
+) {
+    fun run(paymentId: String) = stage.run(ctx, paymentId)
+    fun announce(paymentId: String) =
+        stage.announce(ctx, paymentId)
+}
+```
+
+*(A sketch.)*
+
+The stubs are the reason for the context. Temporal only lets a workflow make activity stubs on its own thread, and a strategy is one instance shared by every payment, so it can't hold a payment's stubs. The index makes them where Temporal requires, wraps them with the plan key in a `StageContext`, and every call carries it. The worker gives the index to each workflow through the factory it registers the workflow with.
+
+## When things change
+
+| Change | What you write | What happens |
+| --- | --- | --- |
+| A check every market needs | One class, applying everywhere | Every payment runs it |
+| A check for one behavior | One class, with the behavior in `on` | Payments with that behavior run it |
+| A market's own check | One class in `market/{m}/`, with `market = M` | Only that market runs it |
+| A market replaces a shared check | One class in `market/{m}/`, with the shared check's key and `market = M` | It beats the shared check in that market, and nowhere else |
+| A market's own rule | A rule in a `RuleSet` in `market/{m}/`, with `market = M` | Only that market runs it. With a shared rule's ID, it replaces that rule there |
+| A market's Verify flow really differs | `{M}PaymentVerifyStage`, with `market = M` | It beats `DefaultPaymentVerifyStage` in that market. Its checks still come from the registry |
+| Two classes claim the same job equally, by mistake | Nothing | The app refuses to start: `Verify check tie for FUNDS at GB [BANK_CONFIRMATION]: [GBFundsCheck, GBBalanceCheck]` |
+
+None of these changes touches shared code, the index or a list.
+
+## What keeps it safe
+
+The registries find mistakes when the app starts. Unit tests build the registries the same way, so the same mistakes fail the build before anything is deployed:
+
+| Mistake | What catches it |
+| --- | --- |
+| Two strategies level for one key | The app refuses to start, and the error names both |
+| A behavior nobody handles | Each step names the behaviors it must act on: mandate authorization and bank confirmation for Verify. A combination where one of them is Y, and no strategy that applies names it, can't run. Delete `MandateCheck`, and no combination with a mandate can run, while payments without one are unaffected |
+| A key nobody fills | Each step also names the keys it must fill, such as `CLEARING` for Execute. A combination with no clearing method can't run |
+| A class Quarkus can't see | Quarkus only finds beans in modules that carry an index, so each module that holds strategies has an empty `META-INF/beans.xml`. A test compares the strategy classes on the classpath with what the registries hold, and fails for any that are missing |
+| A misleading name | A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code |
+| An unnoticed change | The report above is checked in, and a test fails when the build's report differs, so a change to what any combination runs shows up as a diff in review |
 
 The index has unit tests of its own, listed on [Testing → Unit](../../../testing/functional/unit.md#the-plan-key-lookup).
 
-## Why KSP
+## The capability manifest
 
-- Mistakes stop the compile, at the class. Most of the alternatives below find them later: in tests, at boot, or while a payment runs.
-- A payment reads one row. Every choice between classes was made while the code compiled.
-- It needs no container and no reflection. Quarkus's dependency injection (CDI) never sees stage objects, and if workers ever move to a GraalVM native image, the index needs no reflection config there.
-- Adding a version of a stage is one edit, the annotated class, with no list to update somewhere else.
+The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /provisioning/capabilities` returns it, and provisioning checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and provisioning stops at its first step until a build with that combination is deployed.
 
-These were the alternatives:
+## Why the lookup stays in the workflow
 
-| Option | When a mistake shows up | Why not |
-| --- | --- | --- |
-| A hand-written registry, as a map or a small DSL | Never: a forgotten line silently runs the default | Every class needs a second edit |
-| A registry plus a test that scans for classes with ClassGraph | In tests | The close second. Simpler, but every class still needs a second edit |
-| A classpath scan at startup, then reflection | At boot, in each environment | Needs reflection config, and ClassGraph finds nothing in a native image |
-| A Quarkus build step over Jandex, Quarkus's index of annotations | At build, but not at a source line | A module missing from the index silently drops out, and it means two extension modules to maintain |
-| CDI `Instance<T>` with qualifiers | At runtime | Stages can't be beans: their stubs must be made on the workflow's thread |
-| `ServiceLoader`, Java's built-in plugin lookup | At runtime | A missing entry is skipped silently |
-| kapt, Kotlin's older annotation processor | At compile | The same model as KSP, but slower, and Android's guidance lists it as in maintenance mode |
+The Router builds the plan key, so it could pick the stages as well and hand each workflow its class names. It doesn't, because during a rolling deploy the Router and the workers can run different builds. A Router on the new build could name a class that the worker's build doesn't have yet. When the workflow looks up its own stages, the build that runs them is the build that chose them, and Worker Versioning, Temporal's way of keeping a workflow on the build it started on, keeps that pairing for the life of the workflow.
 
-If nobody can own the processor, we would switch to the registry and its ClassGraph test.
+## Why not KSP, SPI or a `when`
 
-## What to watch
+| Option | Why not |
+| --- | --- |
+| A stage class for each combination, picked by KSP, Kotlin's code generator | Classes grow with every combination, and a processor on an experimental KSP API has to work out the winners |
+| A hand-written index: a `when`, a map or a table | Every new market or variation means editing it, and a forgotten line silently runs the default |
+| Java's `ServiceLoader`, the service provider interface (SPI) | It finds the classes listed in `META-INF/services` at runtime, through reflection, but doesn't choose between them, and a class left out of the file is never found |
+| A classpath scan at startup | It needs reflection, and a scan finds nothing in a native image |
+| An `if` or a `when` on behaviors inside a stage | A step's variation spreads through its code instead of living in one class per job |
 
-- The app joins each module's findings with a KSP API that is still marked experimental, so a KSP upgrade can change it.
-- Check which Kotlin versions the KSP release supports against the build's Kotlin version, and check again before upgrading either one.
-- Nobody has checked yet whether KSP reruns during Quarkus dev mode's live reload. Check it before relying on live reload for stage changes.
+The design has three costs:
+
+- A strategy holds no state, so stages take their stubs through a `StageContext`.
+- A mistake shows up when the app starts and in unit tests, not in the compiler. Both happen before a merge.
+- A module that holds strategies must carry an index for Quarkus to see it, and a test checks that none is missed.

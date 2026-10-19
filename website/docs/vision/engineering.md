@@ -111,7 +111,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
   items={[
     {
       term: 'Release-driven market onboarding',
-      desc: `Onboarding a market is picking the APIs it takes, answering its behavior questions with Y, N or BOTH, and filling in its operations settings, once per account type. The result ships as a frozen release that each environment checks, tests and signs off. A market whose answers already have implementations behind them goes live on configuration alone.`,
+      desc: `Onboarding a market is picking the APIs it takes, answering its behavior questions with Y, N or BOTH, and filling in its operations settings, once per account type. The result ships as a frozen release that each environment checks, tests and signs off. A market whose answers the build already handles goes live on configuration alone.`,
     },
     {
       term: 'One workflow per journey',
@@ -122,8 +122,8 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       desc: (
         <>
           When the Router starts a payment it pins a plan key: the market, the journey, the behaviors
-          resolved for it and the market's config version. The workflow looks up its stage implementations from that
-          key, in a table worked out when the code is built, so no market decision is left in the workflow code. Worker
+          resolved for it and the market's config version. The workflow looks up its stages from that key, and every
+          stage, check and method says where it applies, so no market decision is left in the workflow code. Worker
           Versioning pins the workflow to the build it started on, so neither a deploy nor a new release
           changes a payment already running. Nothing is inherited: workflows and stages are never{' '}
           <code>abstract</code>.
@@ -186,7 +186,7 @@ Each environment then provisions that release on its own. It checks every combin
 If a request needs a combination the market never onboarded, there are no stages to pick, so the Router turns it away with a 422 before any workflow starts. A consumer-only market rejects a corporate payment instead of half-processing it.
 :::
 
-A new way of processing a payment is a new stage implementation behind one combination of behaviors. The workflow keeps its shape, and no market ever turns into an `if` inside it.
+A new way of processing a payment is a new piece of code that says which markets and behaviors it is for. The workflow keeps its shape, and no market ever turns into an `if` inside it.
 
 ## Optimize for
 

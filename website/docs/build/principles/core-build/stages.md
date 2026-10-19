@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Building Stages
 
-<Lead>A stage is one business step of a journey: it makes its calls, commits the new state once, and returns its outcome. It is also the only layer that changes with a market's behaviors, so a market that does something differently gets a different stage implementation, never a different workflow.</Lead>
+<Lead>A stage is one business step of a journey: it makes its calls, commits the new state once, and returns its outcome. It is also the only layer that changes with a market's behaviors, through the checks and methods it is made of, so a market that does something differently adds a class, never a different workflow.</Lead>
 
 [Design → Stages](../../../design/component-model/stages.md) lists every stage, the state it moves and what it varies by. This page is about writing one.
 
@@ -17,52 +17,71 @@ import Lead from '@site/src/components/Lead';
 Every stage is a `Payment{Step}Stage` interface with two functions. `run` does the step and returns what happened. `announce` tells RTF, and Raven where the customer is told, about the change `run` committed. The workflow calls them in that order, so a payment's events always reach RTF after the state they describe is in Oracle.
 
 ```kotlin
-interface PaymentExecuteStage {
-    fun run(paymentId: String, verified: VerifyOutcome): ExecuteOutcome  // PROCESSING, after the calls succeed
-    fun announce(paymentId: String)                                      // the PROCESSING event
+interface PaymentExecuteStage : Strategy<Step> {
+    // PROCESSING, after the calls succeed
+    fun run(
+        ctx: StageContext, paymentId: String, verified: VerifyOutcome,
+    ): ExecuteOutcome
+    // the PROCESSING event
+    fun announce(ctx: StageContext, paymentId: String)
 }
 ```
 
-An implementation is named for what it serves, never for a market: `PaymentVerifyStageWithMandate` is the Verify for every market that requires mandate authorization. If two markets share a rule, they share the file, and a market's name in a class name usually means the rule was written in the wrong place. [Naming an implementation](#naming-an-implementation) has the rule.
+A stage is a strategy: one instance, a `@Singleton` bean, serves every payment, so it keeps no state. What a payment needs arrives in its `StageContext`: the plan key and the activity stubs, which the [stage index](./stage-index.md#how-a-workflow-uses-it) makes on the workflow's own thread. The workflow never sees the context. It calls `stages.execute.run(paymentId, verified)`, and the index passes the context along.
+
+The stage every market runs is `DefaultPayment{Step}Stage`. What varies inside a step is not a different stage but the checks and methods the stage uses, each a small class that says where it applies. [Naming](#naming) has the rule.
 
 ## Writing run
 
-A stage makes its calls first, in parallel wherever they don't depend on each other, and then commits once. Here is the Execute for a consumer payment, which clears, posts to Accounts Receivable (AR) and raises open-to-buy at the same time. Open-to-buy needs the instrument's details in clear text, so its branch asks Payment Instruments first, and `thenCompose` chains the two without holding up clearing and AR:
+A stage makes its calls first, in parallel wherever they don't depend on each other, and then commits once. Here is Execute for a consumer payment with AR posting on, which clears, posts to Accounts Receivable (AR) and raises open-to-buy at the same time. Open-to-buy needs the instrument's details in clear text, so its branch asks Payment Instruments first, and `thenCompose` chains the two without holding up clearing and AR:
 
 ```kotlin
-class PaymentExecuteStageWithRealtimeClearing(
-    private val clearing: ClearingActivities,
-    private val receivables: ReceivablesActivities,
-    private val instruments: InstrumentActivities,   // Payment Instruments, no rate limit
-    private val authorization: AuthorizationActivities,
-    private val store: PaymentStore,                 // a local activity
-    private val events: LifecycleEventActivities,    // RTF
+@Singleton
+class DefaultPaymentExecuteStage(
+    // RealtimeClearing or BatchClearing
+    private val clearingMethods: MethodRegistry<ClearingMethod>,
 ) : PaymentExecuteStage {
+    override val key = EXECUTE
+    override val appliesTo = AppliesTo()       // every market
 
-    override fun run(paymentId: String, verified: VerifyOutcome): ExecuteOutcome {
-        val details = Async.function(instruments::clearTextDetails, paymentId)
-        val openToBuy = details.thenCompose { d -> Async.function(authorization::raiseOpenToBuy, paymentId, d) }
+    override fun run(
+        ctx: StageContext, paymentId: String, verified: VerifyOutcome,
+    ): ExecuteOutcome {
+        val s = ctx.stubs
+        // the registry picks: real time or batch
+        val clearing = clearingMethods.one(ctx.plan)
+        // Payment Instruments, no rate limit
+        val details =
+            Async.function(s.instruments::clearTextDetails, paymentId)
+        val openToBuy = details.thenCompose { d ->
+            Async.function(s.authorization::raiseOpenToBuy, paymentId, d)
+        }
         Promise.allOf(
-            Async.function(clearing::clear, paymentId),
-            Async.function(receivables::reduceBalance, paymentId),
+            clearing.clear(ctx, paymentId),
+            Async.function(s.receivables::reduceBalance, paymentId),
             openToBuy,
         ).get()
-        // One commit: the guarded move, the timeline row with the cluster,
-        // and any Work Tracker rows this step opens or closes.
-        val outcome = store.commitExecute(paymentId, expected = ACCEPTED, next = PROCESSING)
-        // Fulfil's notifications need the same details. They travel on in the workflow,
-        // and the payload codec keeps them encrypted in history.
+        // One commit: the guarded move, the timeline row with the
+        // cluster, and any Work Tracker rows this step opens or closes.
+        val outcome = s.store.commitExecute(
+            paymentId, expected = ACCEPTED, next = PROCESSING)
+        // Fulfil's notifications need the same details. They travel
+        // on in the workflow, and the payload codec keeps them
+        // encrypted in history.
         return outcome.copy(instrument = details.get())
     }
 
-    override fun announce(paymentId: String) =
-        events.publish(paymentId, PROCESSING)      // no Raven message for PROCESSING by default
+    // the PROCESSING event; no Raven message for it by default
+    override fun announce(ctx: StageContext, paymentId: String) =
+        ctx.stubs.events.publish(paymentId, PROCESSING)
 }
 ```
 
-*(A sketch: the interface names follow the spec; the method and implementation names are illustrative.)*
+*(A sketch: the interface names follow the spec; the method and class names are illustrative.)*
 
-Stage code runs inside the workflow, so it follows the workflow's rules. It calls activities through their stubs, uses `Async.function` and `Promise.allOf` for parallel calls, and reaches nothing else: no client, no clock, no database. Everything that touches the world happens in an activity. A stage may call plain helper functions, but never a workflow, another stage or a client.
+The clearing method comes from the registry, [as the Stage Index shows](./stage-index.md#a-key-with-two-strategies-executes-clearing). The other things Execute varies by, AR posting and the account type, are picked the same way, so the stage itself never tests a behavior. The sketch writes the AR call inline only because it shows a consumer payment with AR posting on.
+
+Stage code runs inside the workflow, so it follows the workflow's rules. It calls activities through the stubs in its context, uses `Async.function` and `Promise.allOf` for parallel calls, and reaches nothing else: no client, no clock, no database. Everything that touches the world happens in an activity. A stage may call plain helper functions and the strategies the registries give it, but never a workflow, another stage or a client.
 
 The commit is a guarded update: it moves the payment only if it is still in the state the stage expects. If another writer moved it first, such as a cancel that beat Reverify to a scheduled payment, the update changes no row, and the stage returns the payment as it stands instead of failing. The workflow reads that outcome and stops, which is why a stage returns its outcome rather than leaving the workflow to guess.
 
@@ -80,74 +99,150 @@ Two stages bend that order:
 A workflow never chooses its stages, and nothing hands them to it. When it starts, it looks them up from the plan key the [Router](./router.md) pinned:
 
 ```kotlin
-val stages = StageIndex.lookup(plan)               // inside the workflow: one row per step
+// inside the workflow, on its own thread
+val stages = stageIndex.lookup(plan)
 ```
 
-`StageIndex` is generated at build time by KSP (Kotlin Symbol Processing), from what each implementation declares it serves. A declaration names the step and the behaviors it covers, and leaves out the ones it doesn't care about:
+No `when` or `if` maps a plan key to classes, and there is no list to edit. Each stage, check and method says what job it does, its key, and where it applies, its `appliesTo`: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each key, the most specific class that applies wins. A class tied to a market beats one that isn't, so a market is the exception wherever it has a class of its own. Quarkus finds every class at build time, and a registry works out every combination when the app starts.
 
-```kotlin
-@StageFor(step = EXECUTE, requiresRealtimeClearing = Y)
-class PaymentExecuteStageWithRealtimeClearing(...) : PaymentExecuteStage
-```
+GB is the example today. A Pay with Bank Transfer payment there also runs `GBFundsCheck`, which asks the bank-confirmation provider whether the customer's bank account holds enough money for the payment. That one class, in GB's module, is all GB adds. That is why the plan key carries the market. [Building the Stage Index](./stage-index.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
 
-*(The annotation is illustrative; what matters is what it records.)*
+Stages are never `abstract`. A variation is a class of its own that the registry picks, not an override of a base class, so reading one file tells you everything that class does. Payment workflows are pinned to their build with Worker Versioning, so a deploy that adds or changes a class never changes the code under a payment that is already running.
 
-The most specific match wins, and KSP works that out for every combination while the code compiles. It writes the answers as a table, one row per combination for each step, so the lookup at runtime reads a row and weighs nothing. A market override declares the same things plus its market, and lives in `market/{m}/stages/`. It is a more specific match for that market, so it beats the default there and nowhere else. That is why the plan key carries the market. GB has one: for Pay with Bank Transfer, its Verify also checks that the customer's bank account holds enough money. [Design → Routing](../../../design/routing.md#from-profile-to-stages) follows one profile through to the classes it runs, and [Building the Stage Index](./stage-index.md) works through Verify's table row by row, with the mistakes that stop the build and why KSP was chosen.
+## Naming
 
-Stages are never `abstract`. A variation is a concrete class composed in through the index, not an override of a base class, so reading one file tells you everything a stage does. Payment workflows are pinned to their build with Worker Versioning, so a deploy that adds or changes a stage never changes the code under a payment that is already running.
+Names are for people. The registries read `appliesTo`, never a name.
 
-## Naming an implementation
+- A stage interface is `Payment{Step}Stage`, such as `PaymentVerifyStage`.
+- The stage every market runs is `DefaultPayment{Step}Stage`.
+- A market whose flow for a step really differs gets a stage of its own, named with the market's code first, `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. GB doesn't need one today.
+- A check or a method is named for its job, such as `MandateCheck`, `TokenCheck` or `RealtimeClearing`, and a market's own starts with its code, such as `GBFundsCheck`. A test fails when a class tied to a market doesn't start with that market's code.
 
-A stage interface is `Payment{Step}Stage`. An implementation keeps that name and adds what it serves, in a fixed order: `For` and the account type, `With` and each behavior it needs, then `In` and the market for an override. The one that declares nothing is `DefaultPayment{Step}Stage`. [Design → Stages](../../../design/component-model/stages.md#naming-implementations) has the full rule and a table of examples.
-
-A name says what an implementation serves, never what it calls. A market that needs a mandate doesn't get a mandate stage: it gets a version of Verify, `PaymentVerifyStageWithMandate`, that also fetches the mandate details from Plans and runs the rules that check them. The next section shows that class.
+A name says what a class does, never what it calls. A market that needs a mandate doesn't get a mandate stage: Verify gets `MandateCheck`, which fetches the mandate details from Plans, and the rules that check them run. The next section shows that check.
 
 ## Writing verification rules
 
-Verify, Reverify and Represent decide the same way. Each runs its checks, gathers the answers into one set of facts, runs the rules that apply, and commits once. [Design → Stages](../../../design/component-model/stages.md#how-verification-decides) explains the model, and this is the code it turns into:
+Verify, Reverify and Represent decide the same way. Each runs its checks, gathers the answers into one set of facts, runs the rules that apply, and commits once. [Design → Stages](../../../design/component-model/stages.md#how-verification-decides) explains the model, and this is the code it turns into.
+
+Here are the pieces of a rule as a class diagram. A dashed arrow with a hollow head means "implements", a hollow diamond means "holds", and a plain arrow means "uses":
+
+```mermaid
+classDiagram
+  direction TB
+  class RuleRegistry {
+    +evaluate(plan, step, facts)
+  }
+  class RuleSet {
+    <<interface>>
+    +rules
+  }
+  class Rule {
+    +id
+    +appliesTo
+    +steps
+    +runsWhen Spec
+    +passes Spec
+    +declineCode
+    +priority
+  }
+  class Spec~T~ {
+    <<interface>>
+    +isSatisfiedBy(t)
+    +and(other)
+    +or(other)
+    +not()
+  }
+  class VerificationFacts {
+    +each check's answer
+    +settings
+    +asOf
+  }
+  RuleRegistry o-- RuleSet : every bean
+  RuleSet <|.. InstrumentRules
+  RuleSet <|.. MandateRules
+  RuleSet <|.. GBRules
+  RuleSet o-- Rule : holds
+  Rule --> Spec : runsWhen, passes
+  Spec ..> VerificationFacts : asks about
+```
+
+`GBRules` lives in GB's module and holds GB's funds rule. The rule registry gets every `RuleSet` bean the way the stage registries get every check.
+
+A rule is built from specifications. A specification is a named yes/no question about the facts, and specifications combine with `and`, `or` and `not`, so each question is written once and shared:
 
 ```kotlin
-/** One data source. Its call runs in parallel with the other checks' calls. */
-class MandateCheck(private val plans: PlansActivities) : Check<MandateDetails> {
-    override val key = CheckKey.MANDATE
-    override fun fetch(paymentId: String): Promise<MandateDetails> =
-        Async.function(plans::mandateDetails, paymentId)
+/** A specification: a named yes/no question about a candidate. */
+fun interface Spec<T> {
+    fun isSatisfiedBy(t: T): Boolean
+    infix fun and(other: Spec<T>) =
+        Spec<T> { isSatisfiedBy(it) && other.isSatisfiedBy(it) }
+    infix fun or(other: Spec<T>) =
+        Spec<T> { isSatisfiedBy(it) || other.isSatisfiedBy(it) }
+    operator fun not() = Spec<T> { !isSatisfiedBy(it) }
 }
 
-/** A pure condition over the facts: no calls, no clock. */
-val mandateActive = Rule(
-    id = "MANDATE_ACTIVE",
-    declineCode = DeclineCode.MANDATE_INACTIVE,   // illustrative: the closest existing code, until mandate codes are agreed
-    priority = 300,                               // the highest-priority failure decides
-    steps = setOf(Step.VERIFY, Step.REVERIFY),
-    needs = setOf(CheckKey.MANDATE),
-) { facts -> facts.mandate!!.status == MandateStatus.ACTIVE }
+// Questions about the facts, written once and shared by the rules
+typealias FactSpec = Spec<VerificationFacts>
 
-@StageFor(step = VERIFY, requiresMandateAuthorization = Y)
-class PaymentVerifyStageWithMandate(
-    instruments: InstrumentActivities,
-    options: OptionsActivities,
-    plans: PlansActivities,                       // all three on the workflow's queue
-    private val settings: RuleSettings,           // the market's thresholds, from the plan key
-    private val store: PaymentStore,
-) : PaymentVerifyStage {
+fun ran(check: CheckKey) = FactSpec { check in it.ran }
+val instrumentFound = FactSpec { it.instrument != null }
+val instrumentOpen = FactSpec { it.instrument!!.status == OPEN }
+val mandateActive = FactSpec { it.mandate!!.status == ACTIVE }
+```
 
-    private val checks = listOf(InstrumentCheck(instruments), OptionsCheck(options), MandateCheck(plans))
+A rule then says where it applies, as a check does, and asks two questions: `runsWhen`, whether it makes sense for these facts, and `passes`, whether the payment passes it. Rules come in `RuleSet` beans, so the rule registry finds them the way the stage registries find checks:
 
-    override fun run(paymentId: String): VerifyOutcome {
-        val facts = fetchAll(checks, paymentId, settings,
-            asOf = Workflow.currentTimeMillis())      // the only clock a rule may see
-        val report = RuleCatalog.evaluate(Step.VERIFY, facts)   // every rule that applies
-        val outcome = store.commitVerify(paymentId, report.decision, report.failedRuleIds)
-        return outcome.copy(facts = facts)            // travels on to Execute and Fulfil
-    }
+```kotlin
+@Singleton
+class InstrumentRules : RuleSet {
+    override val rules = listOf(
+        Rule(
+            id = "INSTRUMENT_FOUND",
+            steps = setOf(VERIFY, REVERIFY),
+            runsWhen = ran(INSTRUMENT),
+            passes = instrumentFound,
+            declineCode = DeclineCode.INVALID_INSTRUMENT,
+            priority = 500,
+        ),
+        Rule(
+            id = "INSTRUMENT_OPEN",
+            steps = setOf(VERIFY, REVERIFY),
+            // skipped, not failed, when there is no instrument
+            runsWhen = ran(INSTRUMENT) and instrumentFound,
+            passes = instrumentOpen,
+            declineCode = DeclineCode.ACCOUNT_CLOSED,
+            priority = 400,
+        ),
+    )
+}
+
+@Singleton
+class MandateRules : RuleSet {
+    override val rules = listOf(
+        Rule(
+            id = "MANDATE_ACTIVE",
+            appliesTo = AppliesTo(on = setOf(MANDATE_AUTHORIZATION)),
+            steps = setOf(VERIFY, REVERIFY),
+            runsWhen = ran(MANDATE),
+            passes = mandateActive,
+            // the closest existing code, until mandate codes are agreed
+            declineCode = DeclineCode.MANDATE_INACTIVE,
+            priority = 300,       // the highest-priority failure decides
+        ),
+    )
 }
 ```
 
-*(A sketch: the names are illustrative.)*
+*(A sketch: the names and decline codes are illustrative. Each rule maps to an existing `DeclineCode` until new codes are agreed.)*
 
-- The default Verify is the same class with two checks, Instrument and Options. A version differs only in its list of checks, never in an `if` on a behavior.
+`MandateCheck`, the check these rules read, and `DefaultPaymentVerifyStage`, which runs checks and rules for every payment, are on [Building the Stage Index](./stage-index.md#a-worked-example-verify). The stage asks the rule registry for the rules that apply to the payment, and gets back each rule's result: skipped, passed or failed.
+
+
+- There is one Verify stage. A payment that needs no mandate never gets `MandateCheck` or `MANDATE_ACTIVE`, so it gathers no mandate details and runs no mandate rule.
+- `runsWhen` replaces any list of rule dependencies. `INSTRUMENT_OPEN` only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed, and the decision carries `INSTRUMENT_FOUND`'s code.
+- A rule keeps one decline code. Specifications combine inside a rule only when one code fits the whole condition; otherwise they are two rules.
+- The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. GB's funds rule sits beside `GBFundsCheck` in `market/gb/` and names GB and bank confirmation, as the check does.
 - `fetchAll` waits for every check. An activity returns what its system said, such as a closed account or an expired mandate, as data, and throws only on an error, which Temporal retries. So an outage never declines a payment, and a "no" is never retried.
-- Rules live in one catalog, `core/lib/verification/rules/`, each with the steps it runs in. `PaymentReverifyStageWithMandate` runs the same mandate rule on the due date. Represent calls none of these three systems: it will add checks and rules of its own once they are defined.
+- The shared rules sit in `core/lib/verification/rules/`, each with the steps it runs in. Reverify runs the same `MandateCheck` and `MANDATE_ACTIVE` on the due date. Represent calls none of Payment Instruments, Payment Options and Plans: it will add checks and rules of its own once they are defined.
 - A rule reads only the facts, never `Instant.now()` or a service. That is what makes it safe inside the workflow, where a replay must reach the same decision.
 - The report keeps every rule's result. The commit's timeline row keeps the IDs of the rules that failed in its event JSON, and `billpay_verification_declines_total` counts declines by step and rule.

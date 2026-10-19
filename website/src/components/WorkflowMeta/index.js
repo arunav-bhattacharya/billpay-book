@@ -17,7 +17,7 @@ const ALL = [
  *   Cluster       the Temporal cluster(s) it runs on
  *   Workflow ID   the ID it starts with, always the payment ID plus a suffix
  *   Started by    the start mode, or what starts it
- *   Stages vary   the behaviors that select its stage implementations
+ *   Stages vary   the behaviors that decide what its stages do
  *
  * Props:
  *   cluster     'Online' | 'Offline' | 'Online / Offline'
