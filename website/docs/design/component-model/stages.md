@@ -52,7 +52,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | --- | --- |
 | Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate payment stops after Verify |
 | Create Scheduled Payment | Capture, Verify |
-| Create Payment Intent | Capture, RequestConfirmation for bank confirmation, then the wait. On a yes: Verify, Execute, Fulfil, or Verify alone for a future-dated payment (Proposed). On a no, or when the window closes: Cancel |
+| Create Payment Intent | Capture, RequestConfirmation for bank confirmation, then the wait. On a yes: Verify, Execute, Fulfil, or Verify alone for a future-dated payment, which then executes on its scheduled date. On a no, or when the window closes: Cancel |
 | Execute Scheduled Payment | Reverify, Execute, Fulfil. A corporate parent has no Fulfil, and one paid today skips Reverify |
 | Execute Split Payment | Execute, Fulfil |
 | Request Allocations | RequestAllocations |
@@ -76,6 +76,7 @@ A stage interface is named for its step, with `Payment` in front: `PaymentVerify
 
 - The stage every market runs is `DefaultPayment{Step}Stage`.
 - A market whose flow for a step really differs gets a stage of its own, with the market's code first: `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. GB doesn't need one today.
+- A shared stage whose whole flow for a step differs by a behavior is named for that behavior: `Payment{Step}StageWith{Behavior}`. No step needs one today, because a behavior that only adds or swaps a call is a check or a method.
 - A check or a method is named for its job, such as `MandateCheck` or `RealtimeClearing`. A market's own starts with its code, such as `GBFundsCheck`.
 
 A name never lists the activities a class calls. The mandate check, for example, is a call to Plans that Verify makes, so a market that needs one gets `MandateCheck` in its Verify:
@@ -85,7 +86,7 @@ A name never lists the activities a class calls. The mandate check, for example,
 | Checks instruments and options only | `DefaultPaymentVerifyStage`, with `InstrumentCheck` (Payment Instruments) and `OptionsCheck` (Payment Options) |
 | Also requires mandate authorization | The same stage, plus `MandateCheck`, which asks Plans for the mandate details |
 | Also takes bank confirmation | The same stage, plus `TokenCheck`, which asks Payment Instruments whether the verification token is valid |
-| GB, Pay with Bank Transfer | The same stage, with `TokenCheck` and `GBFundsCheck`: whether the customer's bank account holds enough money for the payment. Kept in `market/gb/` |
+| GB, Pay with Bank Transfer | The same stage, with `TokenCheck` and `GBFundsCheck`: whether the customer's bank account holds enough money for the payment. Kept in `market/gb/`, and GB's own until a second market needs it |
 
 *(Examples of the rule, agreed on 2026-10-19.)*
 
@@ -120,7 +121,7 @@ flowchart TB
 - A check is one system and the rules about its answer, and each check says where it applies. Verify runs every check that applies to the payment: the Instrument and Options checks always, `TokenCheck` with bank confirmation, `MandateCheck`, which asks Plans, where the profile requires mandate authorization, and in GB, for Pay with Bank Transfer, `GBFundsCheck`: does the customer's bank account hold enough money for the payment. Represent will run checks of its own, still to be defined.
 - The checks' calls go out in parallel. What a system says, such as a closed account or no valid mandate, comes back as a fact. Only an error fails the call, and Temporal retries it, so an outage never declines a payment and a business "no" is never retried.
 - A rule makes no calls and never reads the clock, so a replay reaches the same decision. Each rule says where it applies, as a check does ([the classes behind a rule](../../build/principles/core-build/stages.md#writing-verification-rules)), and asks two yes/no questions of the facts: does it make sense here, and does the payment pass. "Instrument open" only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed. A market can add a rule of its own, or replace a shared one, without touching shared code.
-- The highest-priority failure decides: `DECLINED` with that rule's code, or `DISALLOWED` for a push payment. There is no outcome that sends a payment to review, because the state model has no state for one.
+- The highest-priority failure decides: `DECLINED` with that rule's code, or `DISALLOWED` for a push payment. Every rule's code comes from one table of rule ID to decline code. Until product sends the codes, each rule uses the closest one the current app has, and when they arrive only the table changes. There is no outcome that sends a payment to review, because the state model has no state for one.
 - A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, and the Router hands them to the workflow in the plan key. So a threshold changes with a release and no deploy, while a rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed, and a metric counts declines by step and rule.
 
 ## Capture
@@ -144,7 +145,7 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Create Payment Intent, when the confirm arrives, guarded on `PENDING`. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`. In GB, a Pay with Bank Transfer payment is also `DECLINED` when the customer's bank account doesn't hold enough money for it.
-- A payment that waited for a go-ahead is verified there too, guarded on `PENDING`, with the checks its behaviors pick, as for any payment. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
+- A payment that waited for a go-ahead is verified there too, guarded on `PENDING`, with the checks its behaviors pick, as for any payment. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row and executes on its scheduled date.
 
 Verify has one flow, and only its checks vary. Where the profile requires mandate authorization, `MandateCheck` fetches the mandate details from Plans, in parallel with the other calls, and a mandate that fails its check is `DECLINED`. Where it requires bank confirmation, `TokenCheck` asks Payment Instruments about the verification token. Nothing else changes Verify: the corporate `ALLOC_REQUEST` row comes from the account type, the way the `SCHED_EXEC` row comes from the date, and what a payment waited for picks nothing.
 
@@ -191,6 +192,10 @@ Writes the next presentment as a new row, with the same payment ID and a `presen
 ## Represent
 
 Rechecks eligibility before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. The recheck is its own, not Verify's: Represent calls neither Payment Instruments, Payment Options nor Plans, and which checks it runs is still to be defined. A failed recheck commits `DECLINED`, and nothing is sent.
+
+:::info[Placeholder: Represent's checks]
+Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules will be strategies like Verify's, listing Represent among their steps, so they are picked the same way.
+:::
 
 ## Settle
 

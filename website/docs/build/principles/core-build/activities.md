@@ -73,24 +73,46 @@ On the Offline cluster, a call to a throttled system runs on that system's `ds-*
 
 A caller on the Online cluster waits for Verify's decision, so the calls that make it run as local activities: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation. A local activity runs in the worker that holds the workflow task, with no trip through a task queue. Capture, Verify's calls and Verify's commit all finish inside the workflow's first task, and the caller's answer comes straight out of it. Together they cost about 2 history writes, where Verify's k calls as regular activities would cost about 2k + 3.
 
-Only a system without a rate limit can be called this way, because a local activity skips the queue and with it the queue's limit. None of these four has one. The stage picks the stub by the cluster it runs on:
+Only a system without a rate limit can be called this way, because a local activity skips the queue and with it the queue's limit. None of these four has one. The stage index makes the stubs, and picks each one by the cluster the workflow runs on. On the Online cluster a Verify call gets 3 tries in the worker, and one that still fails goes out again as a regular activity. The provider's call gets a single try, because its link has to come back inside the API's wait:
 
 ```kotlin
-private val instruments: InstrumentActivities =
-    if (Workflow.getInfo().taskQueue == "online-wf") {
-        Workflow.newLocalActivityStub(
-            InstrumentActivities::class.java,
-            LocalActivityOptions.newBuilder()
-                .setStartToCloseTimeout(instrumentsTimeout)      // about 2 to 3 times the system's p99
-                .setScheduleToCloseTimeout(decisionCallsLimit)   // Proposed: a few hours, as for PaymentStore
-                .build(),
-        )
-    } else {
-        Workflow.newActivityStub(InstrumentActivities::class.java, workflowQueueOptions)   // eager dispatch
+private val online =
+    Workflow.getInfo().taskQueue == "online-wf"
+
+// Online: 3 tries in the worker that holds the workflow task
+private val local = Workflow.newLocalActivityStub(
+    InstrumentActivities::class.java,
+    LocalActivityOptions.newBuilder()
+        .setStartToCloseTimeout(timeout)   // 2 to 3 times p99
+        .setRetryOptions(RetryOptions.newBuilder()
+            .setMaximumAttempts(3).build())
+        .build(),
+)
+// Online, after those 3 tries: a regular activity for 24 hours
+private val regular = Workflow.newActivityStub(
+    InstrumentActivities::class.java,
+    ActivityOptions.newBuilder()
+        .setTaskQueue("online-wf")
+        .setStartToCloseTimeout(timeout)
+        .setScheduleToCloseTimeout(Duration.ofHours(24))
+        .build(),
+)
+// Offline: the workflow's own queue, with eager dispatch
+private val offline = Workflow.newActivityStub(
+    InstrumentActivities::class.java, workflowQueueOptions)
+
+fun instrument(paymentId: String): Instrument? =
+    if (!online) offline.instrument(paymentId)
+    else try {
+        local.instrument(paymentId)
+    } catch (e: ActivityFailure) {
+        regular.instrument(paymentId)   // then the exception list
     }
 ```
 
-The schedule-to-close is what makes "retried in the worker" true: a Java local activity with neither a schedule-to-close nor a maximum number of attempts isn't retried at all. With it, a short failure is retried in place, and a payment caught by a long outage is answered `PENDING` at 2.5 seconds and carries on when the system is back. The provider's stub sets a maximum of one attempt instead, because RequestConfirmation gets one try that fits inside the caller's wait. Everything after the decision, Execute and Fulfil included, stays on regular activities.
+*(A sketch.)*
+
+A Java local activity with neither a schedule-to-close nor a maximum number of attempts isn't retried at all, so the 3 attempts are set. A short failure is retried in place. If all 3 fail, the same call goes out on `online-wf`, which retries it for up to 24 hours; past that, the payment goes on the exception list, as for any activity whose retries run out. The caller isn't kept waiting meanwhile: a payment not decided at 2.5 seconds is answered `PENDING`, and it carries on when the system is back. The provider's stub sets a maximum of one attempt instead, because RequestConfirmation gets one try that fits inside the caller's wait. Everything after the decision, Execute and Fulfil included, stays on regular activities.
 
 ## One interface, three queues
 
@@ -115,7 +137,7 @@ private val notifications = Workflow.newActivityStub(
 )
 ```
 
-*(The method names are illustrative, and so are the queue names until they are agreed.)*
+*(The method names are illustrative.)*
 
 A worker on each of the three queues registers the same implementation, and each only ever receives its own method's tasks. Each method calls one client, so the rule that a call reaches one system still holds.
 

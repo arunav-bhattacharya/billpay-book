@@ -253,6 +253,10 @@ VERIFY GB  mandate=Y bank=Y  Instrument, Options, Token, Mandate, Funds
 
 One stage serves all eight rows. The last row, a GB payment that needs both a mandate and bank confirmation, gets every check that applies to it, with no class written for that combination.
 
+:::info[Placeholder: Represent's checks]
+Represent's rows in the report list no checks yet. Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules are classes like these, listing Represent among their steps, and the report shows them on its rows.
+:::
+
 ### A key with two strategies: Execute's clearing
 
 Checks add up because each has its own key. When a step needs exactly one of several ways to do a job, the strategies share a key instead. Execute clears a payment either in real time or in batch:
@@ -365,6 +369,7 @@ The stubs are the reason for the context. Temporal only lets a workflow make act
 | A market replaces a shared check | One class in `market/{m}/`, with the shared check's key and `market = M` | It beats the shared check in that market, and nowhere else |
 | A market's own rule | A rule in a `RuleSet` in `market/{m}/`, with `market = M` | Only that market runs it. With a shared rule's ID, it replaces that rule there |
 | A market's Verify flow really differs | `{M}PaymentVerifyStage`, with `market = M` | It beats `DefaultPaymentVerifyStage` in that market. Its checks still come from the registry |
+| A step's whole flow differs by a behavior | `Payment{Step}StageWith{Behavior}`, with the behavior in `on` | It beats the default stage wherever that behavior is Y. No step needs one today |
 | Two classes claim the same job equally, by mistake | Nothing | The app refuses to start: `Verify check tie for FUNDS at GB [BANK_CONFIRMATION]: [GBFundsCheck, GBBalanceCheck]` |
 
 None of these changes touches shared code, the index or a list.
@@ -386,7 +391,7 @@ The index has unit tests of its own, listed on [Testing → Unit](../../../testi
 
 ## The capability manifest
 
-The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /provisioning/capabilities` returns it, and provisioning checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and provisioning stops at its first step until a build with that combination is deployed.
+The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /provisioning/capabilities` returns it, and provisioning checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and provisioning stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
 
 ## Why the lookup stays in the workflow
 

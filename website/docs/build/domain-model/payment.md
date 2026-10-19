@@ -44,7 +44,7 @@ sealed interface Payment : Transaction {
 
 ## The types the model leans on
 
-The supplied file uses five types it doesn't define. The build takes each one from the current app where it exists there, and otherwise creates it as below (Proposed, 2026-10-18).
+The supplied file uses five types it doesn't define. The build takes each one from the current app where it exists there, so it matches production, and otherwise creates it as below.
 
 ```kotlin
 /** A payment's ID: a ULID, which One-Data makes. A leg's ID is its parent's plus "_{seq}". */

@@ -74,12 +74,12 @@ fun route(request: RouteRequest): Routed {
 
 ### 1. Admit
 
-The Router checks that the market, the account type and the API are live in this environment. It checks them against billpay-core's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Proposed: each pod reloads its copy when provisioning activates or rolls back a version. If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
+The Router checks that the market, the account type and the API are live in this environment. It checks them against billpay-core's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Each pod reloads its copy when provisioning activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
 
 | Caller | What a refusal becomes |
 | --- | --- |
 | A core API | 422, which senders don't retry |
-| A core API, for a create One-Data held while billpay-core was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). Proposed: the Router starts its workflow with a plan that only captures and declines |
+| A core API, for a create One-Data held while billpay-core was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a plan that only captures and declines, and Verify declines it (agreed 2026-10-19) |
 | An inbox dispatcher | The request is marked `REJECTED` through `UpdateStartRequests.v1`, and an alert tells operations. The sender is not told |
 | A Work Tracker dispatcher | The row goes from `DISPATCHING` to `FAILED`, which raises the retries-exhausted alert. A row is refused only when its market was taken out of service after the row was written |
 
@@ -240,7 +240,7 @@ val reply = try {
 
 *(A sketch: the API names are the Java SDK's, the rest illustrative.)*
 
-The workflow's validator turns away a confirm that comes after it has an answer, or after its timer has fired, before anything is written to its history.
+The workflow's validator turns away a confirm that comes after it has an answer, or once it no longer waits, before anything is written to its history.
 
 Neither cluster uses eager workflow start: the server refuses it with Update-With-Start (`RequestEagerExecution is not supported`), and online latency comes from Update-With-Start and local activities instead. On the Online cluster, Verify's calls run as local activities, so the whole decision happens in the workflow's first task.
 

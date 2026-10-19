@@ -118,6 +118,7 @@ Names are for people. The registries read `appliesTo`, never a name.
 - A stage interface is `Payment{Step}Stage`, such as `PaymentVerifyStage`.
 - The stage every market runs is `DefaultPayment{Step}Stage`.
 - A market whose flow for a step really differs gets a stage of its own, named with the market's code first, `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. GB doesn't need one today.
+- A shared stage whose whole flow for a step differs by a behavior is named for that behavior, `Payment{Step}StageWith{Behavior}`. No step needs one today: a behavior that only adds or swaps a call is a check or a method.
 - A check or a method is named for its job, such as `MandateCheck`, `TokenCheck` or `RealtimeClearing`, and a market's own starts with its code, such as `GBFundsCheck`. A test fails when a class tied to a market doesn't start with that market's code.
 
 A name says what a class does, never what it calls. A market that needs a mandate doesn't get a mandate stage: Verify gets `MandateCheck`, which fetches the mandate details from Plans, and the rules that check them run. The next section shows that check.
@@ -165,8 +166,7 @@ class InstrumentRules : RuleSet {
             steps = setOf(VERIFY, REVERIFY),
             runsWhen = ran(INSTRUMENT),
             passes = instrumentFound,
-            declineCode = DeclineCode.INVALID_INSTRUMENT,
-            priority = 500,
+            priority = 500,  // its code: see DeclineCodes
         ),
         Rule(
             id = "INSTRUMENT_OPEN",
@@ -174,7 +174,6 @@ class InstrumentRules : RuleSet {
             // skipped, not failed, when there is no instrument
             runsWhen = ran(INSTRUMENT) and instrumentFound,
             passes = instrumentOpen,
-            declineCode = DeclineCode.ACCOUNT_CLOSED,
             priority = 400,
         ),
     )
@@ -189,15 +188,31 @@ class MandateRules : RuleSet {
             steps = setOf(VERIFY, REVERIFY),
             runsWhen = ran(MANDATE),
             passes = mandateActive,
-            // the closest existing code, until mandate codes are agreed
-            declineCode = DeclineCode.MANDATE_INACTIVE,
-            priority = 300,       // the highest-priority failure decides
+            priority = 300,  // the highest-priority failure decides
         ),
     )
 }
 ```
 
-*(A sketch: the names and decline codes are illustrative. Each rule maps to an existing `DeclineCode` until new codes are agreed.)*
+Every rule's decline code sits in one table, keyed by the rule's ID, and a rule's `declineCode` reads it from there. Product's codes, when they come, change one file and no rule:
+
+```kotlin
+/** Every rule's decline code, in one place. */
+object DeclineCodes {
+    // the current app's closest codes, until product sends theirs
+    private val byRule = mapOf(
+        "INSTRUMENT_FOUND" to DeclineCode.INVALID_INSTRUMENT,
+        "INSTRUMENT_OPEN" to DeclineCode.ACCOUNT_CLOSED,
+        "MANDATE_ACTIVE" to DeclineCode.MANDATE_INACTIVE,
+        "GB_FUNDS" to DeclineCode.INSUFFICIENT_FUNDS,
+    )
+    fun of(ruleId: String): DeclineCode? = byRule[ruleId]
+}
+```
+
+*(A sketch: the names and decline codes are illustrative.)*
+
+A test asks the rule registry for every rule it holds and fails if `DeclineCodes` has no code for one, so a new rule can't ship without its code.
 
 `MandateCheck`, the check these rules read, and `DefaultPaymentVerifyStage`, which runs checks and rules for every payment, are on [Building the Stage Index](./stage-index.md#a-worked-example-verify). The stage asks the rule registry for the rules that apply to the payment, and gets back each rule's result: skipped, passed or failed.
 

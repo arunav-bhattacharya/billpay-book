@@ -16,7 +16,7 @@ import Lead from '@site/src/components/Lead';
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link. One waiting for a go-ahead carries the IDs of the pending payments the customer was shown, which Capture writes from the request (Proposed). |
+| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link. One waiting for a go-ahead carries the IDs of the pending payments the customer was shown, which Capture writes from the request. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |

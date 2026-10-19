@@ -132,7 +132,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PENDING` (bank confirmation) | `DECLINED` | RequestConfirmation, when the provider gives no redirect link |
 | `PENDING` (bank confirmation or go-ahead) | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify, once the caller confirms; `SCHEDULED` only for a future-dated payment's go-ahead |
 | `PENDING` (bank confirmation or go-ahead) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed, or on the customer's no |
-| `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Its workflow, which captures and declines it (Proposed: by Verify) |
+| `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
 | `SCHEDULED` (corporate) | `ALLOCATING` | RequestAllocations, at the market's fetch time |
@@ -177,7 +177,7 @@ UPDATE trans_dtl SET status = 'CANCELLED'
 
 A payment that has been represented has a row per presentment, so Return's guard names the presentment too. When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm doesn't race the end of the confirmation window, or a no from another tab, in the database: the payment's own workflow takes one answer, and a confirm or a no that comes after it, or after the timer has fired, gets 409. Its commits are still guarded on `PENDING`, like every other.
+A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm doesn't race the end of the confirmation window, or a no from another tab, in the database: the payment's own workflow takes one answer, and a confirm or a no that comes after it, or once the workflow no longer waits, gets 409. Its commits are still guarded on `PENDING`, like every other.
 
 ## Split payments
 

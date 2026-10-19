@@ -910,11 +910,12 @@ sequenceDiagram
   end
 
   rect rgba(83,86,90,0.14)
-    Note over WF,BP: The customer confirms on the provider's site. The workflow waits on its timer: the confirmation window and a short grace
+    Note over WF,BP: The customer confirms on the provider's site. The workflow waits on its timer: the confirmation window and a 10-second grace
   end
 
   alt the caller confirms in time
     OC->>R: POST /payments/<br/>{payment-id}/confirm
+    Note over OC,R: no answer in 3 s, or a 5xx: One-Data holds the confirm<br/>and answers PENDING, and RTF retries it with the same update ID
     Note over R: admit, then an update<br/>to the running workflow
     R->>WF: update confirm,<br/>ID {paymentId}-confirm
     rect rgba(0,111,207,0.12)
@@ -934,7 +935,7 @@ sequenceDiagram
     end
   else no confirm before the timer fires
     rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow. A timer that fires late gives one more window first
+      Note over WF,PS: Online cluster, the same workflow. A timer that fires late gives one more window first, for a confirm One-Data held
       WF->>CAN: run
       rect rgba(102,169,226,0.40)
         CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
@@ -979,7 +980,7 @@ sequenceDiagram
   OD->>RD: one MULTI/EXEC: read the account's pending<br/>payments, add this one, store the create
   RD-->>OD: another payment is pending
   OD->>R: POST /payments, today,<br/>with the pending payment's ID
-  Note over R: admit; the go-ahead is on for this market,<br/>so pick the intent journey; pin plan key,<br/>place on Online
+  Note over R: admit. The go-ahead is on for this market,<br/>so pick the intent journey, pin the plan key,<br/>place on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)

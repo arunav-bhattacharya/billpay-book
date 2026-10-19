@@ -90,7 +90,7 @@ export const ACTIVITIES = [
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel at its end, and `CreatePaymentIntentWorkflow` once after its reply and again at its end, for the delete (Proposed: One-Data\'s one activity interface makes this call too)',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel at its end, and `CreatePaymentIntentWorkflow` once after its reply and again at its end, for the delete: One-Data\'s one activity interface makes this call too',
   },
   {
     name: 'LifecycleEventActivities',
@@ -120,7 +120,7 @@ Activities take IDs, not payment objects, and load what they need. Capture's wri
 
 `BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself.
 
-`TransactionNotificationActivities` is the one interface that spans systems. TFNE, GPHDB and B2Notifier are all told the same news at the same moment, so they share an interface, but each gets a method of its own, and each method runs on its own system's queue, so every system keeps its own rate limit. The queue names are Proposed.
+`TransactionNotificationActivities` is the one interface that spans systems. TFNE, GPHDB and B2Notifier are all told the same news at the same moment, so they share an interface, but each gets a method of its own, and each method runs on its own system's queue, so every system keeps its own rate limit: `ds-tfne`, `ds-gphdb` and `ds-b2notifier`.
 
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 
@@ -151,7 +151,7 @@ It runs as a local activity, which is what lets a payment ride out an Oracle out
 | Call | Runs as | Why |
 | --- | --- | --- |
 | Oracle reads and writes | A local activity (`PaymentStore`) | No task round trip, and one marker in history when the workflow task completes |
-| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation | A local activity | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
+| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation | A local activity. A Verify call that fails 3 times runs again as a regular activity on `online-wf`, for up to 24 hours | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
 | Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 

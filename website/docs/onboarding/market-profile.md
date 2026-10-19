@@ -43,5 +43,6 @@ Each combination of behaviors needs classes in the build that handle it. Verify,
 - A profile built only from combinations in the manifest goes live with config alone, no deploy needed.
 - A new combination is flagged as needing a build while it is being authored, so the gap shows up early.
 - If a release still reaches an environment without the build it needs, provisioning stops at its first step, the check against the manifest, until that build is deployed.
+- The other way round, a build can't take away what a live market uses. Before a build rolls out to an environment, the [deploy pipeline](../deployment/pipeline.md#the-capability-manifest) checks its manifest against every release live there, and stops a build that no longer covers one.
 
 Whether a return can be represented isn't one of these behaviors. It is a market rule, set with the market's other representment rules in its [operations settings](./operations-settings.md): which return reasons can be represented, and how many times a payment can be.

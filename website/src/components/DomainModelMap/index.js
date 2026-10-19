@@ -297,7 +297,7 @@ const VALUES = [
     desc: "On a PendingFullPayment as bankConfirmation, null unless the payment waits for the customer's bank. Not in the code yet.",
     lines: [
       ['providerReference', "the bank-confirmation provider's reference"],
-      ['redirectLink', 'the link the customer follows; a Proposed name'],
+      ['redirectLink', 'the link the customer follows'],
     ],
   },
 ];

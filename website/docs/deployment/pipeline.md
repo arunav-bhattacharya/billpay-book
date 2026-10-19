@@ -31,11 +31,13 @@ Every build ships a manifest of the behavior combinations it can run, worked out
 
 This is where the pipeline and market onboarding meet. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and provisioning stops at its first step until a build with that combination is deployed.
 
+The check runs the other way too. Before a build rolls out to an environment, the pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing. A build that dropped a class a live market needs never rolls out there.
+
 ## Three environments
 
 A build moves through E1, E2 and E3, and E3 is production. Each environment has its own billpay-core, its own Online and Offline clusters and its own Oracle schema.
 
-How a build is set up per environment is Proposed (2026-10-18):
+How a build is set up per environment:
 
 - One build runs in every environment. What differs is config or a secret, read when the app starts. Nothing environment-specific goes into the image.
 - Both Temporal namespaces keep their names everywhere, `billpay-online` and `billpay-offline`, so moving between environments changes only the cluster endpoints.

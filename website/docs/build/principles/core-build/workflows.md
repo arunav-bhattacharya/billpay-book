@@ -167,10 +167,10 @@ class CreatePaymentIntentWorkflowImpl(private val stageIndex: StageIndex) : Crea
 }
 ```
 
-*(GRACE is Proposed at 30 seconds, and LATE at a minute.)*
+*(GRACE is 10 seconds and LATE a minute.)*
 
 - The confirm and the no are updates with fixed IDs, `{paymentId}-confirm` and `{paymentId}-no`, so a repeat whose reply was lost attaches to the same update and gets the same answer.
-- The validator runs before anything is written. A confirm that comes after the workflow has its answer, or after the timer has fired, is turned away with no history event, and the API answers 409.
+- The validator runs before anything is written. A confirm that comes after the workflow has its answer, or once it no longer waits, is turned away with no history event, and the API answers 409.
 - When the timer fires with no answer, the workflow runs Cancel itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer that fires well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a confirm away.

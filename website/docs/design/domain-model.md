@@ -48,7 +48,7 @@ Every class from `SCHEDULED` to `REPRESENTED`, `ALLOCATING` and `ALLOCATED` incl
 `PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` carry neither trait.
 
 - A pending payment may not know its amount yet, so `PendingFullPayment` checks the amount when it's built. If the customer named the amount (an other amount, or an initial payment amount) or the option is already verified, the amount must be there. For any other option it must be empty, because Verify works the amount out.
-- A pending payment that waits for the customer's bank also holds `bankConfirmation`, with the provider's reference and the redirect link.
+- A pending payment that waits for the customer's bank also holds `bankConfirmation`, with the provider's reference, `providerReference`, and the redirect link, `redirectLink`.
 - A cancelled payment, like a declined one, may have no amount and only a plain `Timeline`, because a payment cancelled while `PENDING` was never verified.
 - A declined payment carries a `declineCode` and has no confirmation code. A leg is declined only when its representment fails the recheck.
 - Only a push payment, one a third party sends in, can end `DISALLOWED`.
@@ -93,7 +93,7 @@ These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The build
 1. `PROCESSING` → `RETURNED`, for a payment and a leg: `toReturnedFullPayment(returnedInfo)` and `toReturnedSplitPayment(returnedInfo)`.
 2. The corporate states: `AllocatingPayment` and `AllocatedPayment`, their two full classes, the six moves into and out of them, and the two status values.
 3. `PENDING` → `CANCELLED`, for a payment never confirmed or one the customer said no to, with `CancelledFullPayment` accepting a missing amount and a plain `Timeline`.
-4. `bankConfirmation` on `PendingFullPayment`, holding the provider's reference and the redirect link.
+4. `bankConfirmation` on `PendingFullPayment`, holding `providerReference` and `redirectLink`.
 5. `DisallowedFullPayment`, for push payments only.
 6. A second return's details: `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)`, and the same for a leg. Today that move keeps the first return's.
 7. The next presentment: `toRepresentingFullPayment(representmentDate)` and the leg's version number it one higher and give it the representment date as its clearing date. Today they copy the returned presentment's number and timeline.

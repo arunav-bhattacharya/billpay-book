@@ -14,7 +14,7 @@ The cluster settings, from history shards to namespace limits, are on [Deploymen
 
 ## Namespaces
 
-Each cluster has one namespace. Proposed (2026-10-18): they are named `billpay-online` and `billpay-offline` in every environment, so moving between environments changes only the cluster endpoints.
+Each cluster has one namespace, named `billpay-online` or `billpay-offline` in every environment, so moving between environments changes only the cluster endpoints.
 
 - The Online namespace has one main task queue, `online-wf`. Its `ds-*` queues carry calls only while a SEPA run caps Online on a downstream.
 - One Offline namespace serves every market, with market as a fairness key, so each downstream has exactly one queue and one limit.

@@ -32,6 +32,7 @@ A verification rule is a plain condition over the facts the checks gathered, so 
 - A rule whose `runsWhen` is false is skipped, not failed. A payment that didn't run `MandateCheck` skips the mandate rule, and after "instrument not found", the rule that checks the instrument is open is skipped too.
 - A rule runs only in the steps it lists, and only where its `appliesTo` matches. A market's rule with a shared rule's ID replaces it in that market and nowhere else.
 - The time is part of the facts. A test sets it, so a rule about dates gives the same answer on every run.
+- Every rule has a decline code. A test asks the rule registry for every rule it holds and fails if the table of codes has none for one, so a new rule can't ship without its code.
 
 ## The plan-key lookup
 
@@ -55,6 +56,8 @@ A workflow test runs the real workflow code in the SDK's test environment (`Test
 - A corporate payment stops after Verify. Its next step is a Work Tracker row for a dispatcher, not a call the workflow makes.
 - A payment that Verify declines ends `DECLINED`, and no later stage runs.
 - Each announcement finishes before the next stage starts. Capture and Verify on the Online cluster are the exception: they commit back to back, and both announcements follow the reply.
+- A Verify call on the Online cluster that fails its 3 tries as a local activity goes out again as a regular activity, and the payment carries on instead of failing.
+- In Create Payment Intent, a timer that fires more than a minute late gives the customer one more window. The test holds the worker back past the timer, so the timer fires late, and a confirm sent in the extra window still goes through.
 
 No workflow sleeps until a due date. Dated work waits in Oracle as a Work Tracker row until a dispatcher starts it, so most workflow tests need no timers at all.
 
