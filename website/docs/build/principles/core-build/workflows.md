@@ -132,8 +132,10 @@ class CreatePaymentIntentWorkflowImpl : CreatePaymentIntentWorkflow {
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
         val stages = StageIndex.lookup(plan)
         val paymentId = request.paymentId
-        stages.capture.run(request)                              // PENDING: writes the request
-        decided = stages.requestConfirmation.run(paymentId)       // PENDING with the link or the list, or DECLINED
+        stages.capture.run(request)                              // PENDING: the request, and any pending IDs
+        decided = if (plan.requiresBankConfirmation)
+            stages.requestConfirmation.run(paymentId)             // PENDING with the link, or DECLINED
+        else PaymentDecision.PENDING                             // a go-ahead: One-Data adds the pending list
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
         stages.capture.announce(paymentId)                        // the reply goes out with this task
         if (!waiting) { /* announce, the delete, and end */ return }

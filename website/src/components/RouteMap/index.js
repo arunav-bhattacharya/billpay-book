@@ -49,7 +49,7 @@ const VIA = {
 const SELF = 'Runs it all itself';
 
 const LABEL =
-  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A create that waits for the customer, for bank confirmation or a go-ahead, starts CreatePaymentIntent, and the confirm and the no reach that same workflow as updates.';
+  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A create that waits for the customer, for bank confirmation or a go-ahead where the market turns it on, starts CreatePaymentIntent, and the confirm and the no reach that same workflow as updates.';
 
 const offline = (cluster) => String(cluster).trim().toLowerCase() === 'offline';
 const tone = (cluster) => (offline(cluster) ? styles.off : styles.on);

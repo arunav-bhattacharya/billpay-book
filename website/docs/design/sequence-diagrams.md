@@ -947,7 +947,7 @@ sequenceDiagram
 
 ## 15. A new payment while another is pending
 
-One-Data checks every new payment against the card account's pending payments in Redis, in the same call that adds the new one to the list and stores the create. When the account already has a pending payment, One-Data sends its ID with the create, and the Router starts `CreatePaymentIntentWorkflow`. RequestConfirmation stores the IDs the customer is shown, with no provider call, and One-Data adds the pending payments to the reply. The customer's yes and no are both updates to that workflow, so the first one it accepts wins and the other gets 409. If neither comes before the window and its grace have passed, the timer fires and the workflow cancels the payment, as in diagram 14. The workflow calls One-Data's delete API twice: after its reply, which leaves the account's entry in place while the payment waits, and at its end, which removes it.
+One-Data checks every new payment against the card account's pending payments in Redis, in the same call that adds the new one to the list and stores the create. When the account already has a pending payment, One-Data sends its ID with the create. In a market that has the go-ahead turned on, the Router starts `CreatePaymentIntentWorkflow`, Capture stores the IDs the customer is shown along with the payment, and One-Data adds the pending payments to the reply. With the setting off, the default, the Router ignores the IDs and the payment runs as in diagram 1. The customer's yes and no are both updates to that workflow, so the first one it accepts wins and the other gets 409. If neither comes before the window and its grace have passed, the timer fires and the workflow cancels the payment, as in diagram 14. The workflow calls One-Data's delete API twice: after its reply, which leaves the account's entry in place while the payment waits, and at its end, which removes it.
 
 ```mermaid
 ---
@@ -968,7 +968,6 @@ sequenceDiagram
   box rgba(0,111,207,0.05) Billpay Platform
     participant R as Billpay Router
     participant WF as CreatePaymentIntent<br/>Workflow
-    participant RQC as Request<br/>Confirmation
     participant VER as Verify
     participant CAN as Cancel
     participant PS as PaymentStore (Oracle)
@@ -980,16 +979,13 @@ sequenceDiagram
   OD->>RD: one MULTI/EXEC: read the account's pending<br/>payments, add this one, store the create
   RD-->>OD: another payment is pending
   OD->>R: POST /payments, today,<br/>with the pending payment's ID
-  Note over R: admit, pick the intent journey,<br/>pin plan key, place on Online
+  Note over R: admit; the go-ahead is on for this market,<br/>so pick the intent journey; pin plan key,<br/>place on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
     Note over WF,PS: Online cluster
-    Note over WF: Capture first: PENDING
-    WF->>RQC: run, go-ahead<br/>implementation
-    Note over RQC: no provider call
     rect rgba(102,169,226,0.40)
-      RQC->>PS: the IDs the customer is shown,<br/>guarded on PENDING
+      WF->>PS: Capture: PENDING, with the IDs<br/>of the payments the customer is shown
     end
   end
 
@@ -1011,8 +1007,8 @@ sequenceDiagram
     R->>WF: update confirm,<br/>ID {paymentId}-confirm
     rect rgba(0,111,207,0.12)
       Note over WF,PS: Online cluster, the same workflow
-      WF->>VER: run, go-ahead<br/>implementation
-      Note over VER: the usual checks,<br/>no provider call
+      WF->>VER: run, the version the<br/>payment's behaviors pick
+      Note over VER: the usual checks
       rect rgba(102,169,226,0.40)
         VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
       end

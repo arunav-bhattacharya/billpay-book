@@ -18,7 +18,7 @@ A request reaches Billpay through a One-Data function. Most then call a core API
 The Router runs the same six steps for every request that starts a workflow.
 
 1. Admit the request. The market, account type and API must be live in this environment, which the Router checks against billpay-core's in-memory copy of the onboarding config, so admission adds no call. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them. One create is never refused: a create One-Data held while billpay-core was slow, which arrives after its market was taken out of service, is captured and declined instead, so the customer is told.
-2. Pick the journey from the routing table below. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow`.
+2. Pick the journey from the routing table below. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow`. The go-ahead is a market setting, off by default: where it is off, the Router ignores the pending payments' IDs One-Data sends.
 3. Resolve the behaviors from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel. Bank confirmation set to BOTH follows the request's payment method instead: a method that needs the customer to confirm at their bank gets Y.
 4. Pin the plan key: the market, the journey, the resolved behaviors and the config version. The market is there so a market override can match (Proposed). The key also carries the market's rule settings from that version, which the [verification rules](./component-model/stages.md#how-verification-decides) read, and for a payment that waits for the customer, its confirmation window. The workflow looks up its stages from the key at runtime ([From profile to stages](#from-profile-to-stages) walks through one).
 5. Place the work: cluster, task queue, priority, fairness key and workflow ID.
@@ -106,13 +106,13 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
           ],
         },
         {
-          desc: 'Waits for the customer: bank confirmation, or a go-ahead',
+          desc: 'Waits for the customer: bank confirmation, or a go-ahead where the market has it on',
           flow: [
             {
               via: 'uws',
               name: 'CreatePaymentIntent',
               cluster: 'Online',
-              caption: ['Capture, RequestConfirmation, then the wait', 'After the confirm: Verify, Execute, Fulfil'],
+              caption: ['Capture, RequestConfirmation for a bank, then the wait', 'After the confirm: Verify, Execute, Fulfil'],
             },
           ],
           note: "The confirm and the no arrive as updates. No answer by the window's end: cancelled.",
@@ -261,7 +261,7 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 
 ## Child workflows
 
-The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and for a go-ahead, the other pending payments' IDs One-Data sends with the create. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
+The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and for a go-ahead, the other pending payments' IDs One-Data sends with the create, where the market's go-ahead setting is on. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs, and the parent commits `PROCESSED` once every leg has finished.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.

@@ -36,7 +36,7 @@ Every module that holds stage classes, `core/lib/stages/impl` and each `market/{
 
 ## How a row gets its class
 
-Each step has its own table, keyed only by the behaviors that step's classes declare. A behavior that changes nothing about a step stays out of its key, which keeps the table small: Verify's classes declare the account type, mandate authorization, bank confirmation and the plan key's go-ahead mark, so Verify's key has those four values and 3 × 2 × 2 × 2 = 24 rows. If a Verify class ever declares AR posting, the key gains it on the next build.
+Each step has its own table, keyed only by the behaviors that step's classes declare. A behavior that changes nothing about a step stays out of its key, which keeps the table small. Verify's classes differ only in their checks, so they declare just mandate authorization and bank confirmation, and Verify's key has 2 × 2 = 4 rows. If a Verify class ever declared AR posting, the key would gain it on the next build.
 
 KSP picks each row's class in this order:
 
@@ -56,36 +56,32 @@ These are Verify's classes and what each one declares. The interface also says i
 | `PaymentVerifyStageWithMandate` | Mandate authorization |
 | `PaymentVerifyStageWithBankConfirmation` | Bank confirmation |
 | `PaymentVerifyStageWithMandateAndBankConfirmation` | Mandate authorization, bank confirmation |
-| `PaymentVerifyStageForCorporateWithMandate` | Corporate, mandate authorization |
-| `PaymentVerifyStageWithGoAhead` (Proposed) | The go-ahead mark |
 | `PaymentVerifyStageWithBankConfirmationInGb` | Bank confirmation, in GB |
 
-Run the rules over all 24 rows and each class wins a set of them. In this table and the next, a class goes by what follows `PaymentVerifyStage` in its name, so `WithMandate` is `PaymentVerifyStageWithMandate`, and `Default` is `DefaultPaymentVerifyStage`.
+Two things that could look like reasons for a Verify class are deliberately not. A go-ahead only makes the workflow wait for the customer's yes, and picks no stage. The account type changes what Verify's commit writes, not which checks run: a corporate payment gets its `ALLOC_REQUEST` row from its account type, the way a future-dated payment gets its `SCHED_EXEC` row from its date, whichever Verify runs.
 
-| Class | Rows it wins |
-| --- | --- |
-| `Default` | Any account type with no mandate, no bank confirmation and no go-ahead (3 rows) |
-| `WithGoAhead` | Any account type with a go-ahead, and no mandate or bank confirmation (3 rows) |
-| `WithMandate` | Consumer and business travel with a mandate and no bank confirmation, with or without a go-ahead (4 rows) |
-| `ForCorporateWithMandate` | Corporate with a mandate and no bank confirmation, with or without a go-ahead (2 rows) |
-| `WithBankConfirmation` | Any account type with bank confirmation and no mandate, with or without a go-ahead (6 rows) |
-| `WithMandateAndBankConfirmation` | Any account type with a mandate and bank confirmation, with or without a go-ahead (6 rows) |
+Run the rules over the four rows and each gets one class. In this table and the next, a class goes by what follows `PaymentVerifyStage` in its name, so `WithMandate` is `PaymentVerifyStageWithMandate`, and `Default` is `DefaultPaymentVerifyStage`.
 
-GB gets six rows of its own: the ones with bank confirmation and no mandate, where its class wins by rule 3. A GB payment with both stays on the shared class, because the GB class doesn't declare mandate authorization and rule 2 rules it out.
+| Mandate | Bank confirmation | Class |
+| --- | --- | --- |
+| N | N | `Default` |
+| Y | N | `WithMandate` |
+| N | Y | `WithBankConfirmation` |
+| Y | Y | `WithMandateAndBankConfirmation` |
 
-Rule 2 also settles what happens when a go-ahead meets another behavior. On count alone, `PaymentVerifyStageWithMandate` and `PaymentVerifyStageWithGoAhead` tie for a mandate payment that waited for a go-ahead, but the go-ahead class doesn't check the mandate, so rule 2 drops it. A payment that needs bank confirmation and a go-ahead gets `PaymentVerifyStageWithBankConfirmation` the same way, so the token check runs. That is the behavior the journey wants: the customer waits once, and the bank confirm is the go-ahead.
+Rule 2 does the work here. The default can't take a row with a mandate or bank confirmation, and a class that declares only one of the two can't take a row with both, so every row is left with exactly one class. GB has one row of its own, bank confirmation without a mandate, where its class wins by rule 3. A GB payment with both stays on the shared class, because the GB class doesn't declare mandate authorization.
 
-At runtime the workflow builds Verify's key from its plan key (account type, mandate, bank, go-ahead) and reads one row, looking in its market's own rows first:
+At runtime the workflow builds Verify's key from its plan key (mandate, bank confirmation) and reads one row, looking in its market's own rows first:
 
 | Payment | Key | Class |
 | --- | --- | --- |
-| A US consumer pays by bank (Plaid) | Consumer, N, Y, N | `WithBankConfirmation` |
-| A GB consumer pays by bank | Consumer, N, Y, N | `WithBankConfirmationInGb` |
-| A GB consumer pays while another payment is pending | Consumer, N, N, Y | `WithGoAhead` |
-| A consumer in a market with mandates gives the go-ahead | Consumer, Y, N, Y | `WithMandate` |
-| A corporate payment in a market with mandates | Corporate, Y, N, N | `ForCorporateWithMandate` |
+| A US consumer pays by bank (Plaid) | N, Y | `WithBankConfirmation` |
+| A GB consumer pays by bank | N, Y | `WithBankConfirmationInGb` |
+| A consumer in a market with mandates | Y, N | `WithMandate` |
+| A corporate payment in a market with mandates | Y, N | `WithMandate` |
+| A GB consumer says yes to a go-ahead, with no bank confirmation | N, N | `Default` |
 
-The first two payments have the same key and run different classes, because only GB has rows of its own. The third is a GB payment too, but GB's rows cover only bank confirmation, so its row comes from the shared table.
+The first two payments have the same key and run different classes, because only GB has a row of its own. The corporate payment runs the same class as the consumer one, and its commit also writes the `ALLOC_REQUEST` row. The go-ahead changes nothing here: it only made the workflow wait.
 
 ## What the build writes
 
@@ -108,22 +104,19 @@ class StageTable<T>(
 KSP writes the rest. For Verify, it looks something like this:
 
 ```kotlin
-// Generated. Verify's classes declare account type, mandate, bank confirmation and go-ahead,
-// so its key has those four: 3 × 2 × 2 × 2 = 24 rows, each already decided.
+// Generated. Verify's classes declare only mandate authorization and bank confirmation,
+// so its key has those two: 2 × 2 = 4 rows, each already decided.
 internal val VERIFY = StageTable<PaymentVerifyStage>(
-    keyOf = { p -> key(p.accountType, p.requiresMandateAuthorization, p.requiresBankConfirmation, p.waitsForGoAhead) },
+    keyOf = { p -> key(mandate = p.requiresMandateAuthorization, bank = p.requiresBankConfirmation) },
     rows = mapOf(
-        key(CONSUMER,  mandate = N, bank = N, goAhead = N) to ::defaultVerify,
-        key(CONSUMER,  mandate = N, bank = N, goAhead = Y) to ::verifyWithGoAhead,
-        key(CONSUMER,  mandate = Y, bank = N, goAhead = Y) to ::verifyWithMandate,
-        key(CORPORATE, mandate = Y, bank = N, goAhead = N) to ::verifyForCorporateWithMandate,
-        key(CONSUMER,  mandate = N, bank = Y, goAhead = Y) to ::verifyWithBankConfirmation,
-        // ... one line for each of the 24 rows
+        key(mandate = N, bank = N) to ::defaultVerify,
+        key(mandate = Y, bank = N) to ::verifyWithMandate,
+        key(mandate = N, bank = Y) to ::verifyWithBankConfirmation,
+        key(mandate = Y, bank = Y) to ::verifyWithMandateAndBankConfirmation,
     ),
     overrides = mapOf(
         GB to mapOf(
-            key(CONSUMER, mandate = N, bank = Y, goAhead = N) to ::verifyWithBankConfirmationInGb,
-            // ... the six rows where GB's own class wins
+            key(mandate = N, bank = Y) to ::verifyWithBankConfirmationInGb,
         ),
     ),
 )
@@ -143,22 +136,23 @@ The Router builds the plan key, so it could read the table as well and hand each
 
 ## The checked-in report
 
-The build also writes a plain text report with one line per row, for every step:
+The build also writes a plain text report with one line per row, for every step. Verify's part is all of this:
 
 ```text
-VERIFY     CONSUMER         mandate=N bank=N goAhead=N  DefaultPaymentVerifyStage
-VERIFY     CONSUMER         mandate=Y bank=N goAhead=Y  PaymentVerifyStageWithMandate
-VERIFY     CORPORATE        mandate=Y bank=N goAhead=N  PaymentVerifyStageForCorporateWithMandate
-VERIFY GB  CONSUMER         mandate=N bank=Y goAhead=N  PaymentVerifyStageWithBankConfirmationInGb
+VERIFY     mandate=N bank=N  DefaultPaymentVerifyStage
+VERIFY     mandate=Y bank=N  PaymentVerifyStageWithMandate
+VERIFY     mandate=N bank=Y  PaymentVerifyStageWithBankConfirmation
+VERIFY     mandate=Y bank=Y  PaymentVerifyStageWithMandateAndBankConfirmation
+VERIFY GB  mandate=N bank=Y  PaymentVerifyStageWithBankConfirmationInGb
 ```
 
 The report is checked in, and a test fails when the build's report differs from it. A change to which class a combination runs can't land quietly: the pull request has to update the report, and the reviewer sees exactly which rows moved. These are three changes and what the build does with each:
 
 | Change | What happens |
 | --- | --- |
-| `PaymentVerifyStageWithMandate` is deleted | Four rows disappear: consumer and business travel payments with a mandate and no bank confirmation. The report's diff shows them go, and provisioning refuses any release that needs them |
-| A class that declares only the corporate account type is added | For a corporate payment with no mandate that waits for a go-ahead, it and `PaymentVerifyStageWithGoAhead` each declare one thing, so they tie. The build fails: `Verify tie at CORPORATE mandate=N bank=N goAhead=Y`, naming both classes. A class that declares both settles it |
-| A Verify class declares AR posting | Verify's key gains AR posting and grows to 48 rows. The report's diff shows only the rows whose class changed |
+| `PaymentVerifyStageWithMandate` is deleted | The row with a mandate and no bank confirmation disappears. The report's diff shows it go, and provisioning refuses any release that needs it |
+| A second class that declares only mandate authorization is added | It and `PaymentVerifyStageWithMandate` tie for that row, so the build fails: `Verify tie at mandate=Y bank=N`, naming both classes. Deleting one, or making it a market's own class, settles it |
+| A Verify class declares AR posting | Verify's key gains AR posting and grows to 8 rows. The report's diff shows only the rows whose class changed |
 
 ## The capability manifest
 

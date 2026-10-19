@@ -40,7 +40,6 @@ data class PlanKey(
     val configVersion: Int,                       // the market config version they came from
     val ruleSettings: RuleSettings,               // the verification rules' thresholds, from that version
     val confirmationWindow: Duration? = null,     // for a payment that waits for the customer
-    val waitsForGoAhead: Boolean = false,         // Proposed: other payments were pending
 )
 
 data class Placement(
@@ -93,7 +92,7 @@ The routing table on [Design → Routing](../../../design/routing.md) is the spe
 ```kotlin
 fun pickJourney(r: RouteRequest, version: MarketVersion): Journey = when (r) {
     is CreatePayment -> when {
-        r.waitsForCustomer(version) -> Journey.CREATE_INTENT    // bank confirmation, or other pending payments' IDs
+        r.waitsForCustomer(version) -> Journey.CREATE_INTENT    // bank confirmation, or pending IDs with the go-ahead on
         r.isFutureDated -> Journey.CREATE_SCHEDULED
         r.instructions.size > 1 -> Journey.MULTIPLE_INSTRUCTIONS
         else -> Journey.CREATE_IMMEDIATE
@@ -118,7 +117,7 @@ fun pickJourney(r: RouteRequest, version: MarketVersion): Journey = when (r) {
 }
 ```
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or One-Data sent other pending payments' IDs with the create; for a go-ahead the plan key also marks the wait (step 4). A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead.
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or One-Data sent other pending payments' IDs with the create and the market's go-ahead setting, off by default, is on. The journey alone makes the payment wait: nothing about the go-ahead goes in the plan key. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead.
 
 ### 3. Resolve the behaviors
 
@@ -152,7 +151,7 @@ The Router builds the plan key but never reads the table. During a rolling deplo
 
 The key also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the key carries the market's confirmation window too, which the workflow's timer uses.
 
-When One-Data sends a create with the IDs of other pending payments on the card account, the plan key also marks that the payment waits for a go-ahead, so the index picks RequestConfirmation's and Verify's go-ahead implementations (Proposed). [Design → Journeys](../../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
+A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify as for any payment. [Design → Journeys](../../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
 
 The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg.
 

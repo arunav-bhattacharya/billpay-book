@@ -49,5 +49,5 @@ Returns sit at the lowest priority, so during an execution window they can wait 
 | --- | --- | --- |
 | Pending entry age | An entry in One-Data's account hash passes its set age, which is longer than both a normal workflow and the confirmation window | Find where it is stuck, in Redis or in billpay-core, and send the create again with the same ID |
 | Creates held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-core and the Online cluster. A jump here is usually the first sign of trouble there |
-| Delete calls failing | billpay-core's delete calls to One-Data keep failing | Fix One-Data's delete API. Until then, customers get go-ahead steps they don't need |
+| Delete calls failing | billpay-core's delete calls to One-Data keep failing | Fix One-Data's delete API. Until then, in markets with the go-ahead turned on, customers get go-ahead steps they don't need |
 | Redis memory or write errors | Redis memory is near its limit, or a write fails | Fix it before One-Data has to create payments without the pending check |

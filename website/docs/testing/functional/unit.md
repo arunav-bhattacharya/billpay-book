@@ -39,7 +39,7 @@ A workflow finds its stages by reading the row for its plan key in a table that 
 
 - Every combination in the build's capability manifest resolves to an implementation for every step its journey runs.
 - The most specific match wins. A market override in `market/{m}/stages/` beats the default for its own market, and nowhere else.
-- A row with a value a default can't handle goes only to a class that declares it. A mandate payment that waited for a go-ahead gets `PaymentVerifyStageWithMandate`, never the go-ahead class, which doesn't check the mandate. With no Verify that declares mandate authorization, no combination with mandate authorization is in the manifest.
+- A row with a value a default can't handle goes only to a class that declares it. A payment that needs both a mandate and bank confirmation gets `PaymentVerifyStageWithMandateAndBankConfirmation`, never a class that checks only one of them. With no Verify that declares mandate authorization, no combination with mandate authorization is in the manifest.
 - The report the build writes matches the checked-in one. A change to which class a combination runs fails this test until the same pull request updates the report, so the reviewer sees every row that moved.
 
 The processor itself is tested by compiling small sets of sample classes with it. Each of these must fail the compile, at the class: two classes that tie for a combination, with that combination named in the error; a stage interface with no default; a class without the annotation; and a class whose name doesn't match its declaration.

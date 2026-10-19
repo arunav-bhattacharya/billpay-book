@@ -255,23 +255,18 @@ export const BANDS = [
             id: 'goahead',
             wf: 'CreatePaymentIntent',
             tag: 'go-ahead',
-            lead: 'Pay today while another payment on the account is pending.',
+            lead: 'Pay today while another payment on the account is pending, in a market that has the go-ahead turned on.',
             stages: ['Capture'],
-            own: ['RequestConfirmation'],
             journey:
-              'Create payment, today, one instruction. One-Data sends the IDs of the pending payments it found, so the payment waits for the customer',
+              'Create payment, today, one instruction. One-Data sends the IDs of the pending payments it found, and the market has the go-ahead turned on, so the payment waits for the customer',
             wfId: '{paymentId}-init',
             answer: 'with PENDING, and One-Data adds the pending payments',
             chips: five('CONSUMER', 'Y', 'N'),
             behave:
-              'Example values. A go-ahead is not a behavior: One-Data asks for it per payment, and the Router marks it on the plan key (Proposed).',
-            move: {RequestConfirmation: 'PENDING, unchanged'},
+              'Example values. A go-ahead is not a behavior and picks no stage. It is a market setting, off by default; with it off, this payment takes the pay-today road.',
             notes: {
-              RequestConfirmation:
-                'Its go-ahead implementation runs after Capture, in place of Verify. It stores the IDs of the payments the customer is shown, guarded on PENDING. The caller gets PENDING, and the PENDING event goes out.',
-            },
-            exc: {
-              'RequestConfirmation|BankConfirmationActivities': {kind: 'skip', note: 'no provider call for a go-ahead'},
+              Capture:
+                'It also stores the IDs of the payments the customer is shown, which came with the request. No other stage runs before the customer answers: the caller gets PENDING, and the PENDING event goes out.',
             },
             stop: {
               title: 'The workflow waits here.',
@@ -379,7 +374,7 @@ export const BANDS = [
             wfId: '{paymentId}-init',
             answer: 'once Verify decides',
             chips: five('CONSUMER', 'Y', 'Y'),
-            behave: "Example values. Bank confirmation picks Verify's bank-confirmation implementation, and a go-ahead its go-ahead implementation.",
+            behave: "Example values. Bank confirmation picks Verify's bank-confirmation implementation. After a go-ahead, the payment's behaviors pick Verify as for any payment.",
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:

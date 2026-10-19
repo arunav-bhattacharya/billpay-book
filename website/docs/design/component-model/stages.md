@@ -31,8 +31,8 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the provider gives no link. For a go-ahead, no provider call: it stores the IDs the customer was shown | What the payment waits for: the bank, or a go-ahead |
-| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | All four behaviors; at confirm, what the payment waited for |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the provider gives no link. It runs only for bank confirmation | Nothing |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | Mandate authorization and bank confirmation, which decide its checks |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
@@ -44,7 +44,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
 
-"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and which Verify implementation confirms the payment. A go-ahead is not a behavior. One-Data asks for one per payment, by sending other pending payments' IDs with the create, and the same two stages run their go-ahead implementations.
+"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and which Verify implementation confirms the payment. A go-ahead is not a behavior, and no stage has a version for it. It is a market setting, off by default: where it is on, a create that One-Data sends with other pending payments' IDs waits in Create Payment Intent, and Capture stores the IDs.
 
 ## Which workflow runs which stages
 
@@ -52,7 +52,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | --- | --- |
 | Create Immediate Payment | Capture, Verify, Execute, Fulfil. A corporate payment stops after Verify |
 | Create Scheduled Payment | Capture, Verify |
-| Create Payment Intent | Capture, RequestConfirmation, then the wait. On a yes: Verify, Execute, Fulfil, or Verify alone for a future-dated payment (Proposed). On a no, or when the window closes: Cancel |
+| Create Payment Intent | Capture, RequestConfirmation for bank confirmation, then the wait. On a yes: Verify, Execute, Fulfil, or Verify alone for a future-dated payment (Proposed). On a no, or when the window closes: Cancel |
 | Execute Scheduled Payment | Reverify, Execute, Fulfil. A corporate parent has no Fulfil, and one paid today skips Reverify |
 | Execute Split Payment | Execute, Fulfil |
 | Request Allocations | RequestAllocations |
@@ -71,7 +71,7 @@ Create Balance Refund follows the payment path; its detailed stages are still be
 A stage interface is named for its step, with `Payment` in front: `PaymentVerifyStage`, `PaymentExecuteStage`. An implementation keeps that name whole and adds what it serves after it, so it always reads as one version of a step, never as a step of its own. The parts come from the implementation's index declaration, in this order:
 
 1. `For` and the account type: `ForConsumer`, `ForCorporate` or `ForBusinessTravel`.
-2. `With` and each behavior it needs, joined with `And`, in the profile's order: `ArPosting`, `RealtimeClearing` (`BatchClearing` when it is N), `Mandate`, `BankConfirmation`, then `GoAhead`. A behavior it needs to be N follows as `Without`, such as `WithoutArPosting`.
+2. `With` and each behavior it needs, joined with `And`, in the profile's order: `ArPosting`, `RealtimeClearing` (`BatchClearing` when it is N), `Mandate`, then `BankConfirmation`. A behavior it needs to be N follows as `Without`, such as `WithoutArPosting`.
 3. `In` and the market, for a market override only, such as `InGb`.
 
 The implementation that declares nothing is `DefaultPayment{Step}Stage`, and it runs for every combination nothing more specific matches. A name never lists the activities an implementation calls. The mandate check, for example, is a call to Plans that Verify makes, so a market that needs one runs a Verify that makes that call:
@@ -82,7 +82,6 @@ The implementation that declares nothing is `DefaultPayment{Step}Stage`, and it 
 | `PaymentVerifyStageWithMandate` | Mandate authorization: Payment Instruments, Payment Options and Plans |
 | `PaymentVerifyStageWithBankConfirmation` | Bank confirmation: Payment Instruments, with the verification token check, and Payment Options |
 | `PaymentVerifyStageWithMandateAndBankConfirmation` | Both: Payment Instruments, with the token check, Payment Options and Plans |
-| `PaymentVerifyStageForCorporateWithMandate` | A corporate payment with mandate authorization: the same calls, and its commit also writes the `ALLOC_REQUEST` row |
 | `PaymentVerifyStageWithBankConfirmationInGb` | A rule only GB needs, kept in `market/gb/stages/` |
 
 *(Examples of the rule, agreed on 2026-10-18.)*
@@ -130,7 +129,7 @@ Runs after Capture, in place of Verify, when a payment needs the customer to con
 
 If no link comes back, because the provider is down or too slow, the commit moves the payment to `DECLINED` instead, and the caller gets `DECLINED`. No payment is ever left `PENDING` without a link. The provider only checks the customer's bank details. It never moves money: Billpay does that in Execute, once the customer has confirmed.
 
-RequestConfirmation also holds a payment for the customer's go-ahead, when One-Data sends other pending payments' IDs with the create. Its go-ahead implementation makes no provider call. One commit, guarded on `PENDING`, stores the IDs of the payments the customer was shown. The caller gets `PENDING`, and One-Data adds the pending payments to the reply. A payment that needs both waits once: the reply carries the link and the list, and confirming at the bank is the go-ahead.
+A payment can also wait for the customer's go-ahead, in a market that has it turned on, when One-Data sends other pending payments' IDs with the create. That needs no stage of its own and no provider call: Capture already stored the IDs of the payments the customer was shown, which came with the request. The caller gets `PENDING`, and One-Data adds the pending payments to the reply. A payment that needs both waits once: RequestConfirmation gets the link, the reply carries the link and the list, and confirming at the bank is the go-ahead.
 
 ## Verify
 
@@ -141,9 +140,9 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A corporate payment made today commits `ACCEPTED` together with an `ALLOC_REQUEST` row due at once, and its workflow ends there.
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Create Payment Intent, when the confirm arrives, guarded on `PENDING`. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`.
-- A payment that waited for a go-ahead is verified there too, with the usual checks and no provider call, guarded on `PENDING`. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
+- A payment that waited for a go-ahead is verified there too, guarded on `PENDING`, by the Verify its behaviors pick, as for any payment. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row (Proposed).
 
-Verify varies by all four behaviors and, at confirm, by what the payment waited for. Where the profile requires mandate authorization, Verify also fetches the mandate details from Plans, in parallel with its other two calls, and a mandate that fails its check is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`.
+Verify's versions differ only in their checks. Where the profile requires mandate authorization, Verify also fetches the mandate details from Plans, in parallel with its other two calls, and a mandate that fails its check is `DECLINED`. That version of Verify is `PaymentVerifyStageWithMandate`. Where it requires bank confirmation, the Instruments check adds the token check. Nothing else picks a Verify: the corporate `ALLOC_REQUEST` row comes from the account type, the way the `SCHED_EXEC` row comes from the date, and what a payment waited for picks nothing.
 
 ## Reverify
 
