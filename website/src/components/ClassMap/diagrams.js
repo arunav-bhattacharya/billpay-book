@@ -110,3 +110,59 @@ export const rulePieces = {
     {type: 'uses', points: [[602, 280], [602, 110]], label: 'asks about', at: [612, 199], align: 'start'},
   ],
 };
+
+/* Build -> Domain Model: the type hierarchy. The root chain runs down the
+   centre; what a payment holds hangs off its left; the two shapes sit to the
+   right of the state classes, each with its data classes under it, and both
+   kinds of data class gather back into the state class below. */
+export const typeHierarchy = {
+  width: 700,
+  height: 552,
+  label:
+    "Class diagram of the payment type hierarchy. At the top, the Transaction interface, with an id, an account and an optional amount. Payment and Refund are kinds of Transaction; Refund has no concrete types yet. Payment holds a status, a source, a timeline, an option and an instrument. It holds three sealed types: PaymentOption and Instrument, each going from Reference to Verified, and Timeline, which is either an InitialTimeline or an ExecutableTimeline, immediate or scheduled. Fourteen sealed state classes, one per state from Pending to Disallowed, implement Payment. Two shape interfaces are kinds of Payment: FullPayment, and SplitPayment, which adds originalPaymentId and sequenceNumber. The data classes combine the two: fourteen {State}FullPayment classes implement FullPayment, eight {State}SplitPayment classes, the legs, implement SplitPayment, and every one of them is a kind of its state class.",
+  classes: [
+    {id: 'transaction', kind: 'interface', name: 'Transaction', x: 250, y: 12, w: 210, members: ['id: TransactionId', 'account', 'amount?']},
+    {id: 'payment', kind: 'interface', name: 'Payment', x: 250, y: 160, w: 210, members: ['status, source, timeline', 'option, instrument']},
+    {id: 'refund', kind: 'data', name: 'Refund', note: 'no concrete types yet', x: 490, y: 160, w: 200},
+    {id: 'option', kind: 'interface', name: 'PaymentOption', x: 10, y: 12, w: 200, members: ['Reference → Verified']},
+    {id: 'instrument', kind: 'interface', name: 'Instrument', x: 10, y: 108, w: 200, members: ['Reference → Verified']},
+    {id: 'timeline', kind: 'interface', name: 'Timeline', x: 10, y: 204, w: 200, members: ['InitialTimeline', 'ExecutableTimeline', '↳ Immediate, Scheduled']},
+    {
+      id: 'state',
+      kind: 'class',
+      name: '{State}Payment',
+      note: '14 sealed classes, one per state',
+      x: 10,
+      y: 340,
+      w: 230,
+      members: ['Pending · Scheduled', 'Accepted · Allocating', 'Allocated · Processing', 'Processed · Paid', 'Returned · Representing', 'Represented · Cancelled', 'Declined · Disallowed'],
+    },
+    {id: 'full', kind: 'interface', name: 'FullPayment', x: 280, y: 340, w: 190},
+    {id: 'split', kind: 'interface', name: 'SplitPayment', x: 500, y: 340, w: 190, members: ['originalPaymentId', 'sequenceNumber']},
+    {id: 'fullData', kind: 'data', name: '{State}FullPayment', note: '14 classes, one per state', x: 280, y: 470, w: 190},
+    {id: 'splitData', kind: 'data', name: '{State}SplitPayment', note: '8 classes: the legs', x: 500, y: 470, w: 190},
+  ],
+  links: [
+    // Payment and Refund gather into one trunk up to Transaction
+    {type: 'extends', points: [[590, 160], [590, 143], [355, 143]], head: false},
+    {type: 'extends', points: [[355, 160], [355, 143]], head: false},
+    {type: 'extends', points: [[355, 143], [355, 126]]},
+    // what a payment holds, down a spine on its left
+    {type: 'holds', points: [[250, 200], [230, 200], [230, 53], [210, 53]]},
+    {type: 'holds', points: [[230, 149], [210, 149]], head: false},
+    {type: 'holds', points: [[230, 200], [230, 261], [210, 261]], head: false},
+    // the state classes implement Payment
+    {type: 'implements', points: [[226, 340], [226, 296], [300, 296], [300, 258]]},
+    // the two shapes are kinds of Payment
+    {type: 'extends', points: [[595, 340], [595, 312], [385, 312]], head: false},
+    {type: 'extends', points: [[385, 340], [385, 312]], head: false},
+    {type: 'extends', points: [[385, 312], [385, 258]]},
+    // each data class implements its shape
+    {type: 'implements', points: [[375, 470], [375, 392]]},
+    {type: 'implements', points: [[595, 470], [595, 438]]},
+    // and every data class is a kind of its state class
+    {type: 'extends', points: [[375, 522], [375, 538]], head: false},
+    {type: 'extends', points: [[595, 522], [595, 538], [125, 538]], head: false},
+    {type: 'extends', points: [[125, 538], [125, 518]]},
+  ],
+};

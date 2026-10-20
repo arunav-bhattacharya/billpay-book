@@ -6,6 +6,8 @@ sidebar_label: Domain Model
 
 import Lead from '@site/src/components/Lead';
 import SectionIndex from '@site/src/components/SectionIndex';
+import ClassMap from '@site/src/components/ClassMap';
+import {typeHierarchy} from '@site/src/components/ClassMap/diagrams';
 
 # Domain Model
 
@@ -13,20 +15,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 ## The type hierarchy
 
-```mermaid
-flowchart TD
-  T["Transaction<br/><i>sealed interface · id · account · amount?</i>"]
-  P["Payment<br/><i>sealed interface · status · timeline · option · instrument …</i>"]
-  R["Refund<br/><i>no classes yet</i>"]
-  S["14 state classes<br/><i>PendingPayment · ScheduledPayment · AcceptedPayment · AllocatingPayment ·<br/>AllocatedPayment · ProcessingPayment · ProcessedPayment · PaidPayment ·<br/>ReturnedPayment · RepresentingPayment · RepresentedPayment ·<br/>CancelledPayment · DeclinedPayment · DisallowedPayment</i>"]
-  L["22 data classes<br/><i>&#123;State&#125;FullPayment / &#123;State&#125;SplitPayment</i>"]
-  D["directives<br/><i>PaymentOption · Instrument, each Reference → Verified</i>"]
-  TL["Timeline<br/><i>Initial · Immediate · Scheduled</i>"]
-  T --> P --> S --> L
-  T --> R
-  D --> P
-  TL --> P
-```
+<ClassMap {...typeHierarchy} />
 
 Three patterns repeat throughout the model:
 
