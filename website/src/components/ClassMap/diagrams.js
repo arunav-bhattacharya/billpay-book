@@ -57,16 +57,16 @@ export const pickingClasses = {
   width: 700,
   height: 342,
   label:
-    'Class diagram of the classes that do the picking, numbered in the order they act. StageResolver has resolve(plan). It first makes a StageContext, which holds the plan key and the stubs. Second, it picks the stage from a Registry, which has forPlan and one. Third, it binds that stage, DefaultPaymentVerifyStage, to the context. The stage then asks a Registry for its checks, fourth, and asks the RuleRegistry, which has evaluate, for its rules, fifth.',
+    'Class diagram of the classes that do the picking, numbered in the order they act. StageResolver has resolve(profile). It first makes a StageContext, which holds the resolved profile and the stubs. Second, it picks the stage from a Registry, which has forProfile and one. Third, it binds that stage, DefaultPaymentVerifyStage, to the context. The stage then asks a Registry for its checks, fourth, and asks the RuleRegistry, which has evaluate, for its rules, fifth.',
   classes: [
-    {id: 'resolver', kind: 'class', name: 'StageResolver', x: 10, y: 12, w: 172, members: ['resolve(plan): Stages']},
-    {id: 'ctx', kind: 'data', name: 'StageContext', x: 514, y: 12, w: 176, members: ['plan: PlanKey', 'stubs: Stubs']},
-    {id: 'registry', kind: 'class', name: 'Registry<S>', x: 250, y: 130, w: 186, members: ['forPlan(plan): List<S>', 'one(plan): S']},
-    {id: 'rules', kind: 'class', name: 'RuleRegistry', x: 472, y: 130, w: 218, members: ['evaluate(plan, step, facts)']},
+    {id: 'resolver', kind: 'class', name: 'StageResolver', x: 10, y: 12, w: 200, members: ['resolve(profile): Stages']},
+    {id: 'ctx', kind: 'data', name: 'StageContext', x: 494, y: 12, w: 196, members: ['profile: ResolvedProfile', 'stubs: Stubs']},
+    {id: 'registry', kind: 'class', name: 'Registry<S>', x: 250, y: 130, w: 210, members: ['forProfile(profile): List<S>', 'one(profile): S']},
+    {id: 'rules', kind: 'class', name: 'RuleRegistry', x: 466, y: 130, w: 224, members: ['evaluate(profile, step, facts)']},
     {id: 'stage', kind: 'class', name: 'DefaultPaymentVerifyStage', x: 250, y: 262, w: 238, members: ['run(ctx, paymentId)']},
   ],
   links: [
-    {type: 'makes', points: [[182, 45], [514, 45]], step: 1, label: 'makes the context', at: [196, 37]},
+    {type: 'makes', points: [[210, 45], [494, 45]], step: 1, label: 'makes the context', at: [224, 37]},
     {type: 'uses', points: [[70, 78], [70, 171], [250, 171]], step: 2, label: 'picks the stage', at: [84, 163]},
     {type: 'uses', points: [[40, 78], [40, 295], [250, 295]], step: 3, label: 'binds it to the context', at: [54, 287]},
     {type: 'uses', points: [[290, 262], [290, 212]], step: 4, label: 'asks for its checks', at: [300, 241]},
@@ -83,7 +83,7 @@ export const rulePieces = {
   label:
     'Class diagram of the verification rules. The RuleRegistry, with evaluate, holds every RuleSet bean. RuleSet is an interface with a list of rules; InstrumentRules, MandateRules and GBRules implement it, and GBRules is GB\'s own. A RuleSet holds Rules. A Rule has an id, an appliesTo, the steps it runs in, two specifications, runsWhen and passes, a decline code and a priority. It uses the Spec interface, which has isSatisfiedBy, and, or and not. A Spec asks about the VerificationFacts: each check\'s answer, the settings and the time.',
   classes: [
-    {id: 'registry', kind: 'class', name: 'RuleRegistry', x: 10, y: 12, w: 218, members: ['evaluate(plan, step, facts)']},
+    {id: 'registry', kind: 'class', name: 'RuleRegistry', x: 10, y: 12, w: 226, members: ['evaluate(profile, step, facts)']},
     {id: 'set', kind: 'interface', name: 'RuleSet', x: 10, y: 128, w: 218, members: ['rules: List<Rule>']},
     {id: 'instrument', kind: 'class', name: 'InstrumentRules', x: 272, y: 105, w: 172},
     {id: 'mandate', kind: 'class', name: 'MandateRules', x: 272, y: 151, w: 172},

@@ -23,7 +23,7 @@ What each type is called is in the [naming conventions](../../../design/principl
 
 Only stages have a market column, because stages, with their checks and methods, are the only layer that varies. There is one implementation of each workflow, and it gets its stages from the stage resolver, never copied per market. Activities and clients are shared by every market by design.
 
-Much of what used to be market code isn't code at all now. A market's execution time, time zone, windows and BOTH rules arrive in a release from the Market Onboarding UI in Control Tower, and the Router reads them at runtime. A new market whose behaviors the build already covers goes live with a release and no deploy ([Market Onboarding](../../../onboarding/index.md)).
+Much of what used to be market code isn't code at all now. A market's execution time, time zone, windows and BOTH rules arrive in a release from the Market Onboarding UI, and the Router reads them at runtime. A new market whose behaviors the build already covers goes live with a release and no deploy ([Market Onboarding](../../../onboarding/index.md)).
 
 ## The dependency rule the build enforces
 

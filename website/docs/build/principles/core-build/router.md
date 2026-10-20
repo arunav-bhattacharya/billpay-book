@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Building the Router
 
-<Lead>The Router is the only code that starts a payment workflow. It is a library inside billpay-core, not a service: the core APIs call it while a caller waits, and the dispatchers call it for every row and request they release, so every start is admitted, pinned and placed the same way.</Lead>
+<Lead>The Router is the only code that starts a payment workflow. It is a library inside billpay-core, not a service: the core APIs call it while a caller waits, and the dispatchers call it for every row and request they release, so every start is admitted, pinned and given a run site the same way.</Lead>
 
 Without it, two kinds of code would start payments, the API handlers and the dispatchers, and each would carry its own copy of the market rules. The copies would drift. [Design → Routing](../../../design/routing.md) explains what the Router decides and why. This page is about building it: the two types it hands on, its six steps as code, and the details that are easy to get wrong.
 
@@ -18,18 +18,18 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 - The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch.
 - The dispatchers, once for each Work Tracker row or inbox request they release.
 
-The confirm, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, as an update, so there is nothing to pick, pin or place ([6. Start](#6-start) shows the call).
+The confirm, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, as an update, so there is nothing to pick, pin or choose ([6. Start](#6-start) shows the call).
 
-Calling it is a plain function call inside billpay-core. The app holds a Temporal client for each cluster, and the Router takes the one its placement names. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
+Calling it is a plain function call inside billpay-core. The app holds a Temporal client for each cluster, and the Router takes the one its run site names. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
 
 Control workflows don't go through the Router. The dispatchers, the governor and market onboarding start from their Schedules or their own API.
 
 ## The two types it hands on
 
-Every start produces a plan key, which the workflow receives, and a placement, which says where and how it starts. A sketch: the plan key's fields are the spec's, and the other names are illustrative.
+Every start produces a resolved profile, which the workflow receives, and a run site, which says where and how it starts. A sketch: the resolved profile's fields are the spec's, and the other names are illustrative.
 
 ```kotlin
-data class PlanKey(
+data class ResolvedProfile(
     val market: Market,                           // so a market's own classes, such as GB's, can apply
     val journey: Journey,
     val accountType: AccountType,                 // CONSUMER, CORPORATE or BUSINESS_TRAVEL
@@ -42,7 +42,7 @@ data class PlanKey(
     val confirmationWindow: Duration? = null,     // for a payment that waits for the customer
 )
 
-data class Placement(
+data class RunSite(
     val cluster: Cluster,                         // ONLINE or OFFLINE
     val taskQueue: String,                        // online-wf or offline-wf
     val priority: Int?,                           // 1 to 5, on the Offline cluster
@@ -52,7 +52,7 @@ data class Placement(
 )
 ```
 
-The plan key is a workflow input, so Temporal records it in the workflow's history, and two rules follow. Its JSON must read the same when the workflow replays, so a new field gets a default ([Serialization](../tech-stack/serialization.md)). And it carries values, never a pointer to config: the workflow has to see the behaviors and rule settings as they were when it started, whatever the market changes later.
+The resolved profile is a workflow input, so Temporal records it in the workflow's history, and two rules follow. Its JSON must read the same when the workflow replays, so a new field gets a default ([Serialization](../tech-stack/serialization.md)). And it carries values, never a pointer to config: the workflow has to see the behaviors and rule settings as they were when it started, whatever the market changes later.
 
 ## The six steps
 
@@ -64,11 +64,11 @@ fun route(request: RouteRequest): Routed {
     if (request is AllocationsCallback && !budget.allows(request)) {
         return Routed.OverBudget(budget.retryAfter())                     // 429 with Retry-After
     }
-    val journey = pickJourney(request, version)                           // 2
+    val journey = request.journey(version)                                // 2
     val behaviors = resolve(version, journey, request)                    // 3
-    val plan = PlanKey.of(journey, behaviors, version)                    // 4
-    val placement = place(journey, plan, request)                         // 5
-    return start(journey, plan, placement, request)                       // 6
+    val profile = ResolvedProfile.of(journey, behaviors, version)         // 4
+    val runSite = chooseRunSite(journey, profile, request)                // 5
+    return start(journey, profile, runSite, request)                      // 6
 }
 ```
 
@@ -87,37 +87,73 @@ The allocations callback has one more check: its start must fit inside its traff
 
 ### 2. Pick the journey
 
-The routing table on [Design → Routing](../../../design/routing.md) is the spec for this function, and the code should read like it:
+The routing table on [Design → Routing](../../../design/routing.md#trigger-to-workflow) is the spec for this step. Most of it is a fixed mapping: an update is always `UPDATE`, a `REPRESENT` row is always `REPRESENT`. Only a create has conditions. So the step is built in two parts, and neither is a central `when` that every new request has to edit. Proposed (2026-10-20).
+
+**Each request names its own journey.** `RouteRequest` is a sealed interface with one abstract function, so a new request type doesn't compile until it says which journey it takes. The Work Tracker item types and the inbox request types are enums that carry their journey, so a new item type can't be added without one either:
 
 ```kotlin
-fun pickJourney(r: RouteRequest, version: MarketVersion): Journey = when (r) {
-    is CreatePayment -> when {
-        r.waitsForCustomer(version) -> Journey.CREATE_INTENT    // bank confirmation, or pending IDs with the go-ahead on
-        r.isFutureDated -> Journey.CREATE_SCHEDULED
-        r.instructions.size > 1 -> Journey.MULTIPLE_INSTRUCTIONS
-        else -> Journey.CREATE_IMMEDIATE
-    }
-    is PayAndPlan -> Journey.PAY_AND_PLAN
-    is UpdatePayment -> Journey.UPDATE
-    is CancelPayment -> Journey.CANCEL                // a SCHEDULED payment; the no to a waiting one is an update
-    is Refund -> Journey.BALANCE_REFUND
-    is AllocationsCallback -> Journey.RECEIVE_ALLOCATIONS
-    is DueRow -> when (r.itemType) {                  // a Work Tracker row
-        SCHED_EXEC, ALLOC_EXEC -> Journey.EXECUTE_SCHEDULED
-        ALLOC_REQUEST -> Journey.REQUEST_ALLOCATIONS
-        ALLOC_LEG -> Journey.EXECUTE_SPLIT
-        REPRESENT -> Journey.REPRESENT
-    }
-    is StartRequest -> when (r.type) {                // pulled from One-Data's inbox
-        AR_PAYMENT -> Journey.CREATE_SCHEDULED
-        AR_REFUND -> Journey.BALANCE_REFUND
-        RETURN -> Journey.PROCESS_RETURN
-        INBOUND -> Journey.PROCESS_INBOUND
-    }
+sealed interface RouteRequest {
+    fun journey(version: MarketVersion): Journey
+}
+
+data class UpdatePayment(/* ... */) : RouteRequest {
+    override fun journey(version: MarketVersion) = Journey.UPDATE
+}
+
+data class DueRow(val itemType: WorkItemType /* ... */) : RouteRequest {
+    override fun journey(version: MarketVersion) = itemType.journey
+}
+
+enum class WorkItemType(val journey: Journey) {
+    SCHED_EXEC(Journey.EXECUTE_SCHEDULED),
+    ALLOC_EXEC(Journey.EXECUTE_SCHEDULED),
+    ALLOC_REQUEST(Journey.REQUEST_ALLOCATIONS),
+    ALLOC_LEG(Journey.EXECUTE_SPLIT),
+    REPRESENT(Journey.REPRESENT),
+}
+
+enum class StartRequestType(val journey: Journey) {      // pulled from One-Data's inbox
+    AR_PAYMENT(Journey.CREATE_SCHEDULED),
+    AR_REFUND(Journey.BALANCE_REFUND),
+    RETURN(Journey.PROCESS_RETURN),
+    INBOUND(Journey.PROCESS_INBOUND),
 }
 ```
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or One-Data sent other pending payments' IDs with the create and the market's go-ahead setting, off by default, is on. The journey alone makes the payment wait: nothing about the go-ahead goes in the plan key. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead.
+`CancelPayment`, `Refund`, `PayAndPlan` and `AllocationsCallback` each return their one journey the same way. This is the replace-conditional-with-polymorphism move: the knowledge sits with the type it belongs to, and the compiler checks that none is missing.
+
+**A create asks an ordered list of rules.** Each `JourneyRule` is a small specification: a journey, the condition in words, and a test. The rules are tried in order and the first that matches wins, like a chain of responsibility, so the order in the list is the order of the routing table:
+
+```kotlin
+class JourneyRule(
+    val journey: Journey,
+    val condition: String,                                     // the words the routing table prints
+    val matches: (CreatePayment, MarketVersion) -> Boolean,
+)
+
+object CreateJourneys {
+    private val rules = listOf(
+        JourneyRule(Journey.CREATE_INTENT, "Waits for the customer: bank confirmation, or a go-ahead") { r, v -> r.waitsForCustomer(v) },
+        JourneyRule(Journey.CREATE_SCHEDULED, "Future-dated") { r, _ -> r.isFutureDated },
+        JourneyRule(Journey.MULTIPLE_INSTRUCTIONS, "Today, several instructions") { r, _ -> r.instructions.size > 1 },
+        JourneyRule(Journey.CREATE_IMMEDIATE, "Today, one instruction") { _, _ -> true },
+    )
+
+    fun pick(r: CreatePayment, v: MarketVersion): Journey = rules.first { it.matches(r, v) }.journey
+}
+
+data class CreatePayment(/* ... */) : RouteRequest {
+    override fun journey(version: MarketVersion) = CreateJourneys.pick(this, version)
+}
+```
+
+The Router's step is then one line, `val journey = request.journey(version)`.
+
+The rules are a plain list in one file, not beans that Quarkus collects the way it collects stages. Stages vary by market, so each market adds its own and a registry sorts them out. Journeys don't vary by market: they change only when the code does, and their order matters, so one list a reviewer can read top to bottom is the clearer place for them.
+
+**A test keeps the code and the table together.** It walks every request type, item type, inbox type and create rule, writes the routing table as trigger, condition and journey, and compares it with a checked-in copy, the way the [stage report](./stage-resolver.md) works. A change to which journey a request takes fails the test until the same pull request updates the copy, so the reviewer sees the row that moved.
+
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or One-Data sent other pending payments' IDs with the create and the market's go-ahead setting, off by default, is on. That is why it is the first rule: a future-dated create that waits for a go-ahead still waits. The journey alone makes the payment wait, and nothing about the go-ahead goes in the resolved profile. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead.
 
 ### 3. Resolve the behaviors
 
@@ -137,33 +173,77 @@ fun resolveFlag(rule: BehaviorRule, journey: Journey, method: PaymentMethod?): B
 
 The version is the active one, with one exception. The onboarding workflow tests a new version with real payments before it goes live, so for test accounts only, the Router accepts a pinned version instead.
 
-### 4. Pin the plan key
+### 4. Pin the resolved profile
 
-The workflow gets the plan key as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages. The key carries the market as well as the behaviors, because a market's own class, such as GB's funds check for Pay with Bank Transfer, applies by market:
+The workflow gets the resolved profile as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages. The profile carries the market as well as the behaviors, because a market's own class, such as GB's funds check for Pay with Bank Transfer, applies by market:
 
 ```kotlin
-val stages = stageResolver.resolve(plan)              // inside the workflow, on its own thread
+val stages = stageResolver.resolve(profile)              // inside the workflow, on its own thread
 ```
 
 Each stage, and each check or method a stage uses, says where it applies: a market or every market, an account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, so a market's own class beats a shared one with the same key in that market and nowhere else, while classes with different keys add up. Quarkus finds every class at build time, and a registry works out every combination when the app starts, so a lookup is a map read. The same registries work out the build's capability manifest, which `GET /market-onboarding/capabilities` returns and the onboarding workflow checks every release against.
 
-The Router builds the plan key but never picks a class. During a rolling deploy the Router and the workers can run different builds, so the classes are picked by the build that runs them. [Building Stages](./stages.md#how-a-stage-gets-picked) shows how a class says where it applies, and [Building the Stage Resolver](./stage-resolver.md) works through one payment from its plan key to the checks it runs.
+The Router builds the resolved profile but never picks a class. During a rolling deploy the Router and the workers can run different builds, so the classes are picked by the build that runs them. [Building Stages](./stages.md#how-a-stage-gets-picked) shows how a class says where it applies, and [Building the Stage Resolver](./stage-resolver.md) works through one payment from its resolved profile to the checks it runs.
 
-The key also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the key carries the market's confirmation window too, which the workflow's timer uses.
+The profile also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the profile carries the market's confirmation window too, which the workflow's timer uses.
+
+
+#### Rule settings, with an example
+
+The field names and values here are illustrative (Proposed, 2026-10-20). The spec fixes only what the settings are for: the market's largest payment and the instrument types it takes.
+
+1. In the Market Onboarding UI, the GB consumer profile's Operations step sets the largest payment to 25,000 GBP and the instrument types to bank account only.
+2. A second person approves it, and it is frozen as release v7, the settings with it:
+
+   ```json
+   "ruleSettings": {
+     "maxPaymentAmount": { "amount": "25000.00", "currency": "GBP" },
+     "acceptedInstrumentTypes": ["BANK_ACCOUNT"]
+   }
+   ```
+
+3. Once v7 is active in an environment, every pod reloads its in-memory copy of the config, and for each new GB consumer payment the Router copies the settings into the resolved profile as values:
+
+   ```kotlin
+   data class RuleSettings(
+       val maxPaymentAmount: Money,
+       val acceptedInstrumentTypes: Set<InstrumentType>,
+   )
+
+   val profile = ResolvedProfile.of(journey, behaviors, version)   // ruleSettings = version.ruleSettings
+   ```
+
+4. Verify puts them into `VerificationFacts` with the checks' answers, and a rule reads them like any other fact:
+
+   ```kotlin
+   val withinLimit = FactSpec { it.payment.amount <= it.ruleSettings.maxPaymentAmount }
+
+   Rule(
+       id = "AMOUNT_WITHIN_LIMIT",
+       steps = setOf(VERIFY, REVERIFY),
+       runsWhen = FactSpec { true },
+       passes = withinLimit,
+       priority = 600,
+   )
+   ```
+
+5. A payment of 30,000 GBP fails the rule and is declined with the rule's code. If release v8 raises the limit to 40,000, payments already running keep 25,000, because it is in their history, and payments started after v8 goes live get 40,000. A scheduled payment is routed again on its due date, so its Reverify checks against the version active that day.
+
+The rule's logic is code and changes with a deploy. The number is config and changes with a release.
 
 A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify's checks as for any payment. [Design → Journeys](../../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
 
 The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg.
 
-### 5. Place
+### 5. Choose the run site
 
-Placement is the cluster, the task queue, the priority and fairness key, and the workflow ID.
+The run site is the cluster, the task queue, the priority and fairness key, and the workflow ID.
 
 - Work a caller waits for runs on the Online cluster, on `online-wf`. Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
 - Priority and fairness key are set once, from the traffic class, and every activity inherits them. They matter only on the Offline cluster's shared queues, and [Design → Throttling](../../../design/throttling.md#priority-and-fairness) has the classes.
 - The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
 
-The Online cap is the one part of placement that changes with time. While a SEPA run caps Online on a downstream, `downstream_limit` holds the cap and its end time, and the Router places that downstream's calls for each new Online payment on the Online cluster's `ds-*` queue for it. A cap past its end time is ignored, so a stopped governor can't leave customers capped. Placement is pinned at start, and a running payment never switches queues. Proposed: the capped queues travel into the workflow with the plan key, and the stages build their activity options from them.
+The Online cap is the one part of the run site that changes with time. While a SEPA run caps Online on a downstream, `downstream_limit` holds the cap and its end time, and the Router places that downstream's calls for each new Online payment on the Online cluster's `ds-*` queue for it. A cap past its end time is ignored, so a stopped governor can't leave customers capped. The run site is pinned at start, and a running payment never switches queues. Proposed: the capped queues travel into the workflow with the resolved profile, and the stages build their activity options from them.
 
 ### 6. Start
 
@@ -171,8 +251,8 @@ A caller who waits gets Update-With-Start, answered within 2.5 seconds, which ke
 
 ```kotlin
 val options = WorkflowOptions.newBuilder()
-    .setWorkflowId(placement.workflowId)                        // {paymentId}-init
-    .setTaskQueue(placement.taskQueue)                          // online-wf
+    .setWorkflowId(runSite.workflowId)                        // {paymentId}-init
+    .setTaskQueue(runSite.taskQueue)                          // online-wf
     .setWorkflowIdConflictPolicy(WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING)
     .setTypedSearchAttributes(searchAttributes(request, plan))
     .build()
@@ -196,12 +276,12 @@ Everything else is a plain start, safe to repeat:
 
 ```kotlin
 val options = WorkflowOptions.newBuilder()
-    .setWorkflowId(placement.workflowId)                        // {paymentId}-execute, from the row
-    .setTaskQueue(placement.taskQueue)                          // offline-wf
+    .setWorkflowId(runSite.workflowId)                        // {paymentId}-execute, from the row
+    .setTaskQueue(runSite.taskQueue)                          // offline-wf
     .setWorkflowIdReusePolicy(WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE)
     .setPriority(Priority.newBuilder()
-        .setPriorityKey(placement.priority!!)                   // 1 for execution
-        .setFairnessKey(placement.fairnessKey!!)                // the market
+        .setPriorityKey(runSite.priority!!)                   // 1 for execution
+        .setFairnessKey(runSite.fairnessKey!!)                // the market
         .build())
     .setTypedSearchAttributes(searchAttributes(request, plan))
     .build()
@@ -246,6 +326,6 @@ Neither cluster uses eager workflow start: the server refuses it with Update-Wit
 
 ## Re-routing on the due date
 
-A scheduled payment is routed twice. Its create goes through the Router when the customer schedules it. On the due date, the dispatcher hands its `SCHED_EXEC` row, or a corporate payment's `ALLOC_EXEC` row, to the Router like any other start. The Router resolves the behaviors from that day's active version and pins a new plan key, so the payment executes with today's config. The version it was scheduled under stays in its timeline for audit.
+A scheduled payment is routed twice. Its create goes through the Router when the customer schedules it. On the due date, the dispatcher hands its `SCHED_EXEC` row, or a corporate payment's `ALLOC_EXEC` row, to the Router like any other start. The Router resolves the behaviors from that day's active version and pins a new resolved profile, so the payment executes with today's config. The version it was scheduled under stays in its timeline for audit.
 
-In code, a due row is one more kind of request, which is the point of having one Router. The two guardrails that make this safe are already in place: the plan key carries the behaviors and the version, and Worker Versioning pins the workflow to its build.
+In code, a due row is one more kind of request, which is the point of having one Router. The two guardrails that make this safe are already in place: the resolved profile carries the behaviors and the version, and Worker Versioning pins the workflow to its build.

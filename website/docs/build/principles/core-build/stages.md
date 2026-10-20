@@ -29,7 +29,7 @@ interface PaymentExecuteStage : Strategy<Step> {
 }
 ```
 
-A stage is a strategy: one instance, a `@Singleton` bean, serves every payment, so it keeps no state. What a payment needs arrives in its `StageContext`: the plan key and the activity stubs, which the [stage resolver](./stage-resolver.md#how-a-workflow-uses-it) makes on the workflow's own thread. The workflow never sees the context. It calls `stages.execute.run(paymentId, verified)`, and the resolver passes the context along.
+A stage is a strategy: one instance, a `@Singleton` bean, serves every payment, so it keeps no state. What a payment needs arrives in its `StageContext`: the resolved profile and the activity stubs, which the [stage resolver](./stage-resolver.md#how-a-workflow-uses-it) makes on the workflow's own thread. The workflow never sees the context. It calls `stages.execute.run(paymentId, verified)`, and the resolver passes the context along.
 
 The stage every market runs is `DefaultPayment{Step}Stage`. What varies inside a step is not a different stage but the checks and methods the stage uses, each a small class that says where it applies. [Naming](#naming) has the rule.
 
@@ -51,7 +51,7 @@ class DefaultPaymentExecuteStage(
     ): ExecuteOutcome {
         val s = ctx.stubs
         // the registry picks: real time or batch
-        val clearing = clearingMethods.one(ctx.plan)
+        val clearing = clearingMethods.one(ctx.profile)
         // Payment Instruments, no rate limit
         val details =
             Async.function(s.instruments::clearTextDetails, paymentId)
@@ -98,16 +98,16 @@ Two stages bend that order:
 
 ## How a stage gets picked
 
-A workflow never chooses its stages, and nothing hands them to it. When it starts, it looks them up from the plan key the [Router](./router.md) pinned:
+A workflow never chooses its stages, and nothing hands them to it. When it starts, it looks them up from the resolved profile the [Router](./router.md) pinned:
 
 ```kotlin
 // inside the workflow, on its own thread
-val stages = stageResolver.resolve(plan)
+val stages = stageResolver.resolve(profile)
 ```
 
-No `when` or `if` maps a plan key to classes, and there is no list to edit. Each stage, check and method says what job it does, its key, and where it applies, its `appliesTo`: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each key, the most specific class that applies wins. A class tied to a market beats one that isn't, so a market is the exception wherever it has a class of its own. Quarkus finds every class at build time, and a registry works out every combination when the app starts.
+No `when` or `if` maps a resolved profile to classes, and there is no list to edit. Each stage, check and method says what job it does, its key, and where it applies, its `appliesTo`: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each key, the most specific class that applies wins. A class tied to a market beats one that isn't, so a market is the exception wherever it has a class of its own. Quarkus finds every class at build time, and a registry works out every combination when the app starts.
 
-GB is the example today. A Pay with Bank Transfer payment there also runs `GBFundsCheck`, which asks the bank-confirmation provider whether the customer's bank account holds enough money for the payment. That one class, in GB's module, is all GB adds. That is why the plan key carries the market. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
+GB is the example today. A Pay with Bank Transfer payment there also runs `GBFundsCheck`, which asks the bank-confirmation provider whether the customer's bank account holds enough money for the payment. That one class, in GB's module, is all GB adds. That is why the resolved profile carries the market. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
 
 Stages are never `abstract`. A variation is a class of its own that the registry picks, not an override of a base class, so reading one file tells you everything that class does. Payment workflows are pinned to their build with Worker Versioning, so a deploy that adds or changes a class never changes the code under a payment that is already running.
 

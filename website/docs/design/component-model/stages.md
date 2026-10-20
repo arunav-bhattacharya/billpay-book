@@ -4,12 +4,13 @@ description: 'A stage is one business step, named for the journey step it perfor
 ---
 
 import Lead from '@site/src/components/Lead';
+import VerifyFlow from '@site/src/components/VerifyFlow';
 
 # Stages
 
 <Lead>A stage is one business step, named for the journey step it performs: Verify, Execute, Settle. It makes its calls, in parallel where they don't depend on each other, commits the result in one guarded Oracle transaction, and returns its outcome.</Lead>
 
-Stages are the only layer that changes between markets, and they change through the checks and methods they are made of. Verify in a market that checks a mandate runs one more check than Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its plan key, and every check and method says where it applies. Thirteen stages cover every journey.
+Stages are the only layer that changes between markets, and they change through the checks and methods they are made of. Verify in a market that checks a mandate runs one more check than Verify in one that doesn't, and the workflow never knows the difference: it looks its stages up from its resolved profile, and every check and method says where it applies. Thirteen stages cover every journey.
 
 ## What every stage does
 
@@ -26,25 +27,25 @@ Two stages bend that order, for good reasons:
 
 Which changes send a Raven message is a market setting. By default they are `SCHEDULED`, `DECLINED`, `CANCELLED`, `PROCESSED` and `RETURNED`. A market can change that default, and an account type can change its market's. Where both have a setting, the account type's wins. A change that is switched off sends no message, and Fulfil then waits for RTF alone.
 
-## The thirteen stages
+## How stages vary
 
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
 | RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the provider gives no link. It runs only for bank confirmation | Nothing |
 | Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | Mandate authorization and bank confirmation, which decide its checks |
-| Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
+| Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | Account type, AR posting, realtime clearing, mandate authorization |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls | Account type, AR posting, realtime clearing |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | `SCHEDULED`, or `ACCEPTED` for pay today, → `ALLOCATING` | Nothing |
 | ReceiveAllocations | `ALLOCATING` → `ALLOCATED` once the batches add up, with the payment's `ALLOC_EXEC` row; earlier batches change no state | Nothing |
 | Cancel | `SCHEDULED` → `CANCELLED`; `PENDING` → `CANCELLED` for a payment never confirmed, or on the customer's no | Account type, AR posting |
 | Return | `PROCESSING`, `PROCESSED`, `PAID` or `REPRESENTED` → `RETURNED`, on the presentment that came back | Account type |
-| QueueRepresentment | Writes the next presentment, a new row numbered one higher, in `REPRESENTING`, with the representment date as its clearing date; the returned row stays `RETURNED` | All four |
-| Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | All four |
+| QueueRepresentment | Writes the next presentment, a new row numbered one higher, in `REPRESENTING`, with the representment date as its clearing date; the returned row stays `RETURNED` | Account type, AR posting, realtime clearing, mandate authorization |
+| Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | Account type, AR posting, realtime clearing, mandate authorization |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
 
-"All four" means account type, AR posting, realtime clearing and mandate authorization. Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and adds the token check to Verify. A go-ahead is not a behavior, and no stage or check is picked for it. It is a market setting, off by default: where it is on, a create that One-Data sends with other pending payments' IDs waits in Create Payment Intent, and Capture stores the IDs.
+Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and adds the token check to Verify. A go-ahead is not a behavior, and no stage or check is picked for it. It is a market setting, off by default: where it is on, a create that One-Data sends with other pending payments' IDs waits in Create Payment Intent, and Capture stores the IDs.
 
 ## Which workflow runs which stages
 
@@ -68,7 +69,7 @@ Create Balance Refund follows the payment path; its detailed stages are still be
 
 ## How a step picks its classes
 
-No code maps a payment to classes. Each stage, check and method says which job it does and where it applies: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, and a class tied to a market beats a shared one, so a market is the exception only where it has a class of its own. Different jobs add up, which is how one payment gets several checks. [Building the Stage Resolver](../../build/principles/core-build/stage-resolver.md#the-complete-picture) draws the complete picture, from the plan key to the commit, and the classes behind it.
+No code maps a payment to classes. Each stage, check and method says which job it does and where it applies: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, and a class tied to a market beats a shared one, so a market is the exception only where it has a class of its own. Different jobs add up, which is how one payment gets several checks. [Building the Stage Resolver](../../build/principles/core-build/stage-resolver.md#the-complete-picture) draws the complete picture, from the resolved profile to the commit, and the classes behind it.
 
 ## Naming
 
@@ -102,27 +103,13 @@ Three rules keep the names straight:
 
 Verify, Reverify and Represent each decide whether a payment can go ahead, and they decide it the same way. The stage first asks the systems that know about the payment, then runs a set of rules over their answers. Keeping the two apart makes each rule a plain condition over data, and lets the three stages share their rules.
 
-```mermaid
-flowchart TB
-  subgraph C["Checks, in parallel"]
-    direction TB
-    I["Payment<br/>Instruments"]
-    O["Payment<br/>Options"]
-    P["Plans<br/>for a mandate"]
-    B["The provider<br/>for GB funds"]
-  end
-  C --> F["Facts<br/>answers, settings<br/>and the time"]
-  F --> R["Rules<br/>the ones that apply"]
-  R --> D{"Did a rule fail?"}
-  D -- "No" --> M["The payment<br/>moves on"]
-  D -- "Yes" --> X["DECLINED<br/>with the code of<br/>the top failure"]
-```
+<VerifyFlow />
 
 - A check is one system and the rules about its answer, and each check says where it applies. Verify runs every check that applies to the payment: the Instrument and Options checks always, `TokenCheck` with bank confirmation, `MandateCheck`, which asks Plans, where the profile requires mandate authorization, and in GB, for Pay with Bank Transfer, `GBFundsCheck`: does the customer's bank account hold enough money for the payment. Represent will run checks of its own, still to be defined.
 - The checks' calls go out in parallel. What a system says, such as a closed account or no valid mandate, comes back as a fact. Only an error fails the call, and Temporal retries it, so an outage never declines a payment and a business "no" is never retried.
 - A rule makes no calls and never reads the clock, so a replay reaches the same decision. Each rule says where it applies, as a check does ([the classes behind a rule](../../build/principles/core-build/stages.md#writing-verification-rules)), and asks two yes/no questions of the facts: does it make sense here, and does the payment pass. "Instrument open" only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed. A market can add a rule of its own, or replace a shared one, without touching shared code.
 - The highest-priority failure decides: `DECLINED` with that rule's code, or `DISALLOWED` for a push payment. Every rule's code comes from one table of rule ID to decline code. Until product sends the codes, each rule uses the closest one the current app has, and when they arrive only the table changes. There is no outcome that sends a payment to review, because the state model has no state for one.
-- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, and the Router hands them to the workflow in the plan key. So a threshold changes with a release and no deploy, while a rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed, and a metric counts declines by step and rule.
+- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, and the Router hands them to the workflow in the resolved profile. So a threshold changes with a release and no deploy, while a rule's logic changes with a deploy. The commit's timeline row keeps the IDs of the rules that failed, and a metric counts declines by step and rule.
 
 ## Capture
 

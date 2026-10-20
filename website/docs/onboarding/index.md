@@ -9,7 +9,7 @@ import OnboardingFlow from '@site/src/components/OnboardingFlow';
 
 # Market Onboarding
 
-<Lead>Adding a market to Billpay is a configuration change, as long as the deployed build can already run the market's behaviors. The market is described once in the Market Onboarding UI in Control Tower, frozen as a release, and sent to each environment through one API, where a workflow checks it, tests it and switches it on.</Lead>
+<Lead>Adding a market to Billpay is a configuration change, as long as the deployed build can already run the market's behaviors. The market is described once in the Market Onboarding UI, frozen as a release, and sent to each environment through one API, where a workflow checks it, tests it and switches it on.</Lead>
 
 Onboarding has its own frontend, backend and tables, kept apart from payments. That separation is deliberate. A market's config decides how real money moves, so it should change only through a path that is approved, versioned and tested, and never by someone editing a table in production.
 

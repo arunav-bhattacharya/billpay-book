@@ -9,8 +9,8 @@ import styles from './styles.module.css';
  * The first two cards share their rows, so the eye reads straight across:
  * the profile's five behaviors on the left, the Router's resolved values
  * beside them. The one value that changes, realtime clearing from BOTH to Y,
- * is the one Bright Blue chip, joined to its source by a thin line. The plan
- * key pins what the Router worked out, and the stage resolver turns it into
+ * is the one Bright Blue chip, joined to its source by a thin line. The
+ * resolved profile pins what the Router worked out, and the stage resolver turns it into
  * each step's stage and the checks and methods it gets.
  *
  * Coordinates are hand-placed on a 700 x 246 canvas. Takes no props.
@@ -24,10 +24,10 @@ const ROW0 = TOP + 88; // first shared row's baseline
 const PITCH = 30;
 
 const CARDS = [
-  {n: 1, x: 10, w: 184, title: 'Profile', sub: 'market and account type'},
-  {n: 2, x: 216, w: 100, title: 'Router', sub: 'for pay today'},
-  {n: 3, x: 338, w: 124, title: 'Plan key', sub: 'pinned at start'},
-  {n: 4, x: 484, w: 206, title: 'Stage resolver', sub: 'most specific class per job'},
+  {n: 1, x: 10, w: 176, title: 'Profile', sub: 'market and account type'},
+  {n: 2, x: 206, w: 92, title: 'Router', sub: 'for pay today'},
+  {n: 3, x: 318, w: 150, title: 'Resolved profile', sub: 'pinned at start'},
+  {n: 4, x: 486, w: 204, title: 'Stage resolver', sub: 'most specific class per job'},
 ];
 
 const ROWS = [
@@ -47,7 +47,7 @@ const STEPS = [
 ];
 
 const LABEL =
-  'From a market profile to the classes a payment runs, in four steps, for a payment made today from a channel. One, the profile, for a market and an account type, sets five behaviors: account type CONSUMER, AR posting Y, realtime clearing BOTH, mandate authorization Y and bank confirmation N. Two, the Router resolves those for the journey: BOTH becomes Y for pay today, and the rest stay as they are. Three, it pins the plan key: the market, the journey, the resolved behaviors, the config version and the rule settings from that version. Four, the stage resolver picks the most specific class for each job: DefaultPaymentVerifyStage with the Instrument, Options and Mandate checks, DefaultPaymentExecuteStage with RealtimeClearing, and DefaultPaymentFulfilStage.';
+  'From a market profile to the classes a payment runs, in four steps, for a payment made today from a channel. One, the profile, for a market and an account type, sets five behaviors: account type CONSUMER, AR posting Y, realtime clearing BOTH, mandate authorization Y and bank confirmation N. Two, the Router resolves those for the journey: BOTH becomes Y for pay today, and the rest stay as they are. Three, it pins the resolved profile: the market, the journey, the resolved behaviors, the config version and the rule settings from that version. Four, the stage resolver picks the most specific class for each job: DefaultPaymentVerifyStage with the Instrument, Options and Mandate checks, DefaultPaymentExecuteStage with RealtimeClearing, and DefaultPaymentFulfilStage.';
 
 const chipWidth = (value) => (value.length > 1 ? value.length * 7 + 12 : 22);
 
@@ -124,7 +124,7 @@ export default function ProfileToStages() {
             );
           })}
 
-          {/* 3: the plan key's fields */}
+          {/* 3: the resolved profile's fields */}
           {KEY.map((k, i) => (
             <text key={k} x={c3.x + 14} y={ROW0 + i * PITCH} className={styles.keyText}>
               {k}

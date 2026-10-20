@@ -38,7 +38,7 @@ There are two human checks in all: approval once, on the content, and sign-off i
 
 ## Going live, and going back
 
-Activation switches the market's active config to vN and applies its Schedules and settings. New payments use vN at once. Payments already running keep the version they started with, because it is pinned in their plan key.
+Activation switches the market's active config to vN and applies its Schedules and settings. New payments use vN at once. Payments already running keep the version they started with, because it is pinned in their resolved profile.
 
 Rollback switches the pointer back to the previous version, and its Schedules and settings with it. Nothing is deleted, so rolling back is as quick as going live.
 

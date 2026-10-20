@@ -21,7 +21,8 @@ import styles from './styles.module.css';
  * where the order of events matters.
  *
  * Coordinates are hand-placed on a `width` x `height` canvas, drawn to be
- * read at 1:1 in a 700-unit column. Card heights follow from their content,
+ * read in a 700-unit column. The drawing shows at no more than 84% of its
+ * canvas, so the cards and their text stay compact in a wide column. Card heights follow from their content,
  * so a link's points are written against them:
  *
  *   interface, or a class with a note   52 + members
@@ -194,7 +195,7 @@ export default function ClassMap({classes, links, texts = [], width, height, lab
   return (
     <figure className={styles.wrap}>
       <div className={styles.frame}>
-        <svg viewBox={`0 0 ${width} ${height}`} className={styles.svg} role="img" aria-label={label}>
+        <svg viewBox={`0 0 ${width} ${height}`} className={styles.svg} style={{maxWidth: width * 0.84}} role="img" aria-label={label}>
           <defs>
             <marker id={`${id}-extends`} viewBox="0 0 12 12" refX="11" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
               <path d="M1,1 L11,6 L1,11 z" className={styles.hollow} />

@@ -71,3 +71,24 @@
   font-weight: 600;
   fill: var(--amex-mut);
 }
+
+/* the Oracle field the states sit in */
+.field {
+  fill: color-mix(in srgb, var(--amex-blue) 5%, var(--rl-card));
+}
+.kicker {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  fill: var(--amex-txt-strong);
+}
+.where {
+  font-family: var(--amex-font-mono);
+  font-size: 12px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.whereNote {
+  font-size: 11.5px;
+  fill: var(--amex-mut);
+}

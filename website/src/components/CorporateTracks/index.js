@@ -34,7 +34,7 @@ const LANES = [
 const lane = (id) => LANES.find((l) => l.id === id);
 const mid = (id) => lane(id).top + lane(id).h / 2;
 
-const BOX_W = 116;
+const BOX_W = 124;
 const ENTRY_H = 50;
 const STEP_H = 76;
 

@@ -16,7 +16,7 @@ In front of the workflows sits the **Billpay Router**. For every request it:
 
 1. Admits it, or turns it away with a 422 when the market isn't live.
 2. Picks the journey.
-3. Resolves the market's behaviors into a **plan key**.
+3. Resolves the market's behaviors into a **resolved profile**.
 4. Places the work on the Online or Offline cluster.
 5. Starts it in the right mode:
    - Update-With-Start when a caller is waiting
@@ -32,7 +32,7 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Principles',
       to: '/docs/design/principles',
-      desc: `The rules behind every design choice, the four layers and what each may call, how they are named, and how a plan key picks a market's stages.`,
+      desc: `The rules behind every design choice, the four layers and what each may call, how they are named, and how a resolved profile picks a market's stages.`,
     },
     {
       term: 'Payment State Model',

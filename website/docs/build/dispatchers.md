@@ -65,7 +65,7 @@ override fun claimAndStart(kind: DispatchKind): Counts {
             }
         }
         bucket.acquire { beat(ctx, Position(rows, i)) }      // heartbeat while it waits, too
-        when (router.route(DueRow(rows[i]))) {               // admit, pin, place, start
+        when (router.route(DueRow(rows[i]))) {               // admit, pin, choose the run site, start
             Started, AlreadyStarted -> started += rows[i]    // already started counts as done
             Refused -> store.markFailed(rows[i])             // its market was taken out of service
         }

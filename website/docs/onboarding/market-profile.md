@@ -30,7 +30,7 @@ These are the payment dimensions. Every stage that varies between markets varies
 
 ## BOTH, resolved per journey
 
-BOTH means a behavior applies to some journeys and not others. Onboarding stores which journeys get Y, and the Router turns BOTH into Y or N for each request, before it pins the plan key. A running payment never sees BOTH; it sees the answer for its own journey.
+BOTH means a behavior applies to some journeys and not others. Onboarding stores which journeys get Y, and the Router turns BOTH into Y or N for each request, before it pins the resolved profile. A running payment never sees BOTH; it sees the answer for its own journey.
 
 Realtime clearing shows how this works. Only a pay-today payment from a channel gets Y. Every future-dated payment clears in batch, whether it came from a channel or from Accounts Receivable.
 

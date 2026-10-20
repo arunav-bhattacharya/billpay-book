@@ -1061,7 +1061,7 @@ function ActCard({f, go, onClear}) {
 
 /* --------------------------------------------- with nothing picked yet -- */
 
-const ROUTER_STEPS = ['Admit', 'Pick the journey', 'Resolve behaviors', 'Pin the plan key', 'Place', 'Start'];
+const ROUTER_STEPS = ['Admit', 'Pick the journey', 'Resolve behaviors', 'Pin the resolved profile', 'Choose the run site', 'Start'];
 
 function Overview() {
   return (

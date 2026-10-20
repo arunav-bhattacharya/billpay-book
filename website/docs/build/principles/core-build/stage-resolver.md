@@ -18,7 +18,7 @@ Three parts of Billpay depend on the resolver, each at a different moment:
 
 | When | Who uses it | What it must get right |
 | --- | --- | --- |
-| A payment runs | The workflow, through `stageResolver.resolve(plan)` | The same classes, called in the same order, on every replay |
+| A payment runs | The workflow, through `stageResolver.resolve(profile)` | The same classes, called in the same order, on every replay |
 | A release is onboarded | The onboarding workflow, through `GET /market-onboarding/capabilities` | Only the combinations the build really runs |
 | A change is built | Whoever adds or changes a class | A mistake fails the build before it merges, and names the class |
 
@@ -30,7 +30,7 @@ Think of airport security. Every traveler goes through the same lane in the same
 
 | At the airport | In Billpay |
 | --- | --- |
-| The boarding pass | The plan key, which the [Router](./router.md) pins when the payment starts: the market, the account type and the resolved behaviors |
+| The boarding pass | The resolved profile, which the [Router](./router.md) pins when the payment starts: the market, the account type and the resolved behaviors |
 | The lane | A stage: one step's fixed flow, such as Verify's, which makes every call at once, applies the rules and commits once |
 | A check and its sign | A strategy and its `appliesTo` |
 | The person reading the pass | A registry, one for each kind of strategy |
@@ -88,7 +88,7 @@ sequenceDiagram
 
   Note over X,R: When the app starts, Quarkus hands each registry every class of its kind, and each registry works out every combination once. A tie stops the start.
 
-  W->>X: resolve(plan): GB, consumer, bank confirmation Y
+  W->>X: resolve(profile): GB, consumer, bank confirmation Y
   X->>X: makes the stubs and picks the Verify stage
   X-->>W: the stages, bound to this payment
   W->>S: verify.run(paymentId)
@@ -198,11 +198,11 @@ class DefaultPaymentVerifyStage(
         ctx: StageContext, paymentId: String,
     ): VerifyOutcome {
         // every check that applies, sorted by key
-        val mine = checks.forPlan(ctx.plan, VERIFY)
+        val mine = checks.forProfile(ctx.profile, VERIFY)
         // every call at once, then one set of facts
         val facts = fetchAll(mine, ctx, paymentId)
         // the rules that apply decide
-        val report = rules.evaluate(ctx.plan, VERIFY, facts)
+        val report = rules.evaluate(ctx.profile, VERIFY, facts)
         val outcome = ctx.stubs.store.commitVerify(
             paymentId, report.decision, report.failedRuleIds)
         // the facts travel on to Execute and Fulfil
@@ -217,10 +217,10 @@ The stage never asks which market it is in or which behaviors are on. It asks th
 
 ### One payment, start to finish
 
-A GB customer pays their bill with Pay with Bank Transfer. The Router pins the plan key: market GB, a consumer account, bank confirmation Y and mandate authorization N.
+A GB customer pays their bill with Pay with Bank Transfer. The Router pins the resolved profile: market GB, a consumer account, bank confirmation Y and mandate authorization N.
 
 1. The Verify registry holds one stage, `DefaultPaymentVerifyStage`, which applies everywhere, so it runs.
-2. The check registry reads each check's `appliesTo` against the plan key:
+2. The check registry reads each check's `appliesTo` against the resolved profile:
 
 | Check | `appliesTo` | This payment |
 | --- | --- | --- |
@@ -327,7 +327,7 @@ A workflow sees none of this. It calls the stage resolver once, at the top of it
 
 ```kotlin
 // in the workflow, on its own thread
-val stages = stageResolver.resolve(plan)
+val stages = stageResolver.resolve(profile)
 stages.capture.run(request)
 val verified = stages.verify.run(paymentId)
 ```
@@ -335,12 +335,12 @@ val verified = stages.verify.run(paymentId)
 Inside, the resolver makes the stubs, picks each stage and binds the two:
 
 ```kotlin
-fun resolve(plan: PlanKey): Stages {
+fun resolve(profile: ResolvedProfile): Stages {
     // the activity stubs, made on this thread
-    val ctx = StageContext(plan, Stubs.create())
+    val ctx = StageContext(profile, Stubs.create())
     return Stages(
         // the step's stage, bound to this payment
-        verify = VerifyStep(verifyStages.one(plan), ctx),
+        verify = VerifyStep(verifyStages.one(profile), ctx),
         // ...one line for each step
     )
 }
@@ -357,7 +357,7 @@ class VerifyStep(
 
 *(A sketch.)*
 
-The stubs are the reason for the context. Temporal only lets a workflow make activity stubs on its own thread, and a strategy is one instance shared by every payment, so it can't hold a payment's stubs. The resolver makes them where Temporal requires, wraps them with the plan key in a `StageContext`, and every call carries it. The worker gives the resolver to each workflow through the factory it registers the workflow with.
+The stubs are the reason for the context. Temporal only lets a workflow make activity stubs on its own thread, and a strategy is one instance shared by every payment, so it can't hold a payment's stubs. The resolver makes them where Temporal requires, wraps them with the resolved profile in a `StageContext`, and every call carries it. The worker gives the resolver to each workflow through the factory it registers the workflow with.
 
 ## When things change
 
@@ -387,7 +387,7 @@ The registries find mistakes when the app starts. Unit tests build the registrie
 | A misleading name | A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code |
 | An unnoticed change | The report above is checked in, and a test fails when the build's report differs, so a change to what any combination runs shows up as a diff in review |
 
-The resolver has unit tests of its own, listed on [Testing → Unit](../../../testing/functional/unit.md#the-plan-key-lookup).
+The resolver has unit tests of its own, listed on [Testing → Unit](../../../testing/functional/unit.md#the-profile-lookup).
 
 ## The capability manifest
 
@@ -395,7 +395,7 @@ The registries also work out the build's capability manifest when the app starts
 
 ## Why the lookup stays in the workflow
 
-The Router builds the plan key, so it could pick the stages as well and hand each workflow its class names. It doesn't, because during a rolling deploy the Router and the workers can run different builds. A Router on the new build could name a class that the worker's build doesn't have yet. When the workflow looks up its own stages, the build that runs them is the build that chose them, and Worker Versioning, Temporal's way of keeping a workflow on the build it started on, keeps that pairing for the life of the workflow.
+The Router builds the resolved profile, so it could pick the stages as well and hand each workflow its class names. It doesn't, because during a rolling deploy the Router and the workers can run different builds. A Router on the new build could name a class that the worker's build doesn't have yet. When the workflow looks up its own stages, the build that runs them is the build that chose them, and Worker Versioning, Temporal's way of keeping a workflow on the build it started on, keeps that pairing for the life of the workflow.
 
 ## Why not KSP, SPI or a `when`
 

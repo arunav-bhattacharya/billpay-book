@@ -51,6 +51,6 @@ The Router reads both, and only `MarketOnboardingWorkflow` writes them. Because 
 
 ## How payments pick up a version
 
-- A new payment uses the active version from the moment it is activated. The Router resolves the market's behaviors from it and pins the version in the payment's plan key.
-- A running workflow keeps the version in its plan key until it finishes, so a release never changes config under a payment in flight.
+- A new payment uses the active version from the moment it is activated. The Router resolves the market's behaviors from it and pins the version in the payment's resolved profile.
+- A running workflow keeps the version in its resolved profile until it finishes, so a release never changes config under a payment in flight.
 - A scheduled payment is routed again on its due date, so it executes with that day's active version. The version it was scheduled under stays in its timeline for audit.

@@ -25,7 +25,7 @@ There is no batching to tune here. The pace comes from the governor, which sets 
 
 ## Market Schedules
 
-The scheduled-payments and representment dispatchers run per market, at the market's own times. Their Schedules aren't written by hand, and they don't ship with a deploy. They arrive in a market release from the Market Onboarding UI in Control Tower:
+The scheduled-payments and representment dispatchers run per market, at the market's own times. Their Schedules aren't written by hand, and they don't ship with a deploy. They arrive in a market release from the Market Onboarding UI:
 
 1. [The onboarding workflow](../onboarding/market-onboarding-api.md) saves the release with its Schedules, inactive.
 2. When the release is activated, the Schedules go live with it.

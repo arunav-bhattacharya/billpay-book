@@ -51,7 +51,7 @@ export const STEPS = [
   },
   {
     via: 'read by the Router into',
-    title: 'A plan key, pinned when the payment starts',
+    title: 'A resolved profile, pinned when the payment starts',
     note: 'The journey, the behaviors resolved for it (BOTH becomes Y or N) and the config version.',
   },
   {
@@ -77,7 +77,7 @@ Two problems shape almost every decision on this page. The first is variety. Eve
     },
     {
       term: 'The Workflows',
-      desc: `One workflow per journey, the same in every market. It looks up its stages at runtime from the plan key the Router pinned when it started.`,
+      desc: `One workflow per journey, the same in every market. It looks up its stages at runtime from the resolved profile the Router pinned when it started.`,
     },
     {
       term: 'Dispatchers and the governor',
@@ -118,10 +118,10 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       desc: `A journey has one workflow, and there is no second copy kept for the awkward market. What differs between markets and account types is the stages underneath, and nothing else.`,
     },
     {
-      term: 'Stages chosen from the plan key',
+      term: 'Stages chosen from the resolved profile',
       desc: (
         <>
-          When the Router starts a payment it pins a plan key: the market, the journey, the behaviors
+          When the Router starts a payment it pins a resolved profile: the market, the journey, the behaviors
           resolved for it and the market's config version. The workflow looks up its stages from that key, and every
           stage, check and method says where it applies, so no market decision is left in the workflow code. Worker
           Versioning pins the workflow to the build it started on, so neither a deploy nor a new release
@@ -173,7 +173,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
 
 A market reaches the platform as configuration. In the Market Onboarding UI the team picks the One-Data APIs the market takes, answers the behavior questions and fills in the operations settings, once per account type, because consumer and corporate rules differ. A second person approves it, and it becomes a frozen release.
 
-Each environment then onboards that release on its own. It checks every combination against what the deployed build can run, saves it inactive, sends test payments through it and waits for sign-off. Once the release is active, the Router uses it for every new payment: it resolves the behaviors for the journey, so a BOTH becomes Y or N, and pins them with the config version in the plan key. The workflow picks its stages from that key. What each behavior means is on the [Product Vision](./product.md).
+Each environment then onboards that release on its own. It checks every combination against what the deployed build can run, saves it inactive, sends test payments through it and waits for sign-off. Once the release is active, the Router uses it for every new payment: it resolves the behaviors for the journey, so a BOTH becomes Y or N, and pins them with the config version in the resolved profile. The workflow picks its stages from that key. What each behavior means is on the [Product Vision](./product.md).
 
 <CompositionMap
   apis={['CreatePayment.v3', 'UpdatePayment.v1', 'DeletePayment.v1']}

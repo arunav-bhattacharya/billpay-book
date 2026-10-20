@@ -1,13 +1,13 @@
 ---
 title: Market Onboarding UI
-description: 'The Market Onboarding UI, in Control Tower, is the market onboarding control plane: one for every environment, kept apart from payments.'
+description: 'The Market Onboarding UI is the market onboarding control plane: one for every environment, kept apart from payments.'
 ---
 
 import Lead from '@site/src/components/Lead';
 
 # Market Onboarding UI
 
-<Lead>The Market Onboarding UI, in Control Tower, is the market onboarding control plane: one for every environment, kept apart from payments. Teams use it to describe a market, approve it and send it live, and it reaches each environment only through that environment's Market Onboarding API.</Lead>
+<Lead>The Market Onboarding UI is the market onboarding control plane: one for every environment, kept apart from payments. Teams use it to describe a market, approve it and send it live, and it reaches each environment only through that environment's Market Onboarding API.</Lead>
 
 It has three parts: the frontend, which is the Market Onboarding UI; the backend, which handles single sign-on, maker-checker approval, audit and versioned releases; and the authoring tables, in the control plane's own schema. [What runs where](../../onboarding/index.md#what-runs-where) sets them beside the parts that live in each environment.
 

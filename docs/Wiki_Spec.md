@@ -41,7 +41,7 @@ When a choice is unclear, these rules decide it.
 5. **Pace at the door.** Admit only what a cluster and its downstreams can carry. Big bursts wait in Oracle or in One-Data's inbox, not in Temporal.
 6. **One workflow per journey.** Stages are the only thing that varies by market behavior. There are no market-specific workflows.
 7. **One Oracle commit per stage.** A stage makes its calls first, in parallel where they don't depend on each other; then the state change and the lifecycle timeline entry commit together. Its RTF lifecycle event, and a Raven message where the market's Raven setting tells the customer, go out right after the commit. Other systems subscribe to Billpay's RTF events. Fulfil is the exception: `PROCESSED` waits for both.
-8. **Pin the plan and the build at start.** A running workflow never has its code or config changed under it.
+8. **Pin the resolved profile and the build at start.** A running workflow never has its code or config changed under it.
 
 [^ Top](#table-of-contents)
 
@@ -148,7 +148,7 @@ AR learns the outcome of a request it sent from the SCHEDULED and DECLINED notif
 
 ### Market Onboarding API
 
-Each environment's app exposes the Market Onboarding API (name agreed 2026-10-19). Only the market-onboarding control plane, the Market Onboarding UI's backend in Control Tower, calls it, with its own service identity.
+Each environment's app exposes the Market Onboarding API (name agreed 2026-10-19). Only the market-onboarding control plane, the Market Onboarding UI's backend, calls it, with its own service identity.
 
 | Path | What it does |
 | --- | --- |
@@ -466,7 +466,7 @@ The supplied file leans on five types it doesn't define. The build takes each on
 
 ## Market Onboarding & Payment Dimensions
 
-Markets are onboarded through the Market Onboarding UI in Control Tower, the market-onboarding control plane. The process, releases and the Market Onboarding API are in [Market Onboarding](#market-onboarding).
+Markets are onboarded through the Market Onboarding UI, the market-onboarding control plane. The process, releases and the Market Onboarding API are in [Market Onboarding](#market-onboarding).
 
 A market profile is one market and one account type. Onboarding picks the Billpay APIs the profile takes and answers five behavior questions, the payment dimensions:
 
@@ -530,7 +530,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 
 Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 
-1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Token check (Payment Instruments again: whether the verification token it holds for the payment's instrument is valid), the Options check (Payment Options) and the Mandate check (Plans, which holds the mandate details). Each check says where it applies, and Verify runs every check that applies to the payment: the Instrument and Options checks everywhere, the Token check with bank confirmation, and the Mandate check where the profile requires mandate authorization ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). In GB, a Pay with Bank Transfer payment also runs GB's Funds check: whether the customer's bank account holds enough money for the payment, and a rule declines a payment the account can't cover (agreed 2026-10-18). The bank-confirmation provider answers it (agreed 2026-10-18). The Funds check stays GB's own until a second market needs it (agreed 2026-10-19). Represent runs checks of its own, still to be defined: see the placeholder below.
+1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Token check (Payment Instruments again: whether the verification token it holds for the payment's instrument is valid), the Options check (Payment Options) and the Mandate check (Plans, which holds the mandate details). Each check says where it applies, and Verify runs every check that applies to the payment: the Instrument and Options checks everywhere, the Token check with bank confirmation, and the Mandate check where the profile requires mandate authorization ([Resolved profiles and stage lookup](#resolved-profiles-and-stage-lookup), agreed 2026-10-19). In GB, a Pay with Bank Transfer payment also runs GB's Funds check: whether the customer's bank account holds enough money for the payment, and a rule declines a payment the account can't cover (agreed 2026-10-18). The bank-confirmation provider answers it (agreed 2026-10-18). The Funds check stays GB's own until a second market needs it (agreed 2026-10-19). Represent runs checks of its own, still to be defined: see the placeholder below.
 2. **Facts.** The checks' calls run in parallel, and their answers go into one read-only `VerificationFacts`, with the payment, the market's rule settings and the time, read once from `Workflow.currentTimeMillis()`. A check that didn't run leaves its part empty. These are the facts Verify passes on to Execute and Fulfil, encrypted in history.
 3. **Rules.** A rule is a pure condition over the facts, built with the Specification pattern: a specification is a named yes/no question about the facts, `Spec<VerificationFacts>`, and specifications combine with `and`, `or` and `not`. A rule has an ID, a decline code, a priority, the steps it runs in, an `appliesTo` like a check's, and two specifications: `runsWhen`, whether the rule makes sense for these facts, such as "the instrument was found", and `passes`, whether the payment passes it. It makes no calls and never reads the clock. Small specifications such as `instrumentFound` and `mandateActive` are written once and shared, and a rule may read more than one check's answer. A rule keeps one decline code, so specifications are combined inside a rule only when one code fits the whole condition (agreed 2026-10-19).
 4. **Evaluation.** A rule registry picks the payment's rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins, so a market can add a rule, or replace a shared one by reusing its ID, without touching shared code. A picked rule is skipped when its `runsWhen` is false, and otherwise passes or fails on `passes`. "Instrument open" runs only when "instrument found" holds, so after "instrument not found" it is skipped, not failed, and there is no list of rule dependencies to keep. The highest-priority failure decides, and the report keeps every rule's result (agreed 2026-10-19).
@@ -539,7 +539,8 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 
 - Rules run inside the stage, in workflow code. They are pure and fast, so they add no Temporal writes, and replay gives the same answer.
 - An activity returns what a system said, such as a closed account or no valid mandate, as a fact. Only an error throws, and errors are retried, so an outage never declines a payment and a business "no" is never retried.
-- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, so they change with a release and no deploy. The Router passes them to the workflow in the plan key, as values from the config version it pins (agreed 2026-10-18).
+- A market's thresholds, such as its largest payment or the instrument types it takes, are rule settings in its release, so they change with a release and no deploy. The Router passes them to the workflow in the resolved profile, as values from the config version it pins (agreed 2026-10-18).
+- An example of rule settings, with illustrative names and values (Proposed, 2026-10-20): GB's consumer release v7 sets `maxPaymentAmount` to 25,000 GBP and `acceptedInstrumentTypes` to `BANK_ACCOUNT` only. They are authored in the Market Onboarding UI's Operations step and frozen with the release. When v7 is active, the Router copies them into the resolved profile as `ruleSettings`, Verify puts them into `VerificationFacts`, and the largest-payment rule fails a 30,000 GBP payment. A payment started on v7 keeps 25,000 even after v8 raises it.
 - A rule's logic changes with a deploy. Worker Versioning keeps a running payment on the rules it started with, and Reverify uses the build and config of the due date, which is what a recheck should use.
 - Nothing inside a check or a rule asks which market or behaviors apply: their `appliesTo` picks them. A rule's `runsWhen` starts with the check it reads, such as `ran(MANDATE)`, so the Mandate check's rules are skipped for a payment that didn't run it. GB's funds rule names GB and bank confirmation in its own `appliesTo`, as `GBFundsCheck` does (agreed 2026-10-19).
 - Verify has one flow, and only its checks vary: the Instrument and Options checks, the Token check for bank confirmation, the Mandate check, and GB's Funds check. Nothing else changes Verify: not what the payment waited for, and not its account type (agreed 2026-10-18).
@@ -549,14 +550,14 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 
 > **Placeholder: Represent's checks.** Which systems Represent calls, and what fails its recheck, are still to be defined. It calls none of Payment Instruments, Payment Options and Plans (2026-10-18). Its checks and rules will be strategies like Verify's, picked the same way. Until then the pages that cover Represent mark this gap (agreed 2026-10-19).
 
-### Plan keys and stage lookup
+### Resolved profiles and stage lookup
 
-- The Router pins a **plan key** at start: the market, the journey, the resolved behaviors and the market's config version. The market is there so a market's own classes can apply, such as GB's Funds check (agreed 2026-10-18). The key also carries the market's rule settings from that version, for the [verification rules](#verification-rules), and for a payment that waits for the customer, the market's confirmation window, which its timer uses (agreed 2026-10-18).
-- Nothing maps a plan key to classes by hand: no `when`, no `if` and no list to edit. Each step's stage, and each check or method a stage uses, such as Execute's realtime or batch clearing, is a **strategy**: a small class that names its job, its **key**, and says where it applies, its **`appliesTo`** (agreed 2026-10-19).
+- The Router pins a **resolved profile** at start (named 2026-10-20; it was the plan key, but it carries values as well as the fields the lookup reads, and it is the market's profile resolved for one payment): the market, the journey, the resolved behaviors and the market's config version. The market is there so a market's own classes can apply, such as GB's Funds check (agreed 2026-10-18). The profile also carries the market's rule settings from that version, for the [verification rules](#verification-rules), and for a payment that waits for the customer, the market's confirmation window, which its timer uses (agreed 2026-10-18).
+- Nothing maps a resolved profile to classes by hand: no `when`, no `if` and no list to edit. Each step's stage, and each check or method a stage uses, such as Execute's realtime or batch clearing, is a **strategy**: a small class that names its job, its **key**, and says where it applies, its **`appliesTo`** (agreed 2026-10-19).
 - `appliesTo` holds a market or none, an account type or none, the behaviors that must be Y and the behaviors that must be N. Empty means everywhere. It is data, never code, so the registry can compare two of them (agreed 2026-10-19).
 - One rule picks the strategies: for each key, the most specific strategy that applies wins. A strategy tied to a market beats one that isn't; after that, the one that names more behaviors wins. Strategies with different keys add up, so Verify runs every check that applies. Strategies with the same key compete: Execute's clearing key has a realtime and a batch strategy, and exactly one applies to any payment (agreed 2026-10-19).
 - Every strategy is a `@Singleton` bean, so Quarkus finds them all at build time and hands each kind over as `@All List<T>`. A **registry** for each kind, written once, works out the winners for every combination of market and behaviors when the app starts, so a lookup at runtime is a map read. Two strategies level for one key stop the app at start, and the error names them and the combination. A registry returns its strategies sorted by key, so a replay makes the same calls in the same order (agreed 2026-10-19).
-- Strategies hold no state. The workflow calls the **stage resolver**, `stageResolver.resolve(plan)`, on its own thread, where Temporal requires activity stubs to be made. The resolver makes the stubs there, picks each step's stage, and binds it to a `StageContext` that holds the plan key and the stubs, so workflow code calls `stages.verify.run(paymentId)` and never touches a stub. The worker passes the resolver to each workflow through the factory it registers the workflow with (agreed 2026-10-19).
+- Strategies hold no state. The workflow calls the **stage resolver**, `stageResolver.resolve(profile)`, on its own thread, where Temporal requires activity stubs to be made. The resolver makes the stubs there, picks each step's stage, and binds it to a `StageContext` that holds the resolved profile and the stubs, so workflow code calls `stages.verify.run(paymentId)` and never touches a stub. The worker passes the resolver to each workflow through the factory it registers the workflow with (agreed 2026-10-19).
 - The lookup runs inside the workflow, never in the Router: during a rolling deploy the Router and the workers can run different builds, so only the workflow's own build picks its classes (agreed 2026-10-18).
 - Each step names the behaviors it must act on, such as mandate authorization and bank confirmation for Verify, and the keys it must fill, such as clearing for Execute. A combination can't run where one of those behaviors is Y but no strategy that applies names it, or where one of those keys is empty. From this the registries work out the build's **capability manifest** when the app starts: every combination that every step of its journey can run (agreed 2026-10-19). The onboarding workflow checks each market profile against it. A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
 - A test writes a report: for each step, market and combination, the stage and the strategies it gets. The report is checked in, and the test fails when the build's differs, so a change to what a combination runs is reviewed as a diff (agreed 2026-10-18).
@@ -796,7 +797,7 @@ How a payment workflow reads: Temporal's early-return pattern, with the caller's
 @WorkflowInterface
 interface CreateImmediatePaymentWorkflow {
     @WorkflowMethod
-    fun run(request: CreatePaymentRequest, plan: PlanKey)   // the request itself is the start input
+    fun run(request: CreatePaymentRequest, profile: ResolvedProfile)   // the request itself is the start input
 
     // The caller's Update-With-Start lands here and returns once Verify has decided.
     @UpdateMethod
@@ -808,12 +809,12 @@ class CreateImmediatePaymentWorkflowImpl(
 ) : CreateImmediatePaymentWorkflow {
     private var decided: PaymentDecision? = null
 
-    override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        // Each step's stage, and the checks and methods it uses, come from the plan key at runtime.
+    override fun run(request: CreatePaymentRequest, profile: ResolvedProfile) {
+        // Each step's stage, and the checks and methods it uses, come from the resolved profile at runtime.
         // On the Online cluster the stubs the resolver makes for Payment Instruments, Payment Options
         // and Plans are local activities, so Capture, Verify and its commit all run inside this
         // first workflow task.
-        val stages = stageResolver.resolve(plan)
+        val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId              // One-Data made it
 
         stages.capture.run(request)                    // PENDING: writes the request, insert-if-absent
@@ -827,7 +828,7 @@ class CreateImmediatePaymentWorkflowImpl(
         if (decided != PaymentDecision.ACCEPTED) return
         // A corporate payment stops here: Verify's commit wrote its ALLOC_REQUEST row,
         // and dispatchers start every later step.
-        if (plan.accountType == AccountType.CORPORATE) return
+        if (profile.accountType == AccountType.CORPORATE) return
 
         // Data from Options and Instruments travels on in the workflow, encrypted in history by the payload codec.
         val executed = stages.execute.run(paymentId, verified)  // PROCESSING: clearing, AR, and the Instruments call, then OTB
@@ -848,7 +849,7 @@ A payment that waits for the customer keeps one workflow from the create to its 
 @WorkflowInterface
 interface CreatePaymentIntentWorkflow {
     @WorkflowMethod
-    fun run(request: CreatePaymentRequest, plan: PlanKey)
+    fun run(request: CreatePaymentRequest, profile: ResolvedProfile)
 
     @UpdateMethod
     fun decision(): PaymentDecision                  // the create: PENDING with the link or the list, or DECLINED
@@ -872,11 +873,11 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
-    override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        val stages = stageResolver.resolve(plan)
+    override fun run(request: CreatePaymentRequest, profile: ResolvedProfile) {
+        val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
         stages.capture.run(request)                                    // PENDING: the request, and any pending IDs
-        decided = if (plan.requiresBankConfirmation)
+        decided = if (profile.requiresBankConfirmation)
             stages.requestConfirmation.run(paymentId)                  // PENDING with the link, or DECLINED
         else PaymentDecision.PENDING                                   // a go-ahead: One-Data adds the pending list
         waiting = decided == PaymentDecision.PENDING
@@ -887,7 +888,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         }
         Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // One-Data keeps the entry;
                                                                        // the wait doesn't wait for this call
-        val window = checkNotNull(plan.confirmationWindow)
+        val window = checkNotNull(profile.confirmationWindow)
         val due = Workflow.currentTimeMillis() + (window + GRACE).toMillis()
         if (!Workflow.await(window + GRACE) { answer != null } &&
             Workflow.currentTimeMillis() - due > LATE.toMillis()) {    // fired late: Online was down
@@ -899,7 +900,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
             val verified = stages.verify.run(paymentId)                // ACCEPTED, SCHEDULED or DECLINED
             result = verified.decision                                 // the confirm's early return
             stages.verify.announce(paymentId)
-            if (result == PaymentDecision.ACCEPTED && plan.accountType != AccountType.CORPORATE) {
+            if (result == PaymentDecision.ACCEPTED && profile.accountType != AccountType.CORPORATE) {
                 val executed = stages.execute.run(paymentId, verified)
                 stages.execute.announce(paymentId)
                 stages.fulfil.run(paymentId, executed)
@@ -1018,7 +1019,7 @@ On the Online cluster, the decision's calls run as local activities, and the oth
 
 > One-Data function → Billpay core API → Billpay Router → workflow → stages → activities → clients
 
-Between the core APIs and the workflows sits the Billpay Router. For every row below except settlement and AR posting, which are not routed, it does the same six steps: **admit, pick the journey, resolve behaviors, pin the plan key, place, start.** The confirm, and the no to a payment that waits, are only admitted: they are updates to a workflow that is already running, so there is nothing to pick, pin or place (agreed 2026-10-18).
+Between the core APIs and the workflows sits the Billpay Router. For every row below except settlement and AR posting, which are not routed, it does the same six steps: **admit, pick the journey, resolve behaviors, pin the resolved profile, choose the run site, start.** The confirm, and the no to a payment that waits, are only admitted: they are updates to a workflow that is already running, so there is nothing to pick, pin or choose (agreed 2026-10-18).
 
 | One-Data function | Core API | Router: journey and start | Workflows | Children and follow-ups |
 | --- | --- | --- | --- | --- |
@@ -1069,10 +1070,10 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 ### The Router's six steps
 
 1. **Admit.** The market, account type and API must be live in this environment, checked against billpay-core's in-memory copy of the onboarding config, so admission adds no call; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. A held create that arrives after its market was taken out of service is captured and declined instead ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). A Work Tracker row is refused only if its market was taken out of service after the row was written: its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
-2. **Pick the journey** from the routing table. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18). A create that comes with other pending payments' IDs waits for a go-ahead only when the market's go-ahead setting is on; otherwise the Router ignores the IDs (agreed 2026-10-18).
+2. **Pick the journey** from the routing table. Proposed (2026-10-20): each request type names its own journey, so no central `when` maps requests to journeys. `RouteRequest` is a sealed interface with `journey(version)`, and a new request type doesn't compile until it names one. A Work Tracker item type and an inbox request type each carry their journey as an enum property. A create is the one request with conditions: an ordered list of `JourneyRule`s decides it, and the first that matches wins: waits for the customer, then future-dated, then several instructions, then pay today. A test writes the routing table from the code, trigger, condition and journey, and compares it with a checked-in copy, so the code and this table can't drift. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18). A create that comes with other pending payments' IDs waits for a go-ahead only when the market's go-ahead setting is on; otherwise the Router ignores the IDs (agreed 2026-10-18).
 3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
-4. **Pin the plan key:** the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes can apply, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window (agreed 2026-10-18). A go-ahead adds nothing to the plan key: the workflow the Router picks is what makes the payment wait, and no stage is picked for it (agreed 2026-10-18).
-5. **Place:** cluster, task queue, priority, fairness key and workflow ID. While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
+4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes can apply, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window (agreed 2026-10-18). A go-ahead adds nothing to the resolved profile: the workflow the Router picks is what makes the payment wait, and no stage is picked for it (agreed 2026-10-18).
+5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID, held in a `RunSite` (named 2026-10-20; it was `Placement`). While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
 6. **Start** with the journey's start mode.
 
 ### Start modes
@@ -1119,7 +1120,7 @@ Consumer split legs run as child workflows on the parent's cluster. Corporate le
 
 ### Re-routing on the due date
 
-On the due date the dispatcher calls the Router again, so a scheduled payment runs with today's config. The version used at scheduling stays in its timeline for audit. Two guardrails keep replay safe: the plan key carries the resolved behaviors and the config version, and the workflow is pinned to its build.
+On the due date the dispatcher calls the Router again, so a scheduled payment runs with today's config. The version used at scheduling stays in its timeline for audit. Two guardrails keep replay safe: the resolved profile carries the resolved behaviors and the config version, and the workflow is pinned to its build.
 
 [^ Top](#table-of-contents)
 
@@ -1401,7 +1402,7 @@ A SEPA run's cutoff comes before Online. The US run has no cutoff, so it never c
 
 - **The need.** During a run with a cutoff, Offline's share of a downstream never drops below the run's need: its cutoff floor ([the governor](#the-governor)) times its calls per payment to that downstream. A full SEPA run needs about 56 RPS of clearing.
 - **The cap.** If Online's use would leave less than the need, Online is capped on that downstream at agreed TPS − the run's need, until the run's cutoff. With an agreed TPS of 100 on clearing, that is 44 RPS.
-- **Enforcing it.** The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor sets the cap as that queue's rate limit through the Online cluster's task queue config API, and records the cap and its end time in `downstream_limit`. While a cap is on, the Router places that downstream's calls for each new Online payment on the capped queue; otherwise they run on `online-wf` with eager dispatch, as before. Placement is pinned at start, so a running workflow never switches queues.
+- **Enforcing it.** The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor sets the cap as that queue's rate limit through the Online cluster's task queue config API, and records the cap and its end time in `downstream_limit`. While a cap is on, the Router places that downstream's calls for each new Online payment on the capped queue; otherwise they run on `online-wf` with eager dispatch, as before. The run site is pinned at start, so a running workflow never switches queues.
 - **Lifting it.** The cap ends at the run's cutoff. The Router ignores a cap past its end time and the governor clears it, so a stopped governor can't leave Online capped.
 - **The cost.** While capped, some Online payments wait for that downstream. A payment not decided before the API stops waiting replies PENDING and finishes afterwards.
 
@@ -1464,7 +1465,7 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 
 | Part | What it is | Lives in |
 | --- | --- | --- |
-| Market Onboarding UI frontend, in Control Tower | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
+| Market Onboarding UI frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
 | Market Onboarding UI backend | The control plane itself: SSO, maker-checker, audit, versioned releases | The control plane, one for all environments |
 | Authoring tables | Drafts, revisions, releases, approvals, deployments, audit | The control plane's own schema, outside billpay-core |
 | Market Onboarding API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app (see [Billpay APIs](#market-onboarding-api)) |
@@ -1490,7 +1491,7 @@ There are two human checks: approval once, on the content (maker-checker), and s
 2. **Save** vN as an inactive version, with the Schedules, dispatcher settings, rate rows and fairness settings it needs, also inactive.
 3. **Test** with payments against vN. The Router accepts a pinned version for test accounts only.
 4. **Wait** for sign-off, and for the RFC in E3.
-5. **Activate:** switch `market_config_active` to vN and apply its Schedules and settings. New payments use vN at once; running workflows keep the version in their plan key. Each billpay-core pod keeps the onboarding config in memory and reloads it when the onboarding workflow activates or rolls back a version (agreed 2026-10-19).
+5. **Activate:** switch `market_config_active` to vN and apply its Schedules and settings. New payments use vN at once; running workflows keep the version in their resolved profile. Each billpay-core pod keeps the onboarding config in memory and reloads it when the onboarding workflow activates or rolls back a version (agreed 2026-10-19).
 
 Rollback switches the pointer, and the Schedules and settings, back to the previous version. Pause and resume stop and restart a live market's dispatchers.
 
@@ -1508,7 +1509,7 @@ A step in the Market Onboarding UI. Each setting drives something at runtime.
 | Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's: the account type's setting wins (agreed 2026-10-18) | Every stage's announcement: a status that is switched off sends no Raven message |
 | Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18). The same window is how long a customer has to give a go-ahead (agreed 2026-10-19) | Which provider RequestConfirmation asks for the redirect link, and when `CreatePaymentIntentWorkflow` cancels a payment still waiting: once the window and its grace have passed |
 | Go-ahead for pending payments: on or off, off by default. With it on, a new payment that arrives with other pending payments' IDs waits for the customer's yes (agreed 2026-10-18) | The Router, which sends such a payment to `CreatePaymentIntentWorkflow` only when the setting is on, and otherwise ignores the IDs |
-| Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the plan key (agreed 2026-10-18) |
+| Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the resolved profile (agreed 2026-10-18) |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
 
@@ -1516,7 +1517,7 @@ A market and an account type disagree on Raven when the Market Onboarding UI hol
 
 ### Capability manifest
 
-Every build ships a manifest of the behavior combinations it can run, returned by `GET /market-onboarding/capabilities`. The stage registries work it out when the app starts, from the strategies in the build ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at step 1 until that build is deployed. Before a build rolls out to an environment, the deploy pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing (agreed 2026-10-19).
+Every build ships a manifest of the behavior combinations it can run, returned by `GET /market-onboarding/capabilities`. The stage registries work it out when the app starts, from the strategies in the build ([Resolved profiles and stage lookup](#resolved-profiles-and-stage-lookup), agreed 2026-10-19). A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at step 1 until that build is deployed. Before a build rolls out to an environment, the deploy pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing (agreed 2026-10-19).
 
 ### What changes in today's Market Onboarding UI code
 
@@ -1781,7 +1782,7 @@ After every run, reconcile: Work Tracker rows by status match the completed work
 
 ## Sequence and State Diagrams
 
-Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin the plan key, place), the start mode, stages as participants, and the RTF and Raven calls after each commit (before it, in Fulfil).
+Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin the resolved profile, choose the run site), the start mode, stages as participants, and the RTF and Raven calls after each commit (before it, in Fulfil).
 
 ### Sequence diagrams
 

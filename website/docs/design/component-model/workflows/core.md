@@ -9,7 +9,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 # Core Workflows
 
-<Lead>Thirteen core workflows, one per journey. Each runs its stages in order and holds no market logic: the stages it looks up from its plan key, with their checks and methods, do all the varying.</Lead>
+<Lead>Thirteen core workflows, one per journey. Each runs its stages in order and holds no market logic: the stages it looks up from its resolved profile, with their checks and methods, do all the varying.</Lead>
 
 Every stage commits its state change in one guarded `PaymentStore` transaction. Then the workflow announces the change, an RTF lifecycle event and, where the market tells the customer, a Raven message, and waits for that before the next stage, so a payment's events reach RTF in order. Fulfil is the exception: it sends both before its commit, because `PROCESSED` means they have gone out.
 

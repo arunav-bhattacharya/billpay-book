@@ -24,7 +24,7 @@ const H = 340;
 const MID = 239; // the work line
 
 const LABEL =
-  'How offline work is paced. Across the top, the control loop: GovernorWorkflow runs a check every 15 seconds, writes the rates to rate_allocation, which the dispatchers read every few seconds, and sets the queue limits on the downstream ds-* queues. Across the bottom, the work, left to right: it waits in Oracle as Work Tracker rows, which is dated work, or in One-Data\'s inbox, which holds AR intake, returns and inbound payments. The dispatchers, one per kind of work, release it through the Router, the one door into the Offline cluster, where the payment workflows run, and their calls go to one ds-* queue per downstream.';
+  'How offline work is paced. Across the top, the control loop: GovernorWorkflow runs a check every 15 seconds, writes the rates to rate_allocation, an Oracle table that holds how many starts a second each traffic class may make, which the dispatchers read every few seconds, and sets the queue limits on the downstream ds-* queues. Across the bottom, the work, left to right: it waits in Oracle as Work Tracker rows, which is dated work, or in One-Data\'s inbox, which holds AR intake, returns and inbound payments. The dispatchers, one per kind of work, release it through the Router, the one door into the Offline cluster, where the payment workflows run, and their calls go to one ds-* queue per downstream.';
 
 /* A card. `tone` picks its fill: `field` for a card on a tinted field, `line`
    for one on the work line, `offline` for the cluster. */
@@ -73,21 +73,24 @@ export default function PacingFlow() {
           <text x={26} y={56} className={styles.fieldNote}>
             the rate for every class
           </text>
-          <rect x={189} y={50} width={150} height={34} rx={8} className={styles.table} />
-          <text x={264} y={71.5} textAnchor="middle" className={styles.tableText}>
+          <rect x={180} y={38} width={168} height={58} rx={8} className={styles.table} />
+          <text x={264} y={61} textAnchor="middle" className={styles.tableText}>
             rate_allocation
+          </text>
+          <text x={264} y={80} textAnchor="middle" className={styles.tableSub}>
+            Oracle table: starts/s per class
           </text>
           <Card x={380} y={36} w={174} h={62} title="GovernorWorkflow" sub="a check every 15 s" mono tone="field" />
 
-          <path d="M380,67 H339" className={styles.ctl} markerEnd="url(#pf-ctl)" />
-          <text x={359.5} y={59} textAnchor="middle" className={styles.ctlLabel}>
+          <path d="M380,67 H348" className={styles.ctl} markerEnd="url(#pf-ctl)" />
+          <text x={364} y={59} textAnchor="middle" className={styles.ctlLabel}>
             rates
           </text>
           <path d="M554,67 H621 Q627,67 627,73 V208" className={styles.ctl} markerEnd="url(#pf-ctl)" />
           <text x={590} y={59} textAnchor="middle" className={styles.ctlLabel}>
             queue limits
           </text>
-          <path d="M264,84 V208" className={styles.ctl} markerEnd="url(#pf-ctl)" />
+          <path d="M264,96 V208" className={styles.ctl} markerEnd="url(#pf-ctl)" />
           <text x={275} y={157} className={styles.ctlLabel}>
             read every few seconds
           </text>

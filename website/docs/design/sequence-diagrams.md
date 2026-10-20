@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 <summary>How to read these diagrams</summary>
 
 - The group on the left is whoever starts the flow: a One-Data contract such as `CreatePayment.v3`, or One-Data's inbox when Billpay pulls the work. The light-blue group is the Billpay Platform.
-- Every payment workflow starts through the Router, and its note names the hops: admit, pin the plan key, then place the work on a cluster. The PAID drain and the missing-events check start from Schedules instead.
+- Every payment workflow starts through the Router, and its note names the hops: admit, pin the resolved profile, then choose the run site on a cluster. The PAID drain and the missing-events check start from Schedules instead.
 - A Bright Blue band is the Online cluster, where a caller is waiting. A Deep Blue band is the Offline cluster, where dispatchers pace the work. A grey, dashed band is time when nothing runs, because the work is waiting in Oracle, in One-Data's inbox, or on a workflow's timer.
 - The participants are the workflow and its stages, such as Capture, Verify and Execute. The systems a stage calls, such as clearing and Accounts Receivable, appear in its notes rather than as participants.
 - A pale-blue chip, such as `state → ACCEPTED`, is a commit through `PaymentStore`: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
@@ -54,7 +54,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: POST /payments,<br/>today, one instruction
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pin profile, run on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -129,7 +129,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: POST /payments,<br/>future date
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pin profile, run on Online
   R->>CW: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -159,7 +159,7 @@ sequenceDiagram
     Note over SD,RAV: Offline cluster, at the market's execution time on the due date
     SD->>PS: claim due SCHED_EXEC<br/>rows: DISPATCHING
     SD->>R: re-route with today's config
-    Note over R: admit, pin plan key, place on Offline
+    Note over R: admit, pin profile, run on Offline
     R->>XW: dispatcher start, {paymentId}-execute
     SD->>PS: mark the row<br/>DISPATCHED
     XW->>REV: run
@@ -203,7 +203,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: POST /payments,<br/>corporate, today
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pin profile, run on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -229,7 +229,7 @@ sequenceDiagram
     Note over R,RTF: Offline cluster: the allocation-request dispatcher, at once
     AD->>PS: claim the due<br/>ALLOC_REQUEST row
     AD->>R: start through the Router
-    Note over R: admit, pin plan key, place on Offline
+    Note over R: admit, pin profile, run on Offline
     R->>RQ: start RequestAllocationsWorkflow,<br/>{paymentId}-allocations
     rect rgba(102,169,226,0.40)
       RQ->>PS: state → ALLOCATING, guarded:<br/>only if still ACCEPTED
@@ -247,7 +247,7 @@ sequenceDiagram
     Note over R,RTF: Offline cluster: the allocated-payments dispatcher, every minute
     AD->>PS: claim the due<br/>ALLOC_EXEC row
     AD->>R: start through the Router
-    Note over R: admit, pin plan key, place on Offline
+    Note over R: admit, pin profile, run on Offline
     R->>XW: dispatcher start,<br/>{paymentId}-execute
     Note over XW,EXE: no Reverify: Verify passed it minutes earlier
     XW->>EXE: run
@@ -264,7 +264,7 @@ sequenceDiagram
     AD->>PS: write the legs of every stored batch, 1,000 rows<br/>at a time, each ACCEPTED with a SCHEDULED ALLOC_LEG row
     AD->>PS: claim due ALLOC_LEG<br/>rows, fair across parents
     AD->>R: start each leg through the Router
-    Note over R,XW: admit, pin plan key, place on Offline: priority 2, the parent's ID as fairness key
+    Note over R,XW: admit, pin profile, run on Offline: priority 2, the parent's ID as fairness key
     Note over R,EXE: One ExecuteSplitPaymentWorkflow per leg, {paymentId}_{seq}-execute: AR and OTB (OTB after the Instruments call), no clearing, then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then the leg's RTF event and Raven message, then PROCESSED
   end
 
@@ -314,7 +314,7 @@ sequenceDiagram
     Note over R,RTF: Offline cluster: the allocation-request dispatcher, at the fetch time
     AD->>PS: claim the due<br/>ALLOC_REQUEST row
     AD->>R: start through the Router
-    Note over R: admit, pin plan key, place on Offline
+    Note over R: admit, pin profile, run on Offline
     R->>RQ: start RequestAllocationsWorkflow,<br/>{paymentId}-allocations
     rect rgba(102,169,226,0.40)
       RQ->>PS: state → ALLOCATING, guarded: only if still<br/>SCHEDULED. No cancel or update from here
@@ -325,7 +325,7 @@ sequenceDiagram
 
   rect rgba(0,23,90,0.12)
     Note over R,RTF: Offline cluster: the allocations manager calls back through One-Data, batch by batch
-    Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then admit, pin plan key, place on Offline
+    Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then admit, pin profile, run on Offline
     R->>RC: async start ReceiveAllocationsWorkflow,<br/>{paymentId}-allocations-{batch}, then 202
     Note over RC: checks the batch and writes no legs
     rect rgba(102,169,226,0.40)
@@ -342,7 +342,7 @@ sequenceDiagram
     Note over R,RTF: Offline cluster: the allocated-payments dispatcher, at the execution time on the due date
     AD->>PS: claim the due<br/>ALLOC_EXEC row
     AD->>R: re-route with today's config
-    Note over R: admit, pin plan key, place on Offline
+    Note over R: admit, pin profile, run on Offline
     R->>XW: dispatcher start,<br/>{paymentId}-execute
     XW->>REV: run
     rect rgba(102,169,226,0.40)
@@ -394,7 +394,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: PUT /payments/<br/>{payment-id}
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pin profile, run on Online
   R->>UW: Update-With-Start,<br/>{paymentId}-update
 
   rect rgba(0,111,207,0.12)
@@ -448,7 +448,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: DELETE /payments/<br/>{payment-id}
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pin profile, run on Online
   R->>CW: Update-With-Start,<br/>{paymentId}-cancel
 
   rect rgba(0,111,207,0.12)
@@ -515,7 +515,7 @@ sequenceDiagram
     RD->>IN: ReadStartRequests.v1
     IN-->>RD: the oldest<br/>READY returns
     RD->>R: start through<br/>the Router
-    Note over R: admit, pin plan key, place on Offline: priority 5
+    Note over R: admit, pin profile, run on Offline: priority 5
     R->>WF: dispatcher start,<br/>{paymentId}-return-{seq}
     RD->>IN: UpdateStartRequests.v1:<br/>DONE
     Note over WF,QR: checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED if returned again
@@ -572,7 +572,7 @@ sequenceDiagram
     Note over RPD,RAV: Offline cluster: the market's representment dispatcher, every few minutes
     RPD->>PS: claim due REPRESENT rows: DISPATCHING
     RPD->>R: start through<br/>the Router
-    Note over R: admit, pin plan key, place on Offline: priority 4
+    Note over R: admit, pin profile, run on Offline: priority 4
     R->>WF: dispatcher start,<br/>{paymentId}-represent-{seq}
     RPD->>PS: mark the row DISPATCHED
     WF->>REP: run
@@ -634,7 +634,7 @@ sequenceDiagram
     ID->>IN: ReadStartRequests.v1
     IN-->>ID: the oldest READY<br/>inbound payments
     ID->>R: start through<br/>the Router
-    Note over R: admit, pin plan key, place on Offline: priority 3
+    Note over R: admit, pin profile, run on Offline: priority 3
     R->>WF: dispatcher start,<br/>{paymentId}-init
     ID->>IN: UpdateStartRequests.v1: DONE,<br/>or REJECTED if not admitted
     WF->>CAP: run
@@ -780,7 +780,7 @@ sequenceDiagram
   end
 
   OD->>R: POST<br/>/payment-installments
-  Note over R: admit, pin plan key, place on Online
+  Note over R: admit, pin profile, run on Online
   R->>PP: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -830,7 +830,7 @@ sequenceDiagram
     OD-->>AM: 503, and it is retried
   else admitted
     R->>PS: store the batch in<br/>allocation_batch
-    Note over R: pin plan key, place on Offline
+    Note over R: pin profile, run on Offline
     R->>RW: async start, {paymentId}-allocations-{batch},<br/>with only the payment ID and batch number
     R-->>OD: 202, once the<br/>workflow exists
     OD-->>AM: 202
@@ -882,7 +882,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: POST /payments,<br/>today, bank confirmation
-  Note over R: admit, resolve requiresBankConfirmation<br/>to Y, pick the intent journey,<br/>pin plan key, place on Online
+  Note over R: admit, resolve requiresBankConfirmation<br/>to Y, pick the intent journey,<br/>pin profile, run on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -980,7 +980,7 @@ sequenceDiagram
   OD->>RD: one MULTI/EXEC: read the account's pending<br/>payments, add this one, store the create
   RD-->>OD: another payment is pending
   OD->>R: POST /payments, today,<br/>with the pending payment's ID
-  Note over R: admit. The go-ahead is on for this market,<br/>so pick the intent journey, pin the plan key,<br/>place on Online
+  Note over R: admit. The go-ahead is on for this market,<br/>so pick the intent journey, pin the resolved profile,<br/>place on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)

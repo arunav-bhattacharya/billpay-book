@@ -94,6 +94,10 @@
   font-weight: 650;
   fill: var(--amex-txt-strong);
 }
+.tableSub {
+  font-size: 10.5px;
+  fill: var(--amex-mut);
+}
 
 /* ---- the door ---- */
 .door {

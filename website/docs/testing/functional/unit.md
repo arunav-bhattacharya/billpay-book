@@ -25,7 +25,7 @@ A new check or method, such as `MandateCheck` for markets that check a mandate, 
 
 ## Verification rules
 
-A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the rules for one plan key and step, and checks the report ([Writing verification rules](../../build/principles/core-build/stages.md#writing-verification-rules)):
+A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the rules for one resolved profile and step, and checks the report ([Writing verification rules](../../build/principles/core-build/stages.md#writing-verification-rules)):
 
 - Each small specification, such as `instrumentFound`, gets a table of cases once, facts in and yes or no out. Each rule then gets its own cases: the mandate rule needs one for an active mandate and one for each status that isn't.
 - Priority decides. When two rules fail, the decision carries the code of the higher-priority one, and the report names both.
@@ -34,7 +34,7 @@ A verification rule is a plain condition over the facts the checks gathered, so 
 - The time is part of the facts. A test sets it, so a rule about dates gives the same answer on every run.
 - Every rule has a decline code. A test asks the rule registry for every rule it holds and fails if the table of codes has none for one, so a new rule can't ship without its code.
 
-## The plan-key lookup
+## The profile lookup
 
 A workflow finds its stages through the stage resolver, and every stage, check and method says where it applies ([Building the Stage Resolver](../../build/principles/core-build/stage-resolver.md)). The registries behind the resolver are plain Kotlin, so a unit test builds them from a list of classes, without Quarkus, and checks:
 

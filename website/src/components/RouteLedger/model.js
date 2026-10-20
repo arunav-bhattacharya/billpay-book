@@ -1152,8 +1152,8 @@ export function router(j) {
         note: `Nothing to pick: the answer goes as an update to the payment's running ${j.full}, on the ${j.cluster} cluster. The Router only admits it.`,
       },
       {name: 'Resolve behaviors', chips: j.chips || [], note: 'Nothing new to resolve: the workflow kept the behaviors it was started with.'},
-      {name: 'Pin the plan key', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that plan, and its build, to the end.'},
-      {name: 'Place', main: `Online cluster, the running ${j.wfId}.`, note: 'Nothing new is placed: the update goes to the workflow that is already waiting.'},
+      {name: 'Pin the resolved profile', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that plan, and its build, to the end.'},
+      {name: 'Choose the run site', main: `Online cluster, the running ${j.wfId}.`, note: 'Nothing new is placed: the update goes to the workflow that is already waiting.'},
       {
         name: 'Start',
         main: `No start: an update with the update ID ${j.update}.`,
@@ -1167,13 +1167,13 @@ export function router(j) {
     {name: 'Pick the journey', main: `${j.journey}.`, note: `So ${j.full}, on the ${j.cluster} cluster.`},
     {name: 'Resolve behaviors', chips: j.chips || [], note: j.behave || ''},
     {
-      name: 'Pin the plan key',
+      name: 'Pin the resolved profile',
       main: 'The journey, the five resolved behaviors and the config version (v12, an example).',
       note: j.today
         ? "On the due date the dispatcher calls the Router again, so the payment runs with today's config. The version used at scheduling stays in its timeline for audit."
         : 'The running workflow keeps this plan, and its build, to the end.',
     },
-    {name: 'Place', ...place},
+    {name: 'Choose the run site', ...place},
     {name: 'Start', ...start},
   ];
 }

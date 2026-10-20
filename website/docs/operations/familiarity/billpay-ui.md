@@ -1,13 +1,13 @@
 ---
 title: Market Onboarding UI
-description: 'The Market Onboarding UI, in Control Tower, is where a market is described, approved and sent live, and where a live market is paused.'
+description: 'The Market Onboarding UI is where a market is described, approved and sent live, and where a live market is paused.'
 ---
 
 import Lead from '@site/src/components/Lead';
 
 # Market Onboarding UI
 
-<Lead>The Market Onboarding UI, in Control Tower, is where a market is described, approved and sent live, and where a live market is paused. Operators mostly use three parts of it: the Operations step, the readiness screen, and pause and resume.</Lead>
+<Lead>The Market Onboarding UI is where a market is described, approved and sent live, and where a live market is paused. Operators mostly use three parts of it: the Operations step, the readiness screen, and pause and resume.</Lead>
 
 [Market Onboarding](../../onboarding/index.md) covers the whole process, from a draft to a live market. This page is the operator's view of it.
 
@@ -36,6 +36,6 @@ There is one deployment row per release and environment, and it follows that rel
 
 - Pause stops a live market's dispatchers, through the environment's Market Onboarding API. The market's due work waits in Oracle, and nothing about its config changes.
 - Resume starts them again, and the waiting work is picked up at the governor's pace.
-- Rollback switches the market back to its previous version, with that version's Schedules and settings. New payments use the previous version, and payments already running keep the version pinned in their plan key.
+- Rollback switches the market back to its previous version, with that version's Schedules and settings. New payments use the previous version, and payments already running keep the version pinned in their resolved profile.
 
 To slow one kind of work rather than stop a market, use a rate override instead ([Dispatch Controls](./dispatch-controls.md)).

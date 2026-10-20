@@ -30,7 +30,7 @@ The call chain is strict, **Workflow → Stage → Activity → Client → exter
     {
       term: 'Workflows',
       to: '/docs/build/principles/core-build/workflows',
-      desc: `Deterministic orchestration: one workflow per journey, its stages from the plan key, and the spec's sketch.`,
+      desc: `Deterministic orchestration: one workflow per journey, its stages from the resolved profile, and the spec's sketch.`,
     },
     {
       term: 'Stages',
@@ -40,7 +40,7 @@ The call chain is strict, **Workflow → Stage → Activity → Client → exter
     {
       term: 'Stage Resolver',
       to: '/docs/build/principles/core-build/stage-resolver',
-      desc: `How a workflow finds its stages, checks and methods with no mapping code, worked through for Verify from the plan key to the commit.`,
+      desc: `How a workflow finds its stages, checks and methods with no mapping code, worked through for Verify from the resolved profile to the commit.`,
     },
     {
       term: 'Activities',

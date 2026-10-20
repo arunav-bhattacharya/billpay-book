@@ -16,6 +16,8 @@ The design rests on one rule: pace at the door. Big bursts never wait inside Tem
 
 <PacingFlow />
 
+`rate_allocation` is a small Oracle table with one row per traffic class, such as SEPA scheduled execution or returns: how many workflow starts a second that class may make right now. The governor rewrites it every 15 seconds, the dispatchers read it every few seconds, and an operator's pause or maximum rate is a row there too, which wins over the governor.
+
 ## The Work Tracker
 
 One narrow table in Oracle, `work_tracker`, holds every piece of dated work. A row is written in the same commit as the state change that creates it, so a scheduled payment and its row can never disagree. Its primary key is a business key such as `exec:{paymentId}`, so a retried insert can't create duplicate work. The columns are listed on [Build → Database](../build/database.md).
@@ -99,12 +101,12 @@ A tick costs about 5 Temporal writes. Releasing a million payments at 50 TPS tak
 
 ## Execution windows
 
-| Window | Starts (UTC, winter) | Starts (local) | Volume | Cutoff | Rate needed |
-| --- | --- | --- | --- | --- | --- |
-| SEPA (DE, IT) | 23:00 | Midnight CET, 4 PM MST | Up to 500K | 3 to 4 hours | 46 TPS for 3 hours; the governor aims at about 56 |
-| US | 07:01 | 00:01 MST (Phoenix time) | Up to 1M | None | 50 TPS floor (5.6 hours); 100 TPS takes 2.8 hours |
+| Window | Starts (UTC, winter) | Starts (UTC, summer) | Starts (local) | Volume | Cutoff | Rate needed |
+| --- | --- | --- | --- | --- | --- | --- |
+| SEPA (DE, IT) | 23:00 | 22:00 | Midnight in Central Europe: 4 PM MST in winter, 3 PM in summer | Up to 500K | 3 to 4 hours | 46 TPS for 3 hours; the governor aims at about 56 |
+| US | 07:01 | 07:01 | 00:01 MST (Phoenix time) | Up to 1M | None | 50 TPS floor (5.6 hours); 100 TPS takes 2.8 hours |
 
-In summer the SEPA window starts an hour earlier in UTC. The US run doesn't move, because Phoenix keeps no daylight saving. AT and the other SEPA markets run in the same window as DE and IT, with smaller volumes. The windows never overlap, so one Offline cluster serves them in turn, and the US window sets its size. SEPA runs during the US evening, which makes it the window most likely to meet heavy online traffic. Its floor is there for its cutoff: it aims to finish the run 30 minutes early, and if online traffic would take too much of a downstream, the cutoff wins and online calls are capped ([Throttling](./throttling.md#when-the-cutoff-wins)).
+The SEPA window moves an hour earlier in UTC for European summer time. The US run doesn't move, because Phoenix keeps no daylight saving. AT and the other SEPA markets run in the same window as DE and IT, with smaller volumes. The windows never overlap, so one Offline cluster serves them in turn, and the US window sets its size. SEPA runs during the US evening, which makes it the window most likely to meet heavy online traffic. Its floor is there for its cutoff: it aims to finish the run 30 minutes early, and if online traffic would take too much of a downstream, the cutoff wins and online calls are capped ([Throttling](./throttling.md#when-the-cutoff-wins)).
 
 Two other kinds of work arrive at known times. Inbound payments come in around 8 PM MST, up to 100 a second and 500K a day, after the SEPA run and before the US one. The AR posting events that move payments to `PAID` arrive in the US early morning, and the governor gives the PAID drain its share last.
 

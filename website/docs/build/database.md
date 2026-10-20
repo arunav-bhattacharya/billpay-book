@@ -21,7 +21,7 @@ import Lead from '@site/src/components/Lead';
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
 | Idempotency table | Request | Capture's insert-if-absent check. A duplicate means the request was seen before. |
-| `ORIG_TRANS_REFER_MAP` | Replacement payment | The old and new payment IDs, when Update Payment cancels a payment and creates its replacement. |
+| `ORIG_TRANS_REFER_MAP` | Replacement payment | The old and new payment IDs, when Update Payment cancels a payment and creates its rerunSite. |
 | `allocation_batch` (new) | Allocations callback | A corporate payment's allocations, stored before `ReceiveAllocationsWorkflow` starts, and when that batch's legs were written. It keeps big batches out of workflow inputs, holds every batch until the parent's Execute releases its legs, and makes sure each batch's legs are written once. |
 
 Both timelines are append-only. A step adds a row and never updates one, so the history of a payment is exactly the rows it left behind.

@@ -36,7 +36,7 @@ Three patterns repeat throughout the model:
 
 Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary ([Serialization](../principles/tech-stack/serialization.md)).
 
-The five behaviors that route a payment, `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization` and `requiresBankConfirmation`, aren't on these types. The Router resolves them per journey and pins them in the plan key the workflow carries ([Building the Router](../principles/core-build/router.md)). Idempotency and the lifecycle timeline are persistence concerns, with no domain type of their own.
+The five behaviors that route a payment, `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization` and `requiresBankConfirmation`, aren't on these types. The Router resolves them per journey and pins them in the resolved profile the workflow carries ([Building the Router](../principles/core-build/router.md)). Idempotency and the lifecycle timeline are persistence concerns, with no domain type of their own.
 
 ## In this section
 

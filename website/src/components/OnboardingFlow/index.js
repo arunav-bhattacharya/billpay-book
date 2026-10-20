@@ -46,7 +46,7 @@ const ENVS = [
 const STEPS = (e) => ['Check against the manifest', 'Save vN, inactive', 'Test payments', e.step4, 'Activate vN'];
 
 const LABEL =
-  'How a market release reaches the environments. Across the top is the Market Onboarding UI in Control Tower, the control plane, one for every environment: a profile and its settings are authored, approved once by a maker and a checker, frozen as release vN with a checksum, and tracked through deployment rows. Below are three environments, E1, E2 and E3, where E3 is production. Each one takes the release only through its Market Onboarding API, and in each a MarketOnboardingWorkflow checks vN against the build\'s capability manifest, saves it as an inactive version, tests it with payments, waits for sign-off, and activates it by pointing market_config_active at vN. The control plane sends vN to E1 first, then the same vN to E2 once it is active and signed off in E1, then to E3 once it is active and signed off in E2. In E3 the sign-off also needs a change request. Progress flows back up the same line.';
+  'How a market release reaches the environments. Across the top is the Market Onboarding UI, the control plane, one for every environment: a profile and its settings are authored, approved once by a maker and a checker, frozen as release vN with a checksum, and tracked through deployment rows. Below are three environments, E1, E2 and E3, where E3 is production. Each one takes the release only through its Market Onboarding API, and in each a MarketOnboardingWorkflow checks vN against the build\'s capability manifest, saves it as an inactive version, tests it with payments, waits for sign-off, and activates it by pointing market_config_active at vN. The control plane sends vN to E1 first, then the same vN to E2 once it is active and signed off in E1, then to E3 once it is active and signed off in E2. In E3 the sign-off also needs a change request. Progress flows back up the same line.';
 
 export default function OnboardingFlow() {
   return (
@@ -67,10 +67,7 @@ export default function OnboardingFlow() {
           <text x={32} y={52} className={styles.cpTitle}>
             Market Onboarding UI
           </text>
-          <text x={32} y={72} className={styles.cpSub}>
-            in Control Tower
-          </text>
-          <text x={32} y={90} className={styles.cpNote}>
+          <text x={32} y={76} className={styles.cpNote}>
             the control plane for every environment
           </text>
           {CHIPS.map((c, i) => {

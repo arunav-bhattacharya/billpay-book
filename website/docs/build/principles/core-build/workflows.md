@@ -27,7 +27,7 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 
 ## How a workflow finds its stages
 
-The Router pins a plan key when it starts the workflow: the market, the journey, the resolved behaviors and the market's config version (the market is there so a market's own classes can apply). The workflow reads its plan key and looks up its stages at runtime, through the stage resolver it was given when the worker registered it. Each stage, check and method says where it applies, and for each job the most specific one wins, so a market's own class beats a shared one with the same key in that market, while classes with different keys add up. Stages are never passed into a workflow, and the workflow never sees an activity stub: the resolver makes the stubs on the workflow's thread and binds them to the stages it returns.
+The Router pins a resolved profile when it starts the workflow: the market, the journey, the resolved behaviors and the market's config version (the market is there so a market's own classes can apply). The workflow reads its resolved profile and looks up its stages at runtime, through the stage resolver it was given when the worker registered it. Each stage, check and method says where it applies, and for each job the most specific one wins, so a market's own class beats a shared one with the same key in that market, while classes with different keys add up. Stages are never passed into a workflow, and the workflow never sees an activity stub: the resolver makes the stubs on the workflow's thread and binds them to the stages it returns.
 
 Every step has a default stage, but a market whose behaviors need more, such as Verify's mandate check, runs only once a class that handles them is in the build. A combination the build can't run can't be onboarded, and a request for a combination the market hasn't onboarded gets 422 before any workflow starts. [Building the Stage Resolver](./stage-resolver.md#the-capability-manifest) has the rule.
 
@@ -57,7 +57,7 @@ A corporate payment starts no child at all. It can have 100K legs, so its alloca
 
 Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor aren't pinned: they move to the new build when they continue-as-new.
 
-Config is pinned the same way. The plan key carries the resolved behaviors, the config version and the market's rule settings, and for a payment that waits, its confirmation window, so a replay finds the same stages, thresholds and window. A scheduled payment gets a new plan key on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
+Config is pinned the same way. The resolved profile carries the resolved behaviors, the config version and the market's rule settings, and for a payment that waits, its confirmation window, so a replay finds the same stages, thresholds and window. A scheduled payment gets a new resolved profile on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
 
 ## A worked example: Create Immediate Payment
 
@@ -67,7 +67,7 @@ This is the spec's sketch of the workflow that pays a bill today. Names other th
 @WorkflowInterface
 interface CreateImmediatePaymentWorkflow {
     @WorkflowMethod
-    fun run(request: CreatePaymentRequest, plan: PlanKey)   // the request itself is the start input
+    fun run(request: CreatePaymentRequest, profile: ResolvedProfile)   // the request itself is the start input
 
     // The caller's Update-With-Start lands here and returns once Verify has decided.
     @UpdateMethod
@@ -79,12 +79,12 @@ class CreateImmediatePaymentWorkflowImpl(
 ) : CreateImmediatePaymentWorkflow {
     private var decided: PaymentDecision? = null
 
-    override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        // Each step's stage, and the checks and methods it uses, come from the plan key at runtime.
+    override fun run(request: CreatePaymentRequest, profile: ResolvedProfile) {
+        // Each step's stage, and the checks and methods it uses, come from the resolved profile at runtime.
         // On the Online cluster the stubs the resolver makes for Payment Instruments, Payment Options
         // and Plans are local activities, so Capture, Verify and its commit all run inside this
         // first workflow task.
-        val stages = stageResolver.resolve(plan)
+        val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId              // One-Data made it
 
         stages.capture.run(request)                    // PENDING: writes the request, insert-if-absent
@@ -98,7 +98,7 @@ class CreateImmediatePaymentWorkflowImpl(
         if (decided != PaymentDecision.ACCEPTED) return
         // A corporate payment stops here: Verify's commit wrote its ALLOC_REQUEST row,
         // and dispatchers start every later step.
-        if (plan.accountType == AccountType.CORPORATE) return
+        if (profile.accountType == AccountType.CORPORATE) return
 
         // Data from Options and Instruments travels on in the workflow, encrypted in history by the payload codec.
         val executed = stages.execute.run(paymentId, verified)  // PROCESSING: clearing, AR, and the Instruments call, then OTB
@@ -113,7 +113,7 @@ class CreateImmediatePaymentWorkflowImpl(
 }
 ```
 
-The workflow never names a market: `stageResolver.resolve(plan)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
+The workflow never names a market: `stageResolver.resolve(profile)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
 A payment that needs bank confirmation or a go-ahead never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
 
@@ -132,11 +132,11 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
-    override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        val stages = stageResolver.resolve(plan)
+    override fun run(request: CreatePaymentRequest, profile: ResolvedProfile) {
+        val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
         stages.capture.run(request)                              // PENDING: the request, and any pending IDs
-        decided = if (plan.requiresBankConfirmation)
+        decided = if (profile.requiresBankConfirmation)
             stages.requestConfirmation.run(paymentId)             // PENDING with the link, or DECLINED
         else PaymentDecision.PENDING                             // a go-ahead: One-Data adds the pending list
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
@@ -144,7 +144,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         if (!waiting) { /* announce, the delete, and end */ return }
         Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // the wait doesn't wait for it
 
-        val window = checkNotNull(plan.confirmationWindow)
+        val window = checkNotNull(profile.confirmationWindow)
         val due = Workflow.currentTimeMillis() + (window + GRACE).toMillis()
         if (!Workflow.await(window + GRACE) { answer != null } &&
             Workflow.currentTimeMillis() - due > LATE.toMillis()) {  // fired late: Online was down

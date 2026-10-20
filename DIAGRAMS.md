@@ -311,7 +311,7 @@ picture. So do the newer ones:
 | `OnboardingFlow` | A market release travelling from billpay-ui through the Market Onboarding API to the three environments | Market Onboarding |
 | `PacingFlow` | The control loop over the work line: the governor, `rate_allocation`, where work waits, the dispatchers, the Router as the one door, the Offline cluster and the `ds-*` queues | Design → Pacing |
 | `RowLifecycle` | One Work Tracker row's states, in the payment lifecycle tones | Design → Pacing |
-| `ProfileToStages` | One pay-today payment from its profile, through the Router and the plan key, to the classes the stage resolver picks | Design → Routing |
+| `ProfileToStages` | One pay-today payment from its profile, through the Router and the resolved profile, to the classes the stage resolver picks | Design → Routing |
  For a new diagram, copy the file into a new folder, replace the arrays, and
 delete what you do not need. The structure is worth keeping; the data is not.
 

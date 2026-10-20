@@ -15,7 +15,7 @@ A payment passes through a handful of layers on its way in, and each one has a s
 | --- | --- | --- |
 | **One-Data Functions** | The versioned contracts that channels and partners call, such as `CreatePayment.v3` | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Billpay Core APIs** | The REST endpoints behind the gateway, such as `POST /payments` | [API Spec › Billpay Core](build/api-spec/billpay-core.md) |
-| **Billpay Router** | A library inside the core APIs and the dispatchers. It admits the request (422 when the market isn't live), picks the journey, pins a plan key and places the work on a cluster | [Design › Routing](design/routing.md) |
+| **Billpay Router** | A library inside the core APIs and the dispatchers. It admits the request (422 when the market isn't live), picks the journey, pins a resolved profile and chooses the run site on a cluster | [Design › Routing](design/routing.md) |
 | **Temporal Workflows** | One durable workflow per journey: on the Online cluster when a caller is waiting, on the Offline cluster when nobody is | [Design › Workflows](design/component-model/workflows/index.md) |
 | **Stages** | One business step each, such as Verify or Execute. The only layer that changes with a market's behaviors | [Design › Stages](design/component-model/stages.md) |
 | **Activities** | The calls to one system, grouped as `{System}Activities`. Oracle is reached only through `PaymentStore` | [Design › Activities](design/component-model/activities.md) |

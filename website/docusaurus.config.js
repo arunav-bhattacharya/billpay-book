@@ -37,8 +37,8 @@ const config = {
   clientModules: ['./src/clientModules/anchorScroll.js'],
 
   // Text uses Benton Sans (the Amex corporate face), self-hosted as WOFF2
-  // from src/css/fonts so every browser renders it the same. Code uses SF
-  // Mono. See the @font-face block in src/css/custom.css.
+  // from src/css/fonts so every browser renders it the same. Code uses
+  // JetBrains Mono, self-hosted the same way. See the @font-face block in src/css/custom.css.
 
   markdown: {
     mermaid: true,
@@ -177,7 +177,7 @@ const config = {
           // Colours are driven from custom.css (theme-aware); keep only layout
           // + font here, since Mermaid options are shared across light/dark.
           fontFamily:
-            "'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
           // No rankSpacing here. Mermaid 11 lays state diagrams out through
           // the shared dagre path, which reads rank separation from the
           // top-level config and never falls through to this block: setting it
@@ -231,7 +231,7 @@ const config = {
           },
           themeVariables: {
             fontFamily:
-              "'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
           },
         },
       },
