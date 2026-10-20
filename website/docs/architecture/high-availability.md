@@ -16,7 +16,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 <HADiagram />
 
-## Front door
+## Gateway
 
 - One-Data Functions run active in both sites, so losing a site doesn't close the front door.
 - Both of them call the same core APIs, the ones in IPC2's app. IPC1's One-Data routes across.

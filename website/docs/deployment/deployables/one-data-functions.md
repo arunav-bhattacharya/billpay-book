@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 - The functions channels and other platforms call, each a versioned contract. Most front one billpay-core API. [Build → One-Data Functions](../../build/api-spec/one-data.md) lists every one.
 - The event handlers for money movement, Accounts Receivable (AR) and authorization events. They store what arrives and never start a workflow.
 - The inbox functions Billpay calls to read and update the inbox, and `UpdateUnmatchedPayments.v1`, which One-Data runs on its own schedule.
-- A Redis store in each site, IPC1 and IPC2, run as one active-active database. It holds every create as Pending and each card account's pending payments, so One-Data can hold a create while billpay-core is slow ([High Availability](../../architecture/high-availability.md#front-door)).
+- A Redis store in each site, IPC1 and IPC2, run as one active-active database. It holds every create as Pending and each card account's pending payments, so One-Data can hold a create while billpay-core is slow ([High Availability](../../architecture/high-availability.md#gateway)).
 
 One-Data runs active in both sites, so losing a site doesn't close the front door.
 
