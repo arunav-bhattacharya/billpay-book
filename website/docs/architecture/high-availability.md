@@ -44,7 +44,7 @@ billpay-core is one app that runs the work for both Temporal clusters.
 - Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
 - Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work. Work nobody waits for, from bulk intake and inbound payments to returns, settlement and posting, is held in One-Data's inbox instead, and Billpay pulls it from there. The inbox is a Postgres database of its own, separate from Temporal's, with one primary replicated across IPC1 and IPC2.
 - Short outages and patching windows don't fail payments. `PaymentStore`, the only code that touches Oracle, keeps retrying and then waits on a durable timer, so a payment pauses and carries on when the database is back. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
-- This is the [same Oracle setup](../build/principles/tech-stack/database.md) the DBO team runs day to day.
+- This is the [same Oracle setup](../build/tech-stack/database.md) the DBO team runs day to day.
 
 ## Temporal
 

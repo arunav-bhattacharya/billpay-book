@@ -387,11 +387,11 @@ The registries find mistakes when the app starts. Unit tests build the registrie
 | A misleading name | A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code |
 | An unnoticed change | The report above is checked in, and a test fails when the build's report differs, so a change to what any combination runs shows up as a diff in review |
 
-The resolver has unit tests of its own, listed on [Testing → Unit](../../../testing/functional/unit.md#the-profile-lookup).
+The resolver has unit tests of its own, listed on [Testing → Unit](../../testing/functional/unit.md#the-profile-lookup).
 
 ## The capability manifest
 
-The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /market-onboarding/capabilities` returns it, and the onboarding workflow checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
+The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /market-onboarding/capabilities` returns it, and the onboarding workflow checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
 
 ## Why the lookup stays in the workflow
 

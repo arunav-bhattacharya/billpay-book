@@ -77,6 +77,7 @@ const sidebars = {
       collapsed: true,
       link: {type: 'doc', id: 'onboarding/index'},
       items: [
+        'onboarding/step-by-step',
         'onboarding/market-profile',
         'onboarding/operations-settings',
         'onboarding/releases',
@@ -92,38 +93,30 @@ const sidebars = {
       items: [
         {
           type: 'category',
-          label: 'Principles',
+          label: 'Tech Stack',
           collapsed: true,
-          link: {type: 'doc', id: 'build/principles/index'},
+          link: {type: 'doc', id: 'build/tech-stack/index'},
           items: [
-            {
-              type: 'category',
-              label: 'Tech Stack',
-              collapsed: true,
-              link: {type: 'doc', id: 'build/principles/tech-stack/index'},
-              items: [
-                'build/principles/tech-stack/database',
-                'build/principles/tech-stack/datasource',
-                'build/principles/tech-stack/orm',
-                'build/principles/tech-stack/http-client',
-                'build/principles/tech-stack/serialization',
-              ],
-            },
-            {
-              type: 'category',
-              label: 'Core Build',
-              collapsed: true,
-              link: {type: 'doc', id: 'build/principles/core-build/index'},
-              items: [
-                'build/principles/core-build/code-layout',
-                'build/principles/core-build/router',
-                'build/principles/core-build/workflows',
-                'build/principles/core-build/stages',
-                'build/principles/core-build/stage-resolver',
-                'build/principles/core-build/activities',
-                'build/principles/core-build/clients',
-              ],
-            },
+            'build/tech-stack/database',
+            'build/tech-stack/datasource',
+            'build/tech-stack/orm',
+            'build/tech-stack/http-client',
+            'build/tech-stack/serialization',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Core Build',
+          collapsed: true,
+          link: {type: 'doc', id: 'build/core-build/index'},
+          items: [
+            'build/core-build/code-layout',
+            'build/core-build/router',
+            'build/core-build/workflows',
+            'build/core-build/stages',
+            'build/core-build/stage-resolver',
+            'build/core-build/activities',
+            'build/core-build/clients',
           ],
         },
         {

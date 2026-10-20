@@ -77,4 +77,4 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of up to 500 inbox rows as JDBC batches: each a guarded update from `PROCESSED` to `PAID`, with a `PAID` timeline row tagged with the batch ID wherever the update changed a row |
 
-Every table has one [Exposed](./principles/tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Workflow code never touches any of this, because it has to [stay deterministic](./principles/core-build/workflows.md#why-workflow-code-must-be-deterministic).
+Every table has one [Exposed](./tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Workflow code never touches any of this, because it has to [stay deterministic](./core-build/workflows.md#why-workflow-code-must-be-deterministic).

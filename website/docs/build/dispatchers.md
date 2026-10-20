@@ -16,7 +16,7 @@ import Lead from '@site/src/components/Lead';
 
 A dispatcher is two pieces. The workflow runs on the Offline cluster and loops over ticks. Each tick is one activity, `claimAndStart`, on the dispatcher's own control queue, such as `ctl-sched` or `ctl-leg`, so one kind of work can't hold up another.
 
-The workflow holds no rows and starts nothing itself. Starting a workflow is I/O, and [workflow code has to stay deterministic](./principles/core-build/workflows.md#why-workflow-code-must-be-deterministic), so every claim and every start happens inside the activity. The workflow only adds up counts and decides whether to go round again. A sketch, with illustrative names:
+The workflow holds no rows and starts nothing itself. Starting a workflow is I/O, and [workflow code has to stay deterministic](./core-build/workflows.md#why-workflow-code-must-be-deterministic), so every claim and every start happens inside the activity. The workflow only adds up counts and decides whether to go round again. A sketch, with illustrative names:
 
 ```kotlin
 class DispatcherWorkflowImpl : DispatcherWorkflow {
@@ -69,14 +69,14 @@ override fun claimAndStart(kind: DispatchKind): Counts {
             Started, AlreadyStarted -> started += rows[i]    // already started counts as done
             Refused -> store.markFailed(rows[i])             // its market was taken out of service
         }
-        beat(ctx, Position(rows, i + 1))                     // sends at most every 2 to 3 s
+        beat(ctx, Position(rows, i + 1))                     // the SDK throttles what it sends
     }
     store.markDispatched(started)                            // guarded on DISPATCHING
     return Counts(claimed = rows.size, started = started.size)
 }
 ```
 
-The heartbeat carries the tick's position, every 2 to 3 seconds, and that position is what a retry resumes from. The rest of the sketch is the part that's easy to get wrong:
+The heartbeat carries the tick's position, and that position is what a retry resumes from. The SDK throttles how often heartbeats actually reach the server, so the last recorded position can be a few seconds behind. That costs nothing: the retry repeats a few starts, and a start that is already running counts as done. The rest of the sketch is the part that's easy to get wrong:
 
 - Every status change on a Work Tracker row is a guarded update, like every other status change in Oracle. Marking a row `DISPATCHED` applies only while it is still `DISPATCHING`, so it never overwrites a row that a fast workflow has already closed as `DONE`.
 - The Router sets the workflow ID from the row: the payment ID plus its suffix, such as `{paymentId}-execute`. With reuse policy `REJECT_DUPLICATE`, a row released twice can't execute its payment twice, and a start that fails as already started is a success, not an error.
@@ -116,7 +116,7 @@ The leg dispatcher starts corporate legs like any other dispatcher, and it does 
 
 ## The governor
 
-`GovernorWorkflow` runs on the Offline cluster with the workflow ID `governor`, on `ctl-governor`. A Schedule with overlap policy SKIP starts it again if it isn't running. Every 15 seconds one activity reads Prometheus and Oracle, decides, and writes the result. It continues-as-new every hour and costs about 20 Temporal writes a minute.
+`GovernorWorkflow` runs on the Offline cluster with the workflow ID `governor` plus the trigger time its Schedule appends, on `ctl-governor`. A Schedule with overlap policy SKIP starts it again if it isn't running. Every 15 seconds one activity reads Prometheus and Oracle, decides, and writes the result. It continues-as-new every hour and costs about 20 Temporal writes a minute.
 
 ```kotlin
 class GovernorWorkflowImpl : GovernorWorkflow {

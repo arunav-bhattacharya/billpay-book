@@ -12,7 +12,7 @@ import {rulePieces} from '@site/src/components/ClassMap/diagrams';
 
 <Lead>A stage is one business step of a journey: it makes its calls, commits the new state once, and returns its outcome. It is also the only layer that changes with a market's behaviors, through the checks and methods it is made of, so a market that does something differently adds a class, never a different workflow.</Lead>
 
-[Design → Stages](../../../design/component-model/stages.md) lists every stage, the state it moves and what it varies by. This page is about writing one.
+[Design → Stages](../../design/component-model/stages.md) lists every stage, the state it moves and what it varies by. This page is about writing one.
 
 ## The shape of a stage
 
@@ -125,7 +125,7 @@ A name says what a class does, never what it calls. A market that needs a mandat
 
 ## Writing verification rules
 
-Verify, Reverify and Represent decide the same way. Each runs its checks, gathers the answers into one set of facts, runs the rules that apply, and commits once. [Design → Stages](../../../design/component-model/stages.md#how-verification-decides) explains the model, and this is the code it turns into.
+Verify, Reverify and Represent decide the same way. Each runs its checks, gathers the answers into one set of facts, runs the rules that apply, and commits once. [Design → Stages](../../design/component-model/stages.md#how-verification-decides) explains the model, and this is the code it turns into.
 
 Here are the pieces of a rule as a class diagram:
 

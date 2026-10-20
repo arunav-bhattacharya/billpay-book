@@ -771,7 +771,7 @@ A create that needs the customer to confirm their bank details, or that One-Data
 - Then **Execute** and **Fulfil**, as for pay today, in the same workflow. A scheduled payment stops at `SCHEDULED` with its `SCHED_EXEC` row and executes on its scheduled date, like any scheduled payment (agreed 2026-10-19). A corporate one stops at `ACCEPTED` with its `ALLOC_REQUEST` row, as in its usual journey.
 - **The no:** `DeletePayment.v1` sends the `decline` update with the update ID `{paymentId}-no`. Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, with no window check. A no and a yes from two tabs are two updates to one workflow: the first one it accepts wins, and the validator turns the other away with 409. A repeated no gets `CANCELLED` again (agreed 2026-10-18).
 - **The timer:** when it fires with no answer, Cancel moves the payment to `CANCELLED`, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven, as for any cancel. The workflow never relies on a terminate or an execution timeout: either would leave the payment `PENDING`, with nobody told.
-- **A timer that fires late:** a timer normally fires within about a second of its time. One that fires more than a minute late means the Online cluster or its workers were down. A customer who confirmed during the outage was answered `PENDING`, because One-Data held the confirm. The workflow then gives the customer one more confirmation window before it cancels, and the held confirm lands in it (agreed 2026-10-19). It reads the workflow clock, so a replay decides the same way.
+- **A timer handled late:** the server fires a timer on time, and a worker normally handles it within about a second. One handled more than a minute late means the Online cluster or its workers were down. A customer who confirmed during the outage was answered `PENDING`, because One-Data held the confirm. The workflow then gives the customer one more confirmation window before it cancels, and the held confirm lands in it (agreed 2026-10-19). It reads the workflow clock, so a replay decides the same way.
 - **The delete:** once it has replied, the workflow calls One-Data's delete saying the payment still waits, so One-Data removes only the stored create. When it ends, it calls the delete again, which removes the account's pending entry ([Held creates and the pending check](#held-creates-and-the-pending-check)).
 - A repeated confirm that comes after the workflow has closed is a retry whose reply was lost. The API reads the payment and answers with its current state, such as `PROCESSED` or `DECLINED`, so the channel never shows a failure for a payment that went through. A confirm for a payment that was cancelled, such as one whose window closed, gets 409 (agreed 2026-10-18).
 - A waiting workflow can leave its worker's sticky cache; the confirm then replays its short history first. The workflow stays pinned to its build, so after a deploy the old build's workers keep running until the last wait that started on them has ended, at most one window and the grace later, plus one more window if its timer fired late.
@@ -869,7 +869,7 @@ interface CreatePaymentIntentWorkflow {
 
 class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) : CreatePaymentIntentWorkflow {
     private var decided: PaymentDecision? = null     // the create's answer
-    private var answer: Answer? = null               // YES or NO: the first one accepted wins
+    private var answer: Answer? = null               // YES or NO: the first one to arrive wins
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
@@ -891,7 +891,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         val window = checkNotNull(profile.confirmationWindow)
         val due = Workflow.currentTimeMillis() + (window + GRACE).toMillis()
         if (!Workflow.await(window + GRACE) { answer != null } &&
-            Workflow.currentTimeMillis() - due > LATE.toMillis()) {    // fired late: Online was down
+            Workflow.currentTimeMillis() - due > LATE.toMillis()) {    // handled late: Online or its workers were down
             Workflow.await(window) { answer != null }                  // one more window
         }
         waiting = false                                                // the validators turn answers away now
@@ -910,12 +910,13 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
             stages.cancel.announce(paymentId)
         }
         inbox.deletePending(paymentId)                                 // removes the account's entry
+        Workflow.await { Workflow.isEveryHandlerFinished() }           // no update left without its reply
     }
 
     override fun decision(): PaymentDecision { Workflow.await { decided != null }; return decided!! }
 
     override fun checkConfirm() = check(waiting && answer == null) { "not waiting" }   // the API answers 409
-    override fun confirm(): PaymentDecision { answer = Answer.YES; Workflow.await { result != null }; return result!! }
+    override fun confirm(): PaymentDecision { if (answer == null) answer = Answer.YES; Workflow.await { result != null }; return result!! }
 
     override fun checkDecline() = check(waiting && answer == null) { "not waiting" }
     override fun decline(): PaymentDecision { answer = Answer.NO; Workflow.await { result != null }; return result!! }
@@ -1479,11 +1480,23 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 3. **Track.** A deployment row per release and environment follows the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
 4. **Sign off.** When someone signs off in the UI, the backend sends the sign-off through the same API. In E3 the RFC must pass the ServiceNow check first.
 5. **Promote.** Once vN is active and signed off in E1, the same vN goes to E2, then E3.
-6. **Enable traffic.** A new market's traffic is enabled only once vN is live in E3. Market profiles change rarely, and every change is tested in the lower environments before it reaches production (agreed 2026-10-18).
+6. **Enable traffic.** A new market's traffic is enabled only once vN is live in E3. Market profiles change rarely, and every change is tested in the lower environments before it reaches production (agreed 2026-10-18). Traffic comes from the channels, mostly through One-Data, and a profile gets none until they start sending it. A new account type in a live market is the same: active in E3 doesn't mean traffic, which starts when the channels send it (agreed 2026-10-20).
 
 There are two human checks: approval once, on the content (maker-checker), and sign-off in each environment after its test payments pass.
 
-### MarketOnboardingWorkflow
+### Onboarding paths
+
+Every path ends in a frozen release that goes through E1, E2 and E3 as above. They differ in what comes before it and what happens after (2026-10-20, from the agreed facts above):
+
+| Path | Example | Before the release | After it is live in E3 |
+| --- | --- | --- | --- |
+| A new market, its first account type | DE consumer | Every behavior combination in the build's manifest, or a build first; the whole profile and its operations settings authored | Channels start sending its traffic |
+| A new account type in a live market | US corporate, with US consumer live | Its own profile, v1, authored like a new one; a market-level Raven setting applies unless the account type sets its own | Channels start sending that account type's traffic |
+| A change to a live profile | Raising the largest payment | A new version, vN+1, of the same profile, approved again | New payments use vN+1 at once; running payments keep their version |
+| A change that needs new code | A behavior combination the build lacks | The build, through the deploy pipeline, before the release can pass step 1 | As for the change it carries |
+
+Rollback, pause and resume act on a live profile without a new release.
+
 
 > `onboard-{market}-{accountType}-v{N}` · Offline · started by the Market Onboarding API · control queue `ctl-onboard`
 
@@ -1588,7 +1601,7 @@ Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other 
 - RTF and Raven activities: idempotency keys, and a long schedule-to-close.
 - Inbox function activities: idempotent, unlimited retries with backoff, and a start-to-close a little above the function's own time limit.
 - A 429 becomes `ApplicationFailure.newFailureWithCauseAndDelay(...)` with the `Retry-After` value.
-- Worker Versioning: payment workflows are PINNED; dispatchers and the governor upgrade when they continue-as-new.
+- Worker Versioning: payment workflows are PINNED; dispatchers and the governor upgrade when they continue-as-new. They are pinned too, and continue-as-new with `InitialVersioningBehavior.AUTO_UPGRADE`, so each new run starts on the newest build; the governor also continues-as-new early when `Workflow.getInfo().isTargetWorkerDeploymentVersionChanged()` turns true (Proposed, 2026-10-20; upgrade on continue-as-new is in Public Preview in Temporal).
 - Offline workers in the shared app: their own slot caps (`setMaxConcurrentActivityExecutionSize`, `setMaxConcurrentWorkflowTaskExecutionSize`) and their own Oracle pool, so they can't starve online work.
 - OpenTelemetry interceptors on clients and workers. HTTP clients inside activities have their own retries off.
 
@@ -1621,6 +1634,10 @@ Proposed (2026-10-20), for the team to confirm:
 - Required checks on every pull request: the Gradle build, which makes a breach of the layer rules a compile error; ktlint and detekt; the unit tests, including the registry tests, the checked-in stage report and the bean-index test; the integration tests against Oracle in TestContainers; the replay tests over the recorded histories; and the organization's dependency, static-analysis and secret scans. Auto-merge is allowed once a pull request is approved, so it merges as soon as the checks pass.
 - Replay histories: one or more per journey are checked in, and each release adds histories recorded in E2 for the journeys it changed.
 - A check that fails is fixed, not rerun, unless its log shows a failure outside the code, such as a runner that couldn't start a container. A test that fails now and then is fixed or removed within the sprint, never left to be rerun.
+
+### Coding agents
+
+The billpay-core codebase ships skills for coding agents, so an agent works inside the same guardrails as a person: the layer rules the module graph enforces, deterministic workflow and stage code, Oracle only through `PaymentStore`, the naming rules, and the tests and checked-in reports a change must update (agreed 2026-10-20). Temporal code, from workflows and activities to workers and Schedules, is written and reviewed with the `temporal-developer` skill from the Temporal plugin (agreed 2026-10-20).
 
 ### Sizing
 

@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 
 Four choices sit underneath everything and are not revisited per component:
 
-- Kotlin is the platform language, top to bottom. The domain model leans hard on sealed hierarchies and null-safety, and the [Domain Model](../../domain-model/index.md) pages show why.
+- Kotlin is the platform language, top to bottom. The domain model leans hard on sealed hierarchies and null-safety, and the [Domain Model](../domain-model/index.md) pages show why.
 - Quarkus (ArC/CDI) does the dependency injection and app wiring. We use it lightly: `@ApplicationScoped` and `@Singleton` beans, constructor injection, and `@All List<T>` to hand the stage registries every class of a kind, and none of the rest of the framework.
 - Gradle builds everything from one multi-module monorepo. The [code layout](../core-build/code-layout.md) page shows how the modules map to the component model.
 - Temporal is the workflow engine: two self-hosted clusters, Online and Offline, each with its own Aurora PostgreSQL database and OpenSearch 2 for visibility, on server 1.30.1 or later. Billpay leans on Update-With-Start, Schedules, Worker Versioning, and task queue priority and fairness, and its guarantees (durable state, replay, retries) are why the [core build rules](../core-build/index.md) look the way they do.

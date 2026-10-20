@@ -21,7 +21,7 @@ The checks are Proposed (2026-10-20), for the team to confirm. Where they sit in
 
 | Check | What it runs | What it catches |
 | --- | --- | --- |
-| Build | The Gradle build of the monorepo | A breach of the layer rules, such as stage code reaching an activity's implementation. The module graph makes it a compile error ([Code Layout](../build/principles/core-build/code-layout.md#the-dependency-rule-the-build-enforces)) |
+| Build | The Gradle build of the monorepo | A breach of the layer rules, such as stage code reaching an activity's implementation. The module graph makes it a compile error ([Code Layout](../build/core-build/code-layout.md#the-dependency-rule-the-build-enforces)) |
 | Lint | ktlint and detekt | Formatting drift and the code smells detekt is set to fail on |
 | Unit tests | Stages, checks, methods, verification rules, workflows and activities ([Unit Tests](../testing/functional/unit.md)) | A stage that commits the wrong state, a rule without a decline code, an activity that retries a business error |
 | Registry tests | The stage, check and rule registries, built from the classes in the build | Two classes tied for one job, a combination in the manifest with no stage, a class missing its module's `META-INF/beans.xml`, a market class without its market's code in front |

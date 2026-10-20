@@ -25,7 +25,7 @@ The Router runs the same six steps for every request that starts a workflow.
 5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID.
 6. **Start** it in the journey's start mode.
 
-The resolved profile is the market's profile, resolved for this one payment and pinned. Its rule settings are a good example of why it carries values rather than a pointer to config. Say GB's consumer release v7 sets the largest payment at 25,000 GBP. A payment started while v7 is active carries 25,000 in its profile, and Verify's largest-payment rule declines a 30,000 GBP payment against it. If v8 raises the limit the next day, payments already running still use 25,000, and new ones use the new value. [Building the Router](../build/principles/core-build/router.md#4-pin-the-resolved-profile) shows the settings as code.
+The resolved profile is the market's profile, resolved for this one payment and pinned. Its rule settings are a good example of why it carries values rather than a pointer to config. Say GB's consumer release v7 sets the largest payment at 25,000 GBP. A payment started while v7 is active carries 25,000 in its profile, and Verify's largest-payment rule declines a 30,000 GBP payment against it. If v8 raises the limit the next day, payments already running still use 25,000, and new ones use the new value. [Building the Router](../build/core-build/router.md#4-pin-the-resolved-profile) shows the settings as code.
 
 The confirm, and the customer's no to a payment that waits, are only admitted. They are updates to a workflow that is already running, so there is nothing to pick, pin or choose.
 

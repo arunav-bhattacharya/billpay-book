@@ -3,7 +3,7 @@
 // A wiki documenting Amex's Billpay payment platform. Structure mirrors the
 // reference billpay-wiki; facts come from docs/Wiki_Spec.md. See ../CLAUDE.md.
 
-import {themes as prismThemes} from 'prism-react-renderer';
+import {githubLight, githubDark} from './src/prism/githubThemes.js';
 
 // The GitHub Pages coordinates. The deploy workflow reads the same values.
 const GH_USER = 'arunav-bhattacharya';
@@ -115,9 +115,26 @@ const config = {
           // Renamed 2026-10-19: the provisioning API is the Market Onboarding
           // API, and the stage index is the stage resolver.
           {from: '/docs/onboarding/provisioning', to: '/docs/onboarding/market-onboarding-api'},
+          // Moved 2026-10-20: Core Build and Tech Stack sit directly under Build,
+          // and the Principles page is gone.
+          {from: '/docs/build/principles', to: '/docs/build'},
+          {from: '/docs/build/principles/core-build', to: '/docs/build/core-build'},
+          {from: '/docs/build/principles/core-build/code-layout', to: '/docs/build/core-build/code-layout'},
+          {from: '/docs/build/principles/core-build/router', to: '/docs/build/core-build/router'},
+          {from: '/docs/build/principles/core-build/workflows', to: '/docs/build/core-build/workflows'},
+          {from: '/docs/build/principles/core-build/stages', to: '/docs/build/core-build/stages'},
+          {from: '/docs/build/principles/core-build/stage-resolver', to: '/docs/build/core-build/stage-resolver'},
+          {from: '/docs/build/principles/core-build/activities', to: '/docs/build/core-build/activities'},
+          {from: '/docs/build/principles/core-build/clients', to: '/docs/build/core-build/clients'},
+          {from: '/docs/build/principles/tech-stack', to: '/docs/build/tech-stack'},
+          {from: '/docs/build/principles/tech-stack/database', to: '/docs/build/tech-stack/database'},
+          {from: '/docs/build/principles/tech-stack/datasource', to: '/docs/build/tech-stack/datasource'},
+          {from: '/docs/build/principles/tech-stack/orm', to: '/docs/build/tech-stack/orm'},
+          {from: '/docs/build/principles/tech-stack/http-client', to: '/docs/build/tech-stack/http-client'},
+          {from: '/docs/build/principles/tech-stack/serialization', to: '/docs/build/tech-stack/serialization'},
           {
-            from: '/docs/build/principles/core-build/stage-index',
-            to: '/docs/build/principles/core-build/stage-resolver',
+            from: ['/docs/build/principles/core-build/stage-index', '/docs/build/core-build/stage-index'],
+            to: '/docs/build/core-build/stage-resolver',
           },
         ],
       },
@@ -301,8 +318,8 @@ const config = {
         copyright: `Billpay Wiki · © ${new Date().getFullYear()}`,
       },
       prism: {
-        theme: prismThemes.github,
-        darkTheme: prismThemes.dracula,
+        theme: githubLight,
+        darkTheme: githubDark,
         // Only what the docs actually fence. Every grammar listed here ships
         // to every page, and json, yaml and sql were paying for nothing.
         additionalLanguages: ['bash', 'kotlin'],

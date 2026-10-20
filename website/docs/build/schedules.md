@@ -16,7 +16,7 @@ Schedules start three kinds of work: the dispatchers, which release payments at 
 
 - Overlap policy SKIP. A trigger that fires while the last run is still going does nothing, so a slow run never stacks up behind itself. That is how `ProcessPaidEventsWorkflow` can fire every 30 seconds and still only ever have one run.
 - For the dispatchers, a catch-up window of 6 hours, so a trigger missed during an outage still fires when the cluster is back.
-- A run's workflow ID is its Schedule's ID plus the trigger time Temporal appends, such as `dispatch-sched-DE` and the time, so every run can be found from its Schedule.
+- A run's workflow ID is the workflow ID set in the Schedule's start action, which we make the same as the Schedule's ID, plus the trigger time Temporal appends, such as `dispatch-sched-DE` and the time, so every run can be found from its Schedule.
 - Each dispatcher runs its activities on its own control queue, such as `ctl-sched` or `ctl-repr`, and has its own budget from the governor. One kind of work can't hold up another.
 
 A minute Schedule starts a short run: it drains what is due, continues-as-new while work remains, and ends when a claim comes back empty. The governor's Schedule works differently, because the governor is meant to run all the time. Its Schedule only starts it again if it isn't running.

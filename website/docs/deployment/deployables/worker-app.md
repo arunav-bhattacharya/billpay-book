@@ -15,7 +15,7 @@ The two [Temporal clusters](../../design/component-model/workflows/index.md#two-
 
 Online and offline work can share a pod because offline work reaches the app only at the governor's pace, and two fences hold it in place between the governor's checks:
 
-- Offline work has its own Oracle connection pool ([DataSource](../../build/principles/tech-stack/datasource.md)), so a busy midnight run can't take the connections a customer's payment needs.
+- Offline work has its own Oracle connection pool ([DataSource](../../build/tech-stack/datasource.md)), so a busy midnight run can't take the connections a customer's payment needs.
 - Offline workers have their own slot caps, set through `setMaxConcurrentActivityExecutionSize` and `setMaxConcurrentWorkflowTaskExecutionSize`, so offline tasks can never take a whole pod.
 
 The governor checks every 15 seconds and only stops new starts. The caps protect online work in the seconds in between, and the governor cuts offline rates as soon as online response times climb.

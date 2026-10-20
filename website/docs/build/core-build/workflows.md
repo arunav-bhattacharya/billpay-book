@@ -14,13 +14,13 @@ import Lead from '@site/src/components/Lead';
 
 Temporal recovers a workflow after any failure by replaying its code against the event history it already recorded. That only works if the code takes the same path every time. So inside a workflow there is no I/O, no wall clock, no random number and no database. Anything that could come out differently on a second run happens in an activity, whose result is recorded and replayed.
 
-The same goes for stages, which run inside the workflow and reach the outside world only through their activities. If you are tempted to compute a date inline, it belongs in an activity. When a workflow needs an ID of its own, `Workflow.randomUUID()` gives one that replays the same: that is how Process Paid Events makes a batch ID that a retried Settle reuses.
+The same goes for stages, which run inside the workflow and reach the outside world only through their activities. Never read the wall clock: `Workflow.currentTimeMillis()` is the workflow's own clock, and it replays the same. When a workflow needs an ID of its own, `Workflow.randomUUID()` gives one that replays the same: that is how Process Paid Events makes a batch ID that a retried Settle reuses.
 
 ## Rules for workflow code
 
 - One workflow per journey, with one implementation. Create Immediate Payment, Execute Scheduled Payment and Process Returned Payment exist once each, and no market has a workflow of its own.
-- Never `abstract`. Variation comes from the stages, checks and methods the stage resolver picks, per the [composition rules](../../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
-- Call stages and, on the workflow's own cluster, child workflows. Nothing else: no activity, no client, no outside system and nothing on the other cluster. The [four layers](../../../design/principles.md#the-four-layers) have the full call rules.
+- Never `abstract`. Variation comes from the stages, checks and methods the stage resolver picks, per the [composition rules](../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
+- Call stages and, on the workflow's own cluster, child workflows. Nothing else: no activity, no client, no outside system and nothing on the other cluster. The [four layers](../../design/principles.md#the-four-layers) have the full call rules.
 - Pass the payment ID, not the payment. Stages and activities load what they need. There are two exceptions. A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle, so nothing is written before the workflow starts and the caller's path has no extra database call. And data from Payment Options and Payment Instruments, clear text included, travels on in the workflow to the later stages that need it, with the payload codec keeping it encrypted in history.
 - Set search attributes once, at start. Use no signals or queries on the hot path. What a caller sends a running workflow, the confirm and the no, goes in as an update.
 - Never wait for a date. Work due later is a Work Tracker row in Oracle, written in the same commit as the state change, and a dispatcher starts the next workflow when it falls due. Nothing waits on a Temporal timer until then. The one exception is a payment waiting minutes for its customer: `CreatePaymentIntentWorkflow` waits on its own timer for the confirmation window.
@@ -33,7 +33,7 @@ Every step has a default stage, but a market whose behaviors need more, such as 
 
 ## How a workflow starts
 
-How a workflow starts depends on who is waiting for it, and the Router picks the start mode for the journey: Update-With-Start when a caller waits, a dispatcher's start for work pulled from One-Data's inbox or due on a date, and an async start for an allocation callback. [Design → Routing](../../../design/routing.md#start-modes) has the table, and [Building the Router](./router.md#6-start) has the start calls in code.
+How a workflow starts depends on who is waiting for it, and the Router picks the start mode for the journey: Update-With-Start when a caller waits, a dispatcher's start for work pulled from One-Data's inbox or due on a date, and an async start for an allocation callback. [Design → Routing](../../design/routing.md#start-modes) has the table, and [Building the Router](./router.md#6-start) has the start calls in code.
 
 When a caller waits, its update lands on the workflow's update method and returns as soon as the workflow has the answer, which for a new payment is Verify's decision. The workflow carries on after the reply: Temporal calls this the early-return pattern. On the Online cluster the decision's calls run as local activities, so Capture, Verify's calls and its commit all finish in the workflow's first task, and the update completes with that task. A repeated request joins the running workflow instead of starting a second one; that is what `USE_EXISTING` does.
 
@@ -41,7 +41,7 @@ A payment that waits for its customer takes two more kinds of update later: the 
 
 Eager workflow start is not used. The server refuses it with Update-With-Start, and online latency comes from Update-With-Start and local activities instead.
 
-Every one of these starts goes through the Router, and the Router places it: the cluster, task queue, priority, fairness key and workflow ID. [Design → Routing](../../../design/routing.md#start-modes) has the full picture.
+Every one of these starts goes through the Router, and the Router places it: the cluster, task queue, priority, fairness key and workflow ID. [Design → Routing](../../design/routing.md#start-modes) has the full picture.
 
 ## Child workflows
 
@@ -51,11 +51,11 @@ A child always runs on its parent's cluster. These journeys use them:
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
 
-A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a go-ahead starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm and the no as updates, and cancels the payment on its own timer if neither comes.
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a go-ahead starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm and the no as updates, and cancels the payment on its own timer if neither comes.
 
 ## Versioning
 
-Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor aren't pinned: they move to the new build when they continue-as-new.
+Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor are pinned too, but they move to a new build when they continue-as-new. They pass `ContinueAsNewOptions` with `InitialVersioningBehavior.AUTO_UPGRADE`, so each new run starts on the newest build, and the governor, which runs all the time, continues-as-new early once `Workflow.getInfo().isTargetWorkerDeploymentVersionChanged()` turns true. Upgrading on continue-as-new is in Public Preview in Temporal.
 
 Config is pinned the same way. The resolved profile carries the resolved behaviors, the config version and the market's rule settings, and for a payment that waits, its confirmation window, so a replay finds the same stages, thresholds and window. A scheduled payment gets a new resolved profile on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
 
@@ -113,7 +113,7 @@ class CreateImmediatePaymentWorkflowImpl(
 }
 ```
 
-The workflow never names a market: `stageResolver.resolve(profile)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and the moment `decided` is set, the caller's update returns with it. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
+The workflow never names a market: `stageResolver.resolve(profile)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and once `decided` is set, the caller's update returns with it as soon as that workflow task completes. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
 A payment that needs bank confirmation or a go-ahead never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
 
@@ -128,7 +128,7 @@ A payment that waits for its customer keeps one workflow from the create to its 
 ```kotlin
 class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) : CreatePaymentIntentWorkflow {
     private var decided: PaymentDecision? = null     // the create's answer
-    private var answer: Answer? = null               // YES or NO: the first one accepted wins
+    private var answer: Answer? = null               // YES or NO: the first one to arrive wins
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
@@ -147,7 +147,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         val window = checkNotNull(profile.confirmationWindow)
         val due = Workflow.currentTimeMillis() + (window + GRACE).toMillis()
         if (!Workflow.await(window + GRACE) { answer != null } &&
-            Workflow.currentTimeMillis() - due > LATE.toMillis()) {  // fired late: Online was down
+            Workflow.currentTimeMillis() - due > LATE.toMillis()) {  // handled late: Online or its workers were down
             Workflow.await(window) { answer != null }                // one more window
         }
         waiting = false                                          // the validators turn answers away now
@@ -155,11 +155,12 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         result = if (answer == Answer.YES) stages.verify.run(paymentId).decision   // then Execute and Fulfil
                  else stages.cancel.run(paymentId)                                  // the no, or the timer
         // ... the announcements, Execute and Fulfil for ACCEPTED, then the delete
+        Workflow.await { Workflow.isEveryHandlerFinished() }   // no update left without its reply
     }
 
     override fun checkConfirm() = check(waiting && answer == null) { "not waiting" }   // the API answers 409
     override fun confirm(): PaymentDecision {
-        answer = Answer.YES
+        if (answer == null) answer = Answer.YES              // a no that got here first stands
         Workflow.await { result != null }
         return result!!                                          // the confirm's early return
     }
@@ -172,7 +173,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 - The confirm and the no are updates with fixed IDs, `{paymentId}-confirm` and `{paymentId}-no`, so a repeat whose reply was lost attaches to the same update and gets the same answer.
 - The validator runs before anything is written. A confirm that comes after the workflow has its answer, or once it no longer waits, is turned away with no history event, and the API answers 409.
 - When the timer fires with no answer, the workflow runs Cancel itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
-- A timer that fires well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.
+- A timer handled well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a confirm away.
 - The workflow calls One-Data's delete twice: after its reply, saying the payment still waits, and at its end. The first call runs alongside the wait, so a slow delete never keeps the workflow from taking an answer.
 
@@ -186,4 +187,4 @@ The Router decides, when it places the start, and the workflow has no say. Work 
 | Execute Split Payment | A consumer leg of an Online parent | A corporate leg, or a consumer leg of an Offline parent |
 | Create Balance Refund | From a channel | A refund AR raises, through the AR intake dispatcher |
 
-[Design → Workflows](../../../design/component-model/workflows/index.md) has every workflow with its cluster, workflow ID and behaviors.
+[Design → Workflows](../../design/component-model/workflows/index.md) has every workflow with its cluster, workflow ID and behaviors.

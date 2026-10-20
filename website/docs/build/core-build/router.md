@@ -10,7 +10,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>The Router is the only code that starts a payment workflow. It is a library inside billpay-core, not a service: the core APIs call it while a caller waits, and the dispatchers call it for every row and request they release, so every start is admitted, pinned and given a run site the same way.</Lead>
 
-Without it, two kinds of code would start payments, the API handlers and the dispatchers, and each would carry its own copy of the market rules. The copies would drift. [Design → Routing](../../../design/routing.md) explains what the Router decides and why. This page is about building it: the two types it hands on, its six steps as code, and the details that are easy to get wrong.
+Without it, two kinds of code would start payments, the API handlers and the dispatchers, and each would carry its own copy of the market rules. The copies would drift. [Design → Routing](../../design/routing.md) explains what the Router decides and why. This page is about building it: the two types it hands on, its six steps as code, and the details that are easy to get wrong.
 
 ## Who calls it
 
@@ -83,11 +83,11 @@ The Router checks that the market, the account type and the API are live in this
 | An inbox dispatcher | The request is marked `REJECTED` through `UpdateStartRequests.v1`, and an alert tells operations. The sender is not told |
 | A Work Tracker dispatcher | The row goes from `DISPATCHING` to `FAILED`, which raises the retries-exhausted alert. A row is refused only when its market was taken out of service after the row was written |
 
-The allocations callback has one more check: its start must fit inside its traffic class's budget, or the API answers 429 with `Retry-After`, and the allocations manager retries. Dispatchers skip this check, because the [governor](../../../design/pacing.md#the-governor) already sets their rate.
+The allocations callback has one more check: its start must fit inside its traffic class's budget, or the API answers 429 with `Retry-After`, and the allocations manager retries. Dispatchers skip this check, because the [governor](../../design/pacing.md#the-governor) already sets their rate.
 
 ### 2. Pick the journey
 
-The routing table on [Design → Routing](../../../design/routing.md#trigger-to-workflow) is the spec for this step. Most of it is a fixed mapping: an update is always `UPDATE`, a `REPRESENT` row is always `REPRESENT`. Only a create has conditions. So the step is built in two parts, and neither is a central `when` that every new request has to edit. Proposed (2026-10-20).
+The routing table on [Design → Routing](../../design/routing.md#trigger-to-workflow) is the spec for this step. Most of it is a fixed mapping: an update is always `UPDATE`, a `REPRESENT` row is always `REPRESENT`. Only a create has conditions. So the step is built in two parts, and neither is a central `when` that every new request has to edit. Proposed (2026-10-20).
 
 **Each request names its own journey.** `RouteRequest` is a sealed interface with one abstract function, so a new request type doesn't compile until it says which journey it takes. The Work Tracker item types and the inbox request types are enums that carry their journey, so a new item type can't be added without one either:
 
@@ -231,7 +231,7 @@ The field names and values here are illustrative (Proposed, 2026-10-20). The spe
 
 The rule's logic is code and changes with a deploy. The number is config and changes with a release.
 
-A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify's checks as for any payment. [Design → Journeys](../../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
+A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify's checks as for any payment. [Design → Journeys](../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
 
 The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg.
 
@@ -240,7 +240,7 @@ The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey
 The run site is the cluster, the task queue, the priority and fairness key, and the workflow ID.
 
 - Work a caller waits for runs on the Online cluster, on `online-wf`. Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
-- Priority and fairness key are set once, from the traffic class, and every activity inherits them. They matter only on the Offline cluster's shared queues, and [Design → Throttling](../../../design/throttling.md#priority-and-fairness) has the classes.
+- Priority and fairness key are set once, from the traffic class, and every activity inherits them. They matter only on the Offline cluster's shared queues, and [Design → Throttling](../../design/throttling.md#priority-and-fairness) has the classes.
 - The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
 
 The Online cap is the one part of the run site that changes with time. While a SEPA run caps Online on a downstream, `downstream_limit` holds the cap and its end time, and the Router places that downstream's calls for each new Online payment on the Online cluster's `ds-*` queue for it. A cap past its end time is ignored, so a stopped governor can't leave customers capped. The run site is pinned at start, and a running payment never switches queues. Proposed: the capped queues travel into the workflow with the resolved profile, and the stages build their activity options from them.
@@ -254,10 +254,10 @@ val options = WorkflowOptions.newBuilder()
     .setWorkflowId(runSite.workflowId)                        // {paymentId}-init
     .setTaskQueue(runSite.taskQueue)                          // online-wf
     .setWorkflowIdConflictPolicy(WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING)
-    .setTypedSearchAttributes(searchAttributes(request, plan))
+    .setTypedSearchAttributes(searchAttributes(request, profile))
     .build()
 val wf = onlineClient.newWorkflowStub(CreateImmediatePaymentWorkflow::class.java, options)
-val start = WithStartWorkflowOperation(wf::run, request.body, plan)   // the request itself: nothing is written first
+val start = WithStartWorkflowOperation(wf::run, request.body, profile)   // the request itself: nothing is written first
 
 val reply = try {
     CompletableFuture.supplyAsync({                             // the bound covers the whole call
@@ -283,7 +283,7 @@ val options = WorkflowOptions.newBuilder()
         .setPriorityKey(runSite.priority!!)                   // 1 for execution
         .setFairnessKey(runSite.fairnessKey!!)                // the market
         .build())
-    .setTypedSearchAttributes(searchAttributes(request, plan))
+    .setTypedSearchAttributes(searchAttributes(request, profile))
     .build()
 val wf = offlineClient.newWorkflowStub(ExecuteScheduledPaymentWorkflow::class.java, options)
 try {

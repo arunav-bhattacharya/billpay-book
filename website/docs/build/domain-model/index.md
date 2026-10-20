@@ -34,9 +34,9 @@ Three patterns repeat throughout the model:
 - Every state that can move money, `SCHEDULED` through `REPRESENTED` with the corporate `ALLOCATING` and `ALLOCATED`, is required by its type to carry a tokenized account, a non-null amount, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an executable timeline. `PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` may hold unverified data. Validation here is a change of type, not a boolean flag.
 - Payment options and instruments both arrive as unverified references and are resolved into verified values by the system of record. The same two-phase pattern runs on both directive families.
 
-Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary ([Serialization](../principles/tech-stack/serialization.md)).
+Every sealed hierarchy carries a Jackson `"type"` discriminator, so the concrete types survive every serialization boundary ([Serialization](../tech-stack/serialization.md)).
 
-The five behaviors that route a payment, `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization` and `requiresBankConfirmation`, aren't on these types. The Router resolves them per journey and pins them in the resolved profile the workflow carries ([Building the Router](../principles/core-build/router.md)). Idempotency and the lifecycle timeline are persistence concerns, with no domain type of their own.
+The five behaviors that route a payment, `accountType`, `requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization` and `requiresBankConfirmation`, aren't on these types. The Router resolves them per journey and pins them in the resolved profile the workflow carries ([Building the Router](../core-build/router.md)). Idempotency and the lifecycle timeline are persistence concerns, with no domain type of their own.
 
 ## In this section
 

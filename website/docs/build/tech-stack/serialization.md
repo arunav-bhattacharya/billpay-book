@@ -12,7 +12,7 @@ import Lead from '@site/src/components/Lead';
 
 ## Jackson, with type discriminators
 
-Jackson does that job, with `jackson-module-kotlin` so it understands Kotlin constructors and nullability. Every sealed hierarchy in the [domain model](../../domain-model/index.md) carries the same annotation:
+Jackson does that job, with `jackson-module-kotlin` so it understands Kotlin constructors and nullability. Every sealed hierarchy in the [domain model](../domain-model/index.md) carries the same annotation:
 
 ```kotlin
 @JsonTypeInfo(

@@ -13,7 +13,7 @@ This is the innermost layer of [functional testing](./index.md). The tests use t
 
 ## Stages, checks and methods
 
-A stage makes its calls, commits once through `PaymentStore`, and returns its outcome ([Building Stages](../../build/principles/core-build/stages.md)). Its test stubs the activities and checks three things:
+A stage makes its calls, commits once through `PaymentStore`, and returns its outcome ([Building Stages](../../build/core-build/stages.md)). Its test stubs the activities and checks three things:
 
 - The outcome for each answer the calls can give. Verify can end `ACCEPTED`, `SCHEDULED` or `DECLINED`, and a business failure such as a closed account must end in `DECLINED`, never in a retry.
 - The commit it asks for: the state it expects, the state it moves to, the timeline entry with its cluster, and the Work Tracker rows it opens or closes. Verify on a corporate payment, for example, writes its `ALLOC_REQUEST` row in that same commit.
@@ -25,7 +25,7 @@ A new check or method, such as `MandateCheck` for markets that check a mandate, 
 
 ## Verification rules
 
-A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the rules for one resolved profile and step, and checks the report ([Writing verification rules](../../build/principles/core-build/stages.md#writing-verification-rules)):
+A verification rule is a plain condition over the facts the checks gathered, so its tests need no stubs and no Temporal test environment. A test builds the facts, runs the rules for one resolved profile and step, and checks the report ([Writing verification rules](../../build/core-build/stages.md#writing-verification-rules)):
 
 - Each small specification, such as `instrumentFound`, gets a table of cases once, facts in and yes or no out. Each rule then gets its own cases: the mandate rule needs one for an active mandate and one for each status that isn't.
 - Priority decides. When two rules fail, the decision carries the code of the higher-priority one, and the report names both.
@@ -36,7 +36,7 @@ A verification rule is a plain condition over the facts the checks gathered, so 
 
 ## The profile lookup
 
-A workflow finds its stages through the stage resolver, and every stage, check and method says where it applies ([Building the Stage Resolver](../../build/principles/core-build/stage-resolver.md)). The registries behind the resolver are plain Kotlin, so a unit test builds them from a list of classes, without Quarkus, and checks:
+A workflow finds its stages through the stage resolver, and every stage, check and method says where it applies ([Building the Stage Resolver](../../build/core-build/stage-resolver.md)). The registries behind the resolver are plain Kotlin, so a unit test builds them from a list of classes, without Quarkus, and checks:
 
 - Each registry builds without a tie. Two classes level for one job fail with an error that names both and the combination.
 - The most specific class wins. A market's own class beats the shared one with the same key in that market, and nowhere else, and a class that names more behaviors beats one that names fewer.
@@ -57,13 +57,13 @@ A workflow test runs the real workflow code in the SDK's test environment (`Test
 - A payment that Verify declines ends `DECLINED`, and no later stage runs.
 - Each announcement finishes before the next stage starts. Capture and Verify on the Online cluster are the exception: they commit back to back, and both announcements follow the reply.
 - A Verify call on the Online cluster that fails its 3 tries as a local activity goes out again as a regular activity, and the payment carries on instead of failing.
-- In Create Payment Intent, a timer that fires more than a minute late gives the customer one more window. The test holds the worker back past the timer, so the timer fires late, and a confirm sent in the extra window still goes through.
+- In Create Payment Intent, a timer handled more than a minute late gives the customer one more window. The test holds the worker back past the timer, so the timer is handled late, and a confirm sent in the extra window still goes through.
 
 No workflow sleeps until a due date. Dated work waits in Oracle as a Work Tracker row until a dispatcher starts it, so most workflow tests need no timers at all.
 
 ## Activities
 
-An activity test calls the activity with its client faked, and checks the rules every activity follows ([Building Activities](../../build/principles/core-build/activities.md)):
+An activity test calls the activity with its client faked, and checks the rules every activity follows ([Building Activities](../../build/core-build/activities.md)):
 
 - Every call carries its idempotency key, such as `{paymentId}-{step}`.
 - A 429 becomes `ApplicationFailure.newFailureWithCauseAndDelay(...)` carrying the `Retry-After` delay.

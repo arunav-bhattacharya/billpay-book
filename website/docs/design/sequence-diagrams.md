@@ -935,7 +935,7 @@ sequenceDiagram
     end
   else no confirm before the timer fires
     rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow. A timer that fires late gives one more window first, for a confirm One-Data held
+      Note over WF,PS: Online cluster, the same workflow. A timer handled late gives one more window first, for a confirm One-Data held
       WF->>CAN: run
       rect rgba(102,169,226,0.40)
         CAN->>PS: state → CANCELLED,<br/>guarded on PENDING

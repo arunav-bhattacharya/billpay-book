@@ -40,7 +40,7 @@ sealed interface Payment : Transaction {
 }
 ```
 
-`confirmationCode` is the key the customer keeps: it survives an update, which issues a new payment ID, and a representment. `presentmentSequence` numbers the payment's trips to the bank, starting at 1. Every sealed type carries the `type` property, so the JSON says which class, and which state, it holds ([Serialization](../principles/tech-stack/serialization.md)).
+`confirmationCode` is the key the customer keeps: it survives an update, which issues a new payment ID, and a representment. `presentmentSequence` numbers the payment's trips to the bank, starting at 1. Every sealed type carries the `type` property, so the JSON says which class, and which state, it holds ([Serialization](../tech-stack/serialization.md)).
 
 ## The types the model leans on
 
@@ -159,7 +159,7 @@ fun ReturnedFullPayment.toRepresentingFullPayment(representmentDate: LocalDate) 
 
 The returned payment isn't moved: its row stays `RETURNED`, and the function builds the next presentment beside it. The arguments of every move say what it needs. The move out of `PENDING` takes what Verify resolved, and every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile.
 
-A [stage](../principles/core-build/stages.md) runs one of these moves and commits the result through `PaymentStore`, which is why stage code stays short.
+A [stage](../core-build/stages.md) runs one of these moves and commits the result through `PaymentStore`, which is why stage code stays short.
 
 ## What the build adds
 

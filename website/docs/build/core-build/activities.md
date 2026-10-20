@@ -10,7 +10,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>An activity makes the calls to one system, and nothing else. It is the only layer that touches the world, so writing one well comes down to three habits: take an ID, make every call safe to repeat, and leave the retrying to Temporal.</Lead>
 
-[Design → Activities](../../../design/component-model/activities.md) has the catalogue: every interface, its system, its task queue and the stages that call it, and the retry rules. This page shows how to write one.
+[Design → Activities](../../design/component-model/activities.md) has the catalogue: every interface, its system, its task queue and the stages that call it, and the retry rules. This page shows how to write one.
 
 ## One interface per system
 
@@ -106,6 +106,7 @@ fun instrument(paymentId: String): Instrument? =
     else try {
         local.instrument(paymentId)
     } catch (e: ActivityFailure) {
+        if (e.cause is CanceledFailure) throw e   // a cancellation is not a reason to try again
         regular.instrument(paymentId)   // then the exception list
     }
 ```
