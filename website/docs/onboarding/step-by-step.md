@@ -5,6 +5,7 @@ sidebar_label: Step by Step
 ---
 
 import Lead from '@site/src/components/Lead';
+import OnboardingPaths from '@site/src/components/OnboardingPaths';
 
 # Onboarding Step by Step
 
@@ -21,15 +22,7 @@ The unit of onboarding is a **profile**: one market and one account type. So "on
 | [A change to a live profile](#path-3-a-change-to-a-live-profile) | Raising the largest payment the market takes | A new version of the same profile; no traffic step |
 | [A change that needs new code](#path-4-a-change-that-needs-new-code) | A behavior combination the build can't run yet | A build goes out first, through the deploy pipeline |
 
-```mermaid
-flowchart LR
-  P1["Path 1<br/>a new market"] --> M
-  P2["Path 2<br/>a new account type"] --> M
-  P3["Path 3<br/>a change to a live profile"] --> M
-  M{"All in the<br/>manifest?"} -- "Yes" --> R["Approve and<br/>freeze vN"]
-  M -- "No" --> B["Path 4<br/>a build ships first"] --> R
-  R --> E["E1, then E2,<br/>then E3"] --> T["Channels start sending<br/>(paths 1 and 2)"]
-```
+<OnboardingPaths />
 
 ## The manifest, in plain words
 

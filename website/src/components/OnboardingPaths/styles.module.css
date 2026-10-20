@@ -1,0 +1,126 @@
+/* OnboardingPaths: the four onboarding paths, built like ProfileToStages.
+   Filled cards on the panel, the house number badge, no outlines. Every
+   colour is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --op-accent: var(--amex-blue);
+  --op-card: color-mix(in srgb, var(--amex-indigo) 6%, var(--amex-panel));
+  --op-tint: color-mix(in srgb, var(--amex-sky) 22%, var(--amex-panel));
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 1rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --op-accent: var(--amex-blue-bright);
+  --op-card: color-mix(in srgb, var(--amex-indigo) 14%, var(--amex-panel));
+  --op-tint: color-mix(in srgb, var(--amex-sky) 18%, var(--amex-panel));
+}
+
+.frame {
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+.card {
+  fill: var(--op-card);
+}
+.t_build .card {
+  fill: var(--op-tint);
+}
+.t_live .card {
+  fill: color-mix(in srgb, var(--amex-state-success) 14%, var(--amex-panel));
+}
+
+/* the house number badge: white digits on Bright Blue */
+.num {
+  fill: var(--amex-blue);
+}
+.numText {
+  font-size: 11.5px;
+  font-weight: 700;
+  fill: var(--amex-banner-block-ink);
+}
+.title {
+  font-size: 13.5px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.sub {
+  font-size: 11px;
+  fill: var(--amex-mut);
+}
+.note {
+  font-size: 10.5px;
+  font-style: italic;
+  fill: var(--amex-mut);
+}
+
+.line {
+  fill: none;
+  stroke: var(--op-accent);
+  stroke-width: 1.6;
+}
+.head {
+  fill: var(--op-accent);
+}
+
+/* the question: a pill, so it reads as a question rather than a step */
+.question {
+  fill: var(--amex-midnight);
+}
+:global([data-theme='dark']) .question {
+  fill: var(--amex-banner-block);
+}
+.qText {
+  font-size: 11px;
+  font-weight: 650;
+  fill: var(--amex-banner-block-ink);
+}
+
+.branch {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.yes {
+  fill: var(--amex-state-success);
+}
+.no {
+  fill: var(--amex-state-failure);
+}
+
+/* the environments, as small boxes inside one card */
+.envCard {
+  fill: var(--op-card);
+}
+.env {
+  fill: color-mix(in srgb, var(--op-accent) 18%, var(--amex-panel));
+}
+.envProd {
+  fill: var(--amex-blue);
+}
+.envText {
+  font-family: var(--amex-font-mono);
+  font-size: 10.5px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.envProd + .envText {
+  fill: var(--amex-banner-block-ink);
+}
+.envLine {
+  fill: none;
+  stroke: var(--op-accent);
+  stroke-width: 1.4;
+}
