@@ -10,7 +10,7 @@ import ClusterMap from '@site/src/components/ClusterMap';
 
 export const GROUPS = [
   {
-    label: 'Entry',
+    label: 'Gateway',
     accent: 'var(--amex-blue)',
     layers: [
       {
