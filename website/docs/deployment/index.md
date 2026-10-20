@@ -24,12 +24,12 @@ Market releases don't travel this way. A new market, or a change to one, is conf
     {
       term: 'CI Checks',
       to: '/docs/deployment/ci-checks',
-      desc: `The checks every pull request must pass before it merges.`,
+      desc: `The checks every pull request runs on GitHub Actions, what each one catches, and what to do when one fails.`,
     },
     {
       term: 'Code Merge Strategy',
       to: '/docs/deployment/code-merge-strategy',
-      desc: `How pull requests are reviewed, approved and merged.`,
+      desc: `Gitflow: develop, release and hotfix branches, main as the production copy, and how each merge is done.`,
     },
     {
       term: 'Deployment Pipeline',

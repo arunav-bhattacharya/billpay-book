@@ -1,15 +1,15 @@
 ---
 title: Pipeline
-description: 'The pipeline takes a merged commit to production as one build of billpay-core.'
+description: 'The pipeline takes a release or hotfix branch to production as one build of billpay-core.'
 ---
 
 import Lead from '@site/src/components/Lead';
 
 # Deployment Pipeline
 
-<Lead>The pipeline takes a merged commit to production as one build of billpay-core. The app deploys as one, and a new build never changes the code under a payment that is already running.</Lead>
+<Lead>The pipeline takes a release or hotfix branch to production as one build of billpay-core. The app deploys as one, and a new build never changes the code under a payment that is already running.</Lead>
 
-What the pipeline ships is catalogued under [Deployables](./deployables/index.md), and the gates a change clears before it merges are on [CI Checks](./ci-checks.md). The stage-by-stage description of the pipeline itself is still to come.
+What the pipeline ships is catalogued under [Deployables](./deployables/index.md), and the gates a change clears before it merges are on [CI Checks](./ci-checks.md), and the branches it travels on are on [Code Merge Strategy](./code-merge-strategy.md). The stage-by-stage description of the pipeline itself is still to come.
 
 ## One app, one deploy
 

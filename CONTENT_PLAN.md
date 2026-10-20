@@ -588,8 +588,8 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 | `deployment/deployables/worker-app.md` | Update | Path kept, retitled "billpay-core". One app for both clusters: what it contains, offline work's own Oracle pool and slot caps, a worker per `ds-*` queue (slots ≈ queue limit × call latency), and more pods for more capacity. Payment workflows pinned with Worker Versioning | ☑ |
 | `deployment/pipeline.md` | Update | The app deploys as one. Old builds keep running until their pinned workflows finish. Each build ships a capability manifest that the onboarding workflow checks | ☑ |
 | `deployment/temporal-server.md` | Update | Two clusters on server 1.30.1 or later: 2K and 4K shards, OpenSearch 2, 30-day retention. Schedules on Offline. A passive standby per cluster in us-west-1, promoted on its own. With Offline down, Online keeps serving, dated work waits in Oracle, pulled work in One-Data's inbox, and allocation callbacks get 503. Offline: fairness on, priorities 1 to 5, no eager start | ☑ |
-| `deployment/ci-checks.md` | Style pass | | ☑ |
-| `deployment/code-merge-strategy.md` | Style pass | | ☑ |
+| `deployment/ci-checks.md` | Write | Required checks on GitHub Actions, what each catches, the stage report and replay histories, failing checks; Proposed (2026-10-20) | ☑ |
+| `deployment/code-merge-strategy.md` | Write | Gitflow (agreed 2026-10-20): develop, release/*, main as production copy, hotfix/*; merge methods, CODEOWNERS, protection; Proposed (2026-10-20) | ☑ |
 | `deployment/deployables/codec-server-app.md` | Style pass | | ☑ |
 | `deployment/deployables/mocks-app.md` | Style pass | | ☑ |
 | `deployment/deployables/one-data-functions.md` | Update | One-Data also runs the inbox: its Postgres database (one primary, replicated across IPC1 and IPC2), the handlers' upsert and their `ReadPayments.v1` lookup, the start requests for AR intake, returns and inbound, the four inbox functions and the daily purge | ☑ |

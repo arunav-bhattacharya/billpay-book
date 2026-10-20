@@ -1600,6 +1600,27 @@ A release moves through E1, E2 and E3, and E3 is production ([Market Onboarding]
 - Config per environment: the two Temporal endpoints, the Oracle connection for each pool, One-Data's base URL, each downstream's base URL, the Prometheus address and the OpenTelemetry collector's address.
 - Secrets come from the organization's secret store, under one path per environment: the two Oracle pools' logins, the client certificate for each Temporal cluster, the credentials One-Data and each downstream take (held the way the current app holds them), and the Prometheus login the governor reads with. No secret sits in a config file.
 
+### Branches, checks and merging
+
+billpay-core's code lives on GitHub, CI runs on GitHub Actions, and a `CODEOWNERS` file names who must approve a change to each folder. Branches follow Gitflow (agreed 2026-10-20):
+
+- `develop` is where work comes together. Feature and fix branches start from it and merge back into it.
+- A `release/*` branch is cut from `develop`. Once that release is live in production, it merges to `main`.
+- `main` is the production copy: it always holds what runs in E3.
+- A fix needed in production starts on a `hotfix/*` branch from `main`. It is deployed to production, then merged back to both `main` and `develop`.
+
+Proposed (2026-10-20), for the team to confirm:
+
+- Branch names: `feature/{ticket}-{short-name}` and `fix/{ticket}-{short-name}` from `develop`, `release/{version}` from `develop`, `hotfix/{version}` from `main`.
+- The build that moves through E1, E2 and E3 is built from the `release/*` or `hotfix/*` branch. A merge to `develop` runs every check and publishes an image, but deploys nowhere.
+- A fix found while a release is being tested goes onto its `release/*` branch through a pull request, and the release branch merges back to `develop` when it closes, so the fix isn't lost.
+- Merge methods: a feature or fix branch is squashed into `develop`, one commit per pull request, its title in Conventional Commits form, such as `feat(verify): add MandateCheck`. A `release/*` or `hotfix/*` branch merges to `main` and to `develop` with a merge commit, never squashed, so `main` keeps the exact commits that were tested. The merge to `main` is tagged with the release version, `v{version}`.
+- Branch protection on `develop`, `release/*` and `main`: changes arrive only through a pull request; every required check passes on the branch's latest commit; the branch is up to date with its base; no force push; nobody, administrators included, merges past a failing check or a missing approval.
+- Approvals: one approval, and the code owner's where `CODEOWNERS` names one. A change to workflow or stage code, or to anything under `core/lib/verification/`, needs two, because a determinism mistake there only shows up when a payment replays. A pull request to `main` needs the release manager's approval too.
+- Required checks on every pull request: the Gradle build, which makes a breach of the layer rules a compile error; ktlint and detekt; the unit tests, including the registry tests, the checked-in stage report and the bean-index test; the integration tests against Oracle in TestContainers; the replay tests over the recorded histories; and the organization's dependency, static-analysis and secret scans. Auto-merge is allowed once a pull request is approved, so it merges as soon as the checks pass.
+- Replay histories: one or more per journey are checked in, and each release adds histories recorded in E2 for the journeys it changed.
+- A check that fails is fixed, not rerun, unless its log shows a failure outside the code, such as a runner that couldn't start a container. A test that fails now and then is fixed or removed within the sprint, never left to be rerun.
+
 ### Sizing
 
 | Item | Online cluster | Offline cluster |
