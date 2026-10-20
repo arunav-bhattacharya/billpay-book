@@ -6,7 +6,7 @@
  *   - Deep Blue     #00175A   headings, the brand bar, banners, table heads
  *   - Light Blue    #66A9E2   accent only, never more than a fifth of a surface
  *   - The DLS grey scale (100 to 900) for surfaces and quiet labels
- *   - Typeface: Benton Sans (the Amex corporate face), JetBrains Mono for code.
+ *   - Typeface: Benton Sans (the Amex corporate face), Google Sans Code for code.
  *
  * The one shape is the square from the Amex logo. Section numbers are white
  * digits in a blue box, each h2 opens on a small blue box, and a section
@@ -165,28 +165,35 @@
   src: url('./fonts/BentonSans-Medium.woff2') format('woff2');
 }
 
-/* Every monospaced string on the site, code included, is JetBrains Mono,
+/* Every monospaced string on the site, code included, is Google Sans Code,
  * self-hosted the same way (latin subset, OFL licence). */
 @font-face {
-  font-family: 'JetBrains Mono';
+  font-family: 'Google Sans Code';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('./fonts/JetBrainsMono-400.woff2') format('woff2');
+  src: url('./fonts/GoogleSansCode-400.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'JetBrains Mono';
+  font-family: 'Google Sans Code';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('./fonts/JetBrainsMono-500.woff2') format('woff2');
+  src: url('./fonts/GoogleSansCode-500.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'JetBrains Mono';
+  font-family: 'Google Sans Code';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('./fonts/JetBrainsMono-600.woff2') format('woff2');
+  src: url('./fonts/GoogleSansCode-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Google Sans Code';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/GoogleSansCode-700.woff2') format('woff2');
 }
 
 :root {
@@ -198,7 +205,7 @@
   --amex-font-sans: 'BentonSansUI', ui-rounded, 'SF Pro Rounded', 'SF Pro Text',
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
-  --amex-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas,
+  --amex-font-mono: 'Google Sans Code', ui-monospace, 'SF Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
 
   --ifm-font-family-base: var(--amex-font-sans);
