@@ -84,9 +84,42 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **SLI:** end-to-end latency at the core API, covering the child `CreateImmediatePaymentWorkflow`, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
 
-## Not yet targeted
+## Confirm Payment
 
-Two APIs have no targets yet:
+**Billpay Core API** · `POST /payments/{payment-id}/confirm` · SLA availability: **99.95%**
 
-- `POST /payments/{payment-id}/confirm`, which confirms a payment that waited for its customer. It answers through an update to the payment's waiting workflow, so it needs no workflow start.
-- `POST /payments/{payment-id}/allocations`, the allocations callback. It replies 202 once the batch is stored and its workflow has started, or 429 with `Retry-After` when its traffic class is over budget.
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 120 ms | 250 ms | 500 ms | 900 ms | 1.5 s |
+
+**SLI:** request-to-response latency for a confirm. It answers through an update to the payment's waiting workflow, so no workflow starts, and like a create it waits at most 2.5 seconds for a decision before it replies `PENDING`. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+
+## Allocations Callback
+
+**Billpay Core API** · `POST /payments/{payment-id}/allocations` · SLA availability: **99.95%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 50 ms | 110 ms | 230 ms | 450 ms | 800 ms |
+
+**SLI:** time to the 202, once the batch is stored and its workflow has started. A 429 with `Retry-After` while the traffic class is over budget is pacing, not an error. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+
+## Market Onboarding API Writes
+
+**Billpay Core API** · `POST /market-onboarding/releases` · `.../sign-off` · `.../rollback` · `.../pause` · `.../resume` · SLA availability: **99.9%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 80 ms | 150 ms | 300 ms | 600 ms | 1 s |
+
+**SLI:** time to the 202, once `MarketOnboardingWorkflow` has the call. Only the Market Onboarding UI calls these, a few times a day. While the Offline cluster is down they answer 503 with `Retry-After`, and that counts against availability. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
+
+## Market Onboarding API Reads
+
+**Billpay Core API** · `GET /market-onboarding/releases/{market}/{account-type}/{version}` · `GET /market-onboarding/capabilities` · SLA availability: **99.9%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 30 ms | 60 ms | 150 ms | 300 ms | 500 ms |
+
+**SLI:** read latency for a release's status and step, and for the build's capability manifest, which the registries worked out when the app started. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.

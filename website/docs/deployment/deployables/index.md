@@ -30,7 +30,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
       desc: `Decrypts Temporal Web UI content, so workflow payloads read as plain data when you inspect them there.`,
     },
     {
-      term: 'billpay-ui',
+      term: 'Market Onboarding UI',
       to: '/docs/deployment/deployables/ui-app',
       desc: `The market onboarding control plane: one for every environment, reaching each one only through its Market Onboarding API.`,
     },

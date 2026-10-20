@@ -82,6 +82,76 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 **SLI:** end-to-end latency at the function edge, covering the child `CreateImmediatePaymentWorkflow`, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
 
-## Functions that store and reply 202
+## Confirm Pending Payment
 
-`CreateInboundPayment.v1` and `CreateBillpayTransactionFromAccountsReceivable.v1` store the request in One-Data's inbox and reply 202. They have no latency targets yet. Load-test run 6 holds One-Data to a p99 under 500 ms for storing AR intake, and after the 202 the measure is how long a request waits for its dispatcher ([Work nobody waits for](./index.md#work-nobody-waits-for)).
+**One-Data Function** · `CreateConfirmPendingPayment.v1` · SLA availability: **99.95%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
+
+**SLI:** caller-observed latency for a confirm, from a bank confirmation or a go-ahead, until its answer. If billpay-core doesn't answer within 3 seconds, One-Data holds the confirm for RTF and answers `PENDING`, the same ceiling a create has. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+
+## Create Payment Allocations
+
+**One-Data Function** · `CreatePaymentAllocations.v1` · SLA availability: **99.95%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 60 ms | 120 ms | 250 ms | 500 ms | 900 ms |
+
+**SLI:** time to the 202, which goes out once the batch is stored and its workflow has started. A 429 with `Retry-After` while the traffic class is over budget is pacing, not an error. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+
+## Inbound Payment and AR Intake
+
+**One-Data Functions** · `CreateInboundPayment.v1` · `CreateBillpayTransactionFromAccountsReceivable.v1` · SLA availability: **99.95%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 80 ms | 200 ms | 500 ms | 900 ms | 1.5 s |
+
+**SLI:** time to the 202, once the request is stored in One-Data's inbox. Load-test run 6 holds the p99 under 500 ms for AR intake; the other cells are Proposed (2026-10-20). After the 202 the measure is how long a request waits for its dispatcher ([Work nobody waits for](./index.md#work-nobody-waits-for)). **Error budget:** 0.05% / 30-day window.
+
+## Event Handlers
+
+**One-Data Functions** · `CreateMoneyMovementEventHandler.v1` · `CreateAccountsReceivableTransactionEventHandler.v1` · `CreateOpentoBuyUpdatePaymentEventHandler.v1` · SLA availability: **99.99%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 30 ms | 70 ms | 150 ms | 300 ms | 600 ms |
+
+**SLI:** time to the acknowledgement, which goes out only after the raw event and the payment's inbox row commit together. A sender that gets an error retries, so a failed acknowledgement delays an event but never loses it. Targets Proposed (2026-10-20). **Error budget:** 0.01% / 30-day window.
+
+## Delete Pending Payment
+
+**One-Data Function** · `DeletePendingPayment.v1` · SLA availability: **99.9%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 20 ms | 40 ms | 100 ms | 200 ms | 400 ms |
+
+**SLI:** latency of the call billpay-core makes at the end of each create's workflow to remove the stored create and the account's pending entry. billpay-core retries until it lands, so a breach shows up as entries that stay in Redis longer. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
+
+## Read Inbox
+
+**One-Data Functions** · `ReadPaidReadyPayments.v1` · `ReadStartRequests.v1` · SLA availability: **99.9%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 50 ms | 120 ms | 300 ms | 600 ms | 1 s |
+
+**SLI:** latency for one batch of `READY` rows, up to 500 for the `PAID` drain or a dispatcher's tick for start requests. A miss only delays the next tick. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
+
+## Update Inbox
+
+**One-Data Functions** · `UpdatePaidReadyPayments.v1` · `UpdateStartRequests.v1` · SLA availability: **99.9%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 40 ms | 100 ms | 250 ms | 500 ms | 900 ms |
+
+**SLI:** latency for setting one batch of rows `DONE`, `UNMATCHED` or `REJECTED` in one transaction. Setting a status twice does no harm, so a retry is safe. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
+
+## Not Targeted
+
+`UpdateUnmatchedPayments.v1` has no SLA. One-Data runs it on a cron schedule and nobody calls it, so the measure is the alert it raises for a row `UNMATCHED` for 48 hours.

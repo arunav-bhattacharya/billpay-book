@@ -12,7 +12,16 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 Four layers handle every journey. A **workflow** runs it, **stages** take its business steps, **activities** make the calls to one system each, and **clients** speak that system's contract. Only stages change with a market's behaviors, so adding a market rarely means new code.
 
-In front of the workflows sits the **Billpay Router**. It admits a request (or turns it away with a 422 when the market isn't live), picks the journey, resolves the market's behaviors into a **plan key**, places the work on the Online or Offline cluster, and starts it in the right mode: Update-With-Start when a caller is waiting, an async start for an allocations callback, and a plain start when a dispatcher hands it work that was pulled or fell due.
+In front of the workflows sits the **Billpay Router**. For every request it:
+
+1. Admits it, or turns it away with a 422 when the market isn't live.
+2. Picks the journey.
+3. Resolves the market's behaviors into a **plan key**.
+4. Places the work on the Online or Offline cluster.
+5. Starts it in the right mode:
+   - Update-With-Start when a caller is waiting
+   - an async start for an allocations callback
+   - a plain start when a dispatcher hands it work that was pulled or fell due
 
 The pages below start with the rules and the states, then follow the moving parts.
 

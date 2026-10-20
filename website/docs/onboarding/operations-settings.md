@@ -1,6 +1,6 @@
 ---
 title: Operations Settings
-description: 'The Operations step in billpay-ui sets how a market runs from day to day. Each setting drives something specific at runtime.'
+description: 'The Operations step in the Market Onboarding UI sets how a market runs from day to day. Each setting drives something specific at runtime.'
 sidebar_label: Operations Settings
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Operations Settings
 
-<Lead>The Operations step in billpay-ui sets how a market runs from day to day: when its payments execute, how long a customer can cancel, and how hard Billpay should push to meet a cutoff. Each setting drives something specific at runtime.</Lead>
+<Lead>The Operations step in the Market Onboarding UI sets how a market runs from day to day: when its payments execute, how long a customer can cancel, and how hard Billpay should push to meet a cutoff. Each setting drives something specific at runtime.</Lead>
 
 None of these settings is a code change. They travel in the market's release like the rest of its profile, and they take effect when that release is activated.
 
@@ -32,6 +32,6 @@ The cancellation window and the execution time have to agree. The window must cl
 
 The cutoff decides how the governor treats a market. A SEPA market with a three-hour cutoff gets a floor rate, the remaining payments divided by the time left minus 30 minutes, so its run aims to finish half an hour before the cutoff. Online traffic usually comes first: if online response times or the shared Oracle degrade, every offline class is cut. A SEPA run is the exception. Online response times never cut it below its floor, and if online traffic would take too much of a downstream, online calls to it are capped until the cutoff ([When the cutoff wins](../design/throttling.md#when-the-cutoff-wins)). Oracle trouble still cuts the run, and the cutoff alert fires when it falls behind. The US has no cutoff, and its execution gets a fixed floor of 50 TPS instead. The [governor](../design/pacing.md#the-governor) explains how the floors are handed out.
 
-Raven messages are the one setting with two levels. A market can change the default list, and an account type can change its market's. The two disagree when billpay-ui holds both: if the US turns the `SCHEDULED` message off for the whole market and US Corporate turns it back on, a US corporate payment follows US Corporate, because the account type's setting wins. A US consumer payment follows the market's setting, since US Consumer has none of its own.
+Raven messages are the one setting with two levels. A market can change the default list, and an account type can change its market's. The two disagree when the Market Onboarding UI holds both: if the US turns the `SCHEDULED` message off for the whole market and US Corporate turns it back on, a US corporate payment follows US Corporate, because the account type's setting wins. A US consumer payment follows the market's setting, since US Consumer has none of its own.
 
 Daylight saving deserves a test of its own: run the market's Schedules through both transition weekends before it goes live. The US needs no such test, since Phoenix time doesn't change. Execution runs every day, holidays included, so no market keeps a holiday calendar.

@@ -19,7 +19,7 @@ Billpay is built so that most problems wait instead of fail. A slow downstream, 
     {
       term: 'Familiarity',
       to: '/docs/operations/familiarity',
-      desc: `The surfaces an operator works with, from the two Temporal UIs and billpay-ui down to the databases and the dispatch controls.`,
+      desc: `The surfaces an operator works with, from the two Temporal UIs and the Market Onboarding UI down to the databases and the dispatch controls.`,
     },
     {
       term: 'SOPs',

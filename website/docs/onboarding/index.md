@@ -9,7 +9,7 @@ import OnboardingFlow from '@site/src/components/OnboardingFlow';
 
 # Market Onboarding
 
-<Lead>Adding a market to Billpay is a configuration change, as long as the deployed build can already run the market's behaviors. The market is described once in billpay-ui, frozen as a release, and sent to each environment through one API, where a workflow checks it, tests it and switches it on.</Lead>
+<Lead>Adding a market to Billpay is a configuration change, as long as the deployed build can already run the market's behaviors. The market is described once in the Market Onboarding UI in Control Tower, frozen as a release, and sent to each environment through one API, where a workflow checks it, tests it and switches it on.</Lead>
 
 Onboarding has its own frontend, backend and tables, kept apart from payments. That separation is deliberate. A market's config decides how real money moves, so it should change only through a path that is approved, versioned and tested, and never by someone editing a table in production.
 
@@ -24,7 +24,7 @@ A market is onboarded one **market profile** at a time: one market and one accou
 
 <OnboardingFlow />
 
-1. Freeze. When a release is approved, billpay-ui's backend saves the draft as release vN: the profile's full config as JSON, a checksum, the author and the approver. A release never changes; later edits become vN+1.
+1. Freeze. When a release is approved, the Market Onboarding UI's backend saves the draft as release vN: the profile's full config as JSON, a checksum, the author and the approver. A release never changes; later edits become vN+1.
 2. Send. The backend calls E1's Market Onboarding API with vN, using its own service identity. The call is idempotent, so sending the same release twice starts one workflow, not two.
 3. Track. A deployment row per release and environment follows the workflow through requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
 4. Sign off. Once its test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. In E3, which is production, the change request (RFC) must pass the ServiceNow check first.
@@ -37,8 +37,8 @@ There are only two human checks: approval once, on the content, by a maker and a
 
 | Part | What it is | Lives in |
 | --- | --- | --- |
-| billpay-ui frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
-| billpay-ui backend | The control plane itself: single sign-on, maker-checker, audit, versioned releases | The control plane, one for all environments |
+| Market Onboarding UI frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
+| Market Onboarding UI backend | The control plane itself: single sign-on, maker-checker, audit, versioned releases | The control plane, one for all environments |
 | Authoring tables | Drafts, revisions, releases, approvals, deployments and audit | The control plane's own schema, outside billpay-core |
 | Market Onboarding API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app |
 | `MarketOnboardingWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |

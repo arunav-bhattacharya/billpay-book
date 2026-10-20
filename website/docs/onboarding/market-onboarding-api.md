@@ -13,7 +13,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 ## The API
 
-Each environment's app exposes the Market Onboarding API, and only billpay-ui's backend calls it, with its own service identity.
+Each environment's app exposes the Market Onboarding API, and only the Market Onboarding UI's backend calls it, with its own service identity.
 
 | Path | What it does |
 | --- | --- |

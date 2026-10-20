@@ -148,7 +148,7 @@ AR learns the outcome of a request it sent from the SCHEDULED and DECLINED notif
 
 ### Market Onboarding API
 
-Each environment's app exposes the Market Onboarding API (name agreed 2026-10-19). Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity.
+Each environment's app exposes the Market Onboarding API (name agreed 2026-10-19). Only the market-onboarding control plane, the Market Onboarding UI's backend in Control Tower, calls it, with its own service identity.
 
 | Path | What it does |
 | --- | --- |
@@ -159,7 +159,7 @@ Each environment's app exposes the Market Onboarding API (name agreed 2026-10-19
 
 Sending a release is idempotent: one onboarding workflow per market, account type, version and environment.
 
-The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+The bodies are Proposed (2026-10-18), for the Market Onboarding UI team to confirm. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
 
 | Call | Request | Response |
 | --- | --- | --- |
@@ -466,7 +466,7 @@ The supplied file leans on five types it doesn't define. The build takes each on
 
 ## Market Onboarding & Payment Dimensions
 
-Markets are onboarded through billpay-ui, the market-onboarding control plane. The process, releases and the Market Onboarding API are in [Market Onboarding](#market-onboarding).
+Markets are onboarded through the Market Onboarding UI in Control Tower, the market-onboarding control plane. The process, releases and the Market Onboarding API are in [Market Onboarding](#market-onboarding).
 
 A market profile is one market and one account type. Onboarding picks the Billpay APIs the profile takes and answers five behavior questions, the payment dimensions:
 
@@ -1464,8 +1464,8 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 
 | Part | What it is | Lives in |
 | --- | --- | --- |
-| billpay-ui frontend, the Market Onboarding UI | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
-| billpay-ui backend | The control plane itself: SSO, maker-checker, audit, versioned releases | The control plane, one for all environments |
+| Market Onboarding UI frontend, in Control Tower | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
+| Market Onboarding UI backend | The control plane itself: SSO, maker-checker, audit, versioned releases | The control plane, one for all environments |
 | Authoring tables | Drafts, revisions, releases, approvals, deployments, audit | The control plane's own schema, outside billpay-core |
 | Market Onboarding API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app (see [Billpay APIs](#market-onboarding-api)) |
 | `MarketOnboardingWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
@@ -1496,7 +1496,7 @@ Rollback switches the pointer, and the Schedules and settings, back to the previ
 
 ### Operations settings
 
-A step in billpay-ui. Each setting drives something at runtime.
+A step in the Market Onboarding UI. Each setting drives something at runtime.
 
 | Setting | Used by |
 | --- | --- |
@@ -1512,13 +1512,13 @@ A step in billpay-ui. Each setting drives something at runtime.
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
 
-A market and an account type disagree on Raven when billpay-ui holds a setting for the whole market and another for one of its account types. For example, the US turns the `SCHEDULED` message off for the whole market, and US Corporate turns it back on. A US corporate payment then follows US Corporate, because the account type's setting wins (agreed 2026-10-18). A US consumer payment follows the market's setting, since US Consumer has none of its own, and a market with no setting follows the default.
+A market and an account type disagree on Raven when the Market Onboarding UI holds a setting for the whole market and another for one of its account types. For example, the US turns the `SCHEDULED` message off for the whole market, and US Corporate turns it back on. A US corporate payment then follows US Corporate, because the account type's setting wins (agreed 2026-10-18). A US consumer payment follows the market's setting, since US Consumer has none of its own, and a market with no setting follows the default.
 
 ### Capability manifest
 
 Every build ships a manifest of the behavior combinations it can run, returned by `GET /market-onboarding/capabilities`. The stage registries work it out when the app starts, from the strategies in the build ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at step 1 until that build is deployed. Before a build rolls out to an environment, the deploy pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing (agreed 2026-10-19).
 
-### What changes in today's billpay-ui code
+### What changes in today's Market Onboarding UI code
 
 - `promote()` only moves a status in H2 today; it will send vN to the next environment.
 - `verifyProfile()`, the sign-off, will send the sign-off to that environment's workflow.

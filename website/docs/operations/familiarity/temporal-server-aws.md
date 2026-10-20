@@ -31,11 +31,19 @@ Three kinds of queue, each with its own job:
 
 ## Priorities
 
-Work on the Offline cluster runs at five priority levels, 1 first and 5 last. Execution and AR intake sit at 1, corporate work at 2, inbound payments at 3, representments at 4, and returns at 5. On a shared queue, a level waits until every level above it drains, so returns can wait through a whole execution window. Corporate payments also carry a fairness key per parent, which stops one payment with 100K allocations from taking a whole queue. [Priority and fairness](../../design/throttling.md#priority-and-fairness) has the full table.
+Work on the Offline cluster runs at five priority levels, 1 first and 5 last:
+
+1. Execution and AR intake
+2. Corporate work
+3. Inbound payments
+4. Representments
+5. Returns
+
+On a shared queue, a level waits until every level above it drains, so returns can wait through a whole execution window. Corporate payments also carry a fairness key per parent, which stops one payment with 100K allocations from taking a whole queue. [Priority and fairness](../../design/throttling.md#priority-and-fairness) has the full table.
 
 ## Schedules
 
-Every Temporal Schedule lives on the Offline cluster: one per dispatcher (the scheduled-payment and representment dispatchers have one per market), the governor's, and the periodic jobs'. Each skips a trigger while its last run is still going. Pausing a Schedule stops new runs; to pause a whole market, use billpay-ui instead ([Dispatch Controls](./dispatch-controls.md)).
+Every Temporal Schedule lives on the Offline cluster: one per dispatcher (the scheduled-payment and representment dispatchers have one per market), the governor's, and the periodic jobs'. Each skips a trigger while its last run is still going. Pausing a Schedule stops new runs; to pause a whole market, use the Market Onboarding UI instead ([Dispatch Controls](./dispatch-controls.md)).
 
 ## Scaling
 

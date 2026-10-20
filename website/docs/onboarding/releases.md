@@ -14,7 +14,7 @@ A release is how a market's config earns trust. Nobody edits the config an envir
 
 ## Approval, once
 
-Onboarding uses maker-checker: the person who authors a change can't approve it. When a release is approved, billpay-ui's backend saves the draft as release vN:
+Onboarding uses maker-checker: the person who authors a change can't approve it. When a release is approved, the Market Onboarding UI's backend saves the draft as release vN:
 
 - the profile's full config, as JSON
 - a checksum
@@ -27,7 +27,7 @@ A release is one profile, one market and account type. It never changes after it
 A release moves through E1, E2 and E3, always in that order. E3 is production, and it needs a change request (RFC) as well as a sign-off.
 
 1. The backend sends vN to E1's Market Onboarding API, using its own service identity. Sending is idempotent: there is one onboarding workflow per market, account type, version and environment, so a repeated send doesn't start a second one.
-2. A deployment row per release and environment tracks the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen in billpay-ui reads those rows, so it shows real progress.
+2. A deployment row per release and environment tracks the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen in the Market Onboarding UI reads those rows, so it shows real progress.
 3. In each environment the workflow runs test payments against vN. Once they pass, someone signs off in the UI, and the backend sends the sign-off through the same API.
 4. Once vN is active and signed off in E1, the same vN goes to E2, then to E3. In E3 the RFC must pass the ServiceNow check before the sign-off counts.
 5. A new market's traffic is enabled only once its release is live in E3, so no real payment reaches it before it has passed in every environment.
@@ -46,9 +46,9 @@ A live market can also be paused and resumed. Pausing stops the market's dispatc
 
 Load-test run 7 proves the whole cycle: publish, test, activate and roll back a release in E1 while payments are running. New payments must pick up the new version, running ones must keep theirs, and rollback must restore the old one.
 
-## Changes to today's billpay-ui
+## Changes to today's Market Onboarding UI
 
-billpay-ui already has most of this flow. These are the changes that connect it to real environments:
+The Market Onboarding UI already has most of this flow. These are the changes that connect it to real environments:
 
 - `promote()` only moves a status in its local H2 database today. It will send vN to the next environment.
 - `verifyProfile()`, the sign-off, will send the sign-off to that environment's workflow.

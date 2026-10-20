@@ -33,7 +33,7 @@ The payment waits. Nothing clears and no leg runs until the last batch arrives, 
 
 ## A release failed onboarding
 
-The release failed onboarding alert fires when `MarketOnboardingWorkflow` stops before activation, and the readiness screen in billpay-ui shows the step it stopped at. A market that is already live keeps running on its active version, because the failed one was never activated.
+The release failed onboarding alert fires when `MarketOnboardingWorkflow` stops before activation, and the readiness screen in the Market Onboarding UI shows the step it stopped at. A market that is already live keeps running on its active version, because the failed one was never activated.
 
 1. Read the failed step and its reason in readiness.
 2. If the check failed because the profile needs a behavior combination the deployed build can't run, either change the profile or ship the build that adds the combination. The onboarding workflow can't pass its first step until that build is deployed.
@@ -66,7 +66,10 @@ Billpay has already tried: every call retries from 1 second, doubling to at most
 
 The Offline cluster down alert fires when the cluster stops answering.
 
-The Online cluster keeps serving, since nothing calls across. Dated work waits in Oracle and pulled work in One-Data's inbox. Allocation callbacks get 503 with `Retry-After`, and the allocations manager sends them again. Running offline payments pause, their announcements included, and resume on the restored cluster.
+- The Online cluster keeps serving, since nothing calls across.
+- Dated work waits in Oracle, and pulled work in One-Data's inbox.
+- Allocation callbacks get 503 with `Retry-After`, and the allocations manager sends them again.
+- Running offline payments pause, their announcements included, and resume on the restored cluster.
 
 1. Restore the cluster, or [promote its standby](#promoting-a-clusters-standby) if it can't come back in time.
 2. Nothing needs replaying. Every history is in the cluster's database, so workflows resume where they stopped, and the dispatchers catch up at the governor's pace. A dispatcher trigger missed during the outage still fires, within its Schedule's 6-hour catch-up window.

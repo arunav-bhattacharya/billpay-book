@@ -93,7 +93,18 @@ The first kind sets the **behaviors**, the choices that change how a payment is 
 
 ### Operations settings
 
-The second kind is about time. The **Operations step** asks when the market's scheduled payments run, how long before that a customer can still cancel, whether there is a cutoff they must finish by, when a corporate payment's allocations should be fetched and when their lateness should raise an alert, how a returned payment may be presented again and how many times, which status changes the customer hears about, which provider confirms bank details and how long a customer has to do it, which limits a payment is checked against, such as the largest one the market takes, and what volumes to expect. Every answer drives something real at runtime, from the moment a market's payments are released to the pace they run at.
+The second kind is about time. The **Operations step** asks:
+
+- when the market's scheduled payments run, and how long before that a customer can still cancel
+- whether there is a cutoff they must finish by
+- when a corporate payment's allocations should be fetched, and when their lateness should raise an alert
+- how a returned payment may be presented again, and how many times
+- which status changes the customer hears about
+- which provider confirms bank details, and how long a customer has to do it
+- which limits a payment is checked against, such as the largest one the market takes
+- what volumes to expect
+
+Every answer drives something real at runtime, from the moment a market's payments are released to the pace they run at.
 
 ### Releases
 

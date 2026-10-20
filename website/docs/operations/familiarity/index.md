@@ -22,7 +22,7 @@ Two things about this platform change where you look. There are two Temporal clu
       desc: `One UI per cluster: finding a payment's workflows by ID and by search attribute, and why a scheduled payment has no workflow until its date.`,
     },
     {
-      term: 'billpay-ui',
+      term: 'Market Onboarding UI',
       to: '/docs/operations/familiarity/billpay-ui',
       desc: `The onboarding control plane: a market's operations settings, the readiness of a release, and pausing a live market.`,
     },

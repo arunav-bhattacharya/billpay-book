@@ -58,7 +58,12 @@ The allocated-payments dispatcher runs every minute. When an `ALLOC_EXEC` row fa
 
 Once a parent is released, the leg dispatcher writes the legs of every stored batch, 1,000 rows at a time. Each leg is a payment of its own, `{paymentId}_{seq}`, with its allocation's card account, written in `ACCEPTED` with a `SCHEDULED` `ALLOC_LEG` row, and each batch records when its legs were written, so none is written twice. A declined parent is never released, so its batches are never written, and a cancelled one never got as far as asking.
 
-The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg on the Offline cluster, apart from the parent's clearing. A leg updates the AR balance and open-to-buy in parallel (open-to-buy once Payment Instruments has returned the instrument's clear-text details), then tells accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier, then sends its RTF event and Raven message, and commits `PROCESSED`.
+The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg on the Offline cluster, apart from the parent's clearing. Each leg runs four steps:
+
+1. Updates the AR balance and open-to-buy in parallel (open-to-buy once Payment Instruments has returned the instrument's clear-text details).
+2. Tells accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier.
+3. Sends its RTF event and Raven message.
+4. Commits `PROCESSED`.
 
 Legs run at priority 2 with the parent's payment ID as their fairness key, and a per-key limit caps how fast any one parent's legs can go. At 100 legs a second, a 100K payment takes about 17 minutes without starving any other payment on the same queues.
 

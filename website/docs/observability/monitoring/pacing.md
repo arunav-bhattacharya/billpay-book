@@ -39,7 +39,15 @@ The cutoff alert fires when the projected finish passes the cutoff minus 15 minu
 
 ## Downstream limits
 
-`downstream_limit` has a row per downstream endpoint: its agreed TPS, the online margin, the current offline share, any cap on Online and when it ends, and the last 429. Read it with the task queues on [Temporal Health](./temporal-health.md):
+`downstream_limit` has a row per downstream endpoint, showing:
+
+- its agreed TPS
+- the online margin
+- the current offline share
+- any cap on Online, and when it ends
+- the last 429
+
+Read it with the task queues on [Temporal Health](./temporal-health.md):
 
 - When 429s pass 1% of a queue's calls, or the downstream's p99 doubles, the queue's limit drops to 70% of what it was, then probes back up 5% at a time. A 429 on an Online call halves that downstream's offline share instead. Neither cut takes a SEPA run below its need.
 - A queue down to 1 request a second is a downstream outage.

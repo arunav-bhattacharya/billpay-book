@@ -82,7 +82,13 @@ The 36 functions, grouped by the class they start from. Leg classes mirror the f
 
 The arguments say what each move needs. The move out of `PENDING` takes exactly what Verify resolves, so Verify's results are the arguments. Every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile, and the move to the next presentment takes the date it clears on.
 
-Dates live in their own small hierarchy. An `InitialTimeline` is set at capture; an `ExecutableTimeline` adds the clearing date, the execution time, the cancel cutoff and whether it runs once or recurs; a `ScheduledTimeline` adds the schedule date. Since every verified class needs an executable timeline, a payment that moves money always knows when it clears and when it can no longer be cancelled.
+Dates live in their own small hierarchy:
+
+- An `InitialTimeline` is set at capture.
+- An `ExecutableTimeline` adds the clearing date, the execution time, the cancel cutoff and whether it runs once or recurs.
+- A `ScheduledTimeline` adds the schedule date.
+
+Since every verified class needs an executable timeline, a payment that moves money always knows when it clears and when it can no longer be cancelled.
 
 On the wire, every sealed type carries a `type` property with its class's simple name, such as `"type": "PaidSplitPayment"`, so the JSON says which class, and which state, it holds.
 

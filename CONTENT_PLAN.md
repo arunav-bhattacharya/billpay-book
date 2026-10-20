@@ -605,8 +605,8 @@ Treatments: **Update** (facts change, rewritten in the house voice), **Style pas
 | `observability/monitoring/app-health.md` | Style pass | | ☑ |
 | `observability/monitoring/pacing.md` | New | Governor and dispatchers: rates per class, backlog and in-flight against the cap, inbox backlogs per dispatcher, cutoff projection, downstream limits and 429s, payments waiting on RTF or Raven | ☑ |
 | `observability/monitoring/sla-sli-slo/index.md` | Update | Pulled entries measure time to One-Data's 202, once stored, then the backlog age until a dispatcher starts them; the allocations callback's 202 goes out after its workflow starts, with 429 over budget | ☑ |
-| `observability/monitoring/sla-sli-slo/billpay-apis.md` | Update | Channels reply through Update-With-Start within the 500 ms p99. AR, returns and inbound get One-Data's 202 once stored; after that, the measure is their backlog age. Update and Cancel: 409 outside the window. Refunds on both routes. The allocations callback | ☑ |
-| `observability/monitoring/sla-sli-slo/one-data-functions.md` | Update | Cancel: the round trip to CANCELLED, or 409 outside the window | ☑ |
+| `observability/monitoring/sla-sli-slo/billpay-apis.md` | Update | Channels reply through Update-With-Start within the 500 ms p99. AR, returns and inbound get One-Data's 202 once stored; after that, the measure is their backlog age. Update and Cancel: 409 outside the window. Refunds on both routes. The allocations callback. Confirm and the Market Onboarding API reads and writes, targets Proposed (2026-10-20) | ☑ |
+| `observability/monitoring/sla-sli-slo/one-data-functions.md` | Update | Cancel: the round trip to CANCELLED, or 409 outside the window. Every function the design names: confirm, allocations, AR and inbound intake, event handlers, the delete, inbox reads and updates; targets Proposed (2026-10-20) | ☑ |
 | `observability/monitoring/temporal-health.md` | Update | Both clusters. Panels for the governor's inputs and for backlog and rate limit on each `ds-*` and `ctl-*` queue | ☑ |
 
 #### Operations

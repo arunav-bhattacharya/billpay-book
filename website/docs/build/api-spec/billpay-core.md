@@ -60,9 +60,9 @@ Every write is safe to send twice. `PaymentStore`, the only code that reaches Or
 
 ## Market Onboarding API
 
-Each environment's billpay-core also exposes the Market Onboarding API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+Each environment's billpay-core also exposes the Market Onboarding API. Only the market-onboarding control plane, the Market Onboarding UI's backend in Control Tower, calls it, with its own service identity. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
 
-The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/market-onboarding/releases/{market}/{account-type}/{version}` and `{live}` for `/market-onboarding/markets/{market}/{account-type}`.
+The bodies are Proposed (2026-10-18), for the Market Onboarding UI team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/market-onboarding/releases/{market}/{account-type}/{version}` and `{live}` for `/market-onboarding/markets/{market}/{account-type}`.
 
 | Call | Request | Response |
 | --- | --- | --- |
