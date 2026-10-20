@@ -32,7 +32,7 @@ Escalation paths, and the steps to acknowledge and resolve an alert in Kibana, a
 | Payment not PAID | A payment (other than a split parent) or a leg is still `PROCESSED` after 48 hours, or an inbox row has stayed `UNMATCHED` for 48 hours, which One-Data's `UpdateUnmatchedPayments.v1` raises | Read the inbox row for the missing event, or check the event's IDs against Oracle. [Runbook](../../operations/sops.md#a-payment-not-paid-after-48-hours) |
 | Event without a payment | An event with no payment ID matches no payment through `ReadPayments.v1`, or more than one | Find the payment and replay the event through its handler. [Runbook](../../operations/sops.md#an-event-that-matches-no-payment) |
 | Rejected request | A dispatcher marks a pulled request `REJECTED`, because nothing live matches its market, account type or API | Find out why traffic reached something that isn't live, since a market's traffic is enabled only after its release is live in production. The sender is not told. [Runbook](../../operations/sops.md#a-rejected-request) |
-| Release failed provisioning | `MarketProvisioningWorkflow` stops before activation | Fix the profile, or ship the build it needs. [Runbook](../../operations/sops.md#a-release-failed-provisioning) |
+| Release failed onboarding | `MarketOnboardingWorkflow` stops before activation | Fix the profile, or ship the build it needs. [Runbook](../../operations/sops.md#a-release-failed-onboarding) |
 
 ## Backlogs
 

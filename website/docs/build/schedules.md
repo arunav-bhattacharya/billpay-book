@@ -27,10 +27,10 @@ There is no batching to tune here. The pace comes from the governor, which sets 
 
 The scheduled-payments and representment dispatchers run per market, at the market's own times. Their Schedules aren't written by hand, and they don't ship with a deploy. They arrive in a market release from billpay-ui:
 
-1. [Provisioning](../onboarding/provisioning.md) saves the release with its Schedules, inactive.
+1. [The onboarding workflow](../onboarding/market-onboarding-api.md) saves the release with its Schedules, inactive.
 2. When the release is activated, the Schedules go live with it.
 3. A rollback switches back to the previous version's Schedules and settings.
 
 A market's Schedule takes its time zone, so the execution time holds across daylight saving. Test the daylight-saving weekends. The US market runs on Phoenix time, which has no daylight saving, so its run starts at 00:01 MST all year. Execution runs every day: no market keeps a holiday calendar.
 
-Pausing a live market stops its dispatchers, through the provisioning API's pause and resume, and pausing a Schedule stops new runs too.
+Pausing a live market stops its dispatchers, through the Market Onboarding API's pause and resume, and pausing a Schedule stops new runs too.

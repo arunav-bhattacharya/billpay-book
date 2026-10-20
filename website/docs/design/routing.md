@@ -288,7 +288,7 @@ The payment ID is a ULID, and every workflow ID is the payment ID plus a suffix,
 | Return and representment | `{paymentId}-return-{seq}`, `{paymentId}-represent-{seq}` |
 | Dispatcher run | Its Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time |
 | Governor | `governor`, plus its Schedule's trigger time |
-| Market provisioning | `provision-{market}-{accountType}-v{N}` |
+| Market onboarding | `onboard-{market}-{accountType}-v{N}` |
 
 The confirm and the no are not workflows. They are updates to the waiting payment's `{paymentId}-init`, with the update IDs `{paymentId}-confirm` and `{paymentId}-no`, so the whole wait and its answer show in one history.
 

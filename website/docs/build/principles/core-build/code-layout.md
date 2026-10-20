@@ -19,9 +19,9 @@ import Lead from '@site/src/components/Lead';
 | Activity | `core/lib/activities/` and `impl/` | None |
 | Client | `core/lib/clients/` | None |
 
-What each type is called is in the [naming conventions](../../../design/principles.md#naming). The Router, the dispatchers and the governor sit beside these four in modules of their own, and the [stage index](./stage-index.md) and its registries live in the app. The shared checks and rules that Verify, Reverify and Represent use sit in `core/lib/verification/`, with the checks in `checks/` and the rules, with the specifications they use, in `rules/`. Like stage code, they depend only on activity interfaces. Every module that holds stages, checks or methods carries an empty `META-INF/beans.xml`, so Quarkus finds its classes, and a test fails for any class it misses.
+What each type is called is in the [naming conventions](../../../design/principles.md#naming). The Router, the dispatchers and the governor sit beside these four in modules of their own, and the [stage resolver](./stage-resolver.md) and its registries live in the app. The shared checks and rules that Verify, Reverify and Represent use sit in `core/lib/verification/`, with the checks in `checks/` and the rules, with the specifications they use, in `rules/`. Like stage code, they depend only on activity interfaces. Every module that holds stages, checks or methods carries an empty `META-INF/beans.xml`, so Quarkus finds its classes, and a test fails for any class it misses.
 
-Only stages have a market column, because stages, with their checks and methods, are the only layer that varies. There is one implementation of each workflow, and it gets its stages from the stage index, never copied per market. Activities and clients are shared by every market by design.
+Only stages have a market column, because stages, with their checks and methods, are the only layer that varies. There is one implementation of each workflow, and it gets its stages from the stage resolver, never copied per market. Activities and clients are shared by every market by design.
 
 Much of what used to be market code isn't code at all now. A market's execution time, time zone, windows and BOTH rules arrive in a release from billpay-ui, the onboarding control plane, and the Router reads them at runtime. A new market whose behaviors the build already covers goes live with a release and no deploy ([Market Onboarding](../../../onboarding/index.md)).
 
@@ -29,7 +29,7 @@ Much of what used to be market code isn't code at all now. A market's execution 
 
 Each layer may depend only on the interfaces of the layer below it:
 
-- Workflow code depends on stage interfaces and the stage index. It never sees an activity, a client or another cluster.
+- Workflow code depends on stage interfaces and the stage resolver. It never sees an activity, a client or another cluster.
 - Stage code depends on activity interfaces, and gets their stubs through its `StageContext`. It never sees an activity's implementation or a client.
 - Activity implementations depend on clients. A client depends on nothing above it.
 

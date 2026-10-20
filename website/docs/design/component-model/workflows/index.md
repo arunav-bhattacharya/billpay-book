@@ -41,7 +41,7 @@ export const CLUSTERS = [
       'Create Balance Refund, from AR',
       'Periodic jobs',
       'Dispatchers and the governor',
-      'Market provisioning',
+      'Market onboarding',
     ],
   },
 ];
@@ -87,6 +87,6 @@ The clusters are separate, but the app isn't. One app, billpay-core, runs the wo
 - Core workflows run one business journey each, such as paying today, executing a scheduled payment or processing a return.
 - Composite workflows are a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), and payments with several instructions. They run on the Online cluster, with their children on the same cluster.
 - Periodic workflows are jobs that Temporal Schedules start on the Offline cluster.
-- Control workflows are the dispatchers, the governor and market provisioning. They pace and configure payment work; they aren't payment journeys themselves.
+- Control workflows are the dispatchers, the governor and market onboarding. They pace and configure payment work; they aren't payment journeys themselves.
 
 Each workflow on the pages that follow shows its cluster, its workflow ID and what starts it.

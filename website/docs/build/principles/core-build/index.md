@@ -11,7 +11,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 <Lead>[Tech Stack](../tech-stack/index.md) covers what we buy. This covers what we write: how the component model from Design becomes code, one layer at a time, and the rules that keep each layer doing only its own job.</Lead>
 
-The call chain is strict, **Workflow → Stage → Activity → Client → external system**, exactly as the [component model](../../../design/principles.md#the-four-layers) defines it. Nothing calls up or sideways. A stage may also call the checks and methods the stage index gives it, and plain helper functions, and a workflow may start child workflows, but only on its own cluster. The Router sits in front of all of it: it is the only code that starts a payment workflow.
+The call chain is strict, **Workflow → Stage → Activity → Client → external system**, exactly as the [component model](../../../design/principles.md#the-four-layers) defines it. Nothing calls up or sideways. A stage may also call the checks and methods the stage resolver gives it, and plain helper functions, and a workflow may start child workflows, but only on its own cluster. The Router sits in front of all of it: it is the only code that starts a payment workflow.
 
 ## In this section
 
@@ -38,8 +38,8 @@ The call chain is strict, **Workflow → Stage → Activity → Client → exter
       desc: `One business step each: the calls, one guarded commit, the announcement, naming, and the verification rules.`,
     },
     {
-      term: 'Stage Index',
-      to: '/docs/build/principles/core-build/stage-index',
+      term: 'Stage Resolver',
+      to: '/docs/build/principles/core-build/stage-resolver',
       desc: `How a workflow finds its stages, checks and methods with no mapping code, worked through for Verify from the plan key to the commit.`,
     },
     {

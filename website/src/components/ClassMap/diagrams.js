@@ -11,7 +11,7 @@
  * ClassMap), and every link's points are written against those heights.
  */
 
-/* Build -> Stage Index: every class the registries pick is a strategy.
+/* Build -> Stage Resolver: every class the registries pick is a strategy.
    Three columns, one per kind of strategy, each family hanging from a spine
    down its left edge. */
 export const strategyFamily = {
@@ -49,17 +49,17 @@ export const strategyFamily = {
   ],
 };
 
-/* Build -> Stage Index: the classes that do the picking, numbered in the
-   order they act. StageIndex sits top left and reaches the rest through two
+/* Build -> Stage Resolver: the classes that do the picking, numbered in the
+   order they act. StageResolver sits top left and reaches the rest through two
    lanes down its left side; the stage it binds sits under the registry it
    asks. */
 export const pickingClasses = {
   width: 700,
   height: 342,
   label:
-    'Class diagram of the classes that do the picking, numbered in the order they act. StageIndex has lookup(plan). It first makes a StageContext, which holds the plan key and the stubs. Second, it picks the stage from a Registry, which has forPlan and one. Third, it binds that stage, DefaultPaymentVerifyStage, to the context. The stage then asks a Registry for its checks, fourth, and asks the RuleRegistry, which has evaluate, for its rules, fifth.',
+    'Class diagram of the classes that do the picking, numbered in the order they act. StageResolver has resolve(plan). It first makes a StageContext, which holds the plan key and the stubs. Second, it picks the stage from a Registry, which has forPlan and one. Third, it binds that stage, DefaultPaymentVerifyStage, to the context. The stage then asks a Registry for its checks, fourth, and asks the RuleRegistry, which has evaluate, for its rules, fifth.',
   classes: [
-    {id: 'index', kind: 'class', name: 'StageIndex', x: 10, y: 12, w: 172, members: ['lookup(plan): Stages']},
+    {id: 'resolver', kind: 'class', name: 'StageResolver', x: 10, y: 12, w: 172, members: ['resolve(plan): Stages']},
     {id: 'ctx', kind: 'data', name: 'StageContext', x: 514, y: 12, w: 176, members: ['plan: PlanKey', 'stubs: Stubs']},
     {id: 'registry', kind: 'class', name: 'Registry<S>', x: 250, y: 130, w: 186, members: ['forPlan(plan): List<S>', 'one(plan): S']},
     {id: 'rules', kind: 'class', name: 'RuleRegistry', x: 472, y: 130, w: 218, members: ['evaluate(plan, step, facts)']},

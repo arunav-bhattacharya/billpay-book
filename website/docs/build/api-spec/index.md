@@ -25,7 +25,7 @@ Each layer has its own job. One-Data makes the payment ID, runs the check for ot
     {
       term: 'Billpay Core APIs',
       to: '/docs/build/api-spec/billpay-core',
-      desc: `Every endpoint with its start mode and reply, what the Router refuses before a workflow starts, why a repeated request is safe, and the provisioning API.`,
+      desc: `Every endpoint with its start mode and reply, what the Router refuses before a workflow starts, why a repeated request is safe, and the Market Onboarding API.`,
     },
   ]}
 />

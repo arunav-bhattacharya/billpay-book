@@ -1,25 +1,25 @@
 ---
-title: Building the Stage Index
-description: 'The stage index is how a workflow finds the stage for each step, and the checks and methods that stage uses.'
-sidebar_label: Stage Index
+title: Building the Stage Resolver
+description: 'The stage resolver is how a workflow finds the stage for each step, and the checks and methods that stage uses.'
+sidebar_label: Stage Resolver
 ---
 
 import Lead from '@site/src/components/Lead';
 import ClassMap from '@site/src/components/ClassMap';
 import {strategyFamily, pickingClasses} from '@site/src/components/ClassMap/diagrams';
 
-# Building the Stage Index
+# Building the Stage Resolver
 
-<Lead>The stage index is how a workflow finds the stage for each step, and the checks and methods that stage uses. Nothing maps a payment to classes by hand: every class says where it applies, one rule picks the most specific, and a market's own variation is one new class.</Lead>
+<Lead>The stage resolver is how a workflow finds the stage for each step, and the checks and methods that stage uses. Nothing maps a payment to classes by hand: every class says where it applies, one rule picks the most specific, and a market's own variation is one new class.</Lead>
 
-## What the index has to do
+## What the resolver has to do
 
-Three parts of Billpay depend on the index, each at a different moment:
+Three parts of Billpay depend on the resolver, each at a different moment:
 
 | When | Who uses it | What it must get right |
 | --- | --- | --- |
-| A payment runs | The workflow, through `stageIndex.lookup(plan)` | The same classes, called in the same order, on every replay |
-| A release is provisioned | Provisioning, through `GET /provisioning/capabilities` | Only the combinations the build really runs |
+| A payment runs | The workflow, through `stageResolver.resolve(plan)` | The same classes, called in the same order, on every replay |
+| A release is onboarded | The onboarding workflow, through `GET /market-onboarding/capabilities` | Only the combinations the build really runs |
 | A change is built | Whoever adds or changes a class | A mistake fails the build before it merges, and names the class |
 
 A step varies by behaviors and by market. If every combination got a class of its own, the classes would multiply: two optional checks need up to four versions of Verify, and three need eight. So each job is one class, and a payment gets the sum of the jobs that apply to it.
@@ -43,7 +43,7 @@ Think of airport security. Every traveler goes through the same lane in the same
 | Key | The name of the job, such as `MANDATE` or `CLEARING`. Strategies with different keys add up. Strategies with the same key compete, and one wins |
 | `appliesTo` | Where the strategy applies: a market or every market, an account type or every account type, the behaviors that must be Y and the behaviors that must be N. Empty means everywhere. It is plain data, not code, so two of them can be compared |
 | Registry | One small class, written once and used for every kind of strategy. It gets every strategy of its kind, works out the winners for every combination when the app starts, and after that answers each payment with a lookup |
-| Stage index | The workflow's one way in. On the workflow's own thread it makes the activity stubs, the handles through which a workflow calls other systems, picks each step's stage and hands back stages that are ready to run |
+| Stage resolver | The workflow's one way in. On the workflow's own thread it makes the activity stubs, the handles through which a workflow calls other systems, picks each step's stage and hands back stages that are ready to run |
 
 Every class the registries pick is a strategy. This class diagram shows it for Verify and for Execute's clearing:
 
@@ -79,7 +79,7 @@ config:
 sequenceDiagram
   autonumber
   participant W as Workflow
-  participant X as Stage index
+  participant X as Stage resolver
   participant S as Verify stage
   participant C as Check registry
   participant A as Activities
@@ -88,7 +88,7 @@ sequenceDiagram
 
   Note over X,R: When the app starts, Quarkus hands each registry every class of its kind, and each registry works out every combination once. A tie stops the start.
 
-  W->>X: lookup(plan): GB, consumer, bank confirmation Y
+  W->>X: resolve(plan): GB, consumer, bank confirmation Y
   X->>X: makes the stubs and picks the Verify stage
   X-->>W: the stages, bound to this payment
   W->>S: verify.run(paymentId)
@@ -323,19 +323,19 @@ private fun resolve(all: List<S>, combo: Combination): List<S> =
 
 ## How a workflow uses it
 
-A workflow sees none of this. It calls the stage index once, at the top of its method, and runs its steps:
+A workflow sees none of this. It calls the stage resolver once, at the top of its method, and runs its steps:
 
 ```kotlin
 // in the workflow, on its own thread
-val stages = stageIndex.lookup(plan)
+val stages = stageResolver.resolve(plan)
 stages.capture.run(request)
 val verified = stages.verify.run(paymentId)
 ```
 
-Inside, the index makes the stubs, picks each stage and binds the two:
+Inside, the resolver makes the stubs, picks each stage and binds the two:
 
 ```kotlin
-fun lookup(plan: PlanKey): Stages {
+fun resolve(plan: PlanKey): Stages {
     // the activity stubs, made on this thread
     val ctx = StageContext(plan, Stubs.create())
     return Stages(
@@ -357,7 +357,7 @@ class VerifyStep(
 
 *(A sketch.)*
 
-The stubs are the reason for the context. Temporal only lets a workflow make activity stubs on its own thread, and a strategy is one instance shared by every payment, so it can't hold a payment's stubs. The index makes them where Temporal requires, wraps them with the plan key in a `StageContext`, and every call carries it. The worker gives the index to each workflow through the factory it registers the workflow with.
+The stubs are the reason for the context. Temporal only lets a workflow make activity stubs on its own thread, and a strategy is one instance shared by every payment, so it can't hold a payment's stubs. The resolver makes them where Temporal requires, wraps them with the plan key in a `StageContext`, and every call carries it. The worker gives the resolver to each workflow through the factory it registers the workflow with.
 
 ## When things change
 
@@ -372,7 +372,7 @@ The stubs are the reason for the context. Temporal only lets a workflow make act
 | A step's whole flow differs by a behavior | `Payment{Step}StageWith{Behavior}`, with the behavior in `on` | It beats the default stage wherever that behavior is Y. No step needs one today |
 | Two classes claim the same job equally, by mistake | Nothing | The app refuses to start: `Verify check tie for FUNDS at GB [BANK_CONFIRMATION]: [GBFundsCheck, GBBalanceCheck]` |
 
-None of these changes touches shared code, the index or a list.
+None of these changes touches shared code, the resolver or a list.
 
 ## What keeps it safe
 
@@ -387,11 +387,11 @@ The registries find mistakes when the app starts. Unit tests build the registrie
 | A misleading name | A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code |
 | An unnoticed change | The report above is checked in, and a test fails when the build's report differs, so a change to what any combination runs shows up as a diff in review |
 
-The index has unit tests of its own, listed on [Testing → Unit](../../../testing/functional/unit.md#the-plan-key-lookup).
+The resolver has unit tests of its own, listed on [Testing → Unit](../../../testing/functional/unit.md#the-plan-key-lookup).
 
 ## The capability manifest
 
-The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /provisioning/capabilities` returns it, and provisioning checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and provisioning stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
+The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /market-onboarding/capabilities` returns it, and the onboarding workflow checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
 
 ## Why the lookup stays in the workflow
 

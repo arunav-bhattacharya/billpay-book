@@ -8,10 +8,10 @@ import styles from './styles.module.css';
  *
  * The control plane sits across the top because there is one of it, and the
  * environments sit in a row below because there are three and they are alike.
- * Every line between them goes through the provisioning API, which is the
+ * Every line between them goes through the Market Onboarding API, which is the
  * whole point: a release only ever flows one way, through one door, and the
  * control plane never touches an environment's own databases. Inside each
- * environment the five steps of MarketProvisioningWorkflow are listed, with
+ * environment the five steps of MarketOnboardingWorkflow are listed, with
  * E3's sign-off carrying the RFC.
  *
  * Coordinates are hand-placed on a 980 x 468 canvas. Takes no props.
@@ -46,7 +46,7 @@ const ENVS = [
 const STEPS = (e) => ['Check against the manifest', 'Save vN, inactive', 'Test payments', e.step4, 'Activate vN'];
 
 const LABEL =
-  'How a market release reaches the environments. Across the top is billpay-ui, the control plane, one for every environment: a profile and its settings are authored, approved once by a maker and a checker, frozen as release vN with a checksum, and tracked through deployment rows. Below are three environments, E1, E2 and E3, where E3 is production. Each one takes the release only through its provisioning API, and in each a MarketProvisioningWorkflow checks vN against the build\'s capability manifest, saves it as an inactive version, tests it with payments, waits for sign-off, and activates it by pointing market_config_active at vN. The control plane sends vN to E1 first, then the same vN to E2 once it is active and signed off in E1, then to E3 once it is active and signed off in E2. In E3 the sign-off also needs a change request. Progress flows back up the same line.';
+  'How a market release reaches the environments. Across the top is billpay-ui, the control plane, one for every environment: a profile and its settings are authored, approved once by a maker and a checker, frozen as release vN with a checksum, and tracked through deployment rows. Below are three environments, E1, E2 and E3, where E3 is production. Each one takes the release only through its Market Onboarding API, and in each a MarketOnboardingWorkflow checks vN against the build\'s capability manifest, saves it as an inactive version, tests it with payments, waits for sign-off, and activates it by pointing market_config_active at vN. The control plane sends vN to E1 first, then the same vN to E2 once it is active and signed off in E1, then to E3 once it is active and signed off in E2. In E3 the sign-off also needs a change request. Progress flows back up the same line.';
 
 export default function OnboardingFlow() {
   return (
@@ -120,12 +120,12 @@ export default function OnboardingFlow() {
 
                 <rect x={e.x + 16} y={apiY} width={ENV_W - 32} height={30} rx={8} className={styles.api} />
                 <text x={e.x + 30} y={apiY + 20} className={styles.apiText}>
-                  /provisioning/releases
+                  /market-onboarding/releases
                 </text>
 
                 <rect x={e.x + 16} y={wfY} width={ENV_W - 32} height={142} rx={9} className={styles.wf} />
                 <text x={e.x + 30} y={wfY + 24} className={styles.wfTitle}>
-                  MarketProvisioningWorkflow
+                  MarketOnboardingWorkflow
                 </text>
                 {STEPS(e).map((s, i) => (
                   <g key={s}>

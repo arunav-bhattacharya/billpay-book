@@ -32,7 +32,7 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | --- | --- | --- |
 | `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg or a representment, and when it is due. Written in the same commit as the state change that creates it. |
 | `market_config_version` (new) | Published version of a market profile | Immutable once saved. |
-| `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketProvisioningWorkflow` writes it. |
+| `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketOnboardingWorkflow` writes it. |
 | `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
 | `rate_allocation` (new) | Traffic class, market or corporate payment | The rate the governor sets, which dispatchers read every few seconds. Manual overrides live here too. |
 | `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, Online cap and when it ends, last 429. |

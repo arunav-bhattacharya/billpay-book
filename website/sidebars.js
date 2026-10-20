@@ -80,7 +80,7 @@ const sidebars = {
         'onboarding/market-profile',
         'onboarding/operations-settings',
         'onboarding/releases',
-        'onboarding/provisioning',
+        'onboarding/market-onboarding-api',
       ],
     },
     {
@@ -119,7 +119,7 @@ const sidebars = {
                 'build/principles/core-build/router',
                 'build/principles/core-build/workflows',
                 'build/principles/core-build/stages',
-                'build/principles/core-build/stage-index',
+                'build/principles/core-build/stage-resolver',
                 'build/principles/core-build/activities',
                 'build/principles/core-build/clients',
               ],

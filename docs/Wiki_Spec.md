@@ -37,7 +37,7 @@ When a choice is unclear, these rules decide it.
 1. **Oracle is the source of truth.** Every status change is a conditional update that applies only if the status is still what the writer expects. Whoever loses backs off.
 2. **Work that waits for a date waits in Oracle,** never in a sleeping workflow or on a Temporal timer. The one wait that stays in a workflow is a payment waiting minutes for its customer's confirmation, which `CreatePaymentIntentWorkflow` holds on a durable timer (agreed 2026-10-18).
 3. **Nothing calls across clusters.** Oracle is the only hand-off between the Online and Offline clusters.
-4. **Every payment workflow starts through the Router.** No API or dispatcher starts one on its own. Control workflows (dispatchers, the governor, provisioning) start from Schedules or their own APIs.
+4. **Every payment workflow starts through the Router.** No API or dispatcher starts one on its own. Control workflows (dispatchers, the governor, market onboarding) start from Schedules or their own APIs.
 5. **Pace at the door.** Admit only what a cluster and its downstreams can carry. Big bursts wait in Oracle or in One-Data's inbox, not in Temporal.
 6. **One workflow per journey.** Stages are the only thing that varies by market behavior. There are no market-specific workflows.
 7. **One Oracle commit per stage.** A stage makes its calls first, in parallel where they don't depend on each other; then the state change and the lifecycle timeline entry commit together. Its RTF lifecycle event, and a Raven message where the market's Raven setting tells the customer, go out right after the commit. Other systems subscribe to Billpay's RTF events. Fulfil is the exception: `PROCESSED` waits for both.
@@ -121,7 +121,7 @@ Every write API admits the request first, through the Router (see [Routing and S
 - **422** when the market, account type or API is not live in this environment. Senders do not retry a 422. A held create that RTF delivers after its market was taken out of service is captured and declined instead, so the customer is told and the delete runs (agreed 2026-10-18).
 - **429** with `Retry-After` when an allocation callback arrives over its traffic class's budget. The allocations manager retries on 429.
 - **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED` (a corporate payment leaves it when its allocations are requested), or after the cancellation window has closed; and when a confirm arrives for a payment that has been cancelled, such as one whose confirmation window closed. A cancel of a `PENDING` payment that isn't waiting for a confirmation gets 409 too. A confirm repeated after its workflow has closed gets the payment's current state instead ([CreatePaymentIntentWorkflow](#12-createpaymentintentworkflow)).
-- **503** with `Retry-After` for an allocation callback or a provisioning request while the Offline cluster is down.
+- **503** with `Retry-After` for an allocation callback or a Market Onboarding API request while the Offline cluster is down.
 
 AR intake, returns and inbound payments never reach these APIs. One-Data stores them, and dispatchers pull them at the governor's pace (see [Dispatchers](#dispatchers)).
 
@@ -146,29 +146,29 @@ AR learns the outcome of a request it sent from the SCHEDULED and DECLINED notif
 | --- | --- | --- |
 | `POST /payment-installments` | Pays today and creates a plan of future installments | Update-With-Start; its children run on the Online cluster |
 
-### Provisioning API
+### Market Onboarding API
 
-Each environment's app exposes a provisioning API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity.
+Each environment's app exposes the Market Onboarding API (name agreed 2026-10-19). Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity.
 
 | Path | What it does |
 | --- | --- |
-| `/provisioning/releases` | Takes a frozen market release, reports its provisioning progress, records a sign-off and rolls a release back |
-| `/provisioning/markets/{market}/{account-type}/pause` | Pauses a live market's dispatchers |
-| `/provisioning/markets/{market}/{account-type}/resume` | Resumes them |
-| `GET /provisioning/capabilities` | Returns the deployed build's capability manifest: every behavior combination the build can run |
+| `/market-onboarding/releases` | Takes a frozen market release, reports its onboarding progress, records a sign-off and rolls a release back |
+| `/market-onboarding/markets/{market}/{account-type}/pause` | Pauses a live market's dispatchers |
+| `/market-onboarding/markets/{market}/{account-type}/resume` | Resumes them |
+| `GET /market-onboarding/capabilities` | Returns the deployed build's capability manifest: every behavior combination the build can run |
 
-Sending a release is idempotent: one provisioning workflow per market, account type, version and environment.
+Sending a release is idempotent: one onboarding workflow per market, account type, version and environment.
 
-The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. The work runs in `MarketProvisioningWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
 
 | Call | Request | Response |
 | --- | --- | --- |
-| `POST /provisioning/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
-| `GET /provisioning/releases/{market}/{account-type}/{version}` | | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE` or `FAILED`), the step the workflow is on, and for a failure, the step and the reason |
-| `POST /provisioning/releases/{market}/{account-type}/{version}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off |
-| `POST /provisioning/releases/{market}/{account-type}/{version}/rollback` | `requestedBy`, `reason` | `202`; the version before it becomes active again |
-| `POST /provisioning/markets/{market}/{account-type}/pause`, `.../resume` | `requestedBy`, `reason` | `202` |
-| `GET /provisioning/capabilities` | | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
+| `POST /market-onboarding/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
+| `GET /market-onboarding/releases/{market}/{account-type}/{version}` | | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE` or `FAILED`), the step the workflow is on, and for a failure, the step and the reason |
+| `POST /market-onboarding/releases/{market}/{account-type}/{version}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off |
+| `POST /market-onboarding/releases/{market}/{account-type}/{version}/rollback` | `requestedBy`, `reason` | `202`; the version before it becomes active again |
+| `POST /market-onboarding/markets/{market}/{account-type}/pause`, `.../resume` | `requestedBy`, `reason` | `202` |
+| `GET /market-onboarding/capabilities` | | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
 
 [^ Top](#table-of-contents)
 
@@ -219,7 +219,7 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 - **Core workflows:** one business journey each, such as paying today, executing a scheduled payment or processing a return.
 - **Composite workflows:** a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), multiple instructions. They run on the Online cluster, with their children on the same cluster.
 - **Periodic workflows:** jobs started by Temporal Schedules on the Offline cluster.
-- **Control workflows:** the dispatchers, the governor and market provisioning. They pace and configure payment work; they are not payment journeys.
+- **Control workflows:** the dispatchers, the governor and market onboarding. They pace and configure payment work; they are not payment journeys.
 
 ### Online cluster
 
@@ -250,7 +250,7 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 | `ProcessPaidEventsWorkflow`, `ProcessMissingPaidEventsWorkflow`, `PurgeTransactionDataWorkflow` | Their Schedule's ID plus the trigger time | Temporal Schedules |
 | Dispatchers (scheduled payments, allocation requests, allocated payments, allocation legs, representments, AR intake, returns, inbound) | Their Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time | Temporal Schedules |
 | `GovernorWorkflow` | `governor`, plus its Schedule's trigger time | A Schedule that keeps it running |
-| `MarketProvisioningWorkflow` | `provision-{market}-{accountType}-v{N}` | The provisioning API |
+| `MarketOnboardingWorkflow` | `onboard-{market}-{accountType}-v{N}` | The Market Onboarding API |
 
 On returns and representments `{seq}` is the presentment sequence ([Presentments](#presentments)). A return's is the presentment that came back, and a representment's is the new one it sends, so a payment returned twice runs `-return-1`, `-represent-2`, `-return-2` and `-represent-3`.
 
@@ -466,7 +466,7 @@ The supplied file leans on five types it doesn't define. The build takes each on
 
 ## Market Onboarding & Payment Dimensions
 
-Markets are onboarded through billpay-ui, the market-onboarding control plane. The process, releases and provisioning are in [Market Onboarding](#market-onboarding).
+Markets are onboarded through billpay-ui, the market-onboarding control plane. The process, releases and the Market Onboarding API are in [Market Onboarding](#market-onboarding).
 
 A market profile is one market and one account type. Onboarding picks the Billpay APIs the profile takes and answers five behavior questions, the payment dimensions:
 
@@ -556,9 +556,9 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 - `appliesTo` holds a market or none, an account type or none, the behaviors that must be Y and the behaviors that must be N. Empty means everywhere. It is data, never code, so the registry can compare two of them (agreed 2026-10-19).
 - One rule picks the strategies: for each key, the most specific strategy that applies wins. A strategy tied to a market beats one that isn't; after that, the one that names more behaviors wins. Strategies with different keys add up, so Verify runs every check that applies. Strategies with the same key compete: Execute's clearing key has a realtime and a batch strategy, and exactly one applies to any payment (agreed 2026-10-19).
 - Every strategy is a `@Singleton` bean, so Quarkus finds them all at build time and hands each kind over as `@All List<T>`. A **registry** for each kind, written once, works out the winners for every combination of market and behaviors when the app starts, so a lookup at runtime is a map read. Two strategies level for one key stop the app at start, and the error names them and the combination. A registry returns its strategies sorted by key, so a replay makes the same calls in the same order (agreed 2026-10-19).
-- Strategies hold no state. The workflow calls the **stage index**, `stageIndex.lookup(plan)`, on its own thread, where Temporal requires activity stubs to be made. The index makes the stubs there, picks each step's stage, and binds it to a `StageContext` that holds the plan key and the stubs, so workflow code calls `stages.verify.run(paymentId)` and never touches a stub. The worker passes the index to each workflow through the factory it registers the workflow with (agreed 2026-10-19).
+- Strategies hold no state. The workflow calls the **stage resolver**, `stageResolver.resolve(plan)`, on its own thread, where Temporal requires activity stubs to be made. The resolver makes the stubs there, picks each step's stage, and binds it to a `StageContext` that holds the plan key and the stubs, so workflow code calls `stages.verify.run(paymentId)` and never touches a stub. The worker passes the resolver to each workflow through the factory it registers the workflow with (agreed 2026-10-19).
 - The lookup runs inside the workflow, never in the Router: during a rolling deploy the Router and the workers can run different builds, so only the workflow's own build picks its classes (agreed 2026-10-18).
-- Each step names the behaviors it must act on, such as mandate authorization and bank confirmation for Verify, and the keys it must fill, such as clearing for Execute. A combination can't run where one of those behaviors is Y but no strategy that applies names it, or where one of those keys is empty. From this the registries work out the build's **capability manifest** when the app starts: every combination that every step of its journey can run (agreed 2026-10-19). Provisioning checks each market profile against it. A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- Each step names the behaviors it must act on, such as mandate authorization and bank confirmation for Verify, and the keys it must fill, such as clearing for Execute. A combination can't run where one of those behaviors is Y but no strategy that applies names it, or where one of those keys is empty. From this the registries work out the build's **capability manifest** when the app starts: every combination that every step of its journey can run (agreed 2026-10-19). The onboarding workflow checks each market profile against it. A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
 - A test writes a report: for each step, market and combination, the stage and the strategies it gets. The report is checked in, and the test fails when the build's differs, so a change to what a combination runs is reviewed as a diff (agreed 2026-10-18).
 - Quarkus only sees beans in modules that carry an index, so each module that holds strategies has an empty `META-INF/beans.xml`. A test compares the strategy classes on the classpath with what the registries hold, so a class Quarkus can't see fails the build (agreed 2026-10-19).
 - Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes code under a running payment.
@@ -609,7 +609,7 @@ What the design costs:
 - Workflows and stages are never `abstract`: composition over inheritance.
 - Strategies, the stages, checks and methods the registries pick, hold no state: everything a payment needs arrives in its `StageContext` (agreed 2026-10-19).
 - `appliesTo` is data: a market, an account type and behaviors, never a function (agreed 2026-10-19).
-- There is one implementation of each workflow. A workflow gets its stages from the stage index and is never copied per market.
+- There is one implementation of each workflow. A workflow gets its stages from the stage resolver and is never copied per market.
 - Activities are shared across markets. Pass IDs, not payment objects; activities load what they need. The one exception is data from Payment Options and Payment Instruments: what a stage gets there, clear text included, travels in the workflow to the later calls of the same run that need it, such as Execute's and Fulfil's. Workflow history holds it encrypted by the payload codec (agreed 2026-10-18).
 - A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle. Nothing is written before the workflow starts, so the caller's path has no extra database call. From Capture on, stages pass the ID. A workflow that a Work Tracker row starts takes the payment ID, since the payment is already in Oracle (agreed 2026-10-18).
 - Set search attributes once, at start. No signals or queries on the hot path: what a caller sends a running workflow, the confirm and the no, goes in as an update, which answers the caller (agreed 2026-10-18).
@@ -804,16 +804,16 @@ interface CreateImmediatePaymentWorkflow {
 }
 
 class CreateImmediatePaymentWorkflowImpl(
-    private val stageIndex: StageIndex,              // passed in by the factory the worker registers
+    private val stageResolver: StageResolver,          // passed in by the factory the worker registers
 ) : CreateImmediatePaymentWorkflow {
     private var decided: PaymentDecision? = null
 
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
         // Each step's stage, and the checks and methods it uses, come from the plan key at runtime.
-        // On the Online cluster the stubs the index makes for Payment Instruments, Payment Options
+        // On the Online cluster the stubs the resolver makes for Payment Instruments, Payment Options
         // and Plans are local activities, so Capture, Verify and its commit all run inside this
         // first workflow task.
-        val stages = stageIndex.lookup(plan)
+        val stages = stageResolver.resolve(plan)
         val paymentId = request.paymentId              // One-Data made it
 
         stages.capture.run(request)                    // PENDING: writes the request, insert-if-absent
@@ -866,14 +866,14 @@ interface CreatePaymentIntentWorkflow {
     fun checkDecline()
 }
 
-class CreatePaymentIntentWorkflowImpl(private val stageIndex: StageIndex) : CreatePaymentIntentWorkflow {
+class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) : CreatePaymentIntentWorkflow {
     private var decided: PaymentDecision? = null     // the create's answer
     private var answer: Answer? = null               // YES or NO: the first one accepted wins
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
 
     override fun run(request: CreatePaymentRequest, plan: PlanKey) {
-        val stages = stageIndex.lookup(plan)
+        val stages = stageResolver.resolve(plan)
         val paymentId = request.paymentId
         stages.capture.run(request)                                    // PENDING: the request, and any pending IDs
         decided = if (plan.requiresBankConfirmation)
@@ -1263,7 +1263,7 @@ update bpyevnts.billpay_paid_ready
 | `trans_lfcyc_event` | One row per status per presentment. Two new columns, set on insert: the cluster that ran the step, and `batch_id` on the `PAID` rows Settle writes. A row for a decline by Verify, Reverify or Represent keeps the failed rules' IDs in its event JSON, with no new column (agreed 2026-10-18) | Says which cluster's UI holds each step; lets a retried Settle find the payments it moved |
 | `split_trans_lfcyc_event` | The same two columns, set on insert; `batch_id` goes on the `PAID` rows Settle writes for legs | Legs run on both clusters; a retried Settle finds the legs it moved |
 | `allocation_batch` (new) | Each callback's allocations, stored before its workflow starts, and when its legs were written | Keeps big batches out of workflow inputs; holds every batch until the parent's Execute releases its legs, and makes sure they are written once |
-| `market_config_version`, `market_config_active` (new) | Published market config: immutable versions, and the active one per market and account type | The Router reads it; only `MarketProvisioningWorkflow` writes it |
+| `market_config_version`, `market_config_active` (new) | Published market config: immutable versions, and the active one per market and account type | The Router reads it; only `MarketOnboardingWorkflow` writes it |
 
 Every status change in `trans_dtl` and `split_trans_dtl` is a conditional update on the current status. QueueRepresentment changes no status: it inserts the next presentment's row. Their timelines, `trans_lfcyc_event` and `split_trans_lfcyc_event`, are append-only: a step adds a row and never updates one.
 
@@ -1467,14 +1467,14 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 | billpay-ui frontend, the Market Onboarding UI | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
 | billpay-ui backend | The control plane itself: SSO, maker-checker, audit, versioned releases | The control plane, one for all environments |
 | Authoring tables | Drafts, revisions, releases, approvals, deployments, audit | The control plane's own schema, outside billpay-core |
-| Provisioning API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app (see [Billpay APIs](#provisioning-api)) |
-| `MarketProvisioningWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
+| Market Onboarding API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app (see [Billpay APIs](#market-onboarding-api)) |
+| `MarketOnboardingWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
 | Published config | `market_config_version` and `market_config_active` | Each environment's billpay-core database |
 
 ### From draft to live
 
 1. **Freeze.** When a release is approved, the backend saves the draft as release vN: the profile's full config as JSON, a checksum, the author and the approver. A release is one profile (a market and account type). It never changes; later edits become vN+1.
-2. **Send.** The backend calls E1's provisioning API with vN, using its own service identity. The call is idempotent: one workflow per market, account type, version and environment.
+2. **Send.** The backend calls E1's Market Onboarding API with vN, using its own service identity. The call is idempotent: one workflow per market, account type, version and environment.
 3. **Track.** A deployment row per release and environment follows the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
 4. **Sign off.** When someone signs off in the UI, the backend sends the sign-off through the same API. In E3 the RFC must pass the ServiceNow check first.
 5. **Promote.** Once vN is active and signed off in E1, the same vN goes to E2, then E3.
@@ -1482,15 +1482,15 @@ Onboarding has its own frontend, backend and tables, kept apart from payments. E
 
 There are two human checks: approval once, on the content (maker-checker), and sign-off in each environment after its test payments pass.
 
-### MarketProvisioningWorkflow
+### MarketOnboardingWorkflow
 
-> `provision-{market}-{accountType}-v{N}` · Offline · started by the provisioning API · control queue `ctl-provision`
+> `onboard-{market}-{accountType}-v{N}` · Offline · started by the Market Onboarding API · control queue `ctl-onboard`
 
 1. **Check** vN against the deployed build's capability manifest. A combination the build can't run stops here, marked as needing a build. So does a profile whose cancellation window doesn't close before its execution time (agreed 2026-10-18).
 2. **Save** vN as an inactive version, with the Schedules, dispatcher settings, rate rows and fairness settings it needs, also inactive.
 3. **Test** with payments against vN. The Router accepts a pinned version for test accounts only.
 4. **Wait** for sign-off, and for the RFC in E3.
-5. **Activate:** switch `market_config_active` to vN and apply its Schedules and settings. New payments use vN at once; running workflows keep the version in their plan key. Each billpay-core pod keeps the onboarding config in memory and reloads it when provisioning activates or rolls back a version (agreed 2026-10-19).
+5. **Activate:** switch `market_config_active` to vN and apply its Schedules and settings. New payments use vN at once; running workflows keep the version in their plan key. Each billpay-core pod keeps the onboarding config in memory and reloads it when the onboarding workflow activates or rolls back a version (agreed 2026-10-19).
 
 Rollback switches the pointer, and the Schedules and settings, back to the previous version. Pause and resume stop and restart a live market's dispatchers.
 
@@ -1516,7 +1516,7 @@ A market and an account type disagree on Raven when billpay-ui holds a setting f
 
 ### Capability manifest
 
-Every build ships a manifest of the behavior combinations it can run, returned by `GET /provisioning/capabilities`. The stage registries work it out when the app starts, from the strategies in the build ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and provisioning stops at step 1 until that build is deployed. Before a build rolls out to an environment, the deploy pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing (agreed 2026-10-19).
+Every build ships a manifest of the behavior combinations it can run, returned by `GET /market-onboarding/capabilities`. The stage registries work it out when the app starts, from the strategies in the build ([Plan keys and stage lookup](#plan-keys-and-stage-lookup), agreed 2026-10-19). A profile built only from combinations in the manifest goes live with config alone. A new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at step 1 until that build is deployed. Before a build rolls out to an environment, the deploy pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing (agreed 2026-10-19).
 
 ### What changes in today's billpay-ui code
 
@@ -1526,7 +1526,7 @@ Every build ships a manifest of the behavior combinations it can run, returned b
 - `Readiness.kt` is simulated today; the deployment rows replace it.
 - The behaviors gain `requiresBankConfirmation`, and `requiresRepresentableReturn` goes, since representment is now a market rule. Today's profiles hold none of the Operations step's settings yet.
 - The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
-- The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`; provisioning maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
+- The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`; onboarding maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring checks each new combination against the manifest.
 
 [^ Top](#table-of-contents)
@@ -1564,7 +1564,7 @@ One Offline namespace serves all markets, with market as a fairness key, so each
 | Task queue | Carries | Workers |
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
-| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-provision` | One control queue per dispatcher kind, plus the governor and provisioning | Control workers in the app |
+| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-onboard` | One control queue per dispatcher kind, plus the governor and market onboarding | Control workers in the app |
 | `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
 
 Queue limits are set through the task queue config API, for example:
@@ -1663,7 +1663,7 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | Return and representment | `{paymentId}-return-{seq}`, `{paymentId}-represent-{seq}` |
 | Dispatcher run | Its Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time |
 | Governor | `governor`, plus its Schedule's trigger time |
-| Market provisioning | `provision-{market}-{accountType}-v{N}` |
+| Market onboarding | `onboard-{market}-{accountType}-v{N}` |
 
 The confirm and the no are not workflows. They are updates to the waiting payment's `{paymentId}-init`, with the update IDs `{paymentId}-confirm` and `{paymentId}-no`, so they show in that one history (agreed 2026-10-18).
 
@@ -1694,7 +1694,7 @@ The confirm and the no are not workflows. They are updates to the waiting paymen
 | Offline DB hot | Offline Aurora CPU stays above the governor's cut band for 15 minutes | Look at what is running and whether the bands need tuning |
 | Governor down | `rate_allocation` is 5 minutes stale; dispatchers have fallen back to their floors | Find why the governor stopped, if the Schedule's restart doesn't hold |
 | Offline cluster down | The Offline cluster stops answering | Restore the cluster, or promote its standby |
-| Release failed provisioning | `MarketProvisioningWorkflow` stops before activation | Fix the profile, or ship the build it needs |
+| Release failed onboarding | `MarketOnboardingWorkflow` stops before activation | Fix the profile, or ship the build it needs |
 
 ### Failure modes
 
@@ -1723,7 +1723,7 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Validation fails | `DECLINED`, with notifications | Nothing |
 | Retries run out | Work Tracker row `FAILED`; the payment goes on the exception list in its last state | Review the list; reprocess or terminate each workflow by hand |
 | Allocations late | The payment waits in `ALLOCATING`: nothing clears and no leg runs until the last batch arrives; an alert fires at the market's alert point | Chase the allocation source |
-| A release fails provisioning | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
+| A release fails onboarding | The workflow stops before activation; readiness shows the failed step | Fix the profile, or ship the build it needs |
 | A burst of AR intake, returns or inbound | Requests wait in One-Data's inbox; their dispatchers take them at the governor's rate | Nothing |
 | A pulled request can't be admitted | The dispatcher marks it `REJECTED` and an alert fires; the sender is not told | Find why it was sent before its market was live |
 | billpay-core slow or down for creates or confirms | One-Data hands the creates and confirms it holds to RTF, which retries each with the same payment ID or update ID; channels get `PENDING` (agreed 2026-10-19) | Nothing; RTF delivers once billpay-core is back |

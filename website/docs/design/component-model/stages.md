@@ -68,7 +68,7 @@ Create Balance Refund follows the payment path; its detailed stages are still be
 
 ## How a step picks its classes
 
-No code maps a payment to classes. Each stage, check and method says which job it does and where it applies: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, and a class tied to a market beats a shared one, so a market is the exception only where it has a class of its own. Different jobs add up, which is how one payment gets several checks. [Building the Stage Index](../../build/principles/core-build/stage-index.md#the-complete-picture) draws the complete picture, from the plan key to the commit, and the classes behind it.
+No code maps a payment to classes. Each stage, check and method says which job it does and where it applies: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, and a class tied to a market beats a shared one, so a market is the exception only where it has a class of its own. Different jobs add up, which is how one payment gets several checks. [Building the Stage Resolver](../../build/principles/core-build/stage-resolver.md#the-complete-picture) draws the complete picture, from the plan key to the commit, and the classes behind it.
 
 ## Naming
 

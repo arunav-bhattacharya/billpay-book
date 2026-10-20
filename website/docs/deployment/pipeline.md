@@ -27,9 +27,9 @@ That is why a deploy can't change the rules under a payment halfway through it. 
 
 ## The capability manifest
 
-Every build ships a manifest of the behavior combinations it can run, worked out when the app starts by the same lookup that picks stages at runtime. `GET /provisioning/capabilities` returns it, and provisioning checks every market release against it.
+Every build ships a manifest of the behavior combinations it can run, worked out when the app starts by the same lookup that picks stages at runtime. `GET /market-onboarding/capabilities` returns it, and the onboarding workflow checks every market release against it.
 
-This is where the pipeline and market onboarding meet. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and provisioning stops at its first step until a build with that combination is deployed.
+This is where the pipeline and market onboarding meet. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed.
 
 The check runs the other way too. Before a build rolls out to an environment, the pipeline compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing. A build that dropped a class a live market needs never rolls out there.
 

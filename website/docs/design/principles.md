@@ -20,7 +20,7 @@ When a design choice is unclear, these rules decide it.
 1. Oracle is the source of truth. Every status change is a conditional update that applies only if the status is still what the writer expects. Whoever loses backs off.
 2. Work that waits for a date waits in Oracle, as a Work Tracker row. It never waits in a sleeping workflow or on a Temporal timer. The one wait that stays in a workflow is a payment waiting minutes for its customer's confirmation, which `CreatePaymentIntentWorkflow` holds on a durable timer.
 3. Nothing calls across clusters. Oracle is the only hand-off between the Online and Offline clusters.
-4. Every payment workflow starts through the Router. No API or dispatcher starts one on its own. Control workflows (the dispatchers, the governor and provisioning) start from Schedules or their own APIs.
+4. Every payment workflow starts through the Router. No API or dispatcher starts one on its own. Control workflows (the dispatchers, the governor and market onboarding) start from Schedules or their own APIs.
 5. Pace at the door. Admit only what a cluster and its downstream systems can carry. Big bursts wait in Oracle or in One-Data's inbox, not in Temporal.
 6. One workflow per journey. Stages are the only thing that varies by market behavior, so there are no market-specific workflows.
 7. One Oracle commit per stage. A stage makes its calls first, in parallel where they don't depend on each other, then commits the state change and its timeline entry together. Its lifecycle event (RTF) and, where the customer is told, its message (Raven) go out right after the commit. Fulfil is the exception: `PROCESSED` waits for both.
@@ -63,7 +63,7 @@ Work flows one way: workflow, stage, activity, client, external system. Nothing 
 | Layer | May call | Must not call |
 | --- | --- | --- |
 | Workflow | Stages; child workflows on its own cluster | Activities, clients, external systems, anything on the other cluster |
-| Stage | Activities; the checks and methods the stage index gives it; plain helper functions | Workflows, other stages, clients, external systems |
+| Stage | Activities; the checks and methods the stage resolver gives it; plain helper functions | Workflows, other stages, clients, external systems |
 | Activity | Clients | Workflows, stages, other activities, external systems |
 | Client | Its one system | Other clients, workflows, stages, activities |
 
@@ -80,7 +80,7 @@ Naming a class for its job rather than its market means a check that several mar
 
 ## Composition, not inheritance
 
-- There is one implementation of each workflow. A workflow gets its stages from the stage index and is never copied per market.
+- There is one implementation of each workflow. A workflow gets its stages from the stage resolver and is never copied per market.
 - Workflows and stages are never `abstract`.
 - Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs. A whole request travels only once, into a workflow that creates a payment: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. Data from Payment Options and Payment Instruments is the other exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec.
 
@@ -91,7 +91,7 @@ A workflow is never handed its stages. When the Router starts it, the Router pin
 Nothing maps a plan key to classes by hand. Each stage, and each check or method a stage uses, says what job it does and where it applies: a market or every market, an account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, so a market's own class beats the shared one in that market, and different jobs add up. Quarkus finds every class when the code is built, and a registry works out every combination when the app starts, so a running workflow reads its answers and decides nothing. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
 
 - Each step names the behaviors it must act on, such as mandate authorization for Verify. A combination where one of them is Y and no class that applies handles it can't run, so it can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
-- The same registries produce the build's **capability manifest**, the list of every combination the build can run. Provisioning checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
+- The same registries produce the build's **capability manifest**, the list of every combination the build can run. The onboarding workflow checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
 - Payment workflows are pinned to their build with Worker Versioning, and the plan key carries the config version. A deploy never changes the code under a running payment, and a new market release never changes its config.
 
 ## Writing a step that is safe to repeat

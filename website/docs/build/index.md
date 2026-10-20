@@ -24,7 +24,7 @@ Everything here goes into one app, billpay-core. It runs the core APIs, the Rout
     {
       term: 'API Spec',
       to: '/docs/build/api-spec',
-      desc: `The contracts: One-Data's functions at the edge, billpay-core's REST APIs behind them, what the Router refuses, and the provisioning API.`,
+      desc: `The contracts: One-Data's functions at the edge, billpay-core's REST APIs behind them, what the Router refuses, and the Market Onboarding API.`,
     },
     {
       term: 'Domain Model',

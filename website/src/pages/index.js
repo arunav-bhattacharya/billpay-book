@@ -12,7 +12,7 @@ const SECTIONS = [
   {to: '/docs/vision', label: 'Vision', blurb: 'Why Billpay exists'},
   {to: '/docs/architecture', label: 'Architecture', blurb: 'The shape of the platform'},
   {to: '/docs/design', label: 'Design', blurb: 'Lifecycle, routing, components'},
-  {to: '/docs/onboarding', label: 'Market Onboarding', blurb: 'Profiles, releases, provisioning'},
+  {to: '/docs/onboarding', label: 'Market Onboarding', blurb: 'Profiles, releases, the onboarding API'},
   {to: '/docs/build', label: 'Build', blurb: 'APIs, data model and code'},
   {to: '/docs/testing', label: 'Testing', blurb: 'Correctness and performance'},
   {to: '/docs/deployment', label: 'Deployment', blurb: 'Deployables and the pipeline'},

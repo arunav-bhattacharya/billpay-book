@@ -38,11 +38,11 @@ Bank confirmation is resolved by how the customer pays rather than by the journe
 
 ## What the build can run
 
-Each combination of behaviors needs classes in the build that handle it. Verify, for example, handles mandate authorization with `MandateCheck`, so a combination with mandate authorization runs only once that check is in the build. The build lists the combinations it can run in its **capability manifest**, which the provisioning API returns from `GET /provisioning/capabilities`. The manifest comes from the same lookup the workflows use to find their stages, so the two can't disagree.
+Each combination of behaviors needs classes in the build that handle it. Verify, for example, handles mandate authorization with `MandateCheck`, so a combination with mandate authorization runs only once that check is in the build. The build lists the combinations it can run in its **capability manifest**, which the Market Onboarding API returns from `GET /market-onboarding/capabilities`. The manifest comes from the same lookup the workflows use to find their stages, so the two can't disagree.
 
 - A profile built only from combinations in the manifest goes live with config alone, no deploy needed.
 - A new combination is flagged as needing a build while it is being authored, so the gap shows up early.
-- If a release still reaches an environment without the build it needs, provisioning stops at its first step, the check against the manifest, until that build is deployed.
+- If a release still reaches an environment without the build it needs, the onboarding workflow stops at its first step, the check against the manifest, until that build is deployed.
 - The other way round, a build can't take away what a live market uses. Before a build rolls out to an environment, the [deploy pipeline](../deployment/pipeline.md#the-capability-manifest) checks its manifest against every release live there, and stops a build that no longer covers one.
 
 Whether a return can be represented isn't one of these behaviors. It is a market rule, set with the market's other representment rules in its [operations settings](./operations-settings.md): which return reasons can be represented, and how many times a payment can be.

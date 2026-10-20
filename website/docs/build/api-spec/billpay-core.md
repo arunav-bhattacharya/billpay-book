@@ -17,7 +17,7 @@ The Router answers a write before any workflow starts when it can't take it. It 
 - 422 when the market, account type or API is not live in this environment. Senders don't retry a 422. A create One-Data held while billpay-core was slow, which RTF delivers after its market was taken out of service, is captured and declined instead, so the customer is told and the delete runs.
 - 429 with `Retry-After` when an allocations callback arrives over its traffic class's budget. The allocations manager retries. No other API gets a 429.
 - 409 when an update or cancel arrives for a payment that is no longer `SCHEDULED`, or after the cancellation window has closed. A corporate payment leaves `SCHEDULED` when its allocations are requested. A confirm gets 409 too once its payment's workflow no longer waits, such as when the payment was cancelled because its confirmation window closed, and so does a cancel of a `PENDING` payment that isn't waiting for a confirmation. A confirm repeated after its workflow has closed gets the payment's current state instead.
-- 503 with `Retry-After` for an allocations callback or a provisioning request while the Offline cluster is down.
+- 503 with `Retry-After` for an allocations callback or a Market Onboarding API request while the Offline cluster is down.
 
 ## Endpoints
 
@@ -58,19 +58,19 @@ Every write is safe to send twice. `PaymentStore`, the only code that reaches Or
 - A confirm is an update to the payment's waiting workflow, and Verify's commit is guarded on `PENDING`. A repeated confirm carries the same update ID and gets the same answer, or once the workflow has closed, gets the payment's current state from Oracle, so a retry after a lost reply never looks like a failure. A confirm the workflow turns away, because it already has an answer or no longer waits, gets 409.
 - An allocations callback stores its batch in `allocation_batch` first, then starts `ReceiveAllocationsWorkflow` with the ID `{paymentId}-allocations-{batch}`, which comes from the request. A repeated batch finds the same workflow: a start that fails as already started counts as done, and reuse policy `REJECT_DUPLICATE` stops a second run after the first one closes. The callback's full contract, including its idempotency rules, is still to be agreed with the allocations manager.
 
-## Provisioning API
+## Market Onboarding API
 
-Each environment's billpay-core also exposes a provisioning API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity. The work runs in `MarketProvisioningWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+Each environment's billpay-core also exposes the Market Onboarding API. Only the market-onboarding control plane (billpay-ui's backend) calls it, with its own service identity. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
 
-The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/provisioning/releases/{market}/{account-type}/{version}` and `{live}` for `/provisioning/markets/{market}/{account-type}`.
+The bodies are Proposed (2026-10-18), for billpay-ui's team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/market-onboarding/releases/{market}/{account-type}/{version}` and `{live}` for `/market-onboarding/markets/{market}/{account-type}`.
 
 | Call | Request | Response |
 | --- | --- | --- |
-| `POST /provisioning/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
+| `POST /market-onboarding/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
 | `GET {release}` | No body | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE` or `FAILED`), the step the workflow is on, and for a failure, the step and the reason |
 | `POST {release}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off |
 | `POST {release}/rollback` | `requestedBy`, `reason` | `202`; the version before it becomes active again |
 | `POST {live}/pause` and `POST {live}/resume` | `requestedBy`, `reason` | `202` |
-| `GET /provisioning/capabilities` | No body | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
+| `GET /market-onboarding/capabilities` | No body | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
 
-Sending a release is idempotent: one provisioning workflow per market, account type, version and environment. [Market Onboarding → Provisioning](../../onboarding/provisioning.md) follows a release through it.
+Sending a release is idempotent: one onboarding workflow per market, account type, version and environment. [Market Onboarding API](../../onboarding/market-onboarding-api.md) follows a release through it.

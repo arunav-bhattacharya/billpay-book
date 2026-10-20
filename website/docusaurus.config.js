@@ -112,6 +112,13 @@ const config = {
           },
           {from: '/docs/build/data-model/database', to: '/docs/build/database'},
           {from: '/docs/architecture/components', to: '/docs/architecture/overview'},
+          // Renamed 2026-10-19: the provisioning API is the Market Onboarding
+          // API, and the stage index is the stage resolver.
+          {from: '/docs/onboarding/provisioning', to: '/docs/onboarding/market-onboarding-api'},
+          {
+            from: '/docs/build/principles/core-build/stage-index',
+            to: '/docs/build/principles/core-build/stage-resolver',
+          },
         ],
       },
     ],

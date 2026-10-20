@@ -24,7 +24,7 @@ Each cluster has one namespace, named `billpay-online` or `billpay-offline` in e
 Three kinds of queue, each with its own job:
 
 - `offline-wf` carries the workflow tasks, and activities nothing needs to throttle.
-- A `ctl-*` queue per kind of dispatcher, plus one for the governor and one for provisioning, carries the control activities. A slow dispatcher can't hold up another.
+- A `ctl-*` queue per kind of dispatcher, plus one for the governor and one for market onboarding, carries the control activities. A slow dispatcher can't hold up another.
 - A `ds-*` queue per downstream carries the calls to it, and its rate limit is the limit for that downstream across every pod. The governor changes it at runtime.
 
 [Throttling](../../design/throttling.md#the-offline-clusters-task-queues) lists every queue.

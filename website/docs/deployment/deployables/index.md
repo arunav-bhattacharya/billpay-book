@@ -32,7 +32,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'billpay-ui',
       to: '/docs/deployment/deployables/ui-app',
-      desc: `The market onboarding control plane: one for every environment, reaching each one only through its provisioning API.`,
+      desc: `The market onboarding control plane: one for every environment, reaching each one only through its Market Onboarding API.`,
     },
     {
       term: 'Mocks App',

@@ -10,7 +10,7 @@ import styles from './styles.module.css';
  * the profile's five behaviors on the left, the Router's resolved values
  * beside them. The one value that changes, realtime clearing from BOTH to Y,
  * is the one Bright Blue chip, joined to its source by a thin line. The plan
- * key pins what the Router worked out, and the stage index turns it into
+ * key pins what the Router worked out, and the stage resolver turns it into
  * each step's stage and the checks and methods it gets.
  *
  * Coordinates are hand-placed on a 700 x 246 canvas. Takes no props.
@@ -27,7 +27,7 @@ const CARDS = [
   {n: 1, x: 10, w: 184, title: 'Profile', sub: 'market and account type'},
   {n: 2, x: 216, w: 100, title: 'Router', sub: 'for pay today'},
   {n: 3, x: 338, w: 124, title: 'Plan key', sub: 'pinned at start'},
-  {n: 4, x: 484, w: 206, title: 'Stage index', sub: 'most specific class per job'},
+  {n: 4, x: 484, w: 206, title: 'Stage resolver', sub: 'most specific class per job'},
 ];
 
 const ROWS = [
@@ -47,7 +47,7 @@ const STEPS = [
 ];
 
 const LABEL =
-  'From a market profile to the classes a payment runs, in four steps, for a payment made today from a channel. One, the profile, for a market and an account type, sets five behaviors: account type CONSUMER, AR posting Y, realtime clearing BOTH, mandate authorization Y and bank confirmation N. Two, the Router resolves those for the journey: BOTH becomes Y for pay today, and the rest stay as they are. Three, it pins the plan key: the market, the journey, the resolved behaviors, the config version and the rule settings from that version. Four, the stage index picks the most specific class for each job: DefaultPaymentVerifyStage with the Instrument, Options and Mandate checks, DefaultPaymentExecuteStage with RealtimeClearing, and DefaultPaymentFulfilStage.';
+  'From a market profile to the classes a payment runs, in four steps, for a payment made today from a channel. One, the profile, for a market and an account type, sets five behaviors: account type CONSUMER, AR posting Y, realtime clearing BOTH, mandate authorization Y and bank confirmation N. Two, the Router resolves those for the journey: BOTH becomes Y for pay today, and the rest stay as they are. Three, it pins the plan key: the market, the journey, the resolved behaviors, the config version and the rule settings from that version. Four, the stage resolver picks the most specific class for each job: DefaultPaymentVerifyStage with the Instrument, Options and Mandate checks, DefaultPaymentExecuteStage with RealtimeClearing, and DefaultPaymentFulfilStage.';
 
 const chipWidth = (value) => (value.length > 1 ? value.length * 7 + 12 : 22);
 

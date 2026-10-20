@@ -28,7 +28,7 @@ Four choices sit underneath everything and are not revisited per component:
 | [ORM](./orm.md) | **Exposed** | SQL stays visible, Kotlin-native, no session magic anywhere near payments. |
 | [HTTP client](./http-client.md) | **OkHttp** | Pooling, HTTP/2, and four independent timeouts that respect the activity deadline above them. |
 | [Serialization](./serialization.md) | **Jackson** | Polymorphic `type` discriminators carry our sealed domain model across every boundary, and Temporal's own converter already speaks it. |
-| [Stage lookup](../core-build/stage-index.md) | **Quarkus CDI (ArC)** | Finds every stage, check and method at build time and hands them to the stage registries, so a market's own variation is one new class, with no mapping code and no code generator. |
+| [Stage lookup](../core-build/stage-resolver.md) | **Quarkus CDI (ArC)** | Finds every stage, check and method at build time and hands them to the stage registries, so a market's own variation is one new class, with no mapping code and no code generator. |
 
 ## Under evaluation
 

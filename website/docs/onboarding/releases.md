@@ -26,7 +26,7 @@ A release is one profile, one market and account type. It never changes after it
 
 A release moves through E1, E2 and E3, always in that order. E3 is production, and it needs a change request (RFC) as well as a sign-off.
 
-1. The backend sends vN to E1's provisioning API, using its own service identity. Sending is idempotent: there is one provisioning workflow per market, account type, version and environment, so a repeated send doesn't start a second one.
+1. The backend sends vN to E1's Market Onboarding API, using its own service identity. Sending is idempotent: there is one onboarding workflow per market, account type, version and environment, so a repeated send doesn't start a second one.
 2. A deployment row per release and environment tracks the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen in billpay-ui reads those rows, so it shows real progress.
 3. In each environment the workflow runs test payments against vN. Once they pass, someone signs off in the UI, and the backend sends the sign-off through the same API.
 4. Once vN is active and signed off in E1, the same vN goes to E2, then to E3. In E3 the RFC must pass the ServiceNow check before the sign-off counts.
@@ -56,5 +56,5 @@ billpay-ui already has most of this flow. These are the changes that connect it 
 - `Readiness.kt` is simulated today. The deployment rows replace it.
 - The behaviors gain `requiresBankConfirmation`, and `requiresRepresentableReturn` goes, since representment is now a market rule. Today's profiles hold none of the Operations step's settings yet.
 - The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
-- The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`. Provisioning maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
+- The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`. Onboarding maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring will check each new behavior combination against the build's capability manifest.

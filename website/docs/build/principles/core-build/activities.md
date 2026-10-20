@@ -73,7 +73,7 @@ On the Offline cluster, a call to a throttled system runs on that system's `ds-*
 
 A caller on the Online cluster waits for Verify's decision, so the calls that make it run as local activities: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation. A local activity runs in the worker that holds the workflow task, with no trip through a task queue. Capture, Verify's calls and Verify's commit all finish inside the workflow's first task, and the caller's answer comes straight out of it. Together they cost about 2 history writes, where Verify's k calls as regular activities would cost about 2k + 3.
 
-Only a system without a rate limit can be called this way, because a local activity skips the queue and with it the queue's limit. None of these four has one. The stage index makes the stubs, and picks each one by the cluster the workflow runs on. On the Online cluster a Verify call gets 3 tries in the worker, and one that still fails goes out again as a regular activity. The provider's call gets a single try, because its link has to come back inside the API's wait:
+Only a system without a rate limit can be called this way, because a local activity skips the queue and with it the queue's limit. None of these four has one. The stage resolver makes the stubs, and picks each one by the cluster the workflow runs on. On the Online cluster a Verify call gets 3 tries in the worker, and one that still fails goes out again as a regular activity. The provider's call gets a single try, because its link has to come back inside the API's wait:
 
 ```kotlin
 private val online =

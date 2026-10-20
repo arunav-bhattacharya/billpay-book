@@ -31,12 +31,12 @@ The payment waits. Nothing clears and no leg runs until the last batch arrives, 
 1. Chase the allocation source for the missing batches.
 2. Once the batches add up to the amount, the payment commits `ALLOCATED` and the allocated-payments dispatcher starts its execution: at once for a payment made today, or at the execution time on its due date for a scheduled one, or at once if that time has passed. There is nothing to restart by hand.
 
-## A release failed provisioning
+## A release failed onboarding
 
-The release failed provisioning alert fires when `MarketProvisioningWorkflow` stops before activation, and the readiness screen in billpay-ui shows the step it stopped at. A market that is already live keeps running on its active version, because the failed one was never activated.
+The release failed onboarding alert fires when `MarketOnboardingWorkflow` stops before activation, and the readiness screen in billpay-ui shows the step it stopped at. A market that is already live keeps running on its active version, because the failed one was never activated.
 
 1. Read the failed step and its reason in readiness.
-2. If the check failed because the profile needs a behavior combination the deployed build can't run, either change the profile or ship the build that adds the combination. Provisioning can't pass its first step until that build is deployed.
+2. If the check failed because the profile needs a behavior combination the deployed build can't run, either change the profile or ship the build that adds the combination. The onboarding workflow can't pass its first step until that build is deployed.
 3. If the check failed because the market's cancellation window doesn't close before its execution time, fix the profile.
 4. If the test payments failed, fix the profile. A release never changes once it is frozen, so a fixed profile goes out as the next version, through the same approval.
 

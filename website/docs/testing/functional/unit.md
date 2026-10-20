@@ -36,7 +36,7 @@ A verification rule is a plain condition over the facts the checks gathered, so 
 
 ## The plan-key lookup
 
-A workflow finds its stages through the stage index, and every stage, check and method says where it applies ([Building the Stage Index](../../build/principles/core-build/stage-index.md)). The registries behind the index are plain Kotlin, so a unit test builds them from a list of classes, without Quarkus, and checks:
+A workflow finds its stages through the stage resolver, and every stage, check and method says where it applies ([Building the Stage Resolver](../../build/principles/core-build/stage-resolver.md)). The registries behind the resolver are plain Kotlin, so a unit test builds them from a list of classes, without Quarkus, and checks:
 
 - Each registry builds without a tie. Two classes level for one job fail with an error that names both and the combination.
 - The most specific class wins. A market's own class beats the shared one with the same key in that market, and nowhere else, and a class that names more behaviors beats one that names fewer.
@@ -47,7 +47,7 @@ A workflow finds its stages through the stage index, and every stage, check and 
 
 Two more tests run against the built app. Every stage, check and method class on the classpath must be in a registry, so a module without its `META-INF/beans.xml` can't drop a class silently. And every class tied to a market must start with that market's code.
 
-Provisioning checks every market release against the manifest, so a gap the tests miss turns into a release that can't go live.
+The onboarding workflow checks every market release against the manifest, so a gap the tests miss turns into a release that can't go live.
 
 ## Workflows
 

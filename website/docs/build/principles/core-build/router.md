@@ -22,7 +22,7 @@ The confirm, and the customer's no to a payment that waits, go through admission
 
 Calling it is a plain function call inside billpay-core. The app holds a Temporal client for each cluster, and the Router takes the one its placement names. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
 
-Control workflows don't go through the Router. The dispatchers, the governor and market provisioning start from their Schedules or their own API.
+Control workflows don't go through the Router. The dispatchers, the governor and market onboarding start from their Schedules or their own API.
 
 ## The two types it hands on
 
@@ -74,7 +74,7 @@ fun route(request: RouteRequest): Routed {
 
 ### 1. Admit
 
-The Router checks that the market, the account type and the API are live in this environment. It checks them against billpay-core's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Each pod reloads its copy when provisioning activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
+The Router checks that the market, the account type and the API are live in this environment. It checks them against billpay-core's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
 
 | Caller | What a refusal becomes |
 | --- | --- |
@@ -135,19 +135,19 @@ fun resolveFlag(rule: BehaviorRule, journey: Journey, method: PaymentMethod?): B
     }
 ```
 
-The version is the active one, with one exception. Provisioning tests a new version with real payments before it goes live, so for test accounts only, the Router accepts a pinned version instead.
+The version is the active one, with one exception. The onboarding workflow tests a new version with real payments before it goes live, so for test accounts only, the Router accepts a pinned version instead.
 
 ### 4. Pin the plan key
 
 The workflow gets the plan key as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages. The key carries the market as well as the behaviors, because a market's own class, such as GB's funds check for Pay with Bank Transfer, applies by market:
 
 ```kotlin
-val stages = stageIndex.lookup(plan)              // inside the workflow, on its own thread
+val stages = stageResolver.resolve(plan)              // inside the workflow, on its own thread
 ```
 
-Each stage, and each check or method a stage uses, says where it applies: a market or every market, an account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, so a market's own class beats a shared one with the same key in that market and nowhere else, while classes with different keys add up. Quarkus finds every class at build time, and a registry works out every combination when the app starts, so a lookup is a map read. The same registries work out the build's capability manifest, which `GET /provisioning/capabilities` returns and provisioning checks every release against.
+Each stage, and each check or method a stage uses, says where it applies: a market or every market, an account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, so a market's own class beats a shared one with the same key in that market and nowhere else, while classes with different keys add up. Quarkus finds every class at build time, and a registry works out every combination when the app starts, so a lookup is a map read. The same registries work out the build's capability manifest, which `GET /market-onboarding/capabilities` returns and the onboarding workflow checks every release against.
 
-The Router builds the plan key but never picks a class. During a rolling deploy the Router and the workers can run different builds, so the classes are picked by the build that runs them. [Building Stages](./stages.md#how-a-stage-gets-picked) shows how a class says where it applies, and [Building the Stage Index](./stage-index.md) works through one payment from its plan key to the checks it runs.
+The Router builds the plan key but never picks a class. During a rolling deploy the Router and the workers can run different builds, so the classes are picked by the build that runs them. [Building Stages](./stages.md#how-a-stage-gets-picked) shows how a class says where it applies, and [Building the Stage Resolver](./stage-resolver.md) works through one payment from its plan key to the checks it runs.
 
 The key also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the key carries the market's confirmation window too, which the workflow's timer uses.
 

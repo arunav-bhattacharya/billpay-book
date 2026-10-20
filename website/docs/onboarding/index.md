@@ -25,7 +25,7 @@ A market is onboarded one **market profile** at a time: one market and one accou
 <OnboardingFlow />
 
 1. Freeze. When a release is approved, billpay-ui's backend saves the draft as release vN: the profile's full config as JSON, a checksum, the author and the approver. A release never changes; later edits become vN+1.
-2. Send. The backend calls E1's provisioning API with vN, using its own service identity. The call is idempotent, so sending the same release twice starts one workflow, not two.
+2. Send. The backend calls E1's Market Onboarding API with vN, using its own service identity. The call is idempotent, so sending the same release twice starts one workflow, not two.
 3. Track. A deployment row per release and environment follows the workflow through requested, running, waiting for sign-off, active or failed. The readiness screen reads it.
 4. Sign off. Once its test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. In E3, which is production, the change request (RFC) must pass the ServiceNow check first.
 5. Promote. Once vN is active and signed off in E1, the same vN goes to E2, then to E3.
@@ -40,11 +40,11 @@ There are only two human checks: approval once, on the content, by a maker and a
 | billpay-ui frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
 | billpay-ui backend | The control plane itself: single sign-on, maker-checker, audit, versioned releases | The control plane, one for all environments |
 | Authoring tables | Drafts, revisions, releases, approvals, deployments and audit | The control plane's own schema, outside billpay-core |
-| Provisioning API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app |
-| `MarketProvisioningWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
+| Market Onboarding API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app |
+| `MarketOnboardingWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
 | Published config | `market_config_version` and `market_config_active` | Each environment's billpay-core database |
 
-The control plane never reads or writes an environment's Oracle or Temporal, and an environment never reads the authoring tables. Everything crosses through the provisioning API.
+The control plane never reads or writes an environment's Oracle or Temporal, and an environment never reads the authoring tables. Everything crosses through the Market Onboarding API.
 
 ## In this section
 
@@ -66,9 +66,9 @@ The control plane never reads or writes an environment's Oracle or Temporal, and
       desc: `Maker-checker approval, frozen versions, promotion from E1 to E3, test payments, sign-off, the RFC, rollback, and pausing a live market.`,
     },
     {
-      term: 'Provisioning',
-      to: '/docs/onboarding/provisioning',
-      desc: `The provisioning API, the five steps of MarketProvisioningWorkflow, the published config tables, and how new payments pick up a version.`,
+      term: 'Market Onboarding API',
+      to: '/docs/onboarding/market-onboarding-api',
+      desc: `The Market Onboarding API, the five steps of MarketOnboardingWorkflow, the published config tables, and how new payments pick up a version.`,
     },
   ]}
 />
