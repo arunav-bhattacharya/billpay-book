@@ -4,6 +4,7 @@ description: 'billpay-core follows Gitflow: work comes together on develop, ship
 ---
 
 import Lead from '@site/src/components/Lead';
+import GitflowMap from '@site/src/components/GitflowMap';
 
 # Code Merge Strategy
 
@@ -22,17 +23,7 @@ The branch model is agreed (2026-10-20). Branch names, merge methods, approvals 
 | `main` | | | The production copy: what runs in E3, and nothing else |
 | `hotfix/{version}` | `main` | `main` and `develop` | A fix production needs before the next release |
 
-```mermaid
-flowchart LR
-  F["feature/* and fix/*"] -->|squash| D[develop]
-  D -->|cut| R["release/*"]
-  R -->|"E1, E2, E3"| P((production))
-  P -->|merge commit, tag| M[main]
-  R -->|merge back| D
-  M -->|branch| H["hotfix/*"]
-  H -->|"E1, E2, E3"| P
-  H -->|merge commit| D
-```
+<GitflowMap />
 
 ## From a feature to production
 

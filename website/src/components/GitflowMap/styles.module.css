@@ -1,0 +1,176 @@
+/* GitflowMap: the branch model as lanes. Filled chips for the lane names,
+   rails in each branch's tone, the house E1 E2 E3 card. No outlines. Every
+   colour is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --gf-card: color-mix(in srgb, var(--amex-indigo) 6%, var(--amex-panel));
+  --gf-feature: var(--amex-mut);
+  --gf-develop: var(--amex-blue);
+  --gf-release: var(--amex-sky);
+  --gf-main: var(--amex-midnight);
+  --gf-hotfix: var(--amex-state-failure);
+
+  margin: 1.5rem 0 2.2rem;
+  padding: 1rem 1rem 0.85rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --gf-card: color-mix(in srgb, var(--amex-indigo) 14%, var(--amex-panel));
+  --gf-develop: var(--amex-blue-bright);
+  --gf-main: var(--amex-deep-200);
+}
+
+.frame {
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  min-width: 600px;
+  height: auto;
+  font-family: var(--amex-font-sans);
+}
+
+.t_feature {
+  --tone: var(--gf-feature);
+}
+.t_develop {
+  --tone: var(--gf-develop);
+}
+.t_release {
+  --tone: var(--gf-release);
+}
+.t_main {
+  --tone: var(--gf-main);
+}
+.t_hotfix {
+  --tone: var(--gf-hotfix);
+}
+
+.laneChip {
+  fill: var(--gf-card);
+}
+.laneName {
+  font-family: var(--amex-font-mono);
+  font-size: 11.5px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.laneNote {
+  font-size: 10px;
+  fill: var(--amex-mut);
+}
+.track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--tone) 22%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.rail {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.r_feature {
+  stroke: var(--gf-feature);
+}
+.r_develop {
+  stroke: var(--gf-develop);
+}
+.r_release {
+  stroke: var(--gf-release);
+}
+.r_main {
+  stroke: var(--gf-main);
+}
+.r_hotfix {
+  stroke: var(--gf-hotfix);
+}
+.back {
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.dot {
+  stroke: var(--amex-panel);
+  stroke-width: 2;
+}
+.d_feature {
+  fill: var(--gf-feature);
+}
+.d_develop {
+  fill: var(--gf-develop);
+}
+.d_release {
+  fill: var(--gf-release);
+}
+.d_main {
+  fill: var(--gf-main);
+}
+.d_hotfix {
+  fill: var(--gf-hotfix);
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--amex-mut);
+}
+
+/* the one build through the environments */
+.envCard {
+  fill: var(--amex-panel);
+}
+.env {
+  fill: color-mix(in srgb, var(--gf-develop) 18%, var(--amex-panel));
+}
+.envProd {
+  fill: var(--amex-blue);
+}
+.envText {
+  font-family: var(--amex-font-mono);
+  font-size: 9.5px;
+  font-weight: 650;
+  fill: var(--amex-txt-strong);
+}
+.envTextProd {
+  fill: var(--amex-banner-block-ink);
+}
+
+.tag {
+  fill: var(--gf-main);
+}
+.tagText {
+  font-family: var(--amex-font-mono);
+  font-size: 10.5px;
+  font-weight: 650;
+  fill: var(--amex-banner-block-ink);
+}
+
+/* ---- legend ---- */
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  --legend-gap: 0.4rem 1.3rem;
+  margin: 0.7rem 0.15rem 0;
+}
+.li {
+  composes: legendItem from '../../css/recipes.module.css';
+  --legend-fs: 0.72rem;
+}
+.envSw {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-blue);
+  color: var(--amex-banner-block-ink);
+  font-family: var(--amex-font-mono);
+  font-size: 0.6rem;
+  font-weight: 650;
+}
