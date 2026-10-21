@@ -231,7 +231,7 @@ The field names and values here are illustrative (Proposed, 2026-10-20). The spe
 
 The rule's logic is code and changes with a deploy. The number is config and changes with a release.
 
-A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify's checks as for any payment. [Design → Journeys](../../design/journeys/index.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
+A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify's checks as for any payment. [Design → Journeys](../../design/journeys/all-journeys.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
 
 The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg.
 

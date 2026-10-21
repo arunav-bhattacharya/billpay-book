@@ -215,6 +215,17 @@ export const BANDS = [
             then: [{to: 'immediate', text: 'each instruction runs as a child'}],
           },
           {
+            id: 'points',
+            wf: 'Pay with MR Points',
+            plain: true,
+            full: 'Pay with MR Points, a composite workflow',
+            lead: 'Pay today with MR Points alone.',
+            journey: 'Create payment, today, MR Points as the one instruction',
+            wfId: '{paymentId}-init',
+            behave: 'Its steps are still to be defined, so there are no example values yet.',
+            tbd: 'A composite across Billpay and Loyalty, today only. Its steps and its calls to Loyalty are still to be defined.',
+          },
+          {
             id: 'scheduled',
             wf: 'CreateScheduledPayment',
             lead: 'A payment for a future date.',

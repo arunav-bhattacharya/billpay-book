@@ -47,17 +47,12 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Journeys',
       to: '/docs/design/journeys',
-      desc: `Each journey end to end, from the channel or event that starts it to the money settling.`,
+      desc: `How a payment page becomes a journey, each journey end to end, and the complete picture of one journey through every layer.`,
     },
     {
       term: 'Routing',
       to: '/docs/design/routing',
       desc: `The Router's six steps, the start mode for each kind of request, and which workflow each trigger starts, on which cluster.`,
-    },
-    {
-      term: 'The Complete Picture',
-      to: '/docs/design/complete-picture',
-      desc: `Every road on one sheet: the One-Data function, the core API or dispatcher, the Router, the workflow, its stages and the activities they call.`,
     },
     {
       term: 'Component Model',

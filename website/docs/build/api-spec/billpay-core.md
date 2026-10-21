@@ -40,7 +40,7 @@ One composite API runs core workflows as children:
 | --- | --- | --- |
 | `POST /payment-installments` | Pay & Plan: pays today and creates a plan of future installments | Update-With-Start; its children run on the Online cluster |
 
-[Design → Routing](../../design/routing.md) has the workflow each request starts and the cluster it runs on, and [The Complete Picture](../../design/complete-picture.md) follows every endpoint through its stages to the calls they make. [One-Data Functions](./one-data.md) names the function in front of each endpoint.
+[Design → Routing](../../design/routing.md) has the workflow each request starts and the cluster it runs on, and [The Complete Picture](../../design/journeys/complete-picture.md) follows every endpoint through its stages to the calls they make. [One-Data Functions](./one-data.md) names the function in front of each endpoint.
 
 ## What never reaches these APIs
 

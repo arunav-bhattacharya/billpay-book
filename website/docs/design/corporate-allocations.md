@@ -78,4 +78,4 @@ Every 60 seconds the leg dispatcher counts each parent's legs. Once every batch 
 
 Billpay plans for up to 50K corporate payments and 500K allocations a day, with up to 100K allocations in one payment. One workflow per leg handles that comfortably, so there is no separate chunk mode for big payments. 500K legs a day average about 230 Temporal writes a second on the Offline cluster. A single 100K payment, at 100 legs a second, adds about 4,000 writes a second for those 17 minutes, which the governor budgets like any other class.
 
-The [Payment State Model](./payment-state-model.md#corporate-payments) has the rules in brief, and the [journeys](./journeys/index.md#corporate-payments) show both corporate flows step by step.
+The [Payment State Model](./payment-state-model.md#corporate-payments) has the rules in brief, and the [journeys](./journeys/all-journeys.md#corporate-payments) show both corporate flows step by step.

@@ -36,6 +36,23 @@ Realtime clearing shows how this works. Only a pay-today payment from a channel 
 
 Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a request with several instructions, or a Pay & Plan request, that would need it gets 422.
 
+## What the customer is offered
+
+The profile also decides what a channel's payment page shows. Before the customer pays, the channel calls `ReadPaymentChoices.v1` (Proposed), which reads this profile's active release and returns:
+
+| The page shows | The profile holds it as |
+| --- | --- |
+| The ways to pay | The instrument types in the verification rule settings |
+| Which of them send the customer to their bank first | `requiresBankConfirmation`, and its BOTH rule for payment methods |
+| Today, or a later date up to the horizon | The scheduling horizon, 30 days by default (Proposed) |
+| How late a scheduled payment can be changed | The cancellation window |
+| The largest payment | The verification rule settings |
+| Pay & Plan | Whether the profile takes `CreatePaymentInstallment.v1` |
+| Pay with MR Points | The Pay with MR Points setting (Proposed) |
+| Whether another pending payment needs a go-ahead | The go-ahead setting |
+
+The page and the Router read the same release, so a customer isn't offered what the Router would turn away. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
+
 ## What the build can run
 
 Each combination of behaviors needs classes in the build that handle it. Verify, for example, handles mandate authorization with `MandateCheck`, so a combination with mandate authorization runs only once that check is in the build. The build lists the combinations it can run in its **capability manifest**, which the Market Onboarding API returns from `GET /market-onboarding/capabilities`. The manifest comes from the same lookup the workflows use to find their stages, so the two can't disagree.

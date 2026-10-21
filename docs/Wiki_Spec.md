@@ -62,6 +62,25 @@ One-Data functions are the versioned contracts that channels and partner systems
 7. `CreateInboundPayment.v1`: take a payment pushed by a third party. One-Data stores it in its inbox and replies 202; the inbound dispatcher starts its workflow.
 8. `CreateConfirmPendingPayment.v1`: confirm a payment that waited for the customer. Channels call it with the same payment ID once the customer has confirmed their bank details on the provider's site, or has given the go-ahead for a payment made while another was pending, and it starts processing the payment.
 9. `CreatePaymentAllocations.v1`: the allocations callback for corporate payments. Asynchronous: 202 once the batch is stored and its workflow has started.
+10. `ReadPaymentChoices.v1` (Proposed, 2026-10-20): what a channel may offer a customer who is about to pay, read from Billpay's own rules for the market. It starts no workflow. See [Making a payment: the channel's calls](#making-a-payment-the-channels-calls).
+
+### Making a payment: the channel's calls
+
+A channel's make-a-payment page calls up to four APIs, in this order (agreed 2026-10-20). Payment Options and Payment Instruments are called by the channel directly, separately from the calls Verify makes to them later.
+
+1. **Payment Options API**, for the amounts the customer owes. If nothing is owed, the payment journey never starts and nothing else is called.
+2. **`ReadPaymentChoices.v1`** (Proposed), for what the page may offer. It returns Billpay's own rules for the market and account type, from its active release:
+   - the ways to pay the market takes, from the instrument types in its rule settings, and which of them need the customer to confirm at their bank, from `requiresBankConfirmation` and its BOTH rule;
+   - the dates it offers: today, or up to the market's scheduling horizon ahead ([Operations settings](#operations-settings)), and the cancellation window;
+   - its limits, such as the largest payment;
+   - what else it offers: several instructions, Pay & Plan where the profile takes `CreatePaymentInstallment.v1`, and Pay with MR Points where the market turns it on;
+   - the payments already pending on the account, from One-Data.
+3. **Payment Instruments API**, for the customer's bank accounts and debit cards. Only when the customer picks a bank account or debit card as the way to pay.
+4. **`CreatePayment.v3`**, when the customer reviews and pays. The Router picks the journey ([Routing and Start Modes](#routing-and-start-modes)).
+
+What `ReadPaymentChoices.v1` returns guides the page; it decides nothing. The Router and Verify check the create against the release active when it arrives, so a release that goes live between the read and the create can't let through a payment it refuses.
+
+**MR Points** (agreed 2026-10-20). Next to the way to pay, the customer can tick Pay with MR Points. Points alone run [Pay with MR Points](#composite-workflows). Points with a bank account are two instructions, and run as multiple instructions. Points pay today only: once they are ticked, the page offers no later date, and a future-dated create with points gets 422 before any workflow starts (Proposed).
 
 ### Composite
 
@@ -231,7 +250,7 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 | `CancelPaymentWorkflow` | `{paymentId}-cancel` | |
 | `CreatePaymentIntentWorkflow` | `{paymentId}-init` | A payment that waits for the customer, for bank confirmation or a go-ahead, from the create to its end; the confirm and the no reach it as updates (agreed 2026-10-18) |
 | `CreateBalanceRefundWorkflow` | `{paymentId}-init` | Refunds from channels |
-| `CreatePaymentWithMultipleInstructionsWorkflow` and Pay & Plan | `{paymentId}-init` | Composites; children on the Online cluster |
+| `CreatePaymentWithMultipleInstructionsWorkflow`, Pay & Plan and Pay with MR Points | `{paymentId}-init` | Composites; children on the Online cluster |
 | `ExecuteSplitPaymentWorkflow` | `{paymentId}_{seq}-execute` | Consumer split legs of an Online parent run as its children |
 
 ### Offline cluster
@@ -648,7 +667,7 @@ Each journey is one workflow built from stages. Pay today and scheduled executio
 A scheduled payment is a row in Oracle from intake to its due date. Temporal sees it only while it is checked and while it executes.
 
 1. **Intake.** `CreateScheduledPaymentWorkflow` runs Capture and Verify, calling services in parallel where they don't depend on each other. One Oracle commit writes `SCHEDULED` and the `SCHED_EXEC` Work Tracker row (due at the market's execution time on the due date). A corporate payment gets an `ALLOC_REQUEST` row instead, due at its fetch time; its execution row comes once it is `ALLOCATED`. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
-2. **Wait.** Nothing runs in Temporal, for up to 30 days. Cancel and update work while the payment is `SCHEDULED`, until the cancellation window closes. A corporate payment leaves `SCHEDULED` when its allocations are requested.
+2. **Wait.** Nothing runs in Temporal, for up to the market's scheduling horizon: 30 days by default (the setting is Proposed, 2026-10-20). Cancel and update work while the payment is `SCHEDULED`, until the cancellation window closes. A corporate payment leaves `SCHEDULED` when its allocations are requested.
 3. **Release.** At the market's execution time its dispatcher claims the row, calls the Router with today's config, and starts `ExecuteScheduledPaymentWorkflow` `{paymentId}-execute`. A corporate payment's `ALLOC_EXEC` row goes to the allocated-payments dispatcher instead.
 4. **Execute.** Reverify (`SCHEDULED`, or `ALLOCATED` for a corporate payment, → `ACCEPTED`), Execute (→ `PROCESSING`), Fulfil (→ `PROCESSED`; a corporate parent completes through the leg dispatcher instead). `PAID` follows once One-Data's inbox has both the settlement and the AR posting, and `ProcessPaidEventsWorkflow` picks the payment up. A split payment turns `PAID` leg by leg instead.
 5. **Close.** The last commit marks the Work Tracker row `DONE`, which frees an in-flight slot.
@@ -787,7 +806,8 @@ A create that needs the customer to confirm their bank details, or that One-Data
 > `{paymentId}-init` · Online · Update-With-Start; their children run on the same cluster
 
 1. **Pay & Plan (Create Payment & Installments):** `CreateImmediatePaymentWorkflow` as a child, then the Installments API, then an optional Autopay update. It never takes bank confirmation: a request that would need it gets 422 before any workflow starts (agreed 2026-10-18).
-2. **Multiple instructions** (`CreatePaymentWithMultipleInstructionsWorkflow`): validates the composite payment, then runs one `CreateImmediatePaymentWorkflow` per instruction. It never takes bank confirmation: a request that would need it gets 422 before any workflow starts (agreed 2026-10-18).
+2. **Multiple instructions** (`CreatePaymentWithMultipleInstructionsWorkflow`): validates the composite payment, then runs one `CreateImmediatePaymentWorkflow` per instruction. It never takes bank confirmation: a request that would need it gets 422 before any workflow starts (agreed 2026-10-18). To the customer, several instructions are a bank account plus MR Points, paid today (agreed 2026-10-20).
+3. **Pay with MR Points:** a create whose one instruction is MR Points, across Billpay and Loyalty, paid today only (agreed 2026-10-20). Its children and its calls to Loyalty are still to be defined ([Open Items](#open-items)).
 
 ### Sketch
 
@@ -1027,6 +1047,7 @@ Between the core APIs and the workflows sits the Billpay Router. For every row b
 | `CreatePayment.v3` | `POST /payments` | Today, one instruction; Update-With-Start | `CreateImmediatePaymentWorkflow` (Online) | Consumer: `ExecuteSplitPaymentWorkflow` children (Online). Corporate: `RequestAllocationsWorkflow`, `ReceiveAllocationsWorkflow`, `ExecuteScheduledPaymentWorkflow` and one `ExecuteSplitPaymentWorkflow` per leg, each started by a dispatcher (Offline) |
 | | | Needs bank confirmation, or waits for a go-ahead in a market that has it turned on; Update-With-Start | `CreatePaymentIntentWorkflow` (Online) | None: the confirm and the no arrive as updates, and Execute and Fulfil run in the same workflow (agreed 2026-10-18) |
 | | | Today, several instructions; Update-With-Start | `CreatePaymentWithMultipleInstructionsWorkflow` (Online) | One `CreateImmediatePaymentWorkflow` per instruction |
+| | | Today, MR Points as the one instruction; Update-With-Start (agreed 2026-10-20) | Pay with MR Points composite (Online) | Still to be defined |
 | | | Future-dated; Update-With-Start | `CreateScheduledPaymentWorkflow` (Online), then `ExecuteScheduledPaymentWorkflow` on the due date (Offline) | Consumer: as for pay today, on the Offline cluster. Corporate: `RequestAllocationsWorkflow` and `ReceiveAllocationsWorkflow` first, then the execution and one `ExecuteSplitPaymentWorkflow` per leg, each started by a dispatcher |
 | `UpdatePayment.v1` | `PUT /payments/{payment-id}` | `SCHEDULED`, inside the window; Update-With-Start | `UpdatePaymentWorkflow` (Online) | Child `CreateScheduledPaymentWorkflow` `{newId}-init` |
 | `DeletePayment.v1` | `DELETE /payments/{payment-id}` | `SCHEDULED`, inside the window; Update-With-Start. `PENDING`, waiting for a confirmation, on a no: an update | `CancelPaymentWorkflow` (Online); for the no, the payment's `CreatePaymentIntentWorkflow` | |
@@ -1071,7 +1092,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 ### The Router's six steps
 
 1. **Admit.** The market, account type and API must be live in this environment, checked against billpay-core's in-memory copy of the onboarding config, so admission adds no call; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. A held create that arrives after its market was taken out of service is captured and declined instead ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). A Work Tracker row is refused only if its market was taken out of service after the row was written: its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
-2. **Pick the journey** from the routing table. Proposed (2026-10-20): each request type names its own journey, so no central `when` maps requests to journeys. `RouteRequest` is a sealed interface with `journey(version)`, and a new request type doesn't compile until it names one. A Work Tracker item type and an inbox request type each carry their journey as an enum property. A create is the one request with conditions: an ordered list of `JourneyRule`s decides it, and the first that matches wins: waits for the customer, then future-dated, then several instructions, then pay today. A test writes the routing table from the code, trigger, condition and journey, and compares it with a checked-in copy, so the code and this table can't drift. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18). A create that comes with other pending payments' IDs waits for a go-ahead only when the market's go-ahead setting is on; otherwise the Router ignores the IDs (agreed 2026-10-18).
+2. **Pick the journey** from the routing table. Proposed (2026-10-20): each request type names its own journey, so no central `when` maps requests to journeys. `RouteRequest` is a sealed interface with `journey(version)`, and a new request type doesn't compile until it names one. A Work Tracker item type and an inbox request type each carry their journey as an enum property. A create is the one request with conditions: an ordered list of `JourneyRule`s decides it, and the first that matches wins: waits for the customer, then future-dated, then several instructions, then MR Points alone (placed here 2026-10-20, Proposed), then pay today. A future-dated create with MR Points, or one with MR Points where the market doesn't offer them, gets 422 at admission (Proposed, 2026-10-20). A test writes the routing table from the code, trigger, condition and journey, and compares it with a checked-in copy, so the code and this table can't drift. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18). A create that comes with other pending payments' IDs waits for a go-ahead only when the market's go-ahead setting is on; otherwise the Router ignores the IDs (agreed 2026-10-18).
 3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
 4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes can apply, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window (agreed 2026-10-18). A go-ahead adds nothing to the resolved profile: the workflow the Router picks is what makes the payment wait, and no stage is picked for it (agreed 2026-10-18).
 5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID, held in a `RunSite` (named 2026-10-20; it was `Placement`). While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
@@ -1101,6 +1122,7 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 | --- | --- | --- | --- | --- |
 | Create payment | Today, one instruction | `CreateImmediatePaymentWorkflow` | Online | Update-With-Start |
 | Create payment | Today, several instructions | `CreatePaymentWithMultipleInstructionsWorkflow` | Online | Update-With-Start |
+| Create payment | Today, MR Points as the one instruction | Pay with MR Points composite | Online | Update-With-Start (agreed 2026-10-20) |
 | Create payment | Future-dated | `CreateScheduledPaymentWorkflow`; `ExecuteScheduledPaymentWorkflow` on the due date | Online, then Offline | Update-With-Start; then dispatcher |
 | Create payment | Today with bank confirmation; or any create One-Data sends with other pending payments' IDs | `CreatePaymentIntentWorkflow` | Online | Update-With-Start (agreed 2026-10-18) |
 | From Accounts Receivable | Future-dated | `CreateScheduledPaymentWorkflow`; `ExecuteScheduledPaymentWorkflow` on the due date | Offline | AR intake dispatcher; then the scheduled-payments dispatcher |
@@ -1522,7 +1544,9 @@ A step in the Market Onboarding UI. Each setting drives something at runtime.
 | Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's: the account type's setting wins (agreed 2026-10-18) | Every stage's announcement: a status that is switched off sends no Raven message |
 | Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18). The same window is how long a customer has to give a go-ahead (agreed 2026-10-19) | Which provider RequestConfirmation asks for the redirect link, and when `CreatePaymentIntentWorkflow` cancels a payment still waiting: once the window and its grace have passed |
 | Go-ahead for pending payments: on or off, off by default. With it on, a new payment that arrives with other pending payments' IDs waits for the customer's yes (agreed 2026-10-18) | The Router, which sends such a payment to `CreatePaymentIntentWorkflow` only when the setting is on, and otherwise ignores the IDs |
-| Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the resolved profile (agreed 2026-10-18) |
+| Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the resolved profile (agreed 2026-10-18). `ReadPaymentChoices.v1` reads them too, for the ways to pay and the limits a channel shows (Proposed, 2026-10-20) |
+| Scheduling horizon: how many days ahead a payment can be scheduled, 30 by default (Proposed, 2026-10-20) | `ReadPaymentChoices.v1`, which offers dates up to it, and the verification rules, which decline a create dated beyond it. Like the other rule settings, it reaches the workflow in the resolved profile |
+| Pay with MR Points: offered or not, off by default (Proposed, 2026-10-20) | `ReadPaymentChoices.v1`, which offers the MR Points choice only where it is on, and the Router, which answers 422 to a create with MR Points where it is off |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
 
@@ -1542,6 +1566,7 @@ Every build ships a manifest of the behavior combinations it can run, returned b
 - The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
 - The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`; onboarding maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring checks each new combination against the manifest.
+- The Operations step gains the scheduling horizon and the Pay with MR Points setting (Proposed, 2026-10-20).
 
 [^ Top](#table-of-contents)
 
@@ -1903,5 +1928,9 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Balance refund steps | They follow the payment path. Skipped for now (OK for now, 2026-10-18) | Detailed stages are still to be defined |
 | Represent's eligibility checks | Its own checks, not Verify's: no call to Payment Instruments, Payment Options or Plans (2026-10-18). A marked placeholder stands in for them (agreed 2026-10-19) | Which systems it calls, and what fails the recheck, are still to be defined |
 | Decline codes for verification rules | One table maps each rule ID to a `DeclineCode`. Until product sends the codes, each rule uses the closest one the current app has, and a test fails if any rule has no code (agreed 2026-10-19) | Product will send the codes; only the table changes. They decide what code a declined payment carries, and what the channel tells the customer |
+| `ReadPaymentChoices.v1` | A One-Data read of Billpay's rules for the market, called after Payment Options and before Payment Instruments (Proposed, 2026-10-20) | Its contract, and the billpay-core read behind it, are still to come |
+| Pay with MR Points | Points alone run their own composite across Billpay and Loyalty; with a bank account they run as multiple instructions; today only (agreed 2026-10-20) | Its children, its calls to Loyalty, and how a points instruction runs inside multiple instructions are still to be defined |
+| A later date with a bank step | Not covered. Only consumer payments made today take bank confirmation | What a future-dated create with a payment method that needs the customer to confirm at their bank does: whether BOTH resolves to N, or the create is refused |
+| A go-ahead on a composite create | Not covered. The Router checks for a wait first, so a create with other pending payments' IDs, in a market with the go-ahead on, takes `CreatePaymentIntentWorkflow` even with several instructions or MR Points | That workflow runs one instruction. Whether a composite create can wait for a go-ahead, and how, is still to be decided |
 
 [^ Top](#table-of-contents)

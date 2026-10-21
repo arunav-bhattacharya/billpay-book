@@ -51,7 +51,7 @@ Three edge cases have a working answer:
 - Two creates for one account that reach different Redis sites within the replication lag miss each other, and both go through with no go-ahead. The window is narrow, so it is accepted, and such pairs are counted from Oracle. Only if they show up does billpay-core add the same check against Oracle, at one query per create.
 - A held pay-by-bank create would get a redirect link nobody sees. One-Data can probably tell such a create from its instrument type, when it carries bank details, which One-Data is to confirm. Proposed: One-Data doesn't hold it, and the channel asks the customer to try again. If billpay-core never got the create, no delete comes, and the alert on the age of pending entries finds it.
 
-[Pay while another payment is pending](../../design/journeys/index.md#pay-while-another-payment-is-pending) walks through the go-ahead, and [Creates that arrive late or twice](../../design/component-model/workflows/core.md#creates-that-arrive-late-or-twice) covers what billpay-core does with a repeat.
+[Pay while another payment is pending](../../design/journeys/all-journeys.md#pay-while-another-payment-is-pending) walks through the go-ahead, and [Creates that arrive late or twice](../../design/component-model/workflows/core.md#creates-that-arrive-late-or-twice) covers what billpay-core does with a repeat.
 
 ## Composite functions
 

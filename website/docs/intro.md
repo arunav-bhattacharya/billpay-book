@@ -29,9 +29,9 @@ Start with [Vision](vision/index.md). It covers why the platform exists and how 
 
 After that, the path depends on what you need.
 
-- If you work on the product, read the [Payment Journeys](design/journeys/index.md). They follow a payment from the channel a customer starts in to the money settling. Then read the [Architecture Overview](architecture/overview.md) for the shape of the system around it.
+- If you work on the product, read the [Payment Journeys](design/journeys/all-journeys.md). They follow a payment from the channel a customer starts in to the money settling. Then read the [Architecture Overview](architecture/overview.md) for the shape of the system around it.
 - If you bring new markets onto Billpay, read [Market Onboarding](onboarding/index.md). It covers how a market is described, released and switched on in each environment.
-- If you write the code, start with the same [Payment Journeys](design/journeys/index.md), then go into the [Workflows](design/component-model/workflows/core.md) and the [Build section](build/index.md).
+- If you write the code, start with the same [Payment Journeys](design/journeys/all-journeys.md), then go into the [Workflows](design/component-model/workflows/core.md) and the [Build section](build/index.md).
 - If you run Billpay, read [Observability](observability/index.md) for what to watch, then [Operations](operations/index.md) for the tools and procedures.
 
 ## Conventions

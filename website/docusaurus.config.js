@@ -87,8 +87,9 @@ const config = {
         // dev server, so test them with `npm run build && npm run serve`.
         redirects: [
           {from: '/docs/design/journeys/api', to: '/docs/design/routing'},
-          {from: '/docs/design/journeys/customer-initiated', to: '/docs/design/journeys'},
-          {from: '/docs/design/journeys/system-initiated', to: '/docs/design/journeys'},
+          {from: '/docs/design/journeys/customer-initiated', to: '/docs/design/journeys/all-journeys'},
+          {from: '/docs/design/journeys/system-initiated', to: '/docs/design/journeys/all-journeys'},
+          {from: '/docs/design/complete-picture', to: '/docs/design/journeys/complete-picture'},
           {from: '/docs/design/component-model/routing', to: '/docs/design/routing'},
           {from: '/docs/design/diagrams', to: '/docs/design/sequence-diagrams'},
           {

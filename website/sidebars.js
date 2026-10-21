@@ -40,9 +40,18 @@ const sidebars = {
         'design/principles',
         'design/payment-state-model',
         'design/domain-model',
-        'design/journeys/index',
+        {
+          type: 'category',
+          label: 'Journeys',
+          collapsed: true,
+          link: {type: 'doc', id: 'design/journeys/index'},
+          items: [
+            'design/journeys/make-a-payment',
+            'design/journeys/all-journeys',
+            'design/journeys/complete-picture',
+          ],
+        },
         'design/routing',
-        'design/complete-picture',
         {
           type: 'category',
           label: 'Component Model',

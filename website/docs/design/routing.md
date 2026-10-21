@@ -272,7 +272,7 @@ No child workflow ever crosses clusters. A scheduled payment created on the Onli
 
 ## Re-routing on the due date
 
-A scheduled payment can wait up to 30 days, and a market's config can change in that time. So on the due date the dispatcher calls the Router again, and the payment runs with today's config. The version it was scheduled under stays in its timeline for audit.
+A scheduled payment can wait up to 30 days by default, and a market's config can change in that time. So on the due date the dispatcher calls the Router again, and the payment runs with today's config. The version it was scheduled under stays in its timeline for audit.
 
 Two guardrails keep that safe. The resolved profile carries the resolved behaviors and the config version, so the running workflow never reads config that changed after it started. And the workflow is pinned to its build with Worker Versioning, so a deploy never changes its code mid-run.
 

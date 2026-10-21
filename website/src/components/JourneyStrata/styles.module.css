@@ -1,0 +1,979 @@
+/* JourneyStrata, the cross-section. Blue Box rules: the square is the one
+   shape, structure comes from fills and tints, nothing is outlined. Each
+   stratum is a band a little deeper than the one above it, and Oracle, the
+   ground everything stands on, is Deep Blue. Every colour is a token.
+
+   Inside the board every length is in em, and the board's font size
+   follows the scroller's width (it is the container), so the cross-section
+   scales as one piece. */
+
+.root {
+  margin: 1.4rem 0 2rem;
+}
+
+/* ---- the switch -------------------------------------------------------- */
+
+.switchBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}
+
+.switch {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 10px;
+  background: var(--amex-rail);
+}
+
+.switchBtn {
+  padding: 0.4rem 1rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--amex-txt-strong);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.switchBtn:hover {
+  background: var(--amex-pill);
+}
+
+.switchBtn[aria-pressed='true'] {
+  background: var(--amex-blue);
+  color: var(--amex-white);
+  font-weight: 600;
+}
+
+.switchBtn:focus-visible,
+.pick:focus-visible,
+.expand:focus-visible,
+.nextLink:focus-visible {
+  outline: 2px solid var(--js-link);
+  outline-offset: 2px;
+}
+
+/* ---- the panel --------------------------------------------------------- */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --js-link: var(--amex-blue);
+  --js-ink: var(--amex-txt-strong);
+  --js-band-1: color-mix(in srgb, var(--amex-blue) 4%, var(--amex-card));
+  --js-band-2: color-mix(in srgb, var(--amex-blue) 6%, var(--amex-card));
+  --js-band-3: color-mix(in srgb, var(--amex-blue) 8%, var(--amex-card));
+  --js-band-4: color-mix(in srgb, var(--amex-blue) 11%, var(--amex-card));
+  --js-band-5: color-mix(in srgb, var(--amex-blue) 5%, var(--amex-rail));
+  --js-ground: var(--amex-banner-block);
+  --js-face: var(--amex-card);
+  --js-quiet: var(--amex-journey-system);
+  --js-pale: var(--amex-blue-200);
+  --js-label: 8.5em;
+
+  container-type: inline-size;
+  padding: 1rem;
+}
+
+:global([data-theme='dark']) .wrap {
+  --js-link: var(--amex-blue-bright);
+  --js-band-1: color-mix(in srgb, var(--amex-blue-bright) 5%, var(--amex-card));
+  --js-band-2: color-mix(in srgb, var(--amex-blue-bright) 8%, var(--amex-card));
+  --js-band-3: color-mix(in srgb, var(--amex-blue-bright) 11%, var(--amex-card));
+  --js-band-4: color-mix(in srgb, var(--amex-blue-bright) 15%, var(--amex-card));
+  --js-band-5: color-mix(in srgb, var(--amex-blue-bright) 6%, var(--amex-rail));
+  --js-face: var(--amex-card-hover);
+  --js-pale: var(--amex-deep-400);
+}
+
+.expanded {
+  --card-radius: 0;
+  --card-bw: 0px;
+  --card-sh: none;
+  --card-face: linear-gradient(var(--amex-bg), var(--amex-bg));
+
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  overflow-y: auto;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.2rem;
+}
+
+/* Wide, as in full screen, the index is a rail beside the picture. Below
+   that it folds behind the picker, so the picture comes first. */
+.index {
+  display: none;
+}
+
+.indexOpen {
+  display: grid;
+}
+
+@container (min-width: 1250px) {
+  .layout {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    grid-template-rows: auto;
+    align-items: start;
+  }
+
+  .layout .picker {
+    display: none;
+  }
+
+  .layout .index {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.8rem;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--amex-rail);
+  color: var(--amex-txt);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.picker:hover {
+  background: var(--amex-pill);
+}
+
+.picker:focus-visible {
+  outline: 2px solid var(--js-link);
+  outline-offset: 2px;
+}
+
+.pickerLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+}
+
+.pickerValue {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--js-ink);
+}
+
+.pickerHint {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--js-link);
+}
+
+/* ---- the index --------------------------------------------------------- */
+
+.index {
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.9rem 1.2rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: var(--amex-rail);
+}
+
+.group {
+  min-width: 0;
+}
+
+.groupTerm {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+}
+
+.groupList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.groupList li + li {
+  margin-top: 0.1rem;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.28rem 0.55rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--amex-txt);
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick:hover {
+  background: var(--amex-pill);
+}
+
+.pick[aria-pressed='true'] {
+  background: var(--amex-blue);
+  color: var(--amex-white);
+  font-weight: 600;
+}
+
+.pick[aria-pressed='true'] .sq_on {
+  background: var(--amex-white);
+}
+
+.pick[aria-pressed='true'] .sq_choice {
+  box-shadow: inset 0 0 0 0.11em var(--amex-white);
+}
+
+.indexKey {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.74rem;
+  color: var(--amex-mut);
+}
+
+.indexKey span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ---- the head ---------------------------------------------------------- */
+
+.main {
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--js-link);
+}
+
+.title {
+  margin: 0.15rem 0 0;
+  font-size: 2rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--js-ink);
+}
+
+.meta {
+  margin: 0.35rem 0 0;
+  font-family: var(--amex-font-mono);
+  font-size: 0.78rem;
+  color: var(--amex-mut);
+}
+
+.expand,
+.nextLink {
+  padding: 0.38rem 0.85rem;
+  border: 0;
+  border-radius: 7px;
+  background: var(--amex-pill);
+  color: var(--js-link);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.expand:hover,
+.nextLink:hover {
+  background: color-mix(in srgb, var(--amex-blue) 18%, var(--amex-card));
+}
+
+/* ---- the board --------------------------------------------------------- */
+
+.scroller {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+
+.board {
+  display: grid;
+  row-gap: 0.45em;
+  column-gap: 0.9em;
+  font-size: clamp(10px, calc(100cqi / var(--js-design)), 14.5px);
+}
+
+.phases,
+.stratum {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: start;
+}
+
+.phase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.15em 0.6em;
+  min-width: 0;
+  padding: 0.45em 0.75em;
+  border-radius: 0.5em;
+  background: var(--js-band-1);
+}
+
+.phaseWait {
+  background: transparent;
+}
+
+.phaseTerm {
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--js-link);
+}
+
+.phaseNote {
+  font-size: 0.72em;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+.stratum {
+  padding: 0.85em 0;
+  border-radius: 0.8em;
+  background: var(--js-band-1);
+}
+
+.stratum > :last-child {
+  padding-right: 0.9em;
+}
+
+.stratum_onedata {
+  background: var(--js-band-2);
+}
+.stratum_entry {
+  background: var(--js-band-3);
+}
+.stratum_workflows {
+  background: var(--js-band-4);
+}
+.stratum_time {
+  padding: 0.4em 0 0.5em;
+  background: transparent;
+}
+.stratum_systems {
+  background: var(--js-band-5);
+}
+
+.stratum_oracle {
+  background: var(--js-ground);
+  color: var(--amex-white);
+}
+
+.hasRails > .label {
+  grid-row: 1 / span 2;
+}
+
+.hasRails > .cell {
+  grid-row: 2;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  min-width: 0;
+  padding-left: 0.95em;
+}
+
+.labelTerm {
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--js-ink);
+}
+
+.labelDesc {
+  font-size: 0.75em;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+.stratum_oracle .labelTerm,
+.stratum_oracle .labelDesc {
+  color: var(--amex-white);
+}
+
+.stratum_oracle .labelDesc {
+  opacity: 0.8;
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  align-items: start;
+  gap: 0.5em 0;
+  min-width: 0;
+}
+
+.at {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3em;
+  min-width: 0;
+  padding: 0 0.5em 0 0;
+}
+
+/* ---- squares and states ------------------------------------------------ */
+
+.sq {
+  flex: none;
+  display: inline-block;
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 0.15em;
+}
+
+.sq_on {
+  background: var(--amex-blue);
+}
+
+.sq_choice {
+  background: var(--js-face);
+  box-shadow: inset 0 0 0 0.11em var(--amex-blue);
+}
+
+.sq_quiet {
+  background: var(--js-quiet);
+}
+
+.sq_child {
+  background: var(--js-pale);
+}
+
+.state {
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: 0.62em;
+  --chip-radius: 999px;
+  --chip-pad: 0.15em 0.7em;
+  background: var(--amex-pill);
+  color: var(--js-link);
+  font-family: var(--amex-font-mono);
+}
+
+.stateExit {
+  background: color-mix(in srgb, var(--amex-mut) 16%, transparent);
+  color: var(--amex-mut);
+}
+
+.stateChild {
+  opacity: 0.75;
+}
+
+/* ---- the customer ------------------------------------------------------ */
+
+.track::before,
+.track::after {
+  content: '';
+  position: absolute;
+  top: calc(2.5em + 0.36em - 1px);
+  left: 0;
+  height: 2px;
+}
+
+.track::before {
+  right: 0;
+  background: repeating-linear-gradient(
+    to right,
+    var(--js-quiet) 0 0.35em,
+    transparent 0.35em 0.7em
+  );
+}
+
+.track::after {
+  width: var(--wait-end, 0%);
+  background: var(--amex-blue);
+}
+
+.legendLine.trackOn {
+  background: var(--amex-blue);
+}
+
+.legendLine.trackOff {
+  background: repeating-linear-gradient(
+    to right,
+    var(--js-quiet) 0 0.35em,
+    transparent 0.35em 0.7em
+  );
+}
+
+.momentHead {
+  display: flex;
+  align-items: flex-end;
+  height: 2.5em;
+}
+
+.momentTerm {
+  font-size: 0.86em;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--js-ink);
+}
+
+.momentNode {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 0.72em;
+}
+
+.momentSub {
+  font-size: 0.74em;
+  color: var(--amex-mut);
+}
+
+/* ---- One-Data and the entry ------------------------------------------- */
+
+.box {
+  max-width: 100%;
+  padding: 0.35em 0.65em;
+  border-radius: 0.4em;
+  background: var(--js-face);
+  box-shadow: var(--amex-sh-sm);
+  font-family: var(--amex-font-mono);
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--js-ink);
+  overflow-wrap: anywhere;
+}
+
+.boxSub {
+  font-size: 0.74em;
+  color: var(--amex-mut);
+}
+
+/* ---- the workflows ----------------------------------------------------- */
+
+.card {
+  min-width: 0;
+  padding: 0.75em 0 0.8em;
+  border-radius: 0.7em;
+  background: var(--js-face);
+  box-shadow: var(--amex-sh-sm);
+}
+
+.cardSpan {
+  grid-column: 1 / -1;
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3em 0.6em;
+  padding: 0 0.8em;
+}
+
+.cardName {
+  font-family: var(--amex-font-mono);
+  font-size: 0.86em;
+  font-weight: 700;
+  color: var(--js-ink);
+  overflow-wrap: anywhere;
+}
+
+.cardId {
+  display: block;
+  padding: 0.15em 0.8em 0;
+  font-family: var(--amex-font-mono);
+  font-size: 0.68em;
+  color: var(--amex-mut);
+}
+
+.cardNote {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0.55em 0 0;
+  padding: 0 0.8em;
+  font-size: 0.74em;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+.cluster {
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: 0.58em;
+  --chip-radius: 0.3em;
+  --chip-pad: 0.2em 0.55em;
+  background: var(--amex-worker-online);
+  color: var(--amex-white);
+  text-transform: uppercase;
+}
+
+.cluster_Offline {
+  background: var(--amex-worker-offline);
+}
+
+:global([data-theme='dark']) .cluster {
+  color: var(--amex-midnight);
+}
+
+.stages {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  margin-top: 0.4em;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: 0.8em;
+}
+
+.exits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2em;
+  min-height: 1.35em;
+}
+
+.stageRow {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.stageSq {
+  flex: none;
+  width: 1.7em;
+  height: 1.7em;
+  border-radius: 0.3em;
+  background: var(--amex-blue);
+}
+
+.stageChild {
+  background: var(--js-pale);
+}
+
+.stageCond {
+  background: var(--js-face);
+  box-shadow: inset 0 0 0 0.14em var(--amex-blue);
+}
+
+.inlineSq {
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 0.15em;
+}
+
+.stageText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: 0.5em;
+}
+
+.stageName {
+  font-size: 0.86em;
+  font-weight: 600;
+  color: var(--js-ink);
+  overflow-wrap: anywhere;
+}
+
+.stageState {
+  font-family: var(--amex-font-mono);
+  font-size: 0.62em;
+  color: var(--amex-mut);
+}
+
+.stageArrow {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0.8em;
+  height: 1.5px;
+  margin: 0 0.35em 0 0.45em;
+  background: var(--amex-blue);
+}
+
+.stageArrow::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  border: 0.25em solid transparent;
+  border-left: 0.4em solid var(--amex-blue);
+  border-right: 0;
+  transform: translateY(-50%);
+}
+
+.waitText {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.4em 0.6em 0.4em 0;
+  font-size: 0.78em;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+/* ---- time -------------------------------------------------------------- */
+
+.ruler::before {
+  content: '';
+  position: absolute;
+  top: 0.32em;
+  right: 0;
+  left: 0;
+  height: 1.5px;
+  background: var(--amex-blue);
+}
+
+.rulerGap::before {
+  background: repeating-linear-gradient(to right, var(--amex-blue) 0 0.3em, transparent 0.3em 0.6em);
+}
+
+.ruler .at {
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+.tick {
+  position: relative;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 0.12em;
+  background: var(--amex-blue);
+}
+
+.tickText {
+  font-family: var(--amex-font-mono);
+  font-size: 0.68em;
+  font-weight: 600;
+  color: var(--js-link);
+}
+
+/* ---- systems ----------------------------------------------------------- */
+
+.rails {
+  display: grid;
+  gap: 0.3em;
+  grid-row: 1;
+  margin-bottom: 0.6em;
+}
+
+.rail {
+  padding: 0.25em 0.75em;
+  border-radius: 0.3em;
+  background: var(--amex-indigo);
+  color: var(--amex-white);
+  font-family: var(--amex-font-mono);
+  font-size: 0.68em;
+  font-weight: 600;
+}
+
+.railSoft {
+  background: var(--amex-deep-400);
+}
+
+.systems {
+  display: grid;
+  gap: 0.25em;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.systems li {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0;
+  font-family: var(--amex-font-mono);
+  font-size: 0.72em;
+  color: var(--amex-txt);
+}
+
+.systems li + li {
+  margin-top: 0;
+}
+
+.systems .sq {
+  width: 0.85em;
+  height: 0.85em;
+}
+
+.none {
+  font-size: 0.72em;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+/* ---- Oracle ------------------------------------------------------------ */
+
+.oracleCell .at {
+  gap: 0.2em;
+}
+
+.paymentRow {
+  position: relative;
+  grid-row: 1;
+  margin-bottom: 0.4em;
+}
+
+.paymentRow::before {
+  content: '';
+  position: absolute;
+  top: 0.3em;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--amex-white) 55%, transparent) 0 0.2em,
+    transparent 0.2em 0.45em
+  );
+}
+
+.oracleNode {
+  position: relative;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 0.12em;
+  background: var(--amex-white);
+}
+
+.oState {
+  font-family: var(--amex-font-mono);
+  font-size: 0.66em;
+  font-weight: 600;
+}
+
+.oStateChild {
+  opacity: 0.7;
+}
+
+.oRow {
+  font-family: var(--amex-font-mono);
+  font-size: 0.66em;
+  opacity: 0.85;
+}
+
+.oChip {
+  composes: chip from '../../css/recipes.module.css';
+  --chip-fs: 0.6em;
+  --chip-radius: 999px;
+  --chip-pad: 0.15em 0.7em;
+  background: var(--amex-sky);
+  color: var(--amex-midnight);
+  font-family: var(--amex-font-mono);
+}
+
+.oSub {
+  font-size: 0.68em;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/* ---- legend ------------------------------------------------------------ */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.3rem;
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+  color: var(--amex-mut);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.legendItem .sq {
+  font-size: 1rem;
+}
+
+.legendLine {
+  display: inline-block;
+  width: 1.8rem;
+  height: 2px;
+}
+
+.legendNote {
+  margin-left: auto;
+  font-family: var(--amex-font-mono);
+  font-size: 0.72rem;
+}
+
+.scrollHint {
+  display: none;
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--amex-mut);
+}
+
+@container (max-width: 700px) {
+  .scrollHint {
+    display: block;
+  }
+}
+
+/* A journey of six runs or more is wider than the column; full screen fits it. */
+@container (max-width: 1250px) {
+  .scrollHintWide {
+    display: block;
+  }
+}
+
+.next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  margin: 0.9rem 0 0;
+  font-size: 0.86rem;
+  color: var(--amex-txt);
+}
