@@ -51,7 +51,7 @@ A child always runs on its parent's cluster. These journeys use them:
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
 
-A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a go-ahead starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm and the no as updates, and cancels the payment on its own timer if neither comes.
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation, a debit card's 3D Secure or a go-ahead starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm, the callback and the no as updates, and cancels the payment on its own timer if neither comes.
 
 ## Versioning
 
@@ -115,7 +115,7 @@ class CreateImmediatePaymentWorkflowImpl(
 
 The workflow never names a market: `stageResolver.resolve(profile)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and once `decided` is set, the caller's update returns with it as soon as that workflow task completes. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
-A payment that needs bank confirmation or a go-ahead never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
+A payment that needs bank confirmation, pays by debit card, or needs a go-ahead never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
 
 A declined payment ends after Verify, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
 
@@ -131,20 +131,22 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
     private var answer: Answer? = null               // YES or NO: the first one to arrive wins
     private var result: PaymentDecision? = null      // what that answer gets back
     private var waiting = false
+    private var authentication: AuthenticationResult? = null   // a debit card's 3D Secure result
 
     override fun run(request: CreatePaymentRequest, profile: ResolvedProfile) {
         val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
         stages.capture.run(request)                              // PENDING: the request, and any pending IDs
-        decided = if (profile.requiresBankConfirmation)
-            stages.requestConfirmation.run(paymentId)             // PENDING with the link, or DECLINED
+        decided = if (profile.requiresBankConfirmation || profile.cardAuthentication)
+            stages.requestConfirmation.run(paymentId)             // PENDING with the bank's link or the card's
+                                                                  // challenge link (or none), or DECLINED
         else PaymentDecision.PENDING                             // a go-ahead: One-Data adds the pending list
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
         stages.capture.announce(paymentId)                        // the reply goes out with this task
         if (!waiting) { /* announce, the delete, and end */ return }
         Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // the wait doesn't wait for it
 
-        val window = checkNotNull(profile.confirmationWindow)
+        val window = checkNotNull(profile.confirmationWindow)    // 2 minutes for a debit card's 3D Secure
         val due = Workflow.currentTimeMillis() + (window + GRACE).toMillis()
         if (!Workflow.await(window + GRACE) { answer != null } &&
             Workflow.currentTimeMillis() - due > LATE.toMillis()) {  // handled late: Online or its workers were down
@@ -152,7 +154,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         }
         waiting = false                                          // the validators turn answers away now
 
-        result = if (answer == Answer.YES) stages.verify.run(paymentId).decision   // then Execute and Fulfil
+        result = if (answer == Answer.YES) stages.verify.run(paymentId, authentication).decision  // then Execute, Fulfil
                  else stages.cancel.run(paymentId)                                  // the no, or the timer
         // ... the announcements, Execute and Fulfil for ACCEPTED, then the delete
         Workflow.await { Workflow.isEveryHandlerFinished() }   // no update left without its reply
@@ -164,13 +166,15 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         Workflow.await { result != null }
         return result!!                                          // the confirm's early return
     }
-    // decision() answers the create, as in Create Immediate Payment; decline() and checkDecline() mirror confirm
+    // decision() answers the create, as in Create Immediate Payment; decline() and checkDecline() mirror confirm,
+    // and authenticated(result), the card provider's 3D Secure callback, mirrors it too: it keeps the result
+    // in `authentication` for Verify, whose card authorization check runs last
 }
 ```
 
 *(GRACE is 10 seconds and LATE a minute.)*
 
-- The confirm and the no are updates with fixed IDs, `{paymentId}-confirm` and `{paymentId}-no`, so a repeat whose reply was lost attaches to the same update and gets the same answer.
+- The confirm, the no and the 3D Secure callback are updates with fixed IDs, `{paymentId}-confirm`, `{paymentId}-no` and `{paymentId}-authentication`, so a repeat whose reply was lost attaches to the same update and gets the same answer.
 - The validator runs before anything is written. A confirm that comes after the workflow has its answer, or once it no longer waits, is turned away with no history event, and the API answers 409.
 - When the timer fires with no answer, the workflow runs Cancel itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer handled well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.

@@ -65,6 +65,7 @@ const SYSTEMS = {
   Globestar: 'Globestar, which holds the instalment plan',
   Allocations: 'Allocations Manager, which returns a corporate breakdown',
   'Bank provider': "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
+  'Card provider': "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
 };
 
 const ROUTE_KIND = {
@@ -123,6 +124,8 @@ const PATHS = {
   calendar: ['M5.4 6.4h13.2a1.4 1.4 0 0 1 1.4 1.4v11a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 18.8v-11a1.4 1.4 0 0 1 1.4-1.4z', 'M4 10.6h16', 'M8.4 3.6v3.4', 'M15.6 3.6v3.4'],
   // money coming back the way it went out
   undo: ['M4.2 9.6h9.8a5.2 5.2 0 1 1 0 10.4H7.8', 'M8.2 5.4L4 9.6l4.2 4.2'],
+  // a payment card
+  card: ['M3.4 6.2h17.2a1 1 0 0 1 1 1v9.6a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V7.2a1 1 0 0 1 1-1z', 'M2.4 10h19.2', 'M5.8 14.6h4'],
   // sent somewhere else, to come back later
   redirect: ['M13.6 4.6h5.8v5.8', 'M19.4 4.6l-8.2 8.2', 'M17.6 13.8v4.4a1.6 1.6 0 0 1-1.6 1.6H6.2a1.6 1.6 0 0 1-1.6-1.6V8.4a1.6 1.6 0 0 1 1.6-1.6h4.4'],
   // checked again, later

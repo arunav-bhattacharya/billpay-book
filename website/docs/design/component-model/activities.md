@@ -36,7 +36,7 @@ export const ACTIVITIES = [
     name: 'ClearingActivities',
     system: 'MR/M3',
     queue: 'ds-clearing',
-    calledBy: "Execute (at payment level, and for consumer legs), Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
+    calledBy: "Execute (at payment level, and for consumer legs), except for Pay with Bank Transfer and a debit card, whose money has already moved; Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
   },
   {
     name: 'ReceivablesActivities',
@@ -87,6 +87,12 @@ export const ACTIVITIES = [
     calledBy: "RequestConfirmation, for the redirect link, with one try. Verify doesn't call it for the bank details, which the provider verifies itself. In GB, Verify asks it whether the customer's bank account holds enough money for the payment",
   },
   {
+    name: 'CardActivities',
+    system: "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK; other markets' are still to be named",
+    queue: 'A local activity inside the decision, as for the bank-confirmation provider: only the Online cluster calls it. The authorization carries the payment ID as its idempotency key, so a retry never debits twice (Proposed)',
+    calledBy: "RequestConfirmation, to start 3D Secure with Billpay's callback URL and get the challenge link; Verify's card authorization check, last, which debits the customer's account or is declined",
+  },
+  {
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
@@ -118,7 +124,9 @@ Activities take IDs, not payment objects, and load what they need. Capture's wri
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself.
+`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself, and the money moves at the bank during the customer's bank connection.
+
+`CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-core's callback, and the waiting workflow takes it as an update.
 
 `TransactionNotificationActivities` is the one interface that spans systems. TFNE, GPHDB and B2Notifier are all told the same news at the same moment, so they share an interface, but each gets a method of its own, and each method runs on its own system's queue, so every system keeps its own rate limit: `ds-tfne`, `ds-gphdb` and `ds-b2notifier`.
 
@@ -133,7 +141,7 @@ A corporate payment is never declined because its allocations are slow. It waits
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, with the pending payments' IDs when the payment waits for a go-ahead. A duplicate means the request was seen before |
 | A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once |
-| Bank confirmation | The redirect link and the provider's reference, guarded on `PENDING` |
+| Bank confirmation or 3D Secure | The redirect or challenge link and the provider's reference, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and the cancellation of the payment's Work Tracker rows |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |
 | Settle | A batch of inbox rows as JDBC batches in one transaction: a guarded update from `PROCESSED` to `PAID` on `trans_dtl` for a payment or on `split_trans_dtl` for a leg, and a `PAID` timeline row tagged with the batch ID wherever the update changed a row. Then a read-back by batch ID |
@@ -151,7 +159,7 @@ It runs as a local activity, which is what lets a payment ride out an Oracle out
 | Call | Runs as | Why |
 | --- | --- | --- |
 | Oracle reads and writes | A local activity (`PaymentStore`) | No task round trip, and one marker in history when the workflow task completes |
-| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, and the provider in RequestConfirmation | A local activity. A Verify call that fails 3 times runs again as a regular activity on `online-wf`, for up to 24 hours | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
+| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and the provider in RequestConfirmation | A local activity. A Verify call that fails 3 times runs again as a regular activity on `online-wf`, for up to 24 hours | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
 | Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 

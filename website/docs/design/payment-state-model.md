@@ -29,7 +29,7 @@ config:
 stateDiagram-v2
   direction TB
   [*] --> PENDING: Capture
-  PENDING --> ACCEPTED: Verify, pay today, inbound or at confirm
+  PENDING --> ACCEPTED: Verify, pay today, inbound,<br/>at confirm or at the 3D Secure callback
   PENDING --> SCHEDULED: Verify, future date
   PENDING --> DECLINED: Verify fails, or no link from the provider
   PENDING --> DISALLOWED: Verify, push payment not accepted
@@ -105,18 +105,18 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 
 | State | Meaning | Terminal? |
 | --- | --- | --- |
-| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the customer to confirm their bank details, or to give the go-ahead for a payment made while another was pending. | No |
+| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the customer to confirm their bank details, to authenticate their debit card with 3D Secure, or to give the go-ahead for a payment made while another was pending. | No |
 | `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
 | `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. | No |
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager. Batches may be arriving. | No |
 | `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once if it was paid today, at its execution time if it was scheduled. | No |
-| `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. | No |
+| `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. A Pay with Bank Transfer or debit card payment has no clearing, because its money has already moved. | No |
 | `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
 | `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date the market's rules set. | No |
-| `PAID` | Settled with the bank and posted to Accounts Receivable. | Yes, unless a return arrives |
+| `PAID` | Settled with the bank and posted to Accounts Receivable. A Pay with Bank Transfer or debit card payment has no settlement to wait for, so it is `PAID` once posted. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank sent the funds back. | Yes. A representment is a new row |
 | `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
-| `DECLINED` | Failed validation, or a representment failed its recheck; or the bank-confirmation provider gave no redirect link; or a held create arrived after its market was taken out of service. | Yes |
+| `DECLINED` | Failed validation, or a representment failed its recheck; or the bank-confirmation or card provider gave no link; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
 | `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed before the market's confirmation window closed; or the customer said no to a payment made while another was pending. | Yes |
 | `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
@@ -129,9 +129,9 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
-| `PENDING` (bank confirmation) | `DECLINED` | RequestConfirmation, when the provider gives no redirect link |
-| `PENDING` (bank confirmation or go-ahead) | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify, once the caller confirms; `SCHEDULED` only for a future-dated payment's go-ahead |
-| `PENDING` (bank confirmation or go-ahead) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed, or on the customer's no |
+| `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when the provider gives no redirect or challenge link |
+| `PENDING` (bank confirmation, 3D Secure or go-ahead) | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify, once the caller confirms or the card provider calls back; `SCHEDULED` only for a future-dated payment's go-ahead. For a debit card, `ACCEPTED` means the authorization has debited the customer's account |
+| `PENDING` (bank confirmation, 3D Secure or go-ahead) | `CANCELLED` | Cancel, once the confirmation or 2-minute authentication window closes unanswered, or on the customer's no |
 | `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |

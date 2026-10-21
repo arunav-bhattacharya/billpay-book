@@ -72,7 +72,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 | --- | --- | --- | --- | --- |
 | 35 ms | 80 ms | 170 ms | 350 ms | 600 ms |
 
-**SLI:** read latency for one payment from Oracle, with its redirect link while it waits for bank confirmation. **Error budget:** 0.01% / 30-day window.
+**SLI:** read latency for one payment from Oracle, with its redirect or challenge link while it waits for bank confirmation or 3D Secure. **Error budget:** 0.01% / 30-day window.
 
 ## Payment Installments
 
@@ -93,6 +93,16 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 | 120 ms | 250 ms | 500 ms | 900 ms | 1.5 s |
 
 **SLI:** request-to-response latency for a confirm. It answers through an update to the payment's waiting workflow, so no workflow starts, and like a create it waits at most 2.5 seconds for a decision before it replies `PENDING`. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+
+## 3D Secure Callback
+
+**Billpay Core API** · `POST /payments/{payment-id}/authentication` · SLA availability: **99.95%**
+
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 150 ms | 300 ms | 600 ms | 1 s | 1.5 s |
+
+**SLI:** request-to-response latency for the card provider's 3D Secure callback. Like a confirm, it answers through an update to the payment's waiting workflow and waits at most 2.5 seconds for a decision, but its Verify includes the card authorization, one more call. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
 
 ## Allocations Callback
 

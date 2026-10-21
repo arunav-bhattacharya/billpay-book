@@ -127,7 +127,7 @@ Verify decides whether a payment can go ahead. Its flow never changes: it makes 
 
 ### The checks
 
-Five checks exist today. Each is a class, and each says where it applies:
+Six checks exist today. Each is a class, and each says where it applies:
 
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
@@ -136,6 +136,7 @@ Five checks exist today. Each is a class, and each says where it applies:
 | `TokenCheck` | `TOKEN` | Bank confirmation Y | Payment Instruments, whether the verification token it holds for the instrument is valid |
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
 | `GBFundsCheck` | `FUNDS` | GB, bank confirmation Y | The bank-confirmation provider, whether the customer's bank account holds enough money for the payment |
+| `CardAuthorizationCheck` | `CARD_AUTHORIZATION` | Card authentication Y | The card provider, to authorize a debit card payment with its 3D Secure result. Approved, it debits the customer's account, so it runs after the other checks' rules pass (Proposed) |
 
 In code, a check is this small:
 
@@ -283,6 +284,20 @@ class BatchClearing : ClearingMethod {
 
 Realtime clearing is either Y or N for any payment, so exactly one of the two applies. Execute's stage asks the registry for its clearing method and never needs to know which one it got.
 
+Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank during the customer's bank connection, or at the card authorization. Each gets a clearing method that makes no call, and each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names Proposed):
+
+```kotlin
+@Singleton
+class NoClearingForDebitCard : ClearingMethod {
+    override val key = ExecuteKey.CLEARING
+    override val appliesTo =
+        AppliesTo(on = setOf(REALTIME_CLEARING, CARD_AUTHENTICATION))
+    // no call: the authorization moved the money
+}
+```
+
+`NoClearingForBankTransfer` is the same, with `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
+
 ## How the registry decides
 
 The registry is the only place where matching happens, and one class serves every kind of strategy. Its core is four steps:
@@ -381,7 +396,7 @@ The registries find mistakes when the app starts. Unit tests build the registrie
 | Mistake | What catches it |
 | --- | --- |
 | Two strategies level for one key | The app refuses to start, and the error names both |
-| A behavior nobody handles | Each step names the behaviors it must act on: mandate authorization and bank confirmation for Verify. A combination where one of them is Y, and no strategy that applies names it, can't run. Delete `MandateCheck`, and no combination with a mandate can run, while payments without one are unaffected |
+| A behavior nobody handles | Each step names the behaviors it must act on: mandate authorization, bank confirmation and card authentication for Verify. A combination where one of them is Y, and no strategy that applies names it, can't run. Delete `MandateCheck`, and no combination with a mandate can run, while payments without one are unaffected |
 | A key nobody fills | Each step also names the keys it must fill, such as `CLEARING` for Execute. A combination with no clearing method can't run |
 | A class Quarkus can't see | Quarkus only finds beans in modules that carry an index, so each module that holds strategies has an empty `META-INF/beans.xml`. A test compares the strategy classes on the classpath with what the registries hold, and fails for any that are missing |
 | A misleading name | A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code |

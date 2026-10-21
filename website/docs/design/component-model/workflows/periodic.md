@@ -51,7 +51,7 @@ A run's workflow ID is its Schedule's ID, such as `dispatch-sched-DE`, plus the 
 
 <WorkflowMeta cluster="Offline" id="Its Schedule's ID, plus the trigger time" start="A Schedule, every 30 seconds, overlap SKIP" behaviors="generic" />
 
-`ProcessPaidEventsWorkflow` marks payments `PAID`. The two confirmations it needs, settlement from the bank and posting from Accounts Receivable, don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own, and mark a payment's row `READY` once both are in. This workflow pulls those rows at Billpay's own pace.
+`ProcessPaidEventsWorkflow` marks payments `PAID`. The two confirmations it needs, settlement from the bank and posting from Accounts Receivable, don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own, and mark a payment's row `READY` once both are in. A Pay with Bank Transfer or debit card payment has no clearing, so no settlement comes for it, and its row is `READY` on the posting alone. This workflow pulls those rows at Billpay's own pace.
 
 Only one run is ever active. A run takes batches until the inbox has no `READY` rows left, then ends. Each batch:
 

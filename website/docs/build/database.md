@@ -71,7 +71,7 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, with the pending payments' IDs when the payment waits for a go-ahead |
 | A stage commit | The guarded status update, the timeline row with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, together with the note on the batch that its legs are written |
-| Bank confirmation | The redirect link and the provider's reference, guarded on `PENDING` |
+| Bank confirmation or 3D Secure | The redirect or challenge link and the provider's reference, guarded on `PENDING` |
 | Cancel | The guarded update to `CANCELLED`, and cancelling the payment's Work Tracker rows |
 | Giving up | The Work Tracker row to `FAILED`, and the payment or leg onto `exception_list` in the status it stopped in |
 | Mapping a replacement | The old and new payment IDs in `ORIG_TRANS_REFER_MAP` |

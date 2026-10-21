@@ -499,6 +499,22 @@
   opacity: var(--pc-dim);
 }
 
+.callback {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--amex-mut);
+  opacity: var(--pc-dim);
+  transition: opacity 0.2s;
+}
+
+.callbackOn {
+  opacity: 1;
+}
+
 .returns,
 .open,
 .notes {

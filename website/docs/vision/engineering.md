@@ -38,6 +38,7 @@ export const SETTINGS = [
   'Cutoff',
   'Allocation fetch',
   'Bank confirmation window',
+  'Card provider and 3D Secure window',
   'Representment rules',
   'Raven notifications',
   'Expected volumes',

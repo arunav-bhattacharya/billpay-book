@@ -15,6 +15,7 @@ export const GROUPS = [
       {label: 'Pay my bill today', to: '#pay-my-bill-today', kind: 'customer'},
       {label: 'Pay on a future date', to: '#pay-on-a-future-date', kind: 'customer'},
       {label: 'Pay by Bank today', to: '#pay-by-bank-today', kind: 'customer'},
+      {label: 'Pay by Debit card', to: '#pay-by-debit-card', kind: 'customer'},
       {label: 'Pay with multiple instructions', to: '#pay-with-multiple-instructions', kind: 'customer'},
       {label: 'Pay while another is pending', to: '#pay-while-another-payment-is-pending', kind: 'customer'},
       {label: 'Pay with MR Points', to: '#pay-with-mr-points', kind: 'customer'},
@@ -313,9 +314,9 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
       name: 'Execute',
       state: 'PROCESSING',
       mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
+      systems: ['GAR', 'Payment Instruments', 'AMP'],
       parallel: true,
-      fanNote: 'at once; AMP after Instruments',
+      fanNote: 'no clearing; AMP after Instruments',
     },
     {
       icon: 'broadcast',
@@ -329,8 +330,8 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
       name: 'Paid',
       state: 'PAID',
       mode: 'awaiting',
-      caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
+      caption: 'posted',
+      systems: ['GAR'],
       exit: {state: 'RETURNED'},
     },
   ]}
@@ -340,16 +341,111 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the workflow waits on its timer: the market\'s confirmation window and a short grace. If no confirm comes in that time, the workflow runs Cancel itself, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
     {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer\'s bank account holds enough money for the payment, and declines it if not. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409.'},
     {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
-    {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
+    {step: 5, text: 'No clearing call: the money moved at the bank, during the customer\'s bank connection. The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
     {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
+    {step: 7, text: '`PAID` follows once the AR posting is in One-Data\'s inbox. With no clearing, no settlement comes, so the posting alone makes the payment ready.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
 />
 
+### Pay by Debit card
+
+A customer can pay with a debit card, a way to pay of its own, apart from a bank account. Every debit card payment goes through 3D Secure, the card schemes' check that the customer is the cardholder. Billpay asks the market's card provider (Checkout.com in the UK) to start it, and the provider calls Billpay back once the card is authenticated. Then Billpay authorizes the payment, and the authorization takes the money from the customer's account if it holds enough. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end.
+
+<JourneyMap
+  kind="customer"
+  eyebrow="Immediate payment, 3D Secure"
+  title="Pay by Debit card"
+  origin={{
+    actor: 'Cardmember',
+    icon: 'user',
+    channels: [
+      {icon: 'monitor', label: 'Web'},
+      {icon: 'phone', label: 'Mobile app'},
+    ],
+    note: 'Every debit card needs 3D Secure. The card provider is a market setting.',
+  }}
+  entry={[
+    {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
+    {kind: 'event', label: '3D Secure callback', note: 'from the card provider, not One-Data'},
+  ]}
+  core={[
+    {kind: 'api', label: 'POST /payments'},
+    {kind: 'api', label: 'POST /payments/{payment-id}/authentication'},
+  ]}
+  workflow={{label: 'CreatePaymentIntentWorkflow', note: "the card provider's callback arrives as an update"}}
+  steps={[
+    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
+    {
+      icon: 'card',
+      name: '3D Secure',
+      state: 'PENDING',
+      mode: 'live',
+      caption: 'caller gets the challenge link',
+      systems: ['Card provider'],
+    },
+    {
+      icon: 'user',
+      name: 'Customer authenticates',
+      state: 'PENDING',
+      mode: 'awaiting',
+      caption: 'a code or an app approval',
+      exit: {state: 'CANCELLED'},
+    },
+    {
+      icon: 'shieldCheck',
+      name: 'Verify',
+      state: 'ACCEPTED',
+      mode: 'background',
+      caption: 'checks, then the authorization',
+      systems: ['Payment Instruments', 'Payment Options', 'Plans', 'Card provider'],
+      parallel: true,
+      fanNote: 'checks at once; the card provider last',
+      exit: {state: 'DECLINED'},
+    },
+    {
+      icon: 'parallelArrows',
+      name: 'Execute',
+      state: 'PROCESSING',
+      mode: 'background',
+      systems: ['GAR', 'Payment Instruments', 'AMP'],
+      parallel: true,
+      fanNote: 'no clearing; AMP after Instruments',
+    },
+    {
+      icon: 'broadcast',
+      name: 'Fulfil',
+      state: 'PROCESSED',
+      mode: 'background',
+      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
+    },
+    {
+      icon: 'doubleCheck',
+      name: 'Paid',
+      state: 'PAID',
+      mode: 'awaiting',
+      caption: 'posted',
+      systems: ['GAR'],
+      exit: {state: 'RETURNED'},
+    },
+  ]}
+  detail={[
+    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. The card came from Payment Instruments, which the channel asked for the customer\'s saved cards.'},
+    {step: 2, text: 'The payment method is a debit card, so the Router sets card authentication to Y and starts `CreatePaymentIntentWorkflow`. RequestConfirmation asks the market\'s card provider to start 3D Secure, and gives it Billpay\'s callback URL. When the card\'s bank wants a challenge, the provider returns the challenge link, and the caller\'s update returns `PENDING` with it. When it needs none, the caller gets `PENDING` with no link. If the provider doesn\'t answer, the payment is `DECLINED` instead.'},
+    {step: 3, text: 'The customer completes the challenge, such as a one-time code or a banking-app approval, while the workflow waits on its timer: 2 minutes and a short grace. If no callback comes in that time, the workflow runs Cancel itself, the payment ends `CANCELLED`, and nothing has been taken.'},
+    {step: 4, text: 'The card provider calls `POST /payments/{payment-id}/authentication` directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D Secure result is `DECLINED` with no further call. Otherwise Verify runs its usual checks, then authorizes the payment with the card provider, last: the authorization debits the customer\'s account if it holds enough money, and the card\'s bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the callback\'s reply returns here. The customer learns the outcome from the channel, through the payment\'s state and its Raven message.'},
+    {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
+    {step: 5, text: 'No clearing call: the authorization has already moved the money. The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once.'},
+    {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
+    {step: 7, text: '`PAID` follows once the AR posting is in One-Data\'s inbox. No settlement comes for a debit card, so the posting alone makes the payment ready.'},
+    {text: 'A debit card pays today only, with one instruction, and never with MR Points. A create that breaks this gets 422 before any workflow starts.'},
+  ]}
+  reference={{to: '/docs/design/sequence-diagrams#16-pay-by-debit-card-create-3d-secure-and-authorization', label: 'Sequence diagram'}}
+/>
+
 ### Pay with multiple instructions
 
-One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. Billpay validates the composite payment as a whole, then runs each instruction as its own payment, all on the Online cluster. A request with several instructions never takes bank confirmation: one that would need it gets 422 before any workflow starts.
+One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. Billpay validates the composite payment as a whole, then runs each instruction as its own payment, all on the Online cluster. A request with several instructions never takes bank confirmation or a debit card: one that would need either gets 422 before any workflow starts.
 
 <JourneyMap
   kind="customer"

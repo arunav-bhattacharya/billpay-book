@@ -1,6 +1,6 @@
 ---
 title: Sequence Diagrams
-description: "Fifteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make."
+description: "Sixteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make."
 sidebar_label: Sequence Diagrams
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Sequence Diagrams
 
-<Lead>Fifteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make. Each one shows which cluster runs every step, and when RTF and Raven hear about it.</Lead>
+<Lead>Sixteen flows traced end to end, from the call or Schedule that starts each one to the stages that do the work and the commits they make. Each one shows which cluster runs every step, and when RTF and Raven hear about it.</Lead>
 
 <details>
 <summary>How to read these diagrams</summary>
@@ -852,7 +852,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. The money moves at the bank, during the customer's bank connection, so Execute makes no clearing call. A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
 
 ```mermaid
 ---
@@ -931,7 +931,7 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over WF,RAV: Online cluster, after the reply
       WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute, then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
+      Note over WF,VER: ACCEPTED: Execute, with no clearing call, since the money<br/>moved at the bank, then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
     end
   else no confirm before the timer fires
     rect rgba(0,111,207,0.12)
@@ -1039,6 +1039,97 @@ sequenceDiagram
       WF->>RTF: CANCELLED event
       WF->>RAV: CANCELLED message
       WF->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
+    end
+  end
+```
+
+## 16. Pay by Debit card: create, 3D Secure and authorization
+
+A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-core directly, not through One-Data, and the callback is an update to the same workflow. Verify runs its usual checks, then authorizes the payment last: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision. Execute makes no clearing call, because the money has already moved. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
+
+```mermaid
+---
+config:
+  fontFamily: "BentonSansUI, Helvetica, Arial, sans-serif"
+  fontSize: 15
+---
+sequenceDiagram
+  autonumber
+
+  box rgba(0,23,90,0.07) Caller
+    participant OD as CreatePayment.v3
+  end
+
+  box rgba(0,111,207,0.05) Billpay Platform
+    participant R as Billpay Router
+    participant WF as CreatePaymentIntent<br/>Workflow
+    participant RQC as Request<br/>Confirmation
+    participant VER as Verify
+    participant CAN as Cancel
+    participant PS as PaymentStore (Oracle)
+  end
+
+  participant CP as Card provider<br/>(3D Secure)
+  participant RTF
+  participant RAV as Raven
+
+  OD->>R: POST /payments,<br/>today, by debit card
+  Note over R: admit, set card authentication<br/>to Y, pick the intent journey,<br/>pin profile, run on Online
+  R->>WF: Update-With-Start,<br/>{paymentId}-init
+
+  rect rgba(0,111,207,0.12)
+    Note over WF,PS: Online cluster, the first workflow task
+    Note over WF: Capture first: PENDING
+    WF->>RQC: run
+    RQC->>CP: start 3D Secure with the callback URL,<br/>one try
+    alt the provider answers
+      rect rgba(102,169,226,0.40)
+        RQC->>PS: the challenge link, or none,<br/>and the provider's reference, guarded on PENDING
+      end
+    else no answer: the provider is down or too slow
+      rect rgba(102,169,226,0.40)
+        RQC->>PS: state → DECLINED,<br/>guarded on PENDING
+      end
+    end
+  end
+
+  WF-->>R: update result
+  R-->>OD: PENDING with the challenge link or none,<br/>or DECLINED
+
+  rect rgba(83,86,90,0.14)
+    Note over WF,CP: The customer completes the challenge, if there is one. The workflow waits on its timer: 2 minutes and a 10-second grace
+  end
+
+  alt the provider calls back in time
+    CP->>R: POST /payments/<br/>{payment-id}/authentication
+    Note over R: admit, then an update<br/>to the running workflow
+    R->>WF: update authenticated,<br/>ID {paymentId}-authentication
+    rect rgba(0,111,207,0.12)
+      Note over WF,PS: Online cluster, the same workflow
+      WF->>VER: run, with the 3D Secure result
+      Note over VER: a failed result: DECLINED, no authorization.<br/>Otherwise the usual checks, then last<br/>the card provider authorizes the payment
+      VER->>CP: authorize, with the payment ID<br/>as the idempotency key
+      CP-->>VER: approved and the account debited,<br/>or declined: not enough money
+      rect rgba(102,169,226,0.40)
+        VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
+      end
+    end
+    WF-->>R: update result
+    R-->>CP: ACCEPTED or DECLINED.<br/>409 once the workflow no longer waits
+    rect rgba(0,111,207,0.12)
+      Note over WF,RAV: Online cluster, after the reply
+      WF->>RTF: ACCEPTED or DECLINED event
+      Note over WF,VER: ACCEPTED: Execute, with no clearing call,<br/>then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
+    end
+  else no callback before the timer fires
+    rect rgba(0,111,207,0.12)
+      Note over WF,PS: Online cluster, the same workflow. Nothing was authorized, so no money moved
+      WF->>CAN: run
+      rect rgba(102,169,226,0.40)
+        CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
+      end
+      WF->>RTF: CANCELLED event
+      WF->>RAV: CANCELLED message
     end
   end
 ```

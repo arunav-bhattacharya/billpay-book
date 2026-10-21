@@ -19,15 +19,15 @@ A request reaches Billpay through a One-Data function. Most then call a core API
 The Router runs the same six steps for every request that starts a workflow.
 
 1. **Admit the request.** The market, account type and API must be live in this environment, which the Router checks against billpay-core's in-memory copy of the onboarding config, so admission adds no call. If they aren't, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them. One create is never refused: a create One-Data held while billpay-core was slow, which arrives after its market was taken out of service, is captured and declined instead, so the customer is told.
-2. **Pick the journey.** Each kind of request names its own journey, so there is no central switch to edit when a request type is added. A create is the one with conditions, and it asks an ordered list of rules, first match wins: waits for the customer, future-dated, several instructions, then pay today. A create that waits for the customer, for bank confirmation or a go-ahead, takes `CreatePaymentIntentWorkflow`. The go-ahead is a market setting, off by default: where it is off, the Router ignores the pending payments' IDs One-Data sends.
-3. **Resolve the behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel. Bank confirmation set to BOTH follows the request's payment method instead: a method that needs the customer to confirm at their bank gets Y.
-4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version. The market is there so a market's own classes can apply, such as GB's funds check for Pay with Bank Transfer. The profile also carries the market's rule settings from that version, which the [verification rules](./component-model/stages.md#how-verification-decides) read, and for a payment that waits for the customer, its confirmation window. The workflow looks up its stages from the profile at runtime ([From profile to stages](#from-profile-to-stages) walks through one).
+2. **Pick the journey.** Each kind of request names its own journey, so there is no central switch to edit when a request type is added. A create is the one with conditions, and it asks an ordered list of rules, first match wins: waits for the customer, future-dated, several instructions, then pay today. A create that waits for the customer, for bank confirmation, a debit card's 3D Secure or a go-ahead, takes `CreatePaymentIntentWorkflow`. A debit card pays today only, with one instruction and no MR Points; a create that breaks this gets 422. The go-ahead is a market setting, off by default: where it is off, the Router ignores the pending payments' IDs One-Data sends.
+3. **Resolve the behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel. Bank confirmation set to BOTH follows the request's payment method instead: a method that needs the customer to confirm at their bank gets Y. Card authentication isn't a market's answer at all: every debit card needs 3D Secure, so the Router sets it to Y for a debit card payment (Proposed).
+4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version. The market is there so a market's own classes can apply, such as GB's funds check for Pay with Bank Transfer. The profile also carries the market's rule settings from that version, which the [verification rules](./component-model/stages.md#how-verification-decides) read, and for a payment that waits for the customer, its confirmation window, or for a debit card, its 2-minute authentication window. The workflow looks up its stages from the profile at runtime ([From profile to stages](#from-profile-to-stages) walks through one).
 5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID.
 6. **Start** it in the journey's start mode.
 
 The resolved profile is the market's profile, resolved for this one payment and pinned. Its rule settings are a good example of why it carries values rather than a pointer to config. Say GB's consumer release v7 sets the largest payment at 25,000 GBP. A payment started while v7 is active carries 25,000 in its profile, and Verify's largest-payment rule declines a 30,000 GBP payment against it. If v8 raises the limit the next day, payments already running still use 25,000, and new ones use the new value. [Building the Router](../build/core-build/router.md#4-pin-the-resolved-profile) shows the settings as code.
 
-The confirm, and the customer's no to a payment that waits, are only admitted. They are updates to a workflow that is already running, so there is nothing to pick, pin or choose.
+The confirm, the customer's no to a payment that waits, and the card provider's 3D Secure callback are only admitted. They are updates to a workflow that is already running, so there is nothing to pick, pin or choose.
 
 ## From profile to stages
 
@@ -70,7 +70,7 @@ How a workflow starts depends on who is waiting for it.
 
 Update-With-Start is what keeps the online journeys fast. It starts the workflow and sends it an update in one call, and the request itself rides in the start, so nothing is written to Oracle before the workflow begins. The update returns as soon as there is an answer, such as Verify's decision on a new payment or `CANCELLED` for a cancel, and the rest of the workflow carries on without the caller. Temporal calls this the early-return pattern. On the Online cluster, the decision's calls also run as local activities, inside the worker, so Capture, Verify and its commit all happen in the workflow's first task and the caller's answer comes back with it.
 
-- `PENDING` in a reply means the payment is captured but not yet decided. The API waits at most 2.5 seconds for the decision, so its answer reaches One-Data inside One-Data's own 3 seconds; a payment not decided by then is answered `PENDING` and finishes on its own. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link, and the confirm's reply carries the decision. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A payment held for the customer's go-ahead also comes back `PENDING`, and One-Data adds the pending payments to the reply.
+- `PENDING` in a reply means the payment is captured but not yet decided. The API waits at most 2.5 seconds for the decision, so its answer reaches One-Data inside One-Data's own 3 seconds; a payment not decided by then is answered `PENDING` and finishes on its own. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link, and the confirm's reply carries the decision. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A payment held for the customer's go-ahead also comes back `PENDING`, and One-Data adds the pending payments to the reply. A debit card payment comes back `PENDING` with the 3D Secure challenge link, or with none when the card's bank needs no challenge, and the card provider's callback brings the decision.
 - A create repeated after its `{paymentId}-init` run has closed starts a new run under the default reuse policy, and Capture's idempotency check decides whether it carries on ([Creates that arrive late or twice](./component-model/workflows/core.md#creates-that-arrive-late-or-twice)).
 - A payment that waits for the customer stays in one workflow, `CreatePaymentIntentWorkflow`, from the create to its end. The confirm and the customer's no reach it as updates, so their replies carry the decision, and its own timer cancels the payment once the confirmation window and a short grace have passed.
 - Eager workflow start isn't used: the server refuses it with Update-With-Start. Online latency comes from Update-With-Start and local activities instead.
@@ -106,13 +106,13 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
           ],
         },
         {
-          desc: 'Waits for the customer: bank confirmation, or a go-ahead where the market has it on',
+          desc: 'Waits for the customer: bank confirmation, a debit card, or a go-ahead where the market has it on',
           flow: [
             {
               via: 'uws',
               name: 'CreatePaymentIntent',
               cluster: 'Online',
-              caption: ['Capture, RequestConfirmation for a bank, then the wait', 'After the confirm: Verify, Execute, Fulfil'],
+              caption: ['Capture, RequestConfirmation for a bank or a card, then the wait', 'After the confirm or the callback: Verify, Execute, Fulfil'],
             },
           ],
           note: "The confirm and the no arrive as updates. No answer by the window's end: cancelled.",
@@ -208,6 +208,10 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
       routes: [{desc: 'PENDING, confirmed at the bank or given the go-ahead', flow: [{via: 'update', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
     },
     {
+      term: '3D Secure callback',
+      routes: [{desc: "PENDING, the debit card authenticated; from the card provider, not One-Data", flow: [{via: 'update', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
+    },
+    {
       term: 'Credit balance refund',
       routes: [
         {desc: 'From a channel', flow: [{via: 'uws', name: 'CreateBalanceRefund', cluster: 'Online'}]},
@@ -257,16 +261,16 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
   ]}
 />
 
-Settlement and Accounts Receivable posting are the one input the Router never sees. One-Data pairs the two events in its inbox, and `ProcessPaidEventsWorkflow` pulls the payments that have both every 30 seconds ([Periodic Workflows](./component-model/workflows/periodic.md) has the detail).
+Settlement and Accounts Receivable posting are the one input the Router never sees. One-Data pairs the two events in its inbox, and `ProcessPaidEventsWorkflow` pulls the payments that have both every 30 seconds. A Pay with Bank Transfer or debit card payment has no clearing, so it waits for the posting alone ([Periodic Workflows](./component-model/workflows/periodic.md) has the detail).
 
 ## Child workflows
 
-The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and for a go-ahead, the other pending payments' IDs One-Data sends with the create, where the market's go-ahead setting is on. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
+The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, a debit card for 3D Secure, and for a go-ahead, the other pending payments' IDs One-Data sends with the create, where the market's go-ahead setting is on. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs, and the parent commits `PROCESSED` once every leg has finished.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
-- A request with several instructions never takes bank confirmation, and neither does Pay & Plan: one that would need it gets 422 before any workflow starts.
-- A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` replies `PENDING` with the provider's redirect link, or the pending list for a go-ahead, and waits. The caller's confirm and the customer's no are updates to that same workflow, and if neither comes in time, its timer runs Cancel. After a confirm it runs Verify, Execute and Fulfil itself, or stops at `SCHEDULED` for a future-dated go-ahead.
+- A request with several instructions never takes bank confirmation or a debit card, and neither does Pay & Plan: one that would need either gets 422 before any workflow starts.
+- A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` replies `PENDING` with the provider's redirect link, the 3D Secure challenge link for a debit card, or the pending list for a go-ahead, and waits. The caller's confirm, the card provider's callback and the customer's no are updates to that same workflow, and if neither comes in time, its timer runs Cancel. After a confirm it runs Verify, Execute and Fulfil itself, or stops at `SCHEDULED` for a future-dated go-ahead.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
 

@@ -46,6 +46,13 @@ const JOURNEYS = [
     to: `${ALL_JOURNEYS}#pay-by-bank-today`,
   },
   {
+    id: "card",
+    term: "Pay by Debit card",
+    when: ["today", "a debit card"],
+    wf: "CreatePaymentIntent",
+    to: `${ALL_JOURNEYS}#pay-by-debit-card`,
+  },
+  {
     id: "multi",
     term: "Pay with multiple instructions",
     when: ["today", "account and points"],
@@ -71,7 +78,8 @@ const JOURNEYS = [
 const JOURNEY = Object.fromEntries(JOURNEYS.map((j) => [j.id, j]));
 
 const METHODS = [
-  { id: "bank", label: "Bank account or debit card" },
+  { id: "bank", label: "Bank account" },
+  { id: "debit", label: "Debit card", note: "checked with 3D Secure" },
   { id: "wallet", label: "Wallet" },
   {
     id: "transfer",
@@ -82,7 +90,7 @@ const METHODS = [
 
 const RETURNS = [
   [
-    "the ways to pay this market takes, and which need a bank step",
+    "the ways to pay this market takes, which need a bank step, and that a debit card needs 3D Secure",
     "rule settings, bank confirmation",
   ],
   [
@@ -104,6 +112,7 @@ const OPEN = [
   ],
   ["Pay with MR Points", "its steps, and its calls to Loyalty"],
   ["Wallet", "which instrument it is, and whether it needs a bank step"],
+  ["The card provider outside the UK", "Checkout.com in the UK; other markets' still to be named"],
 ];
 
 /* What the Router does with one set of answers. Returns a result with a
@@ -124,12 +133,14 @@ function decide(a) {
       : [a.method];
   const several = instructions.length > 1;
   const bankStep = instructions.includes("transfer");
+  const card = instructions.includes("debit");
   const later = a.date === "later";
   const met = new Set([later ? "a later date" : "today"]);
   if (several) met.add("account and points");
   else if (pointsOnly) met.add("points only");
   else met.add("one instruction");
   if (bankStep) met.add("a bank step");
+  if (card) met.add("a debit card");
   if (a.pending) met.add("another pending");
   if (a.goAhead) met.add("go-ahead on");
 
@@ -138,6 +149,28 @@ function decide(a) {
       kind: "open",
       met,
       text: "Wallet is still to be defined: which instrument it is, and whether it needs a bank step. The Router has no rule for it yet.",
+    };
+  }
+  if (card && (several || later)) {
+    return {
+      kind: "refused",
+      met,
+      text: "A debit card pays today only, with one instruction and no MR Points, so this create gets 422 before any workflow starts.",
+    };
+  }
+  if (card && a.pending && a.goAhead) {
+    return {
+      kind: "open",
+      met,
+      text: "Still to be decided: what the Router does with a debit card payment made while another is pending, in a market with the go-ahead on.",
+    };
+  }
+  if (card) {
+    return {
+      kind: "pick",
+      id: "card",
+      met,
+      text: `The Router starts CreatePaymentIntentWorkflow. It starts 3D Secure with the card provider and replies PENDING with the challenge link, or none. The card provider's callback brings the result, and Verify authorizes the payment last: approved, the money leaves the customer's account; declined by the card's bank, the payment is DECLINED. No callback in 2 minutes, and the payment is cancelled.${a.pending ? " One-Data sends the pending payment's ID, and the Router ignores it, because the go-ahead is off." : ""}`,
     };
   }
   if (bankStep && several) {
@@ -328,7 +361,12 @@ function ThePage({ a, set }) {
               aria-label="From where"
               value={a.method}
               disabled={pointsOnly}
-              onChange={(e) => set({ method: e.target.value })}
+              onChange={(e) =>
+                set({
+                  method: e.target.value,
+                  ...(e.target.value === "debit" ? { points: false, date: "today" } : {}),
+                })
+              }
             >
               {METHODS.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -340,22 +378,28 @@ function ThePage({ a, set }) {
           {method.note && !pointsOnly && (
             <p className={styles.hint}>{method.note}</p>
           )}
-          {a.method === "bank" && !pointsOnly && (
+          {(a.method === "bank" || a.method === "debit") && !pointsOnly && (
             <div className={styles.sub}>
               <div className={styles.subHead}>
-                <span>Which account or card</span>
+                <span>{a.method === "debit" ? "Which card" : "Which account"}</span>
                 <CallTag n={3} name="Payment Instruments API" />
               </div>
               <div className={styles.selectWrap}>
-                <select
-                  className={styles.select}
-                  aria-label="Which account or card"
-                  value={a.account}
-                  onChange={(e) => set({ account: e.target.value })}
-                >
-                  <option value="checking">Checking account</option>
-                  <option value="debit">Debit card</option>
-                </select>
+                {a.method === "debit" ? (
+                  <select className={styles.select} aria-label="Which card" defaultValue="saved">
+                    <option value="saved">Saved debit card</option>
+                  </select>
+                ) : (
+                  <select
+                    className={styles.select}
+                    aria-label="Which account"
+                    value={a.account}
+                    onChange={(e) => set({ account: e.target.value })}
+                  >
+                    <option value="checking">Checking account</option>
+                    <option value="savings">Savings account</option>
+                  </select>
+                )}
               </div>
             </div>
           )}
@@ -363,6 +407,7 @@ function ThePage({ a, set }) {
             <input
               type="checkbox"
               checked={a.points}
+              disabled={a.method === "debit"}
               onChange={(e) =>
                 set({
                   points: e.target.checked,
@@ -372,7 +417,7 @@ function ThePage({ a, set }) {
             />
             <span>Pay with MR Points</span>
             <span className={styles.checkNote}>
-              where the market offers them
+              {a.method === "debit" ? "not with a debit card" : "where the market offers them"}
             </span>
           </label>
           {a.points && (
@@ -397,16 +442,18 @@ function ThePage({ a, set }) {
             label="When"
             value={a.date}
             onChange={(v) => set({ date: v })}
-            disabled={(id) => id === "later" && a.points}
+            disabled={(id) => id === "later" && (a.points || a.method === "debit")}
             options={[
               { id: "today", label: "Today" },
               { id: "later", label: "A later date" },
             ]}
           />
           <p className={styles.hint}>
-            {a.points
-              ? "MR Points pay today only."
-              : "Up to 30 days ahead by default. A per-market horizon is Proposed."}
+            {a.method === "debit"
+              ? "A debit card pays today only."
+              : a.points
+                ? "MR Points pay today only."
+                : "Up to 30 days ahead by default. A per-market horizon is Proposed."}
           </p>
         </Field>
 
@@ -439,7 +486,7 @@ function ThePage({ a, set }) {
 function TheCalls({ a }) {
   const uid = useId();
   const pointsOnly = a.points && a.pointsMode === "only";
-  const instruments = a.owed && a.method === "bank" && !pointsOnly;
+  const instruments = a.owed && (a.method === "bank" || a.method === "debit") && !pointsOnly;
   const calls = [
     {
       n: 1,
@@ -457,7 +504,7 @@ function TheCalls({ a }) {
     {
       n: 3,
       name: "Payment Instruments API",
-      line: "The customer's bank accounts and debit cards.",
+      line: "The customer's bank accounts, or their debit cards.",
       on: instruments,
     },
     {
@@ -469,7 +516,7 @@ function TheCalls({ a }) {
   ];
   const gates = [
     "when something is owed",
-    "only when a bank account or debit card is picked",
+    "only when a bank account or a debit card is picked",
     "on Review and pay",
   ];
   return (
@@ -526,6 +573,13 @@ function TheCalls({ a }) {
             </li>
           ))}
         </ol>
+        <p className={clsx(styles.callback, a.owed && a.method === "debit" && !(a.points && a.pointsMode === "only") && styles.callbackOn)}>
+          <span className={styles.hollow} aria-hidden="true" />
+          <span>
+            For a debit card, one more call comes in after the create: the card provider&apos;s 3D Secure callback,
+            straight to billpay-core and not from the channel.
+          </span>
+        </p>
       </div>
 
       <div className={styles.callsMore}>

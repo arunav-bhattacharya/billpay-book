@@ -470,7 +470,7 @@ function Trigger({j, n, brief, go}) {
       </p>
       {!brief && (
         <p className={styles.stepNote}>
-          One-Data {req.handler ? 'event handler' : 'function'}
+          {req.direct ? 'Straight to billpay-core, not through One-Data' : `One-Data ${req.handler ? 'event handler' : 'function'}`}
           {req.aside ? `, ${req.aside}` : ''}: {req.does}.
         </p>
       )}

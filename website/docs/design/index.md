@@ -77,7 +77,7 @@ The pages below start with the rules and the states, then follow the moving part
     {
       term: 'Sequence Diagrams',
       to: '/docs/design/sequence-diagrams',
-      desc: `Fourteen flows traced from the caller, through the Router, to the stages and the systems they call.`,
+      desc: `Sixteen flows traced from the caller, through the Router, to the stages and the systems they call.`,
     },
   ]}
 />

@@ -40,7 +40,8 @@ A stage makes its calls first, in parallel wherever they don't depend on each ot
 ```kotlin
 @Singleton
 class DefaultPaymentExecuteStage(
-    // RealtimeClearing or BatchClearing
+    // RealtimeClearing or BatchClearing; NoClearingForBankTransfer or
+    // NoClearingForDebitCard, which make no call
     private val clearingMethods: MethodRegistry<ClearingMethod>,
 ) : PaymentExecuteStage {
     override val key = EXECUTE
@@ -107,7 +108,7 @@ val stages = stageResolver.resolve(profile)
 
 No `when` or `if` maps a resolved profile to classes, and there is no list to edit. Each stage, check and method says what job it does, its key, and where it applies, its `appliesTo`: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each key, the most specific class that applies wins. A class tied to a market beats one that isn't, so a market is the exception wherever it has a class of its own. Quarkus finds every class at build time, and a registry works out every combination when the app starts.
 
-GB is the example today. A Pay with Bank Transfer payment there also runs `GBFundsCheck`, which asks the bank-confirmation provider whether the customer's bank account holds enough money for the payment. That one class, in GB's module, is all GB adds. That is why the resolved profile carries the market. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
+GB is the example today. A Pay with Bank Transfer payment there also runs `GBFundsCheck`, which asks the bank-confirmation provider whether the customer's bank account holds enough money for the payment. That one class, in GB's module, is all GB adds. That is why the resolved profile carries the market. A debit card works the same way, with no market in it: `CardAuthorizationCheck` applies where card authentication is Y, and Verify runs it last, because an approved authorization has already taken the customer's money. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
 
 Stages are never `abstract`. A variation is a class of its own that the registry picks, not an override of a base class, so reading one file tells you everything that class does. Payment workflows are pinned to their build with Worker Versioning, so a deploy that adds or changes a class never changes the code under a payment that is already running.
 

@@ -92,6 +92,7 @@ function resolve(seg) {
     ? {...base, stages: seg.stages, child: base.child.filter((s) => seg.stages.includes(s))}
     : base;
   if (seg.cond) j = {...j, cond: seg.cond};
+  if (seg.exc) j = {...j, exc: {...j.exc, ...seg.exc}};
   const stages = seq(j);
   return {...seg, kind: 'run', j, stages, cols: Math.max(stages.length, 1), weight: Math.max(stages.length, 1.6)};
 }

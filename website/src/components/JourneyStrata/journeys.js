@@ -24,6 +24,14 @@ const PAID_SEGMENT = {
   oneData: [{c: 'inbox', s: 'settlement from MR/M3, AR posting from GAR. READY when both are in', at: 'Settle'}],
 };
 
+/* Pay with Bank Transfer and a debit card have no clearing, so no settlement
+   comes: the GAR posting alone makes the row READY. */
+const PAID_GAR_ONLY = {
+  ...PAID_SEGMENT,
+  phase: ['Posted', 'when the GAR posting is in'],
+  oneData: [{c: 'inbox', s: 'the AR posting from GAR alone: no clearing, so no settlement comes', at: 'Settle'}],
+};
+
 const paidAfter = (ruler) => (ruler ? {...PAID_SEGMENT, ruler: [{t: 'the next 30-second run', at: 'Settle'}]} : PAID_SEGMENT);
 
 export const GROUPS = [
@@ -131,8 +139,47 @@ export const GROUPS = [
               {c: 'CreateConfirmPendingPayment.v1', s: 'the confirm', at: 'Verify'},
               {c: 'DeletePendingPayment.v1', s: 'at the end: the entry goes', at: 'last'},
             ],
+            exc: {'Execute|ClearingActivities': {kind: 'skip'}},
+            after: 'No clearing call in Execute: the money moved at the bank, during the customer\'s bank connection.',
           },
-          paidAfter(false),
+          PAID_GAR_ONLY,
+        ],
+      },
+      {
+        id: 'card',
+        term: 'Pay by Debit card',
+        kind: 'customer',
+        meta: ['customer initiated', 'Online, one workflow throughout', 'today only, 2 minutes for 3D Secure'],
+        segments: [
+          {
+            phase: ['The create', 'the customer waits for the challenge'],
+            road: 'card',
+            waiting: true,
+            customer: [
+              {t: 'Pays by debit card', s: 'a card from Payment Instruments', st: 'PENDING', m: 'on', at: 'Capture'},
+              {t: 'Gets the challenge link', s: 'or none, when the bank needs no challenge', st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
+            ],
+            oneData: [
+              {...CREATE, at: 'Capture'},
+              {c: 'DeletePendingPayment.v1', s: 'after the reply: only the stored create goes', at: 'RequestConfirmation'},
+            ],
+          },
+          {
+            phase: ['3D Secure', '2 minutes at most'],
+            wait: 'The workflow waits on its own timer. No callback in time, and the timer runs Cancel: CANCELLED, and nothing is taken.',
+            customer: [{t: 'Completes the challenge', s: 'a one-time code or a banking-app approval', m: 'choice'}],
+          },
+          {
+            phase: ['The callback', 'from the card provider, not One-Data'],
+            road: 'authenticated',
+            customer: [
+              {t: 'Sees the result', s: "ACCEPTED, or DECLINED when the account can't cover it", st: 'ACCEPTED', m: 'on', at: 'Verify'},
+              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'},
+            ],
+            oneData: [{c: 'DeletePendingPayment.v1', s: 'at the end: the entry goes', at: 'last'}],
+            after: "The authorization in Verify debits the customer's account, so Execute makes no clearing call.",
+          },
+          PAID_GAR_ONLY,
         ],
       },
       {

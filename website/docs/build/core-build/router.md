@@ -15,6 +15,7 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 ## Who calls it
 
 - The core APIs, for every write a caller waits on: `POST /payments`, `PUT` and `DELETE /payments/{payment-id}`, `POST /payments/{payment-id}/confirm`, `POST /refunds` and `POST /payment-installments`.
+- The 3D Secure callback, `POST /payments/{payment-id}/authentication`, which the market's card provider calls directly. Like the confirm, it is only admitted, then sent as an update to the waiting workflow.
 - The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch.
 - The dispatchers, once for each Work Tracker row or inbox request they release.
 
@@ -37,9 +38,10 @@ data class ResolvedProfile(
     val requiresRealtimeClearing: Boolean,        // Y or N, never BOTH
     val requiresMandateAuthorization: Boolean,
     val requiresBankConfirmation: Boolean,
+    val cardAuthentication: Boolean,              // Y for a debit card: every one needs 3D Secure (Proposed)
     val configVersion: Int,                       // the market config version they came from
     val ruleSettings: RuleSettings,               // the verification rules' thresholds, from that version
-    val confirmationWindow: Duration? = null,     // for a payment that waits for the customer
+    val confirmationWindow: Duration? = null,     // for a payment that waits for the customer; 2 minutes for a debit card
 )
 
 data class RunSite(
@@ -133,9 +135,10 @@ class JourneyRule(
 
 object CreateJourneys {
     private val rules = listOf(
-        JourneyRule(Journey.CREATE_INTENT, "Waits for the customer: bank confirmation, or a go-ahead") { r, v -> r.waitsForCustomer(v) },
+        JourneyRule(Journey.CREATE_INTENT, "Waits for the customer: bank confirmation, a debit card, or a go-ahead") { r, v -> r.waitsForCustomer(v) },
         JourneyRule(Journey.CREATE_SCHEDULED, "Future-dated") { r, _ -> r.isFutureDated },
         JourneyRule(Journey.MULTIPLE_INSTRUCTIONS, "Today, several instructions") { r, _ -> r.instructions.size > 1 },
+        JourneyRule(Journey.PAY_WITH_MR_POINTS, "Today, MR Points alone") { r, _ -> r.instructions.single().isMrPoints },
         JourneyRule(Journey.CREATE_IMMEDIATE, "Today, one instruction") { _, _ -> true },
     )
 
@@ -153,7 +156,7 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 **A test keeps the code and the table together.** It walks every request type, item type, inbox type and create rule, writes the routing table as trigger, condition and journey, and compares it with a checked-in copy, the way the [stage report](./stage-resolver.md) works. A change to which journey a request takes fails the test until the same pull request updates the copy, so the reviewer sees the row that moved.
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or One-Data sent other pending payments' IDs with the create and the market's go-ahead setting, off by default, is on. That is why it is the first rule: a future-dated create that waits for a go-ahead still waits. The journey alone makes the payment wait, and nothing about the go-ahead goes in the resolved profile. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead.
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, when the payment method is a debit card, or One-Data sent other pending payments' IDs with the create and the market's go-ahead setting, off by default, is on. That is why it is the first rule: a future-dated create that waits for a go-ahead still waits. The journey alone makes the payment wait, and nothing about the go-ahead goes in the resolved profile. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
 
 ### 3. Resolve the behaviors
 
@@ -161,6 +164,7 @@ Each behavior in the market's version is Y, N or BOTH, and a workflow must only 
 
 - For most behaviors the rule lists the journeys that get Y. Realtime clearing is the usual example: only a pay-today payment from a channel gets it.
 - For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Only consumer payments made today take bank confirmation, so a corporate or future-dated payment always resolves to N, and a request with several instructions that would need it is refused with 422.
+- Card authentication is never BOTH, because no market chooses it: the Router sets it to Y whenever the payment method is a debit card (Proposed).
 
 ```kotlin
 fun resolveFlag(rule: BehaviorRule, journey: Journey, method: PaymentMethod?): Boolean =

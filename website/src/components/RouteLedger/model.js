@@ -145,6 +145,14 @@ export const IFACES = [
     note: 'only the Online cluster calls it',
   },
   {
+    name: 'CardActivities',
+    system: 'Card provider',
+    long: "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
+    queue: 'local activity',
+    at: ['RequestConfirmation', 'Verify'],
+    note: 'only for a debit card; the authorization carries the payment ID as its idempotency key',
+  },
+  {
     name: 'InboxActivities',
     system: 'One-Data',
     queue: "the workflow's queue",
@@ -261,6 +269,30 @@ export const BANDS = [
               text: "On its own timer: the market's confirmation window and a short grace. The confirm arrives as an update to this same workflow. If none comes in time, the timer runs Cancel, and the payment ends CANCELLED.",
             },
             then: [{to: 'confirm', text: 'the caller confirms, with the same payment ID'}],
+          },
+          {
+            id: 'card',
+            wf: 'CreatePaymentIntent',
+            tag: 'debit card',
+            card: true,
+            lead: 'Pay today by debit card, once 3D Secure has authenticated it.',
+            stages: ['Capture'],
+            own: ['RequestConfirmation'],
+            journey: 'Create payment, today, one instruction, by debit card: a payment that waits for 3D Secure',
+            wfId: '{paymentId}-init',
+            answer: 'with PENDING and the challenge link, or none; DECLINED when the provider gives no answer',
+            chips: five('CONSUMER', 'Y', 'N'),
+            behave:
+              'Example values. Card authentication is Y: the Router sets it for every debit card, and no market chooses it. A debit card pays today only, with one instruction and no MR Points.',
+            notes: {
+              RequestConfirmation:
+                "It asks the market's card provider to start 3D Secure, with Billpay's callback URL, one try, and stores the challenge link, or none when the card's bank needs no challenge, guarded on PENDING. The caller gets PENDING. With no answer from the provider, the payment is DECLINED instead.",
+            },
+            stop: {
+              title: 'The workflow waits here.',
+              text: "On its own timer: 2 minutes and a short grace. The card provider's callback arrives as an update to this same workflow. If none comes in time, the timer runs Cancel, and nothing has been taken.",
+            },
+            then: [{to: 'authenticated', text: 'the card provider calls back, with the same payment ID'}],
           },
           {
             id: 'goahead',
@@ -393,8 +425,44 @@ export const BANDS = [
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'call', note: "also asks whether the instrument's verification token is valid"},
+              'Execute|ClearingActivities': {kind: 'cond', note: 'not for Pay with Bank Transfer: its money moved at the bank'},
             },
             then: [PAID],
+          },
+        ],
+      },
+      {
+        fn: ['3D Secure|callback'],
+        from: 'the card provider',
+        calls: 'The card provider calls',
+        direct: true,
+        does: "a debit card's 3D Secure result, once the customer is authenticated or authentication has failed",
+        api: ['POST', '/payments/{payment-id}/authentication'],
+        roads: [
+          {
+            id: 'authenticated',
+            wf: 'CreatePaymentIntent',
+            tag: 'the callback',
+            card: true,
+            update: '{paymentId}-authentication',
+            start: 'an update to the running workflow',
+            lead: 'Go ahead with a debit card payment once the card provider has called back with the 3D Secure result.',
+            stages: ['Verify', 'Execute', 'Fulfil'],
+            journey: "3D Secure callback, PENDING and waiting for a debit card's authentication, inside the 2-minute window",
+            wfId: '{paymentId}-init',
+            answer: 'once Verify decides',
+            chips: five('CONSUMER', 'Y', 'N'),
+            behave: 'Example values. Card authentication adds the card authorization check to Verify, and takes clearing out of Execute.',
+            move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
+            notes: {
+              Verify:
+                "A failed 3D Secure result is DECLINED with no authorization. Otherwise the usual checks run, then last the card provider authorizes the payment: approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
+              Execute: 'No clearing call: the authorization moved the money. Only the AR balance and open-to-buy calls go out.',
+            },
+            exc: {
+              'Execute|ClearingActivities': {kind: 'skip', note: 'the authorization moved the money'},
+            },
+            then: [{to: 'paid', text: 'PAID, once One-Data has the GAR posting: no settlement comes for a debit card'}],
           },
         ],
       },
@@ -765,7 +833,7 @@ export const BANDS = [
             wfId: "its Schedule's ID plus the trigger time",
             notes: {
               Settle:
-                'Up to 500 READY rows a batch, in one transaction: each payment or leg goes from PROCESSED to PAID. Then the PAID events go to RTF.',
+                'Up to 500 READY rows a batch, in one transaction: each payment or leg goes from PROCESSED to PAID. Then the PAID events go to RTF. A Pay with Bank Transfer or debit card payment is READY on its GAR posting alone, since it has no clearing and no settlement comes.',
             },
             then: [{to: 'returned', text: 'PAID is final, unless a return arrives'}],
           },
@@ -952,7 +1020,8 @@ export function calls(j, f) {
       return;
     }
     if (!(f.at || []).includes(s)) return;
-    if (f.name === 'BankConfirmationActivities' && s !== 'RequestConfirmation') return;
+    if (f.name === 'BankConfirmationActivities' && (s !== 'RequestConfirmation' || j.card)) return;
+    if (f.name === 'CardActivities' && !j.card) return;
     let kind = sometimes ? 'cond' : base;
     let note;
     if (f.name === 'CommunicationActivities') {
@@ -971,6 +1040,7 @@ export function calls(j, f) {
       }
     }
     if (f.name === 'BankConfirmationActivities') note = 'for the redirect link';
+    if (f.name === 'CardActivities') note = s === 'Verify' ? 'last: the authorization, which debits the account' : "to start 3D Secure, with Billpay's callback URL";
     if (f.name === 'PlansActivities') {
       note = 'only where the profile requires mandate authorization';
       if (kind === 'call') kind = 'cond';
@@ -986,13 +1056,13 @@ export function calls(j, f) {
 /* roads whose workflow calls the delete API at One-Data: a create from a
    channel at its end; a payment that waits, once after its reply and again
    when the confirm or the no ends the wait */
-const DELETES = new Set(['immediate', 'scheduled', 'bank', 'goahead', 'confirm', 'no']);
+const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'goahead', 'confirm', 'authenticated', 'no']);
 
 /* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
   if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
   if (j.band.key === 'pulled') return 'its dispatcher reads the request, and marks it once started';
-  if (j.id === 'bank' || j.id === 'goahead') {
+  if (j.id === 'bank' || j.id === 'card' || j.id === 'goahead') {
     return "calls the delete API after its reply, saying the payment still waits, so only the stored create leaves One-Data's Redis";
   }
   if (DELETES.has(j.id)) return "calls the delete API at the end, so the payment leaves One-Data's Redis";

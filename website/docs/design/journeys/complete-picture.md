@@ -34,7 +34,7 @@ Whatever happens at a stage lines up under it, all the way down. On Pay on a fut
 
 The switch above the picture changes the question. **By journey** follows one thing a customer or a system asks for, across every workflow it takes. **By workflow** lists the workflows instead, every road from a trigger to one workflow, grouped by how the work arrives. Pick a road there to open its card: the Router's six steps with this road's outcome, every activity its stages call, and what happens when a call fails.
 
-A journey can take several workflows, and a workflow can serve several journeys. Pay on a future date takes three: `CreateScheduledPaymentWorkflow` on the day it is made, `ExecuteScheduledPaymentWorkflow` on its due date, and `ProcessPaidEventsWorkflow` when it settles. `CreatePaymentIntentWorkflow` serves both Pay by Bank today and Pay while another payment is pending.
+A journey can take several workflows, and a workflow can serve several journeys. Pay on a future date takes three: `CreateScheduledPaymentWorkflow` on the day it is made, `ExecuteScheduledPaymentWorkflow` on its due date, and `ProcessPaidEventsWorkflow` when it settles. `CreatePaymentIntentWorkflow` serves three: Pay by Bank today, Pay by Debit card and Pay while another payment is pending.
 
 ## What the picture shows
 
@@ -43,6 +43,7 @@ A few things are easier to see here than anywhere else.
 - The customer waits only while a request is answered: at the create, and again at a confirm. The solid line ends at Verify, or at the reply that carries the link or the pending list, and everything after it runs with nobody waiting.
 - Work that waits for a date waits in Oracle, not in Temporal. Between runs, the Workflows band is empty and the Work Tracker row is what carries the payment forward.
 - A corporate payment takes six kinds of run to get from the request to `PAID`, and asks for its allocations before any money moves. Its own execution clears once, for the whole payment; its legs do the rest.
+- Two journeys have no clearing at all. Pay by Bank today moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call and the payment is `PAID` on the Accounts Receivable posting alone.
 - One journey skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.
 
 ## When the Router says no

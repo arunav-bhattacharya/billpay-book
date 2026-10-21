@@ -19,9 +19,11 @@ A channel that decided on its own what to offer would drift from what Billpay ac
 ## Four calls, in this order
 
 1. **Payment Options API**, for what the customer owes. If nothing is owed, the payment journey never starts, and the channel calls nothing else.
-2. **`ReadPaymentChoices.v1`** (Proposed), for Billpay's own rules: the ways to pay the market takes and which of them need a bank step, the dates it offers, the cancellation window, the limits, whether it offers Pay & Plan and MR Points, and the payments already pending on the account.
-3. **Payment Instruments API**, for the customer's bank accounts and debit cards. The channel calls it only when the customer picks a bank account or debit card.
+2. **`ReadPaymentChoices.v1`** (Proposed), for Billpay's own rules: the ways to pay the market takes, which of them need a bank step, and that a debit card needs 3D Secure, the dates it offers, the cancellation window, the limits, whether it offers Pay & Plan and MR Points, and the payments already pending on the account.
+3. **Payment Instruments API**, for the customer's bank accounts, or for their debit cards. The page offers the two separately, and the channel calls it only when the customer picks one of them.
 4. **`CreatePayment.v3`**, when the customer reviews and pays. This is the only call that starts anything.
+
+A debit card adds one more call, in the other direction. Billpay gives the market's card provider a callback URL when it starts 3D Secure, and the provider calls billpay-core back directly once the card is authenticated, not through One-Data and not from the channel.
 
 The channel calls Payment Options and Payment Instruments itself, to fill the page. Verify calls them again once the payment is created, and that second call is the one that decides. The same goes for the rules: `ReadPaymentChoices.v1` only guides the page, and the Router and Verify check the payment against the release that is active when it arrives. A release that goes live while the customer is on the page can't let through a payment it would refuse.
 
@@ -38,17 +40,34 @@ The page sends one request to one door, `CreatePayment.v3`, whatever the custome
 | [Pay my bill today](./all-journeys.md#pay-my-bill-today) | Today, one instruction | `CreateImmediatePaymentWorkflow` |
 | [Pay on a future date](./all-journeys.md#pay-on-a-future-date) | A later date | `CreateScheduledPaymentWorkflow`, then `ExecuteScheduledPaymentWorkflow` on the date |
 | [Pay by Bank today](./all-journeys.md#pay-by-bank-today) | Today, with a way to pay that needs a bank step | `CreatePaymentIntentWorkflow` |
+| [Pay by Debit card](./all-journeys.md#pay-by-debit-card) | Today, a debit card | `CreatePaymentIntentWorkflow` |
 | [Pay with multiple instructions](./all-journeys.md#pay-with-multiple-instructions) | Today, a bank account and MR Points | `CreatePaymentWithMultipleInstructionsWorkflow` |
 | [Pay while another payment is pending](./all-journeys.md#pay-while-another-payment-is-pending) | Another payment is pending, in a market with the go-ahead on | `CreatePaymentIntentWorkflow` |
 | [Pay with MR Points](./all-journeys.md#pay-with-mr-points) | Today, MR Points only | The Pay with MR Points composite |
 
 The table follows the order customers meet these journeys. The Router checks them in a different order, and the first that matches wins: a wait comes first, because a payment that waits for the customer has to run in the one workflow that can wait for them. Then a later date, then several instructions, then MR Points alone, and pay today last. The ordered list is Proposed, and so is MR Points' place in it.
 
+## Debit card
+
+A debit card is its own way to pay, apart from a bank account. Every debit card payment goes through 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money:
+
+1. The Router starts `CreatePaymentIntentWorkflow`. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure, and gives it Billpay's callback URL.
+2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link.
+3. The card provider calls `POST /payments/{payment-id}/authentication` (Proposed) once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
+4. Verify runs its usual checks, then authorizes the payment, last. The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
+5. Execute makes no clearing call, because the money has moved, and the payment is `PAID` once Accounts Receivable has posted it. No settlement comes for a debit card.
+
+If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. A debit card pays today only, with one instruction, and never with MR Points: a create that breaks this gets 422 before any workflow starts.
+
+Pay with Bank Transfer works the same way at the end: its money moves at the bank, during the customer's bank connection, so it has no clearing step either.
+
+## Pay & Plan
+
 Pay & Plan is not on this list because it doesn't come through this door. A customer who sets up a plan sends `CreatePaymentInstallment.v1`, and the Router starts the Pay & Plan composite.
 
 ## MR Points
 
-The customer can tick Pay with MR Points next to the way to pay, to pay with their Membership Rewards points. Points alone run the Pay with MR Points composite, across Billpay and Loyalty. Points with a bank account are two instructions, so they run as Pay with multiple instructions.
+The customer can tick Pay with MR Points next to the way to pay, to pay with their Membership Rewards points. Points alone run the Pay with MR Points composite, across Billpay and Loyalty. Points with a bank account are two instructions, so they run as Pay with multiple instructions. A debit card doesn't combine with points.
 
 Points pay today only. Once they are ticked, the page offers no later date, and a future-dated create that carries points gets 422 before any workflow starts (Proposed). The same happens in a market whose Pay with MR Points setting is off.
 
@@ -58,4 +77,6 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. It appears on this page only.
 - A go-ahead on a composite create. The Router checks for a wait first, but the workflow that waits runs one instruction, so a create with several instructions or with MR Points alone has no settled path when another payment is pending in a market with the go-ahead on.
+- The card provider in markets other than the UK, and whether one provider always handles both 3D Secure and the authorization.
+- A debit card payment made while another is pending, in a market with the go-ahead on.
 - A later date with Pay with Bank Transfer. Only consumer payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.

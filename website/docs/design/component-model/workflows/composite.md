@@ -34,4 +34,4 @@ Pay & Plan never takes bank confirmation. A request that would need it gets 422 
 1. Validate the composite payment as a whole.
 2. Run one `CreateImmediatePaymentWorkflow` per instruction, so each gets its own payment, its own lifecycle and its own outcome.
 
-It never takes bank confirmation, because one request would need several redirect links and several confirms. A request with several instructions that would need it gets 422 before any workflow starts.
+It never takes bank confirmation or a debit card, because one request would need several redirect links and several answers. A request with several instructions that would need either gets 422 before any workflow starts. To the customer, several instructions are a bank account and MR Points; a debit card doesn't combine with MR Points.
