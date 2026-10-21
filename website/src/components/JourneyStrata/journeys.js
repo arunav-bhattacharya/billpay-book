@@ -139,10 +139,12 @@ export const GROUPS = [
               {c: 'CreateConfirmPendingPayment.v1', s: 'the confirm', at: 'Verify'},
               {c: 'DeletePendingPayment.v1', s: 'at the end: the entry goes', at: 'last'},
             ],
-            exc: {'Execute|ClearingActivities': {kind: 'skip'}},
-            after: 'No clearing call in Execute: the money moved at the bank, during the customer\'s bank connection.',
+            after: 'No clearing call in Execute for Pay with Bank Transfer: the money moved at the bank, during the customer\'s bank connection. Whether a Plaid payment in the US clears is still open.',
           },
-          PAID_GAR_ONLY,
+          {
+            ...PAID_SEGMENT,
+            oneData: [{c: 'inbox', s: 'the AR posting from GAR, and the settlement if it cleared; the posting alone for Pay with Bank Transfer', at: 'Settle'}],
+          },
         ],
       },
       {

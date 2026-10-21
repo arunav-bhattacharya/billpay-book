@@ -13,7 +13,7 @@ import styles from "./styles.module.css";
  * Temporal workflow. Change an answer and the picked journey moves.
  *
  * The rules follow the spec's Router: it checks for a wait first (a bank step,
- * or a go-ahead), then a later date, then several instructions, then MR Points
+ * a debit card, or a go-ahead), then a later date, then several instructions, then MR Points
  * alone, then pay today. The list shows the journeys in the order customers
  * meet them, which is not the order the Router checks them in, and the
  * footnote says so. Where the spec has no answer yet (Wallet, a go-ahead on a

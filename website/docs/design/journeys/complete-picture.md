@@ -43,7 +43,7 @@ A few things are easier to see here than anywhere else.
 - The customer waits only while a request is answered: at the create, and again at a confirm. The solid line ends at Verify, or at the reply that carries the link or the pending list, and everything after it runs with nobody waiting.
 - Work that waits for a date waits in Oracle, not in Temporal. Between runs, the Workflows band is empty and the Work Tracker row is what carries the payment forward.
 - A corporate payment takes six kinds of run to get from the request to `PAID`, and asks for its allocations before any money moves. Its own execution clears once, for the whole payment; its legs do the rest.
-- Two journeys have no clearing at all. Pay by Bank today moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call and the payment is `PAID` on the Accounts Receivable posting alone.
+- Two ways to pay have no clearing at all. Pay with Bank Transfer moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call and the payment is `PAID` on the Accounts Receivable posting alone.
 - One journey skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.
 
 ## When the Router says no

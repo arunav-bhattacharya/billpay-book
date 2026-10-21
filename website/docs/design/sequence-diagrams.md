@@ -660,7 +660,7 @@ sequenceDiagram
 
 ## 10. Paid events
 
-A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
+A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. A Pay with Bank Transfer or debit card payment has no clearing, so no settlement comes for it, and the posting alone makes its row `READY`. One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
 
 ```mermaid
 ---
@@ -852,7 +852,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. The money moves at the bank, during the customer's bank connection, so Execute makes no clearing call. A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call. A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
 
 ```mermaid
 ---
@@ -931,7 +931,7 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over WF,RAV: Online cluster, after the reply
       WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute, with no clearing call, since the money<br/>moved at the bank, then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
+      Note over WF,VER: ACCEPTED: Execute (no clearing call for Pay with<br/>Bank Transfer: the money moved at the bank), then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
     end
   else no confirm before the timer fires
     rect rgba(0,111,207,0.12)
@@ -1074,7 +1074,7 @@ sequenceDiagram
   participant RAV as Raven
 
   OD->>R: POST /payments,<br/>today, by debit card
-  Note over R: admit, set card authentication<br/>to Y, pick the intent journey,<br/>pin profile, run on Online
+  Note over R: admit, set card authentication<br/>to Y (Proposed), pick the intent journey,<br/>pin profile, run on Online
   R->>WF: Update-With-Start,<br/>{paymentId}-init
 
   rect rgba(0,111,207,0.12)
@@ -1101,15 +1101,17 @@ sequenceDiagram
   end
 
   alt the provider calls back in time
-    CP->>R: POST /payments/<br/>{payment-id}/authentication
+    CP->>R: POST /payments/<br/>{payment-id}/authentication (Proposed)
     Note over R: admit, then an update<br/>to the running workflow
     R->>WF: update authenticated,<br/>ID {paymentId}-authentication
     rect rgba(0,111,207,0.12)
       Note over WF,PS: Online cluster, the same workflow
       WF->>VER: run, with the 3D Secure result
-      Note over VER: a failed result: DECLINED, no authorization.<br/>Otherwise the usual checks, then last<br/>the card provider authorizes the payment
-      VER->>CP: authorize, with the payment ID<br/>as the idempotency key
-      CP-->>VER: approved and the account debited,<br/>or declined: not enough money
+      Note over VER: a failed result: DECLINED, no authorization.<br/>Otherwise the usual checks first
+      opt the checks' rules pass
+        VER->>CP: authorize, with the payment ID<br/>as the idempotency key (Proposed)
+        CP-->>VER: approved and the account debited,<br/>or declined: not enough money
+      end
       rect rgba(102,169,226,0.40)
         VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
       end

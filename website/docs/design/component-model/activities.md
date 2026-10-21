@@ -124,7 +124,7 @@ Activities take IDs, not payment objects, and load what they need. Capture's wri
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks the provider only for the redirect link: the provider verifies the customer's bank details itself, and the money moves at the bank during the customer's bank connection.
+`BankConfirmationActivities` asks the provider for the redirect link, and in GB, for the Funds check. The provider verifies the customer's bank details itself, and for Pay with Bank Transfer the money moves at the bank during the customer's bank connection.
 
 `CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-core's callback, and the waiting workflow takes it as an update.
 

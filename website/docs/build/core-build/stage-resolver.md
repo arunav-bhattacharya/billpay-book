@@ -198,12 +198,18 @@ class DefaultPaymentVerifyStage(
     override fun run(
         ctx: StageContext, paymentId: String,
     ): VerifyOutcome {
-        // every check that applies, sorted by key
-        val mine = checks.forProfile(ctx.profile, VERIFY)
+        // every check that applies, sorted by key; a check that moves money,
+        // like the card authorization, waits for a second phase (Proposed)
+        val (first, last) = checks.forProfile(ctx.profile, VERIFY).partition { !it.movesMoney }
         // every call at once, then one set of facts
-        val facts = fetchAll(mine, ctx, paymentId)
+        var facts = fetchAll(first, ctx, paymentId)
         // the rules that apply decide
-        val report = rules.evaluate(ctx.profile, VERIFY, facts)
+        var report = rules.evaluate(ctx.profile, VERIFY, facts)
+        if (report.passed && last.isNotEmpty()) {
+            // only now: an approved authorization debits the customer's account
+            facts = facts + fetchAll(last, ctx, paymentId)
+            report = rules.evaluate(ctx.profile, VERIFY, facts)
+        }
         val outcome = ctx.stubs.store.commitVerify(
             paymentId, report.decision, report.failedRuleIds)
         // the facts travel on to Execute and Fulfil
@@ -296,7 +302,7 @@ class NoClearingForDebitCard : ClearingMethod {
 }
 ```
 
-`NoClearingForBankTransfer` is the same, with `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
+`NoClearingForBankTransfer` is the same, with `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`. As written it would also catch a US payment confirmed through Plaid; if that money still clears, the class becomes GB's own, `GBNoClearingForBankTransfer` (open). RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
 
 ## How the registry decides
 

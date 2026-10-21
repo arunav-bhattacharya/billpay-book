@@ -52,9 +52,9 @@ The table follows the order customers meet these journeys. The Router checks the
 A debit card is its own way to pay, apart from a bank account. Every debit card payment goes through 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money:
 
 1. The Router starts `CreatePaymentIntentWorkflow`. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure, and gives it Billpay's callback URL.
-2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link.
+2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link (Proposed).
 3. The card provider calls `POST /payments/{payment-id}/authentication` (Proposed) once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
-4. Verify runs its usual checks, then authorizes the payment, last. The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
+4. Verify runs its usual checks, then authorizes the payment, last (the check is Proposed). The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
 5. Execute makes no clearing call, because the money has moved, and the payment is `PAID` once Accounts Receivable has posted it. No settlement comes for a debit card.
 
 If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. A debit card pays today only, with one instruction, and never with MR Points: a create that breaks this gets 422 before any workflow starts.

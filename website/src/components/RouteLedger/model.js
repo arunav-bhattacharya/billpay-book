@@ -172,7 +172,7 @@ const five = (account, realtime, bank) => [
 
 const CV = ['Capture', 'Verify'];
 const CVEF = ['Capture', 'Verify', 'Execute', 'Fulfil'];
-const PAID = {to: 'paid', text: 'PAID, once One-Data has the settlement and the AR posting'};
+const PAID = {to: 'paid', text: 'PAID, once One-Data has the settlement and the AR posting (the posting alone for Pay with Bank Transfer)'};
 const CANCEL_NOTE =
   'It checks the cancellation window and eligibility first, with read-only calls. Outside the window, or once the payment is no longer SCHEDULED, the answer is 409.';
 
@@ -286,7 +286,7 @@ export const BANDS = [
               'Example values. Card authentication is Y: the Router sets it for every debit card, and no market chooses it. A debit card pays today only, with one instruction and no MR Points.',
             notes: {
               RequestConfirmation:
-                "It asks the market's card provider to start 3D Secure, with Billpay's callback URL, one try, and stores the challenge link, or none when the card's bank needs no challenge, guarded on PENDING. The caller gets PENDING. With no answer from the provider, the payment is DECLINED instead.",
+                "It asks the market's card provider to start 3D Secure, with Billpay's callback URL, one try, and stores the challenge link, or none when the card's bank needs no challenge (Proposed), guarded on PENDING. The caller gets PENDING. With no answer from the provider, the payment is DECLINED instead (Proposed).",
             },
             stop: {
               title: 'The workflow waits here.',
@@ -456,7 +456,7 @@ export const BANDS = [
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "A failed 3D Secure result is DECLINED with no authorization. Otherwise the usual checks run, then last the card provider authorizes the payment: approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
+                "A failed 3D Secure result is DECLINED with no authorization. Otherwise the usual checks run, then last the card provider authorizes the payment (the check is Proposed): approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
               Execute: 'No clearing call: the authorization moved the money. Only the AR balance and open-to-buy calls go out.',
             },
             exc: {
@@ -1093,7 +1093,7 @@ const FAILS = {
 /* the decision's calls on the Online cluster run as local activities */
 function localOnOnline(j, f, s) {
   if (j.cluster !== 'Online') return false;
-  if (f.name === 'BankConfirmationActivities') return true;
+  if (f.name === 'BankConfirmationActivities' || f.name === 'CardActivities') return true;
   return s === 'Verify' && ['InstrumentActivities', 'OptionsActivities', 'PlansActivities'].includes(f.name);
 }
 

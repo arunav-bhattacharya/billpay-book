@@ -116,8 +116,8 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PAID` | Settled with the bank and posted to Accounts Receivable. A Pay with Bank Transfer or debit card payment has no settlement to wait for, so it is `PAID` once posted. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank sent the funds back. | Yes. A representment is a new row |
 | `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
-| `DECLINED` | Failed validation, or a representment failed its recheck; or the bank-confirmation or card provider gave no link; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
-| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed before the market's confirmation window closed; or the customer said no to a payment made while another was pending. | Yes |
+| `DECLINED` | Failed validation, or a representment failed its recheck; or the bank-confirmation provider gave no redirect link, or the card provider gave no answer; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed before the market's confirmation window closed; or a debit card payment whose 3D Secure callback didn't come within 2 minutes; or the customer said no to a payment made while another was pending. | Yes |
 | `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
 `PROCESSED` is a higher bar than it looks. A payment reaches it only after every must-succeed system has answered and the customer has been told, which is why an outage at RTF or Raven holds payments at `PROCESSING` rather than letting them through with a gap.
@@ -129,9 +129,9 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
-| `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when the provider gives no redirect or challenge link |
+| `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when the bank provider gives no redirect link, or the card provider gives no answer (Proposed) |
 | `PENDING` (bank confirmation, 3D Secure or go-ahead) | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify, once the caller confirms or the card provider calls back; `SCHEDULED` only for a future-dated payment's go-ahead. For a debit card, `ACCEPTED` means the authorization has debited the customer's account |
-| `PENDING` (bank confirmation, 3D Secure or go-ahead) | `CANCELLED` | Cancel, once the confirmation or 2-minute authentication window closes unanswered, or on the customer's no |
+| `PENDING` (bank confirmation, 3D Secure or go-ahead) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed or the 2-minute authentication window closes with no callback, or on the customer's no |
 | `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |

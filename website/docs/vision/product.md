@@ -58,7 +58,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
     },
     {
       term: 'Pay by bank',
-      desc: `Pay from a bank account the customer confirms on their bank's side, such as Plaid in the US or Pay with Bank Transfer in the UK. The payment waits until they come back and confirm it, and the money moves at the bank.`,
+      desc: `Pay from a bank account the customer confirms on their bank's side, such as Plaid in the US or Pay with Bank Transfer in the UK. The payment waits until they come back and confirm it. With Pay with Bank Transfer, the money moves at the bank.`,
     },
     {
       term: 'Pay by Debit card',
