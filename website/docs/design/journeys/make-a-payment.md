@@ -55,6 +55,7 @@ A payment stays on the account's pending list only until it is decided. Once it 
 - The check and the add are one atomic call to Redis (Proposed), so two creates that arrive together can't both get through.
 - It covers payments from channels: creates through `CreatePayment.v3`, and Pay & Plan's through `CreatePaymentInstallment.v1`. Payments Accounts Receivable raises, push payments from third parties and refunds never go through it.
 - When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-core alone. A create billpay-core hasn't captured yet can slip past that read, and the design accepts the gap.
+- If a delete never lands, the entry would block the account for good. So every hour One-Data sweeps the entries more than 2 hours old and asks billpay-core about each one. It removes those whose payment is decided or that billpay-core never got, and keeps those still `PENDING`.
 
 ## Debit card
 
@@ -85,5 +86,4 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 - The contract of `ReadPaymentChoices.v1`, and the billpay-core read behind it.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. It appears on this page only.
-- A pending entry left behind. billpay-core retries the delete until it lands, and an alert finds an entry that stays too long, but while it stays, One-Data declines the account's payments. Whether One-Data should ever drop an old entry on its own, and after how long, is open.
 - A later date with Pay with Bank Transfer. Only consumer payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.

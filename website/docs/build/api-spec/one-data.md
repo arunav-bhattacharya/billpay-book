@@ -55,9 +55,15 @@ Three edge cases have a working answer:
 
 - If Redis is down, One-Data makes the pending check through `ReadPayments.v1` instead, which then reads billpay-core alone, and declines the create if the account has a `PENDING` payment there. Nothing is stored. A create One-Data held, or one billpay-core hasn't captured yet, isn't in Oracle, so the check can miss it, and that edge is accepted.
 - Two creates for one account that reach different Redis sites within the replication lag miss each other, and both go through, though one should have been declined. The window is narrow, so it is accepted, and such pairs are counted from Oracle. Only if they show up does billpay-core add the same check against Oracle, at one query per create.
-- A held pay-by-bank create would get a redirect link nobody sees. One-Data can probably tell such a create from its instrument type, when it carries bank details, which One-Data is to confirm. Proposed: One-Data doesn't hold it, and the channel asks the customer to try again. If billpay-core never got the create, no delete comes, and the alert on the age of pending entries finds it.
+- A held pay-by-bank create would get a redirect link nobody sees. One-Data can probably tell such a create from its instrument type, when it carries bank details, which One-Data is to confirm. Proposed: One-Data doesn't hold it, and the channel asks the customer to try again. If billpay-core never got the create, no delete comes, and the sweep below removes the entry once it is 2 hours old.
 
-A pending entry left behind blocks its account, because One-Data declines every create while it stays. billpay-core retries the delete until it lands, and the alert on the age of pending entries finds one that stays too long. Whether One-Data should ever drop an old entry on its own, and after how long, is still open.
+An entry can be left behind when no delete ever lands: One-Data's delete API keeps failing, billpay-core never got the create, or perhaps a delete reaches one Redis site before the entry has replicated from the other (for One-Data to confirm). While it stays, One-Data declines every create on its account. So One-Data runs a sweep on its own schedule, every hour, and Billpay never calls it. It takes the entries created more than 2 hours ago and asks billpay-core about each one through `GET /payments/{payment-id}`:
+
+- The payment is no longer `PENDING`, whatever state it has reached, or billpay-core has no record of it: the sweep removes the entry, and the stored create if it is still there, as the missed delete would have. A create One-Data still holds for RTF is skipped, since it may still land.
+- The payment is still `PENDING` in billpay-core: the entry stays, so the account can't take a second payment while this one is undecided.
+- A run that removed any entries raises one alert, with the count and the payment IDs.
+
+The sweep's name, `DeleteStalePendingPayments.v1`, is Proposed.
 
 [When another payment is still pending](../../design/journeys/make-a-payment.md#when-another-payment-is-still-pending) puts the rule in the customer's terms, and [Creates that arrive late or twice](../../design/component-model/workflows/core.md#creates-that-arrive-late-or-twice) covers what billpay-core does with a repeat.
 
