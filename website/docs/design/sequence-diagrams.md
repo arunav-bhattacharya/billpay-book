@@ -25,7 +25,7 @@ import Lead from '@site/src/components/Lead';
 
 ## 1. Pay today, one instruction
 
-The caller is waiting for one answer: did the payment go through? So the workflow replies as soon as Verify commits, Temporal's early-return pattern, and only then announces the change and moves the money. Capture, Verify's calls and its commit run as local activities, inside the worker, so the answer comes out of the workflow's first task. Execute and Fulfil finish on Online after the reply, and Fulfil tells RTF and Raven before it commits `PROCESSED`, so nothing is marked processed until both know.
+The caller is waiting for one answer: did the payment go through? So the workflow replies as soon as Verify commits, Temporal's early-return pattern, and only then announces the change and moves the money. Capture, Verify's calls and its commit run as local activities, inside the worker, so the answer comes out of the workflow's first task. Execute and Fulfil finish on Online after the reply, and Fulfil tells RTF and Raven before it commits `PROCESSED`, so nothing is marked processed until both know. Once Verify has decided, the workflow also calls One-Data's delete API, so the account can take its next payment (diagram 15).
 
 ```mermaid
 ---
@@ -422,7 +422,7 @@ sequenceDiagram
 
 ## 6. Cancel a payment
 
-A cancel is one guarded update. It sets `CANCELLED` only if the payment is still `SCHEDULED`, which a corporate payment stops being once its allocations are requested. It cancels the payment's Work Tracker rows in the same commit, so no dispatcher can start a cancelled payment. Asking twice is safe: a payment that is already `CANCELLED` returns that result again. Anything else that loses the race or arrives outside the window gets 409. The same workflow also takes a customer's no to a payment that waited for a go-ahead, guarded on `PENDING` instead and with no window check (diagram 15).
+A cancel is one guarded update. It sets `CANCELLED` only if the payment is still `SCHEDULED`, which a corporate payment stops being once its allocations are requested. It cancels the payment's Work Tracker rows in the same commit, so no dispatcher can start a cancelled payment. Asking twice is safe: a payment that is already `CANCELLED` returns that result again. Anything else that loses the race or arrives outside the window gets 409. A customer's no to a payment that waits for bank confirmation goes elsewhere: it is an update to that payment's own `CreatePaymentIntentWorkflow`, guarded on `PENDING` and with no window check.
 
 ```mermaid
 ---
@@ -660,7 +660,7 @@ sequenceDiagram
 
 ## 10. Paid events
 
-A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. A Pay with Bank Transfer or debit card payment has no clearing, so no settlement comes for it, and the posting alone makes its row `READY`. One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
+A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 sends no settlement for it. Billpay creates that event itself: Execute hands it to the same handler MR/M3 uses, dated when the money moved, so every row pairs the same way. One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
 
 ```mermaid
 ---
@@ -690,6 +690,7 @@ sequenceDiagram
   rect rgba(83,86,90,0.14)
     Note over MM,IN: One-Data's inbox keeps one row per payment or leg
     MM->>IN: settlement,<br/>CreateMoneyMovementEventHandler.v1
+    Note over MM,IN: Pay with Bank Transfer and debit cards: Billpay's Execute<br/>sends the settlement to this handler instead
     GAR->>IN: AR posting, CreateAccountsReceivable<br/>TransactionEventHandler.v1
     Note over GAR,IN: whichever arrives second sets the row READY. A leg's posting takes its payment's settlement
   end
@@ -713,7 +714,7 @@ sequenceDiagram
 
 ## 11. Missing paid events
 
-Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing, and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. Whatever it can't find raises an alert.
+Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing, and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. MR/M3 never settles a Pay with Bank Transfer or debit card payment, so for those the check asks GAR alone, and hands over Billpay's own settlement event again if the inbox doesn't have it (Proposed). Whatever it can't find raises an alert.
 
 ```mermaid
 ---
@@ -741,13 +742,17 @@ sequenceDiagram
     SCH->>WF: start, periodically
     Note over SCH,WF: finds payments and legs still PROCESSED after 48 hours. Split parents are skipped
     loop each one found
-      WF->>MM: asks for the settlement: its own, or for a leg, its payment's
-      MM-->>WF: current state
+      opt not Pay with Bank Transfer or a debit card
+        WF->>MM: asks for the settlement: its own, or for a leg, its payment's
+        MM-->>WF: current state
+      end
       WF->>GAR: asks for the AR posting: the payment's, or the leg's own
       GAR-->>WF: current state
       alt an event is found
         WF->>IN: hands it to its One-Data handler
         Note over IN: it reaches the inbox the one way events do
+      else Billpay's own settlement is missing
+        WF->>IN: hands it over again,<br/>CreateMoneyMovementEventHandler.v1 (Proposed)
       else still missing
         Note over SCH,WF: alert. The inbox row shows which event is missing
       end
@@ -758,7 +763,7 @@ sequenceDiagram
 
 ## 12. Pay & Plan
 
-Pay & Plan is a composite. It starts on Online, runs the payment as a child `CreateImmediatePaymentWorkflow` on the same cluster, then calls the Installments API and, when asked, updates Autopay.
+Pay & Plan is a composite. It starts on Online, runs the payment as a child `CreateImmediatePaymentWorkflow` on the same cluster, then calls the Installments API and, when asked, updates Autopay. One-Data runs the same pending check first, as in diagram 15, so a request on an account with a payment already `PENDING` never gets here.
 
 ```mermaid
 ---
@@ -852,7 +857,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call. A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call and hands One-Data the settlement event Billpay creates instead. Once Verify or Cancel has decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15). A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
 
 ```mermaid
 ---
@@ -931,7 +936,7 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over WF,RAV: Online cluster, after the reply
       WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute (no clearing call for Pay with<br/>Bank Transfer: the money moved at the bank), then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
+      Note over WF,VER: ACCEPTED: Execute (for Pay with Bank Transfer, no clearing call:<br/>it sends One-Data Billpay's settlement event), then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
     end
   else no confirm before the timer fires
     rect rgba(0,111,207,0.12)
@@ -948,7 +953,7 @@ sequenceDiagram
 
 ## 15. A new payment while another is pending
 
-One-Data checks every new payment against the card account's pending payments in Redis, in the same call that adds the new one to the list and stores the create. When the account already has a pending payment, One-Data sends its ID with the create. In a market that has the go-ahead turned on, the Router starts `CreatePaymentIntentWorkflow`, Capture stores the IDs the customer is shown along with the payment, and One-Data adds the pending payments to the reply. With the setting off, the default, the Router ignores the IDs and the payment runs as in diagram 1. The customer's yes and no are both updates to that workflow, so the first one it accepts wins and the other gets 409. If neither comes before the window and its grace have passed, the timer fires and the workflow cancels the payment, as in diagram 14. The workflow calls One-Data's delete API twice: after its reply, which leaves the account's entry in place while the payment waits, and at its end, which removes it.
+One-Data checks every create from a channel before billpay-core sees it. In one atomic call to Redis, a Lua script (Proposed), it reads the card account's pending payments and, if there are none, adds the new payment and stores the create. If the account already has a payment in `PENDING`, One-Data answers 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed), and never calls billpay-core, so no payment exists in Billpay for the attempt. When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-core alone, so a create billpay-core hasn't captured yet can be missed. A payment keeps its entry only until it is decided: then billpay-core calls One-Data's delete API, and the account can take its next payment. Payments AR raises, push payments from third parties and refunds skip the check.
 
 ```mermaid
 ---
@@ -959,93 +964,57 @@ config:
 sequenceDiagram
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
+  box rgba(0,23,90,0.07) One-Data
     participant OD as CreatePayment.v3
     participant RD as One-Data's<br/>Redis
-    participant OC as CreateConfirm<br/>PendingPayment.v1
-    participant OX as DeletePayment.v1
+    participant RP as ReadPayments.v1
   end
 
   box rgba(0,111,207,0.05) Billpay Platform
     participant R as Billpay Router
-    participant WF as CreatePaymentIntent<br/>Workflow
-    participant VER as Verify
-    participant CAN as Cancel
+    participant WF as CreateImmediate<br/>PaymentWorkflow
     participant PS as PaymentStore (Oracle)
   end
 
-  participant RTF
-  participant RAV as Raven
+  Note over OD: a create from a channel, today, one instruction
 
-  OD->>RD: one MULTI/EXEC: read the account's pending<br/>payments, add this one, store the create
-  RD-->>OD: another payment is pending
-  OD->>R: POST /payments, today,<br/>with the pending payment's ID
-  Note over R: admit. The go-ahead is on for this market,<br/>so pick the intent journey, pin the resolved profile,<br/>place on Online
-  R->>WF: Update-With-Start,<br/>{paymentId}-init
-
-  rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster
-    rect rgba(102,169,226,0.40)
-      WF->>PS: Capture: PENDING, with the IDs<br/>of the payments the customer is shown
-    end
+  alt Redis is up
+    OD->>RD: one atomic call (Proposed): read the account's<br/>pending payments, and if there are none,<br/>add this one and store the create
+    RD-->>OD: another payment is PENDING,<br/>or added and stored
+  else Redis is down
+    OD->>RP: the account's payments
+    Note over RD,RP: it reads billpay-core alone, so a create<br/>not captured yet is missed (accepted)
+    RP-->>OD: a PENDING payment, or none.<br/>Nothing is stored
   end
 
-  WF-->>R: update result
-  R-->>OD: PENDING, and One-Data adds<br/>the pending payments to the reply
-
-  rect rgba(0,111,207,0.12)
-    Note over WF,RTF: Online cluster, after the reply
-    WF->>RTF: PENDING event
-    WF->>RD: DeletePendingPayment.v1, still waiting:<br/>only the stored create goes
-  end
-
-  rect rgba(83,86,90,0.14)
-    Note over OD,PS: The channel shows the pending payments and asks the customer. The workflow waits on its timer
-  end
-
-  alt the customer says yes
-    OC->>R: POST /payments/<br/>{payment-id}/confirm
-    R->>WF: update confirm,<br/>ID {paymentId}-confirm
+  alt the account already has a PENDING payment
+    Note over OD,RD: 200 DECLINED, with a reason such as ANOTHER_PAYMENT_PENDING<br/>(Proposed). billpay-core is never called
+  else none is pending
+    OD->>R: POST /payments
+    Note over R: admit, pick the journey,<br/>pin profile, run on Online
+    R->>WF: Update-With-Start,<br/>{paymentId}-init
     rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow
-      WF->>VER: run, the version the<br/>payment's behaviors pick
-      Note over VER: the usual checks
+      Note over WF,PS: Online cluster, as in diagram 1
       rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
+        WF->>PS: Capture, then Verify:<br/>state → ACCEPTED or DECLINED
       end
     end
     WF-->>R: update result
-    R-->>OC: ACCEPTED or DECLINED.<br/>409 if a no came first
+    R-->>OD: ACCEPTED or DECLINED
     rect rgba(0,111,207,0.12)
-      Note over WF,RAV: Online cluster, after the reply
-      WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute, then Fulfil, in the same workflow.<br/>DECLINED: the Raven message
-      WF->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
+      Note over WF,PS: Online cluster, after the reply
+      WF->>RD: DeletePendingPayment.v1, decided:<br/>the stored create and the account's entry go
     end
-  else the customer says no
-    OX->>R: DELETE /payments/<br/>{payment-id}
-    R->>WF: update decline,<br/>ID {paymentId}-no
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow, no window check
-      WF->>CAN: run
-      rect rgba(102,169,226,0.40)
-        CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
-      end
-    end
-    WF-->>R: CANCELLED
-    R-->>OX: CANCELLED.<br/>409 if a yes came first
-    rect rgba(0,111,207,0.12)
-      Note over WF,RAV: Online cluster, after the reply
-      WF->>RTF: CANCELLED event
-      WF->>RAV: CANCELLED message
-      WF->>RD: DeletePendingPayment.v1 at the end:<br/>the account's entry goes
-    end
+  end
+
+  rect rgba(83,86,90,0.14)
+    Note over OD,PS: An entry stays only while its payment is PENDING. ACCEPTED, SCHEDULED, DECLINED or CANCELLED ends it, and the account can pay again
   end
 ```
 
 ## 16. Pay by Debit card: create, 3D Secure and authorization
 
-A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-core directly, not through One-Data, and the callback is an update to the same workflow. Verify runs its usual checks, then authorizes the payment last: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision. Execute makes no clearing call, because the money has already moved. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
+A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-core directly, not through One-Data, and the callback is an update to the same workflow. Verify runs its usual checks, then authorizes the payment last: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS (Proposed). Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
 
 ```mermaid
 ---
@@ -1101,7 +1070,7 @@ sequenceDiagram
   end
 
   alt the provider calls back in time
-    CP->>R: POST /payments/<br/>{payment-id}/authentication (Proposed)
+    CP->>R: POST /payments/<br/>{payment-id}/authentication,<br/>mutual TLS (both Proposed)
     Note over R: admit, then an update<br/>to the running workflow
     R->>WF: update authenticated,<br/>ID {paymentId}-authentication
     rect rgba(0,111,207,0.12)
@@ -1121,7 +1090,7 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over WF,RAV: Online cluster, after the reply
       WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute, with no clearing call,<br/>then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
+      Note over WF,VER: ACCEPTED: Execute, with no clearing call: it sends<br/>One-Data Billpay's settlement event. Then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
     end
   else no callback before the timer fires
     rect rgba(0,111,207,0.12)

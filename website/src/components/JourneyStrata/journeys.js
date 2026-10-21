@@ -15,7 +15,7 @@
  */
 
 const CREATE = {c: 'CreatePayment.v3', s: 'the pending check, then the create is stored'};
-const DELETE_END = {c: 'DeletePendingPayment.v1', s: 'called at the end: the stored create and its pending entry go', at: 'last'};
+const DELETE_END = {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the stored create and the pending entry go', at: 'Verify'};
 
 const PAID_SEGMENT = {
   phase: ['Settled and posted', 'when both events are in'],
@@ -24,12 +24,12 @@ const PAID_SEGMENT = {
   oneData: [{c: 'inbox', s: 'settlement from MR/M3, AR posting from GAR. READY when both are in', at: 'Settle'}],
 };
 
-/* Pay with Bank Transfer and a debit card have no clearing, so no settlement
-   comes: the GAR posting alone makes the row READY. */
-const PAID_GAR_ONLY = {
+/* Pay with Bank Transfer and a debit card have no clearing, so MR/M3 sends
+   no settlement. Execute hands One-Data the one Billpay creates, and the row
+   pairs it with the GAR posting like any other. */
+const PAID_BILLPAY_SETTLEMENT = {
   ...PAID_SEGMENT,
-  phase: ['Posted', 'when the GAR posting is in'],
-  oneData: [{c: 'inbox', s: 'the AR posting from GAR alone: no clearing, so no settlement comes', at: 'Settle'}],
+  oneData: [{c: 'inbox', s: 'the settlement Billpay created in Execute, and the AR posting from GAR. READY when both are in', at: 'Settle'}],
 };
 
 const paidAfter = (ruler) => (ruler ? {...PAID_SEGMENT, ruler: [{t: 'the next 30-second run', at: 'Settle'}]} : PAID_SEGMENT);
@@ -137,13 +137,13 @@ export const GROUPS = [
             ],
             oneData: [
               {c: 'CreateConfirmPendingPayment.v1', s: 'the confirm', at: 'Verify'},
-              {c: 'DeletePendingPayment.v1', s: 'at the end: the entry goes', at: 'last'},
+              {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'},
             ],
-            after: 'No clearing call in Execute for Pay with Bank Transfer: the money moved at the bank, during the customer\'s bank connection. Whether a Plaid payment in the US clears is still open.',
+            after: "Execute makes no clearing call for Pay with Bank Transfer: the money moved at the bank, during the customer's bank connection. It hands One-Data the settlement event Billpay creates instead. Whether a Plaid payment in the US clears is still open.",
           },
           {
             ...PAID_SEGMENT,
-            oneData: [{c: 'inbox', s: 'the AR posting from GAR, and the settlement if it cleared; the posting alone for Pay with Bank Transfer', at: 'Settle'}],
+            oneData: [{c: 'inbox', s: 'the AR posting from GAR, and the settlement: from MR/M3 if it cleared, from Billpay for Pay with Bank Transfer', at: 'Settle'}],
           },
         ],
       },
@@ -178,10 +178,10 @@ export const GROUPS = [
               {t: 'Sees the result', s: "ACCEPTED, or DECLINED when the account can't cover it", st: 'ACCEPTED', m: 'on', at: 'Verify'},
               {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'},
             ],
-            oneData: [{c: 'DeletePendingPayment.v1', s: 'at the end: the entry goes', at: 'last'}],
-            after: "The authorization in Verify debits the customer's account, so Execute makes no clearing call.",
+            oneData: [{c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'}],
+            after: "The authorization in Verify debits the customer's account, so Execute makes no clearing call. It hands One-Data the settlement event Billpay creates, dated when the money moved.",
           },
-          PAID_GAR_ONLY,
+          PAID_BILLPAY_SETTLEMENT,
         ],
       },
       {
@@ -199,45 +199,6 @@ export const GROUPS = [
               {t: 'Sees the result', st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
             oneData: [{...CREATE, at: 'Capture'}],
-          },
-          paidAfter(false),
-        ],
-      },
-      {
-        id: 'pending',
-        term: 'Pay while another payment is pending',
-        kind: 'customer',
-        meta: ['customer initiated', 'Online, one workflow throughout', 'a market with the go-ahead on'],
-        segments: [
-          {
-            phase: ['The create', 'the customer waits'],
-            road: 'goahead',
-            waiting: true,
-            customer: [
-              {t: 'Pays while another is pending', s: 'One-Data finds the other', st: 'PENDING', m: 'on', at: 'Capture'},
-            ],
-            oneData: [
-              {c: 'CreatePayment.v3', s: "finds the pending payments and sends their IDs", at: 'Capture'},
-              {c: 'DeletePendingPayment.v1', s: 'after the reply: only the stored create goes', at: 'last'},
-            ],
-          },
-          {
-            phase: ['The customer decides', 'the same window as a bank confirmation'],
-            wait: 'The workflow waits on its own timer. A no, or no answer in time, runs Cancel: CANCELLED.',
-            customer: [{t: 'Says yes, or no', s: 'shown the pending payments', m: 'choice'}],
-          },
-          {
-            phase: ['The yes', 'the customer waits again'],
-            road: 'confirm',
-            waiting: true,
-            customer: [
-              {t: 'Says yes', s: 'ACCEPTED, or SCHEDULED for a later date', st: 'ACCEPTED', m: 'on', at: 'Verify'},
-              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'},
-            ],
-            oneData: [
-              {c: 'CreateConfirmPendingPayment.v1', s: 'the yes', at: 'Verify'},
-              {c: 'DeletePendingPayment.v1', s: 'at the end: the entry goes', at: 'last'},
-            ],
           },
           paidAfter(false),
         ],

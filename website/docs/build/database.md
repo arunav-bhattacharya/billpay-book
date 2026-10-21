@@ -16,7 +16,7 @@ import Lead from '@site/src/components/Lead';
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link. One waiting for a go-ahead carries the IDs of the pending payments the customer was shown, which Capture writes from the request. |
+| `trans_dtl` | Payment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
@@ -68,7 +68,7 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 
 | Operation | In one transaction |
 | --- | --- |
-| Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, with the pending payments' IDs when the payment waits for a go-ahead |
+| Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table |
 | A stage commit | The guarded status update, the timeline row with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, together with the note on the batch that its legs are written |
 | Bank confirmation or 3D Secure | The redirect or challenge link and the provider's reference, guarded on `PENDING` |

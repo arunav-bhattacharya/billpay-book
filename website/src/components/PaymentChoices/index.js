@@ -12,13 +12,14 @@ import styles from "./styles.module.css";
  * side: one door, CreatePayment.v3, and the journeys it can pick, each a
  * Temporal workflow. Change an answer and the picked journey moves.
  *
- * The rules follow the spec's Router: it checks for a wait first (a bank step,
- * a debit card, or a go-ahead), then a later date, then several instructions, then MR Points
+ * Before the Router, One-Data's pending check: a create on an account that
+ * already has a payment in PENDING is declined there, and never reaches
+ * Billpay. Then the spec's Router: it checks for a wait first (a bank step or
+ * a debit card), then a later date, then several instructions, then MR Points
  * alone, then pay today. The list shows the journeys in the order customers
  * meet them, which is not the order the Router checks them in, and the
- * footnote says so. Where the spec has no answer yet (Wallet, a go-ahead on a
- * composite create, a later date with a bank step), the model says that
- * instead of picking a journey.
+ * footnote says so. Where the spec has no answer yet (Wallet, a later date
+ * with a bank step), the model says that instead of picking a journey.
  */
 
 const ALL_JOURNEYS = "/docs/design/journeys/all-journeys";
@@ -58,13 +59,6 @@ const JOURNEYS = [
     when: ["today", "account and points"],
     wf: "CreatePaymentWithMultipleInstructions",
     to: `${ALL_JOURNEYS}#pay-with-multiple-instructions`,
-  },
-  {
-    id: "pending",
-    term: "Pay while another payment is pending",
-    when: ["another pending", "go-ahead on"],
-    wf: "CreatePaymentIntent",
-    to: `${ALL_JOURNEYS}#pay-while-another-payment-is-pending`,
   },
   {
     id: "points",
@@ -112,12 +106,12 @@ const OPEN = [
   ],
   ["Pay with MR Points", "its steps, and its calls to Loyalty"],
   ["Wallet", "which instrument it is, and whether it needs a bank step"],
-  ["The card provider outside the UK", "Checkout.com in the UK; other markets' still to be named"],
 ];
 
 /* What the Router does with one set of answers. Returns a result with a
-   kind: 'none' (nothing owed), 'open' (the design has no answer yet),
-   'refused' (422), or 'pick' with the journey's id. */
+   kind: 'none' (nothing owed), 'declined' (One-Data's pending check),
+   'open' (the design has no answer yet), 'refused' (422), or 'pick' with
+   the journey's id. */
 function decide(a) {
   if (!a.owed) {
     return {
@@ -141,9 +135,14 @@ function decide(a) {
   else met.add("one instruction");
   if (bankStep) met.add("a bank step");
   if (card) met.add("a debit card");
-  if (a.pending) met.add("another pending");
-  if (a.goAhead) met.add("go-ahead on");
 
+  if (a.pending) {
+    return {
+      kind: "declined",
+      met,
+      text: "One-Data's pending check finds the payment already PENDING on the account, and declines this one there and then: 200 with DECLINED and its reason. billpay-core is never called, so no payment exists in Billpay. The customer can pay again once the pending one is decided.",
+    };
+  }
   if (instructions.includes("wallet")) {
     return {
       kind: "open",
@@ -158,19 +157,12 @@ function decide(a) {
       text: "A debit card pays today only, with one instruction and no MR Points, so this create gets 422 before any workflow starts.",
     };
   }
-  if (card && a.pending && a.goAhead) {
-    return {
-      kind: "open",
-      met,
-      text: "Still to be decided: what the Router does with a debit card payment made while another is pending, in a market with the go-ahead on.",
-    };
-  }
   if (card) {
     return {
       kind: "pick",
       id: "card",
       met,
-      text: `The Router starts CreatePaymentIntentWorkflow. It starts 3D Secure with the card provider and replies PENDING with the challenge link, or none. The card provider's callback brings the result, and Verify authorizes the payment last: approved, the money leaves the customer's account; declined by the card's bank, the payment is DECLINED. No callback in 2 minutes, and the payment is cancelled.${a.pending ? " One-Data sends the pending payment's ID, and the Router ignores it, because the go-ahead is off." : ""}`,
+      text: `The Router starts CreatePaymentIntentWorkflow. It starts 3D Secure with the card provider and replies PENDING with the challenge link, or none. The card provider's callback brings the result, and Verify authorizes the payment last: approved, the money leaves the customer's account; declined by the card's bank, the payment is DECLINED. No callback in 2 minutes, and the payment is cancelled.`,
     };
   }
   if (bankStep && several) {
@@ -187,36 +179,12 @@ function decide(a) {
       text: "Only consumer payments made today take bank confirmation. What a later date with Pay with Bank Transfer does isn't in the design yet.",
     };
   }
-  if (a.pending && a.goAhead && !bankStep) {
-    if (several || pointsOnly) {
-      return {
-        kind: "open",
-        met,
-        text: "Still to be decided: the Router checks for a wait first, but the workflow that waits for a go-ahead runs one instruction. Whether a composite create can wait for a go-ahead is an open item.",
-      };
-    }
-    return {
-      kind: "pick",
-      id: "pending",
-      met,
-      text: later
-        ? "The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the pending payments. At the customer's yes, the payment is scheduled for its date."
-        : "The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the pending payments and waits for the customer's yes.",
-    };
-  }
-  const ignored =
-    a.pending && !a.goAhead
-      ? " One-Data sends the pending payment's ID, and the Router ignores it, because the go-ahead is off."
-      : "";
   if (bankStep) {
     return {
       kind: "pick",
       id: "bank",
       met,
-      text:
-        a.pending && a.goAhead
-          ? "The Router starts CreatePaymentIntentWorkflow. It waits once: the reply carries the provider's link and the pending payments, and the bank confirm is the go-ahead."
-          : `The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the provider's link and waits for the confirm.${ignored}`,
+      text: "The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the provider's link and waits for the confirm.",
     };
   }
   if (later) {
@@ -224,7 +192,7 @@ function decide(a) {
       kind: "pick",
       id: "later",
       met,
-      text: `The Router starts CreateScheduledPaymentWorkflow on the Online cluster. On the due date, ExecuteScheduledPaymentWorkflow runs it on the Offline cluster.${ignored}`,
+      text: `The Router starts CreateScheduledPaymentWorkflow on the Online cluster. On the due date, ExecuteScheduledPaymentWorkflow runs it on the Offline cluster.`,
     };
   }
   if (several) {
@@ -232,7 +200,7 @@ function decide(a) {
       kind: "pick",
       id: "multi",
       met,
-      text: `The Router starts CreatePaymentWithMultipleInstructionsWorkflow, which runs one CreateImmediatePaymentWorkflow per instruction.${ignored}`,
+      text: `The Router starts CreatePaymentWithMultipleInstructionsWorkflow, which runs one CreateImmediatePaymentWorkflow per instruction.`,
     };
   }
   if (pointsOnly) {
@@ -240,14 +208,14 @@ function decide(a) {
       kind: "pick",
       id: "points",
       met,
-      text: `The Router starts the Pay with MR Points composite, across Billpay and Loyalty. Its steps are still to be defined.${ignored}`,
+      text: `The Router starts the Pay with MR Points composite, across Billpay and Loyalty. Its steps are still to be defined.`,
     };
   }
   return {
     kind: "pick",
     id: "today",
     met,
-    text: `The Router starts CreateImmediatePaymentWorkflow on the Online cluster, and the customer has an answer once Verify decides.${ignored}`,
+    text: `The Router starts CreateImmediatePaymentWorkflow on the Online cluster, and the customer has an answer once Verify decides.`,
   };
 }
 
@@ -639,24 +607,15 @@ function TheRouter({ a, set, result }) {
       </div>
 
       <div className={styles.knows}>
-        <p className={styles.kickerQuiet}>What the Router also knows</p>
+        <p className={styles.kickerQuiet}>Before the Router: One-Data&apos;s pending check</p>
         <label className={styles.check}>
           <input
             type="checkbox"
             checked={a.pending}
             onChange={(e) => set({ pending: e.target.checked })}
           />
-          <span>Another payment is pending on the account</span>
-          <span className={styles.checkNote}>One-Data finds it</span>
-        </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={a.goAhead}
-            onChange={(e) => set({ goAhead: e.target.checked })}
-          />
-          <span>The market has the go-ahead turned on</span>
-          <span className={styles.checkNote}>off by default</span>
+          <span>Another payment on the account is still PENDING</span>
+          <span className={styles.checkNote}>One-Data declines this one</span>
         </label>
       </div>
 
@@ -719,6 +678,7 @@ function TheRouter({ a, set, result }) {
           {result.kind === "none" && "No journey"}
           {result.kind === "refused" && "Turned away, 422"}
           {result.kind === "open" && "Not in the design yet"}
+          {result.kind === "declined" && "Declined by One-Data"}
         </p>
         <p className={styles.resultText}>{result.text}</p>
       </div>
@@ -736,7 +696,7 @@ function TheRouter({ a, set, result }) {
           <span>
             <strong>Pay &amp; Plan</strong> is its own call,{" "}
             <code>CreatePaymentInstallment.v1</code>, and its own composite
-            workflow.
+            workflow. One-Data&apos;s pending check covers it too.
           </span>
         </li>
         <li>
@@ -766,7 +726,6 @@ const START = {
   pointsMode: "with",
   date: "today",
   pending: false,
-  goAhead: false,
 };
 
 export default function PaymentChoices() {

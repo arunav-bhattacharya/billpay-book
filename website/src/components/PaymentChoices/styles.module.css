@@ -757,11 +757,13 @@
   --result-edge: var(--amex-grey-400);
 }
 
-.result_refused {
+.result_refused,
+.result_declined {
   --result-edge: var(--amex-midnight);
 }
 
-:global([data-theme='dark']) .result_refused {
+:global([data-theme='dark']) .result_refused,
+:global([data-theme='dark']) .result_declined {
   --result-edge: var(--amex-deep-200);
 }
 

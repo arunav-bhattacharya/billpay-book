@@ -51,7 +51,7 @@ A run's workflow ID is its Schedule's ID, such as `dispatch-sched-DE`, plus the 
 
 <WorkflowMeta cluster="Offline" id="Its Schedule's ID, plus the trigger time" start="A Schedule, every 30 seconds, overlap SKIP" behaviors="generic" />
 
-`ProcessPaidEventsWorkflow` marks payments `PAID`. The two confirmations it needs, settlement from the bank and posting from Accounts Receivable, don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own, and mark a payment's row `READY` once both are in. A Pay with Bank Transfer or debit card payment has no clearing, so no settlement comes for it, and its row is `READY` on the posting alone. This workflow pulls those rows at Billpay's own pace.
+`ProcessPaidEventsWorkflow` marks payments `PAID`. The two confirmations it needs, settlement from the bank and posting from Accounts Receivable, don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own, and mark a payment's row `READY` once both are in. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead, in Execute, and hands it to the same handler MR/M3 uses, dated when the money moved, so its row pairs the same way (Proposed). This workflow pulls those rows at Billpay's own pace.
 
 Only one run is ever active. A run takes batches until the inbox has no `READY` rows left, then ends. Each batch:
 
@@ -83,6 +83,7 @@ One run settles an estimated 1,000 payments a second, at about half a second a b
 
 - It finds payments, and legs of split payments, that have been `PROCESSED` for more than 48 hours without turning `PAID`. Split parents are skipped, since only their legs turn `PAID`.
 - It asks MR/M3 and GAR for the payment's current state (for a leg, its payment's settlement and its own posting) and hands any event it finds to its One-Data handler, so events reach the inbox only one way. An event still missing raises an alert, and the payment's inbox row shows which one.
+- It never asks MR/M3 about a Pay with Bank Transfer or debit card payment, because MR/M3 never settles one. It asks GAR alone, and if the inbox lacks Billpay's own settlement event, it hands that over again (Proposed).
 - A row that has been `UNMATCHED` for 48 hours is left for a person. Replaying an event can't bring it back, because the inbox only moves rows that are still waiting, so One-Data's alert names it.
 
 ## Purge Transaction Data

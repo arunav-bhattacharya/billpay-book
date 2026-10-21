@@ -40,8 +40,9 @@ A stage makes its calls first, in parallel wherever they don't depend on each ot
 ```kotlin
 @Singleton
 class DefaultPaymentExecuteStage(
-    // RealtimeClearing or BatchClearing; NoClearingForBankTransfer or
-    // NoClearingForDebitCard, which make no call
+    // RealtimeClearing or BatchClearing; BankTransferSettlement or
+    // CardSettlement, which make no clearing call and hand One-Data
+    // the settlement event Billpay creates
     private val clearingMethods: MethodRegistry<ClearingMethod>,
 ) : PaymentExecuteStage {
     override val key = EXECUTE

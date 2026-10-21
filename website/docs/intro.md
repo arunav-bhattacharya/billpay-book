@@ -20,7 +20,7 @@ A payment passes through a handful of layers on its way in, and each one has a s
 | **Stages** | One business step each, such as Verify or Execute. The only layer that changes with a market's behaviors | [Design › Stages](design/component-model/stages.md) |
 | **Activities** | The calls to one system, grouped as `{System}Activities`. Oracle is reached only through `PaymentStore` | [Design › Activities](design/component-model/activities.md) |
 | **Clients** | The adapter for one external system's contract | [Build › Clients](build/core-build/clients.md) |
-| **Event Handlers** | Events from other platforms, held in One-Data's inbox. A return waits there until the returns dispatcher pulls it. Settlement and Accounts Receivable (AR) posting wait until a payment, or a leg of a split payment, has both, and Billpay then marks it `PAID`. A Pay with Bank Transfer or debit card payment needs the posting alone | [API Spec › One-Data](build/api-spec/one-data.md) |
+| **Event Handlers** | Events from other platforms, held in One-Data's inbox. A return waits there until the returns dispatcher pulls it. Settlement and Accounts Receivable (AR) posting wait until a payment, or a leg of a split payment, has both, and Billpay then marks it `PAID`. For a Pay with Bank Transfer or debit card payment, which has no clearing, Billpay creates the settlement event itself | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Schedules** | Start the dispatchers, which release dated work and pull work waiting in One-Data's inbox at the rate the governor sets, and the periodic jobs | [Build › Schedules](build/schedules.md) |
 
 ## How to read these docs

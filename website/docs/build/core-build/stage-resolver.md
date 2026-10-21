@@ -290,19 +290,21 @@ class BatchClearing : ClearingMethod {
 
 Realtime clearing is either Y or N for any payment, so exactly one of the two applies. Execute's stage asks the registry for its clearing method and never needs to know which one it got.
 
-Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank during the customer's bank connection, or at the card authorization. Each gets a clearing method that makes no call, and each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names Proposed):
+Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank during the customer's bank connection, or at the card authorization. MR/M3 will never send a settlement for them either, so each gets a clearing method that makes no clearing call and creates the settlement event instead. It hands the event to One-Data's money movement handler, `CreateMoneyMovementEventHandler.v1`, through `InboxActivities`, dated when the money moved, and One-Data pairs it with the AR posting like any other. Each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names and mechanism Proposed):
 
 ```kotlin
 @Singleton
-class NoClearingForDebitCard : ClearingMethod {
+class CardSettlement : ClearingMethod {
     override val key = ExecuteKey.CLEARING
     override val appliesTo =
         AppliesTo(on = setOf(REALTIME_CLEARING, CARD_AUTHENTICATION))
-    // no call: the authorization moved the money
+    // no clearing call: the authorization moved the money.
+    // Billpay creates the settlement event, dated when the money moved,
+    // and hands it to One-Data's money movement handler.
 }
 ```
 
-`NoClearingForBankTransfer` is the same, with `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`. As written it would also catch a US payment confirmed through Plaid; if that money still clears, the class becomes GB's own, `GBNoClearingForBankTransfer` (open). RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
+`BankTransferSettlement` is the same, with `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`. As written it would also catch a US payment confirmed through Plaid; if that money still clears, the class becomes GB's own (open). RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
 
 ## How the registry decides
 

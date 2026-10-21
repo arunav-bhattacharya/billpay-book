@@ -21,7 +21,7 @@ Each of the other Design pages covers one layer. [Routing](../routing.md) maps t
 Left to right is time. The journey is cut into stretches: one for each workflow run, and one for each wait between runs, such as the days a scheduled payment spends as a row in Oracle. Top to bottom is distance from the customer, one band per layer.
 
 - **Customer.** What the customer does, and the answers and messages they get. A solid line means the customer is waiting for an answer. A dashed line means nobody is: the rest runs on its own. A hollow square is something the customer may do, such as cancel a scheduled payment.
-- **One-Data.** The function the request comes in through, the inbox where work nobody waits for is stored, and the delete call that ends a create.
+- **One-Data.** The function the request comes in through, the inbox where work nobody waits for is stored, and the delete call that takes a payment off the account's pending list once it is decided.
 - **API and Router.** The core API or the dispatcher that hands the work to the Router, the cluster it runs on, and how it starts.
 - **Workflows.** Each run as a card, with its stages in order and the state each one commits. A pale square is a stage a child workflow runs. A hollow one runs only in some cases. A state above a stage is where it can stop instead, such as `DECLINED`.
 - **Time.** Only on a journey that waits for a date. Everything else happens in seconds or minutes.
@@ -34,16 +34,17 @@ Whatever happens at a stage lines up under it, all the way down. On Pay on a fut
 
 The switch above the picture changes the question. **By journey** follows one thing a customer or a system asks for, across every workflow it takes. **By workflow** lists the workflows instead, every road from a trigger to one workflow, grouped by how the work arrives. Pick a road there to open its card: the Router's six steps with this road's outcome, every activity its stages call, and what happens when a call fails.
 
-A journey can take several workflows, and a workflow can serve several journeys. Pay on a future date takes three: `CreateScheduledPaymentWorkflow` on the day it is made, `ExecuteScheduledPaymentWorkflow` on its due date, and `ProcessPaidEventsWorkflow` when it settles. `CreatePaymentIntentWorkflow` serves three: Pay by Bank today, Pay by Debit card and Pay while another payment is pending.
+A journey can take several workflows, and a workflow can serve several journeys. Pay on a future date takes three: `CreateScheduledPaymentWorkflow` on the day it is made, `ExecuteScheduledPaymentWorkflow` on its due date, and `ProcessPaidEventsWorkflow` when it settles. `CreatePaymentIntentWorkflow` serves two: Pay by Bank today and Pay by Debit card.
 
 ## What the picture shows
 
 A few things are easier to see here than anywhere else.
 
-- The customer waits only while a request is answered: at the create, and again at a confirm. The solid line ends at Verify, or at the reply that carries the link or the pending list, and everything after it runs with nobody waiting.
+- The customer waits only while a request is answered: at the create, and again at a confirm. The solid line ends at Verify, or at the reply that carries the link, and everything after it runs with nobody waiting.
 - Work that waits for a date waits in Oracle, not in Temporal. Between runs, the Workflows band is empty and the Work Tracker row is what carries the payment forward.
 - A corporate payment takes six kinds of run to get from the request to `PAID`, and asks for its allocations before any money moves. Its own execution clears once, for the whole payment; its legs do the rest.
-- Two ways to pay have no clearing at all. Pay with Bank Transfer moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call and the payment is `PAID` on the Accounts Receivable posting alone.
+- Two ways to pay have no clearing at all. Pay with Bank Transfer moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call. It hands One-Data a settlement event Billpay creates instead, and `PAID` still waits for that and the Accounts Receivable posting.
+- A create on an account that already has a payment in `PENDING` never appears here. One-Data declines it before billpay-core is called, so no workflow runs ([When another payment is still pending](./make-a-payment.md#when-another-payment-is-still-pending)).
 - One journey skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.
 
 ## When the Router says no

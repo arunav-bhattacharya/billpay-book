@@ -19,7 +19,7 @@ A channel that decided on its own what to offer would drift from what Billpay ac
 ## Four calls, in this order
 
 1. **Payment Options API**, for what the customer owes. If nothing is owed, the payment journey never starts, and the channel calls nothing else.
-2. **`ReadPaymentChoices.v1`** (Proposed), for Billpay's own rules: the ways to pay the market takes, which of them need a bank step, and that a debit card needs 3D Secure, the dates it offers, the cancellation window, the limits, whether it offers Pay & Plan and MR Points, and the payments already pending on the account.
+2. **`ReadPaymentChoices.v1`** (Proposed), for Billpay's own rules: the ways to pay the market takes, which of them need a bank step, and that a debit card needs 3D Secure, the dates it offers, the cancellation window, the limits, whether it offers Pay & Plan and MR Points, and any payment already pending on the account, so the page can tell the customer before they try.
 3. **Payment Instruments API**, for the customer's bank accounts, or for their debit cards. The page offers the two separately, and the channel calls it only when the customer picks one of them.
 4. **`CreatePayment.v3`**, when the customer reviews and pays. This is the only call that starts anything.
 
@@ -33,7 +33,7 @@ Everything the read call returns already lives in the market's profile: the inst
 
 ## How the Router picks the journey
 
-The page sends one request to one door, `CreatePayment.v3`, whatever the customer chose. The Router reads the date, the instructions and the way to pay, and what One-Data adds (the IDs of payments already pending on the account), then picks one journey:
+The page sends one request to one door, `CreatePayment.v3`, whatever the customer chose. Once it is past One-Data's pending check (below), the Router reads the date, the instructions and the way to pay, then picks one journey:
 
 | Journey | When | Temporal workflow |
 | --- | --- | --- |
@@ -42,10 +42,19 @@ The page sends one request to one door, `CreatePayment.v3`, whatever the custome
 | [Pay by Bank today](./all-journeys.md#pay-by-bank-today) | Today, with a way to pay that needs a bank step | `CreatePaymentIntentWorkflow` |
 | [Pay by Debit card](./all-journeys.md#pay-by-debit-card) | Today, a debit card | `CreatePaymentIntentWorkflow` |
 | [Pay with multiple instructions](./all-journeys.md#pay-with-multiple-instructions) | Today, a bank account and MR Points | `CreatePaymentWithMultipleInstructionsWorkflow` |
-| [Pay while another payment is pending](./all-journeys.md#pay-while-another-payment-is-pending) | Another payment is pending, in a market with the go-ahead on | `CreatePaymentIntentWorkflow` |
 | [Pay with MR Points](./all-journeys.md#pay-with-mr-points) | Today, MR Points only | The Pay with MR Points composite |
 
 The table follows the order customers meet these journeys. The Router checks them in a different order, and the first that matches wins: a wait comes first, because a payment that waits for the customer has to run in the one workflow that can wait for them. Then a later date, then several instructions, then MR Points alone, and pay today last. The ordered list is Proposed, and so is MR Points' place in it.
+
+## When another payment is still pending
+
+A customer who isn't sure a payment went through may pay again, and pay twice. So One-Data checks every create before billpay-core sees it. It keeps each card account's pending payments in Redis, and if the account already has one in `PENDING`, it declines the new create there and then: the channel gets 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed). billpay-core is never called, so no journey starts and Billpay holds no record of the attempt.
+
+A payment stays on the account's pending list only until it is decided. Once it is `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED`, billpay-core calls One-Data's delete API, `DeletePendingPayment.v1`, and the customer can pay again. So a scheduled payment never blocks the next one, and a payment that waits for bank confirmation or 3D Secure blocks it only while it waits, 10 or 2 minutes at most.
+
+- The check and the add are one atomic call to Redis (Proposed), so two creates that arrive together can't both get through.
+- It covers payments from channels: creates through `CreatePayment.v3`, and Pay & Plan's through `CreatePaymentInstallment.v1`. Payments Accounts Receivable raises, push payments from third parties and refunds never go through it.
+- When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-core alone. A create billpay-core hasn't captured yet can slip past that read, and the design accepts the gap.
 
 ## Debit card
 
@@ -55,15 +64,15 @@ A debit card is its own way to pay, apart from a bank account. Every debit card 
 2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link (Proposed).
 3. The card provider calls `POST /payments/{payment-id}/authentication` (Proposed) once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
 4. Verify runs its usual checks, then authorizes the payment, last (the check is Proposed). The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
-5. Execute makes no clearing call, because the money has moved, and the payment is `PAID` once Accounts Receivable has posted it. No settlement comes for a debit card.
+5. Execute makes no clearing call, because the money has moved. Billpay creates the settlement event itself and hands it to One-Data, dated when the money moved (Proposed), and the payment is `PAID` once that event and Accounts Receivable's posting are both in.
 
-If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. A debit card pays today only, with one instruction, and never with MR Points: a create that breaks this gets 422 before any workflow starts.
+If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. Any account type can pay by debit card: consumer, corporate and business travel. A debit card pays today only, with one instruction, and never with MR Points: a create that breaks this gets 422 before any workflow starts.
 
-Pay with Bank Transfer works the same way at the end: its money moves at the bank, during the customer's bank connection, so it has no clearing step either.
+Pay with Bank Transfer works the same way at the end: its money moves at the bank, during the customer's bank connection, so it has no clearing step either, and Billpay creates its settlement event too.
 
 ## Pay & Plan
 
-Pay & Plan is not on this list because it doesn't come through this door. A customer who sets up a plan sends `CreatePaymentInstallment.v1`, and the Router starts the Pay & Plan composite.
+Pay & Plan is not on this list because it doesn't come through this door. A customer who sets up a plan sends `CreatePaymentInstallment.v1`, and the Router starts the Pay & Plan composite. One-Data's pending check covers that create too: a Pay & Plan request on an account with a payment already `PENDING` is declined the same way.
 
 ## MR Points
 
@@ -76,7 +85,5 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 - The contract of `ReadPaymentChoices.v1`, and the billpay-core read behind it.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. It appears on this page only.
-- A go-ahead on a composite create. The Router checks for a wait first, but the workflow that waits runs one instruction, so a create with several instructions or with MR Points alone has no settled path when another payment is pending in a market with the go-ahead on.
-- The card provider in markets other than the UK, and whether one provider always handles both 3D Secure and the authorization.
-- A debit card payment made while another is pending, in a market with the go-ahead on.
+- A pending entry left behind. billpay-core retries the delete until it lands, and an alert finds an entry that stays too long, but while it stays, One-Data declines the account's payments. Whether One-Data should ever drop an old entry on its own, and after how long, is open.
 - A later date with Pay with Bank Transfer. Only consumer payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.

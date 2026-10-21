@@ -172,7 +172,7 @@ const five = (account, realtime, bank) => [
 
 const CV = ['Capture', 'Verify'];
 const CVEF = ['Capture', 'Verify', 'Execute', 'Fulfil'];
-const PAID = {to: 'paid', text: 'PAID, once One-Data has the settlement and the AR posting (the posting alone for Pay with Bank Transfer)'};
+const PAID = {to: 'paid', text: 'PAID, once One-Data has the settlement and the AR posting (for Pay with Bank Transfer, the settlement Billpay creates)'};
 const CANCEL_NOTE =
   'It checks the cancellation window and eligibility first, with read-only calls. Outside the window, or once the payment is no longer SCHEDULED, the answer is 409.';
 
@@ -268,7 +268,10 @@ export const BANDS = [
               title: 'The workflow waits here.',
               text: "On its own timer: the market's confirmation window and a short grace. The confirm arrives as an update to this same workflow. If none comes in time, the timer runs Cancel, and the payment ends CANCELLED.",
             },
-            then: [{to: 'confirm', text: 'the caller confirms, with the same payment ID'}],
+            then: [
+              {to: 'confirm', text: 'the caller confirms, with the same payment ID'},
+              {to: 'no', text: 'or says no'},
+            ],
           },
           {
             id: 'card',
@@ -293,32 +296,6 @@ export const BANDS = [
               text: "On its own timer: 2 minutes and a short grace. The card provider's callback arrives as an update to this same workflow. If none comes in time, the timer runs Cancel, and nothing has been taken.",
             },
             then: [{to: 'authenticated', text: 'the card provider calls back, with the same payment ID'}],
-          },
-          {
-            id: 'goahead',
-            wf: 'CreatePaymentIntent',
-            tag: 'go-ahead',
-            lead: 'Pay today while another payment on the account is pending, in a market that has the go-ahead turned on.',
-            stages: ['Capture'],
-            journey:
-              'Create payment, today, one instruction. One-Data sends the IDs of the pending payments it found, and the market has the go-ahead turned on, so the payment waits for the customer',
-            wfId: '{paymentId}-init',
-            answer: 'with PENDING, and One-Data adds the pending payments',
-            chips: five('CONSUMER', 'Y', 'N'),
-            behave:
-              'Example values. A go-ahead is not a behavior and picks no stage. It is a market setting, off by default; with it off, this payment takes the pay-today road.',
-            notes: {
-              Capture:
-                'It also stores the IDs of the payments the customer is shown, which came with the request. No other stage runs before the customer answers: the caller gets PENDING, and the PENDING event goes out.',
-            },
-            stop: {
-              title: 'The workflow waits here.',
-              text: "On its own timer, while the customer decides. The payment stays PENDING and on the account's pending list. The yes and the no arrive as updates to this same workflow. If neither comes in time, the timer runs Cancel.",
-            },
-            then: [
-              {to: 'confirm', text: 'the customer says yes, with the same payment ID'},
-              {to: 'no', text: 'or says no'},
-            ],
           },
         ],
       },
@@ -382,12 +359,12 @@ export const BANDS = [
             tag: 'a no',
             update: '{paymentId}-no',
             start: 'an update to the running workflow',
-            lead: 'Cancel a payment the customer said no to, made while another was pending.',
+            lead: 'Cancel a payment that waits for bank confirmation, when the customer says no.',
             own: ['Cancel'],
             journey: "Cancel payment, PENDING and waiting for the customer, on the customer's no",
             wfId: '{paymentId}-init',
             answer: 'CANCELLED, and CANCELLED again for a repeat',
-            chips: five('CONSUMER', 'Y', 'N'),
+            chips: five('CONSUMER', 'Y', 'Y'),
             behave: 'Example values. Cancel varies by account type and AR posting.',
             move: {Cancel: 'PENDING to CANCELLED'},
             notes: {
@@ -402,7 +379,7 @@ export const BANDS = [
         fn: ['CreateConfirm|PendingPayment.v1'],
         from: 'a channel',
         calls: 'A channel calls',
-        does: 'go ahead with a payment that waited for the customer, with the same payment ID',
+        does: 'go ahead with a payment that waited for bank confirmation, with the same payment ID',
         api: ['POST', '/payments/{payment-id}/confirm'],
         roads: [
           {
@@ -411,13 +388,13 @@ export const BANDS = [
             tag: 'the confirm',
             update: '{paymentId}-confirm',
             start: 'an update to the running workflow',
-            lead: 'Go ahead with a payment once the customer has confirmed their bank details, or given the go-ahead.',
+            lead: 'Go ahead with a payment once the customer has confirmed their bank details.',
             stages: ['Verify', 'Execute', 'Fulfil'],
-            journey: 'Confirm payment, PENDING and waiting for bank confirmation or a go-ahead, inside the confirmation window',
+            journey: 'Confirm payment, PENDING and waiting for bank confirmation, inside the confirmation window',
             wfId: '{paymentId}-init',
             answer: 'once Verify decides',
             chips: five('CONSUMER', 'Y', 'Y'),
-            behave: "Example values. Bank confirmation adds the token check to Verify. After a go-ahead, the payment's behaviors pick Verify's checks as for any payment.",
+            behave: 'Example values. Bank confirmation adds the token check to Verify, and takes clearing out of Execute for Pay with Bank Transfer.',
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
@@ -425,7 +402,7 @@ export const BANDS = [
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'call', note: "also asks whether the instrument's verification token is valid"},
-              'Execute|ClearingActivities': {kind: 'cond', note: 'not for Pay with Bank Transfer: its money moved at the bank'},
+              'Execute|ClearingActivities': {kind: 'cond', note: 'not for Pay with Bank Transfer: its money moved at the bank, and Billpay creates its settlement event'},
             },
             then: [PAID],
           },
@@ -457,12 +434,12 @@ export const BANDS = [
             notes: {
               Verify:
                 "A failed 3D Secure result is DECLINED with no authorization. Otherwise the usual checks run, then last the card provider authorizes the payment (the check is Proposed): approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
-              Execute: 'No clearing call: the authorization moved the money. Only the AR balance and open-to-buy calls go out.',
+              Execute: "No clearing call: the authorization moved the money. The AR balance and open-to-buy calls go out, and One-Data gets the settlement event Billpay creates, dated when the money moved.",
             },
             exc: {
               'Execute|ClearingActivities': {kind: 'skip', note: 'the authorization moved the money'},
             },
-            then: [{to: 'paid', text: 'PAID, once One-Data has the GAR posting: no settlement comes for a debit card'}],
+            then: [{to: 'paid', text: 'PAID, once One-Data has the settlement Billpay created and the GAR posting'}],
           },
         ],
       },
@@ -833,7 +810,7 @@ export const BANDS = [
             wfId: "its Schedule's ID plus the trigger time",
             notes: {
               Settle:
-                'Up to 500 READY rows a batch, in one transaction: each payment or leg goes from PROCESSED to PAID. Then the PAID events go to RTF. A Pay with Bank Transfer or debit card payment is READY on its GAR posting alone, since it has no clearing and no settlement comes.',
+                'Up to 500 READY rows a batch, in one transaction: each payment or leg goes from PROCESSED to PAID. Then the PAID events go to RTF. A Pay with Bank Transfer or debit card payment has no clearing, so its settlement is the event Billpay created in Execute, and it pairs the same way.',
             },
             then: [{to: 'returned', text: 'PAID is final, unless a return arrives'}],
           },
@@ -1054,18 +1031,25 @@ export function calls(j, f) {
 }
 
 /* roads whose workflow calls the delete API at One-Data: a create from a
-   channel at its end; a payment that waits, once after its reply and again
-   when the confirm or the no ends the wait */
-const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'goahead', 'confirm', 'authenticated', 'no']);
+   channel once Verify decides; a payment that waits, once after its reply
+   and again once the confirm, the callback or the no decides it */
+const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no']);
 
 /* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
   if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
   if (j.band.key === 'pulled') return 'its dispatcher reads the request, and marks it once started';
-  if (j.id === 'bank' || j.id === 'card' || j.id === 'goahead') {
+  if (j.id === 'bank' || j.id === 'card') {
     return "calls the delete API after its reply, saying the payment still waits, so only the stored create leaves One-Data's Redis";
   }
-  if (DELETES.has(j.id)) return "calls the delete API at the end, so the payment leaves One-Data's Redis";
+  if (j.id === 'confirm') {
+    return "calls the delete API once Verify decides, so the account's pending entry goes and the customer can pay again. For Pay with Bank Transfer, Execute hands One-Data the settlement event Billpay creates";
+  }
+  if (j.id === 'authenticated') {
+    return "calls the delete API once Verify decides, so the account's pending entry goes. Execute hands One-Data the settlement event Billpay creates, dated when the money moved";
+  }
+  if (j.id === 'no') return "calls the delete API once Cancel decides, so the account's pending entry goes";
+  if (DELETES.has(j.id)) return "calls the delete API once Verify decides, so the stored create and the account's pending entry leave One-Data's Redis";
   return null;
 }
 

@@ -36,7 +36,7 @@ export const ACTIVITIES = [
     name: 'ClearingActivities',
     system: 'MR/M3',
     queue: 'ds-clearing',
-    calledBy: "Execute (at payment level, and for consumer legs), except for Pay with Bank Transfer and a debit card, whose money has already moved; Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
+    calledBy: "Execute (at payment level, and for consumer legs), except for Pay with Bank Transfer and a debit card, whose money has already moved; Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state, but never for those two",
   },
   {
     name: 'ReceivablesActivities',
@@ -88,7 +88,7 @@ export const ACTIVITIES = [
   },
   {
     name: 'CardActivities',
-    system: "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK; other markets' are still to be named",
+    system: "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK; other markets' providers will be added over time",
     queue: 'A local activity inside the decision, as for the bank-confirmation provider: only the Online cluster calls it. The authorization carries the payment ID as its idempotency key, so a retry never debits twice (Proposed)',
     calledBy: "RequestConfirmation, to start 3D Secure with Billpay's callback URL and get the challenge link; Verify's card authorization check, last, which debits the customer's account or is declined",
   },
@@ -96,7 +96,7 @@ export const ACTIVITIES = [
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel at its end, and `CreatePaymentIntentWorkflow` once after its reply and again at its end, for the delete: One-Data\'s one activity interface makes this call too',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel once its payment is decided, and `CreatePaymentIntentWorkflow` once after its reply and again once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a Pay with Bank Transfer or debit card payment (Proposed)',
   },
   {
     name: 'LifecycleEventActivities',
@@ -138,7 +138,7 @@ A corporate payment is never declined because its allocations are slow. It waits
 
 | Operation | What it writes |
 | --- | --- |
-| Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, with the pending payments' IDs when the payment waits for a go-ahead. A duplicate means the request was seen before |
+| Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table. A duplicate means the request was seen before |
 | A stage commit | The guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes |
 | Writing legs | A batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once |
 | Bank confirmation or 3D Secure | The redirect or challenge link and the provider's reference, guarded on `PENDING` |

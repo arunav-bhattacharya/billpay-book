@@ -135,7 +135,7 @@ class JourneyRule(
 
 object CreateJourneys {
     private val rules = listOf(
-        JourneyRule(Journey.CREATE_INTENT, "Waits for the customer: bank confirmation, a debit card, or a go-ahead") { r, v -> r.waitsForCustomer(v) },
+        JourneyRule(Journey.CREATE_INTENT, "Waits for the customer: bank confirmation or a debit card") { r, v -> r.waitsForCustomer(v) },
         JourneyRule(Journey.CREATE_SCHEDULED, "Future-dated") { r, _ -> r.isFutureDated },
         JourneyRule(Journey.MULTIPLE_INSTRUCTIONS, "Today, several instructions") { r, _ -> r.instructions.size > 1 },
         JourneyRule(Journey.PAY_WITH_MR_POINTS, "Today, MR Points alone") { r, _ -> r.instructions.single().isMrPoints },
@@ -156,7 +156,9 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 **A test keeps the code and the table together.** It walks every request type, item type, inbox type and create rule, writes the routing table as trigger, condition and journey, and compares it with a checked-in copy, the way the [stage report](./stage-resolver.md) works. A change to which journey a request takes fails the test until the same pull request updates the copy, so the reviewer sees the row that moved.
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, when the payment method is a debit card, or One-Data sent other pending payments' IDs with the create and the market's go-ahead setting, off by default, is on. That is why it is the first rule: a future-dated create that waits for a go-ahead still waits. The journey alone makes the payment wait, and nothing about the go-ahead goes in the resolved profile. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
+
+No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-core ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
 ### 3. Resolve the behaviors
 
@@ -234,8 +236,6 @@ The field names and values here are illustrative (Proposed, 2026-10-20). The spe
 5. A payment of 30,000 GBP fails the rule and is declined with the rule's code. If release v8 raises the limit to 40,000, payments already running keep 25,000, because it is in their history, and payments started after v8 goes live get 40,000. A scheduled payment is routed again on its due date, so its Reverify checks against the version active that day.
 
 The rule's logic is code and changes with a deploy. The number is config and changes with a release.
-
-A go-ahead picks no stage. The `CREATE_INTENT` journey from step 2 is what makes the payment wait, and once the customer says yes, its behaviors pick Verify's checks as for any payment. [Design → Journeys](../../design/journeys/all-journeys.md#pay-while-another-payment-is-pending) follows that payment from the wait to the customer's yes or no.
 
 The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg.
 

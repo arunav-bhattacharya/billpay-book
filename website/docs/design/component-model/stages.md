@@ -35,7 +35,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the bank provider gives no link, or the card provider no answer (Proposed). It runs only for bank confirmation or a debit card, whose 3D Secure it starts | Bank confirmation or card authentication, which pick the request |
 | Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | Mandate authorization, bank confirmation and card authentication, which decide its checks |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | Account type, AR posting, realtime clearing, mandate authorization |
-| Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls. Pay with Bank Transfer and a debit card make no clearing call | Account type, AR posting, realtime clearing, bank confirmation, card authentication |
+| Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls. Pay with Bank Transfer and a debit card make no clearing call, and hand One-Data the settlement event Billpay creates | Account type, AR posting, realtime clearing, bank confirmation, card authentication |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
 | RequestAllocations | `SCHEDULED`, or `ACCEPTED` for pay today, → `ALLOCATING` | Nothing |
 | ReceiveAllocations | `ALLOCATING` → `ALLOCATED` once the batches add up, with the payment's `ALLOC_EXEC` row; earlier batches change no state | Nothing |
@@ -45,7 +45,7 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Represent | `REPRESENTING` → `REPRESENTED` or `DECLINED` | Account type, AR posting, realtime clearing, mandate authorization |
 | Settle | `PROCESSED` → `PAID` for each payment or leg in a batch of up to 500 ready inbox rows | Nothing |
 
-Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and adds the token check to Verify. Card authentication is not a behavior a market answers. Every debit card needs 3D Secure, so the Router sets it to Y for a debit card payment, and it picks RequestConfirmation's 3D Secure request and Verify's card authorization check (Proposed). Both take clearing out of Execute for Pay with Bank Transfer and a debit card, because the money has already moved. Whether a payment confirmed through Plaid in the US still clears is open. A go-ahead is not a behavior, and no stage or check is picked for it. It is a market setting, off by default: where it is on, a create that One-Data sends with other pending payments' IDs waits in Create Payment Intent, and Capture stores the IDs.
+Bank confirmation is the fifth behavior: it decides whether RequestConfirmation runs, and adds the token check to Verify. Card authentication is not a behavior a market answers. Every debit card needs 3D Secure, so the Router sets it to Y for a debit card payment, and it picks RequestConfirmation's 3D Secure request and Verify's card authorization check (Proposed). Both take clearing out of Execute for Pay with Bank Transfer and a debit card, because the money has already moved. Whether a payment confirmed through Plaid in the US still clears is open.
 
 ## Which workflow runs which stages
 
@@ -92,7 +92,7 @@ A name never lists the activities a class calls. The mandate check, for example,
 
 *(Examples of the rule, agreed on 2026-10-19.)*
 
-On the due date, Reverify runs the same `MandateCheck` again for a payment that needs a mandate. Execute works the same way: `RealtimeClearing` clears in real time and `BatchClearing` in batch, and the payment's behaviors pick one. Pay with Bank Transfer and a debit card get a method that makes no call, `NoClearingForBankTransfer` or `NoClearingForDebitCard`, because each names one more behavior than `RealtimeClearing` and so wins (Proposed names). RequestConfirmation picks its request the same way: `BankConfirmationRequest` or `CardAuthenticationRequest`.
+On the due date, Reverify runs the same `MandateCheck` again for a payment that needs a mandate. Execute works the same way: `RealtimeClearing` clears in real time and `BatchClearing` in batch, and the payment's behaviors pick one. Pay with Bank Transfer and a debit card get a method that makes no clearing call and hands One-Data the settlement event Billpay creates instead, `BankTransferSettlement` or `CardSettlement`. Each names one more behavior than `RealtimeClearing`, so it wins (Proposed names). RequestConfirmation picks its request the same way: `BankConfirmationRequest` or `CardAuthenticationRequest`.
 
 Three rules keep the names straight:
 
@@ -124,8 +124,6 @@ If no link comes back, because the provider is down or too slow, the commit move
 
 For a debit card, RequestConfirmation starts 3D Secure, the card schemes' check that the customer is the cardholder. It asks the market's card provider (Checkout.com in the UK) to authenticate the card, and gives it Billpay's callback URL. When the card's issuing bank wants a challenge, such as a one-time code or a banking-app approval, the provider returns the challenge link, and the caller gets `PENDING` with it. When the bank needs no challenge, the caller gets `PENDING` with no link (Proposed). Either way, the result comes only through the provider's callback, and Create Payment Intent waits up to 2 minutes for it. No answer at all from the provider means `DECLINED` (Proposed).
 
-A payment can also wait for the customer's go-ahead, in a market that has it turned on, when One-Data sends other pending payments' IDs with the create. That needs no stage of its own and no provider call: Capture already stored the IDs of the payments the customer was shown, which came with the request. The caller gets `PENDING`, and One-Data adds the pending payments to the reply. A payment that needs both waits once: RequestConfirmation gets the link, the reply carries the link and the list, and confirming at the bank is the go-ahead.
-
 ## Verify
 
 Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and Payment Options, to confirm the amount.
@@ -136,7 +134,6 @@ Decides whether a pending payment can go ahead. It calls Payment Instruments, to
 - A push payment (inbound, sent by a third party) that Amex won't take commits `DISALLOWED`. No other kind of payment can end there.
 - A payment that waited for bank confirmation is verified in Create Payment Intent, when the confirm arrives, guarded on `PENDING`. The provider has already verified the customer's bank details, so Verify asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud. Payment Instruments decides what makes a token valid. A payment without a valid token is `DECLINED`. In GB, a Pay with Bank Transfer payment is also `DECLINED` when the customer's bank account doesn't hold enough money for it.
 - A debit card payment is verified in Create Payment Intent when the card provider's callback arrives, guarded on `PENDING`. A failed 3D Secure result is `DECLINED` with no authorization. Otherwise the usual checks run first, and `CardAuthorizationCheck` runs last (Proposed): the card provider authorizes the payment with the 3D Secure result, and the authorization debits the customer's account if it holds enough money. The issuing bank declines it if not, and the payment is `DECLINED`. It runs last because once it is approved, the money has moved, and no other rule may decline the payment after that.
-- A payment that waited for a go-ahead is verified there too, guarded on `PENDING`, with the checks its behaviors pick, as for any payment. It goes through even if the earlier payment was decided while the customer looked. A future-dated payment commits `SCHEDULED` with its `SCHED_EXEC` row and executes on its scheduled date.
 
 Verify has one flow, and only its checks vary. Where the profile requires mandate authorization, `MandateCheck` fetches the mandate details from Plans, in parallel with the other calls, and a mandate that fails its check is `DECLINED`. Where it requires bank confirmation, `TokenCheck` asks Payment Instruments about the verification token. For a debit card, `CardAuthorizationCheck` asks the card provider to authorize the payment. Nothing else changes Verify: the corporate `ALLOC_REQUEST` row comes from the account type, the way the `SCHED_EXEC` row comes from the date, and what a payment waited for picks nothing.
 
@@ -146,7 +143,7 @@ Checks a scheduled payment again on its due date, with the same calls as Verify,
 
 ## Execute
 
-Moves the money and commits `PROCESSING`. Three calls go out in parallel, each on its own rate-limited queue: clearing (MR/M3), the AR balance (GAR) and open-to-buy (AMP). A Pay with Bank Transfer or debit card payment makes no clearing call: its money moved at the bank connection, or at the card authorization, so only the AR balance and open-to-buy calls go out.
+Moves the money and commits `PROCESSING`. Three calls go out in parallel, each on its own rate-limited queue: clearing (MR/M3), the AR balance (GAR) and open-to-buy (AMP). A Pay with Bank Transfer or debit card payment makes no clearing call: its money moved at the bank connection, or at the card authorization, so only the AR balance and open-to-buy calls go out. MR/M3 will never send a settlement for it, so Execute creates the settlement event itself and hands it to One-Data's money movement handler, `CreateMoneyMovementEventHandler.v1`, dated when the money moved (Proposed). One-Data pairs it with the AR posting like any other, and the payment turns `PAID` the usual way.
 
 Open-to-buy needs the instrument's details in clear text, which Billpay never stores. So that branch starts with a call to Payment Instruments for them, and only then calls AMP. Clearing and AR don't wait for it. The same details stay in the workflow for Fulfil, whose notifications need them too, and workflow history keeps them encrypted by the payload codec.
 

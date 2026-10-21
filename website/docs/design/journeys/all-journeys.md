@@ -17,7 +17,6 @@ export const GROUPS = [
       {label: 'Pay by Bank today', to: '#pay-by-bank-today', kind: 'customer'},
       {label: 'Pay by Debit card', to: '#pay-by-debit-card', kind: 'customer'},
       {label: 'Pay with multiple instructions', to: '#pay-with-multiple-instructions', kind: 'customer'},
-      {label: 'Pay while another is pending', to: '#pay-while-another-payment-is-pending', kind: 'customer'},
       {label: 'Pay with MR Points', to: '#pay-with-mr-points', kind: 'customer'},
       {label: 'Pay & Plan', to: '#pay--plan', kind: 'customer'},
     ],
@@ -150,8 +149,9 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
     },
   ]}
   detail={[
+    {text: 'One-Data checks the card account first. If another payment on it is still `PENDING`, One-Data declines this one there and then, with 200 `DECLINED` and a reason, and Billpay never sees it. Otherwise One-Data adds the payment to the account\'s pending list, stores the create and calls billpay-core.'},
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent. A repeated request joins the workflow that is already running, so the customer gets the original answer back and is never charged twice.'},
-    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, Payment Options confirms the amount they picked, and Plans returns the mandate details where the market requires one. Billpay\'s verification rules check the answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. A payment the customer must confirm at their bank goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does one made while another is pending, on [Pay while another payment is pending](#pay-while-another-payment-is-pending).'},
+    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, Payment Options confirms the amount they picked, and Plans returns the mandate details where the market requires one. Billpay\'s verification rules check the answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. Once Verify has decided, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, which takes the payment off the account\'s pending list, so the customer can pay again. A payment the customer must confirm at their bank goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does a debit card, on [Pay by Debit card](#pay-by-debit-card).'},
     {text: 'Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF after the reply, in order.'},
     {step: 3, text: 'Three calls go out at once: clearing with the bank, the statement balance down in Accounts Receivable, and available credit up in Authorizations. Authorizations needs the instrument\'s details in clear text, so its branch first asks Payment Instruments for them, while the other two calls are already under way. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
     {step: 4, text: 'Accounting, eBNC, risk and three notification systems are told first, in parallel: two legacy systems, the Transaction Notification Engine (TFNE) and the Payments History Database (GPHDB), and B2Notifier, which passes the news on to other downstream systems. The three use the clear-text details Execute fetched. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
@@ -244,7 +244,7 @@ The customer picks a date, up to 30 days out by default: each market sets its ow
   ]}
   detail={[
     {step: 1, text: 'The same insert-if-absent as an immediate payment, so a repeated request gets the original back.'},
-    {step: 2, text: 'Checked now, not on the day. The answer is `SCHEDULED`, and the same commit writes a `SCHED_EXEC` row in the Work Tracker, due at the market\'s execution time on that date. Then the workflow closes.'},
+    {step: 2, text: 'Checked now, not on the day. The answer is `SCHEDULED`, and the same commit writes a `SCHED_EXEC` row in the Work Tracker, due at the market\'s execution time on that date. `SCHEDULED` is a decision, so the delete takes the payment off the account\'s pending list, and the customer can make another payment while this one waits. Then the workflow closes.'},
     {step: 3, text: 'Until its date, up to 30 days away by default, the payment is a row in Oracle and nothing more. The customer can update or cancel it until the market\'s cancellation window closes, which is always before execution starts.'},
     {step: 4, text: 'At the market\'s execution time, that market\'s dispatcher claims the row, calls the Router again so the payment runs with today\'s config, and starts `ExecuteScheduledPaymentWorkflow` on the Offline cluster at the rate the governor allows. Reverify checks the payment again, the mandate included where the market requires one, because an account can close or a balance can move while a payment waits.'},
     {text: 'A future-dated payment never clears in real time. It clears in batch, whichever channel it came from.'},
@@ -330,7 +330,7 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
       name: 'Paid',
       state: 'PAID',
       mode: 'awaiting',
-      caption: 'posted, and settled if it cleared',
+      caption: 'settled and posted',
       systems: ['MR/M3', 'GAR'],
       exit: {state: 'RETURNED'},
     },
@@ -339,11 +339,11 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
     {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`, and RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and stores it on the payment. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If the provider gives no link, the payment is `DECLINED` instead.'},
     {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the workflow waits on its timer: the market\'s confirmation window and a short grace. If no confirm comes in that time, the workflow runs Cancel itself, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
-    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer\'s bank account holds enough money for the payment, and declines it if not. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409.'},
+    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer\'s bank account holds enough money for the payment, and declines it if not. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
     {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
-    {step: 5, text: 'For Pay with Bank Transfer there is no clearing call: the money moved at the bank, during the customer\'s bank connection. Otherwise Execute clears with the bank as usual (whether a payment confirmed through Plaid in the US clears is still open). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
+    {step: 5, text: 'For Pay with Bank Transfer there is no clearing call: the money moved at the bank, during the customer\'s bank connection. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). Otherwise Execute clears with the bank as usual (whether a payment confirmed through Plaid in the US clears is still open). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
     {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 7, text: '`PAID` follows once the AR posting is in One-Data\'s inbox, and the settlement too for a payment that cleared. Pay with Bank Transfer has no clearing, so no settlement comes, and the posting alone makes it ready.'},
+    {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox. For Pay with Bank Transfer, the settlement is the one Billpay created in Execute.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
 />
@@ -424,7 +424,7 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
       name: 'Paid',
       state: 'PAID',
       mode: 'awaiting',
-      caption: 'posted',
+      caption: 'settled and posted',
       systems: ['GAR'],
       exit: {state: 'RETURNED'},
     },
@@ -433,11 +433,12 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. The card came from Payment Instruments, which the channel asked for the customer\'s saved cards.'},
     {step: 2, text: 'The payment method is a debit card, so the Router sets card authentication to Y (Proposed) and starts `CreatePaymentIntentWorkflow`. RequestConfirmation asks the market\'s card provider to start 3D Secure, and gives it Billpay\'s callback URL. When the card\'s bank wants a challenge, the provider returns the challenge link, and the caller\'s update returns `PENDING` with it. When it needs none, the caller gets `PENDING` with no link (Proposed). If the provider doesn\'t answer, the payment is `DECLINED` instead (Proposed).'},
     {step: 3, text: 'The customer completes the challenge, such as a one-time code or a banking-app approval, while the workflow waits on its timer: 2 minutes and a short grace. If no callback comes in that time, the workflow runs Cancel itself, the payment ends `CANCELLED`, and nothing has been taken.'},
-    {step: 4, text: 'The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed) directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D Secure result is `DECLINED` with no authorization. Otherwise Verify runs its usual checks, then authorizes the payment with the card provider, last (the check is Proposed): the authorization debits the customer\'s account if it holds enough money, and the card\'s bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the callback\'s reply returns here. The customer learns the outcome from the channel, through the payment\'s state.'},
+    {step: 4, text: 'The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed) directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D Secure result is `DECLINED` with no authorization. Otherwise Verify runs its usual checks, then authorizes the payment with the card provider, last (the check is Proposed): the authorization debits the customer\'s account if it holds enough money, and the card\'s bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the callback\'s reply returns here. The customer learns the outcome from the channel, through the payment\'s state. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
     {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
-    {step: 5, text: 'No clearing call: the authorization has already moved the money. The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once.'},
+    {step: 5, text: 'No clearing call: the authorization has already moved the money. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once.'},
     {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 7, text: '`PAID` follows once the AR posting is in One-Data\'s inbox. No settlement comes for a debit card, so the posting alone makes the payment ready.'},
+    {step: 7, text: '`PAID` follows once the settlement Billpay created and the AR posting are both in One-Data\'s inbox.'},
+    {text: 'Any account type can pay by debit card. A corporate one stops at `ACCEPTED` and asks for its allocations, as on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
     {text: 'A debit card pays today only, with one instruction, and never with MR Points. A create that breaks this gets 422 before any workflow starts.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#16-pay-by-debit-card-create-3d-secure-and-authorization', label: 'Sequence diagram'}}
@@ -486,104 +487,6 @@ One request, more than one instruction. To the customer, that is a bank account 
   ]}
 />
 
-### Pay while another payment is pending
-
-A customer who isn't sure their first payment went through may pay again, and end up paying twice. So One-Data checks every new payment against the card account's pending payments, which it keeps in Redis. When it finds one, and the market has the go-ahead turned on (it is off unless a market asks for it), the new payment waits for the customer's go-ahead: the channel shows what is already pending and asks whether to go ahead with this one too. Only the new payment waits. The earlier one carries on by itself, and this step offers no way to cancel it.
-
-<JourneyMap
-  kind="customer"
-  eyebrow="Immediate payment, go-ahead"
-  title="Pay while another payment is pending"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-    note: 'One-Data checks the card account for pending payments on every new payment, today or future-dated.',
-  }}
-  entry={[
-    {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData', note: 'checks pending'},
-    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', logo: 'oneData', note: 'on a yes'},
-    {kind: 'function', label: 'DeletePayment.v1', logo: 'oneData', note: 'on a no'},
-  ]}
-  core={[
-    {kind: 'api', label: 'POST /payments'},
-    {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
-    {kind: 'api', label: 'DELETE /payments/{payment-id}'},
-  ]}
-  workflow={{label: 'CreatePaymentIntentWorkflow', note: 'the yes and the no arrive as updates'}}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
-    {
-      icon: 'lock',
-      name: 'Hold',
-      state: 'PENDING',
-      mode: 'live',
-      caption: 'caller gets the pending list',
-    },
-    {
-      icon: 'user',
-      name: 'Customer decides',
-      state: 'PENDING',
-      mode: 'awaiting',
-      caption: 'yes or no',
-      exit: {state: 'CANCELLED'},
-    },
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'ACCEPTED',
-      mode: 'live',
-      caption: 'caller confirms, gets a response',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'at once; AMP after Instruments',
-    },
-    {
-      icon: 'broadcast',
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {text: 'One-Data checks before it calls the core. In one Redis call it reads the card account\'s pending payments, adds this one to the list and stores the create. Another payment is still pending, so One-Data sends that payment\'s ID with the create.'},
-    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment, along with the IDs of the pending payments that came with the create.'},
-    {step: 2, text: 'The create came with those IDs and the market has the go-ahead turned on, so the Router started `CreatePaymentIntentWorkflow`, and the payment is held before any check runs. The caller gets `PENDING`, One-Data adds the pending payments to the reply, and the workflow waits. A payment that also needs bank confirmation waits only once: RequestConfirmation gets the redirect link, the reply carries the link and the list, and confirming at the bank is the go-ahead.'},
-    {step: 3, text: 'The channel shows the pending payments and asks whether to go ahead. A no comes in through `DeletePayment.v1` as an update to the waiting workflow, and Cancel moves the new payment to `CANCELLED`, guarded on `PENDING`. So does the workflow\'s timer, if no answer comes before the window and its grace have passed. Either way, RTF gets the event, the customer gets the message through Raven, and the payment leaves the account\'s pending list.'},
-    {step: 4, text: 'A yes comes in through `CreateConfirmPendingPayment.v1` with the same payment ID, as an update to the same workflow, and Verify runs the usual checks: the payment\'s behaviors pick them, as for any payment. It goes through even if the earlier payment was decided while the customer looked. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the caller\'s update returns here. A yes and a no from two tabs are two updates to one workflow: the first one wins, and the other gets 409. For a payment dated in the future, Verify commits `SCHEDULED` instead, and the payment executes on its date like any scheduled payment.'},
-    {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
-    {step: 5, text: 'Clearing with the bank, the statement balance down in Accounts Receivable and available credit up in Authorizations, all at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
-    {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`. When the workflow ends, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, and the payment leaves the account\'s pending list.'},
-    {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#15-a-new-payment-while-another-is-pending', label: 'Sequence diagram'}}
-/>
-
 ### Pay with MR Points
 
 Next to the way to pay, the customer can tick Pay with MR Points, to pay with their Membership Rewards points. When the points are the only instruction, the payment runs as a composite workflow of its own, Pay with MR Points, on the Online cluster, across Billpay and Loyalty. With a bank account as well, it is two instructions, and runs as [Pay with multiple instructions](#pay-with-multiple-instructions).
@@ -620,6 +523,7 @@ The customer pays today and sets up a plan of future installments in the same re
     {icon: 'recheck', name: 'Autopay', caption: 'an optional update'},
   ]}
   detail={[
+    {text: 'One-Data runs the same pending check as on a payment: if the card account already has a payment in `PENDING`, it declines the request there and then, and Billpay never sees it.'},
     {step: 1, text: 'The payment is [Pay my bill today](#pay-my-bill-today), run as a child workflow. Nothing about the plan changes how the money moves or settles.'},
     {step: 2, text: 'Then the composite calls the Installments API to set up the plan of future installments. Billpay asks for the plan; it doesn\'t own it.'},
     {step: 3, text: 'Last, an optional update to the customer\'s Autopay.'},
@@ -698,7 +602,7 @@ Nothing is edited in place. Billpay cancels the original and raises a new paymen
 
 ### Cancel a payment
 
-A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled. A corporate payment can close sooner: it leaves `SCHEDULED` for `ALLOCATING` when its allocations are requested, and from then on a cancel gets 409. The same call also carries a customer's no to a payment made while another was pending, with no window check, on [Pay while another payment is pending](#pay-while-another-payment-is-pending).
+A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled. A corporate payment can close sooner: it leaves `SCHEDULED` for `ALLOCATING` when its allocations are requested, and from then on a cancel gets 409. The same call also carries a customer's no to a payment that waits for bank confirmation, with no window check, on [Pay by Bank today](#pay-by-bank-today).
 
 <JourneyMap
   kind="customer"
@@ -1088,7 +992,7 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
 
 ### A payment is paid
 
-This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A Pay with Bank Transfer or debit card payment has no clearing, so no settlement comes, and it waits for the posting alone.
+This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other.
 
 <JourneyMap
   kind="system"
@@ -1117,14 +1021,14 @@ This is where a payment turns `PAID`, or for a split payment, each of its legs. 
     {icon: 'doubleCheck', name: 'Mark', mode: 'background', caption: 'DONE or UNMATCHED'},
   ]}
   detail={[
-    {text: 'A payment reaches this point `PROCESSED`: the money has gone to the bank and every system has been told. Two confirmations are still owed. The bank says the money settled, and Accounts Receivable says the payment posted. A Pay with Bank Transfer or debit card payment owes only the posting.'},
+    {text: 'A payment reaches this point `PROCESSED`: the money has gone to the bank and every system has been told. Two confirmations are still owed. The bank says the money settled, and Accounts Receivable says the payment posted. For a Pay with Bank Transfer or debit card payment, the settlement is the one Billpay created in Execute.'},
     {text: 'Both arrive as events, sometimes 1,000 a second, and neither touches Billpay directly. One-Data\'s event handlers store each one in its inbox, a Postgres database of its own, and whichever arrives second marks the payment\'s row `READY`.'},
     {step: 1, text: 'A Schedule starts `ProcessPaidEventsWorkflow` every 30 seconds, and only one run is ever active. Each batch fetches up to 500 `READY` rows through a One-Data function.'},
     {step: 2, text: 'Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a guarded update, and tags each `PAID` timeline row with the batch\'s ID. A retried Settle finds the payments it already moved by that ID.'},
     {step: 3, text: 'The `PAID` events go to RTF.'},
     {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data\'s own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row is `DONE` only once its event has gone out.'},
     {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its parent has settled, and the parent stays `PROCESSED`.'},
-    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert.'},
+    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a Pay with Bank Transfer or debit card payment, which MR/M3 never settles: it asks GAR alone, and hands over Billpay\'s own settlement event again if the inbox lacks it (Proposed).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#10-paid-events', label: 'Sequence diagram'}}
 />

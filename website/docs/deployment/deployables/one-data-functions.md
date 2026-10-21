@@ -38,12 +38,12 @@ A start request is `READY` as soon as it is stored, and its dispatcher marks it 
 
 ### Rows for PAID
 
-A payment turns `PAID` once both the bank's settlement and AR's posting are in. Every payment gets both, even where `requiresArPosting` is N. A Pay with Bank Transfer or debit card payment is the exception: it has no clearing, so no settlement comes, and its row is `READY` on the GAR posting alone. How One-Data tells these payments apart when the posting lands is still to be decided. A split payment settles once, as a whole, while each leg posts on its own, so a leg takes its payment's settlement: the split payment's own row holds only the settlement, and each leg's row pairs its posting with it.
+A payment turns `PAID` once both the bank's settlement and AR's posting are in. Every payment gets both, even where `requiresArPosting` is N. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead: Execute hands it to the money movement handler, dated when the money moved, so its row pairs the same way and needs no rule of its own (Proposed). A split payment settles once, as a whole, while each leg posts on its own, so a leg takes its payment's settlement: the split payment's own row holds only the settlement, and each leg's row pairs its posting with it.
 
 | `sta_cd` | Meaning |
 | --- | --- |
 | `WAITING` | The payment or leg is still missing an event |
-| `READY` | Its posting and its settlement are in (the posting alone for a Pay with Bank Transfer or debit card payment), and it waits for Billpay |
+| `READY` | Its posting and its settlement are in, and it waits for Billpay |
 | `DONE` | Billpay has applied it; or, for a split payment's own row, a leg has taken its settlement |
 | `UNMATCHED` | Billpay found nothing ready for it: no payment or leg, or one not yet `PROCESSED`. It is tried again an hour later, for up to 48 hours, and after that `UpdateUnmatchedPayments.v1` raises an alert |
 

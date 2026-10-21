@@ -36,7 +36,7 @@ Realtime clearing shows how this works. Only a pay-today payment from a channel 
 
 Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a request with several instructions, or a Pay & Plan request, that would need it gets 422.
 
-A debit card's 3D Secure is not one of the five behaviors, because there is nothing to choose: every debit card needs it. The Router sets card authentication to Y for a debit card payment, and the stages pick their classes from it as from a behavior (Proposed). What a market does choose is whether it takes debit cards at all, through the instrument types in its rule settings, and which card provider runs 3D Secure and the authorization, in its operations settings. A debit card pays today only, with one instruction and no MR Points.
+A debit card's 3D Secure is not one of the five behaviors, because there is nothing to choose: every debit card needs it. The Router sets card authentication to Y for a debit card payment, and the stages pick their classes from it as from a behavior (Proposed). What a market does choose is whether it takes debit cards at all, through the instrument types in its rule settings, and which card provider runs 3D Secure and the authorization, in its operations settings. Any account type can pay by debit card: consumer, corporate and business travel. A debit card pays today only, with one instruction and no MR Points.
 
 ## What the customer is offered
 

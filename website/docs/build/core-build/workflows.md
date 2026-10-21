@@ -51,7 +51,7 @@ A child always runs on its parent's cluster. These journeys use them:
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
 
-A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation, a debit card's 3D Secure or a go-ahead starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm, the callback and the no as updates, and cancels the payment on its own timer if neither comes.
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a debit card's 3D Secure starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm, the callback and the no as updates, and cancels the payment on its own timer if none comes.
 
 ## Versioning
 
@@ -91,6 +91,7 @@ class CreateImmediatePaymentWorkflowImpl(
         val verified = stages.verify.run(paymentId)    // ACCEPTED or DECLINED, one guarded commit,
                                                        // with what Options and Instruments returned
         decided = verified.decision
+        inbox.deletePending(paymentId)                 // decided: One-Data drops the create and the account's entry
         // Early return: the caller's update has its answer here, and the rest runs with nobody waiting.
         // Announce both changes, in order.
         stages.capture.announce(paymentId)             // the PENDING event to RTF
@@ -115,7 +116,7 @@ class CreateImmediatePaymentWorkflowImpl(
 
 The workflow never names a market: `stageResolver.resolve(profile)` is the only place its stages come from. The request arrives as the start input, and Capture writes it with insert-if-absent; from then on, every stage takes the ID. Capture, Verify's calls and both commits run as local activities in the first workflow task, and once `decided` is set, the caller's update returns with it as soon as that workflow task completes. Both announcements go out after that, in order, so the reply never waits on RTF or Raven.
 
-A payment that needs bank confirmation, pays by debit card, or needs a go-ahead never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
+A payment that needs bank confirmation, or pays by debit card, never comes here: the Router starts `CreatePaymentIntentWorkflow` for it, the next example.
 
 A declined payment ends after Verify, and so does a corporate one. Verify's commit already wrote the corporate payment's `ALLOC_REQUEST` row, so there is no corporate branch to write: dispatchers take it from there. Every other payment runs Execute and Fulfil, and Fulfil sends its RTF event and Raven message before it commits, because `PROCESSED` means they have gone out.
 
@@ -136,11 +137,9 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
     override fun run(request: CreatePaymentRequest, profile: ResolvedProfile) {
         val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
-        stages.capture.run(request)                              // PENDING: the request, and any pending IDs
-        decided = if (profile.requiresBankConfirmation || profile.cardAuthentication)
-            stages.requestConfirmation.run(paymentId)             // PENDING with the bank's link or the card's
+        stages.capture.run(request)                              // PENDING: the request
+        decided = stages.requestConfirmation.run(paymentId)       // PENDING with the bank's link or the card's
                                                                   // challenge link (or none), or DECLINED
-        else PaymentDecision.PENDING                             // a go-ahead: One-Data adds the pending list
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
         stages.capture.announce(paymentId)                        // the reply goes out with this task
         if (!waiting) { /* announce, the delete, and end */ return }
@@ -156,7 +155,8 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 
         result = if (answer == Answer.YES) stages.verify.run(paymentId, authentication).decision  // then Execute, Fulfil
                  else stages.cancel.run(paymentId)                                  // the no, or the timer
-        // ... the announcements, Execute and Fulfil for ACCEPTED, then the delete
+        inbox.deletePending(paymentId)                           // decided: the account's entry goes
+        // ... the announcements, then Execute and Fulfil for ACCEPTED
         Workflow.await { Workflow.isEveryHandlerFinished() }   // no update left without its reply
     }
 
@@ -179,7 +179,8 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 - When the timer fires with no answer, the workflow runs Cancel itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer handled well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a confirm away.
-- The workflow calls One-Data's delete twice: after its reply, saying the payment still waits, and at its end. The first call runs alongside the wait, so a slow delete never keeps the workflow from taking an answer.
+- The workflow calls One-Data's delete twice: after its reply, saying the payment still waits, and again as soon as Verify or Cancel has decided, so the customer can pay again without waiting for Execute and Fulfil. The first call runs alongside the wait, so a slow delete never keeps the workflow from taking an answer.
+- For Pay with Bank Transfer and a debit card, Execute makes no clearing call. Its clearing method creates the payment's settlement event and hands it to One-Data's money movement handler instead, dated when the money moved (Proposed).
 
 ## Which cluster runs it
 
