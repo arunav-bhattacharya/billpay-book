@@ -386,7 +386,7 @@ One request, more than one instruction. To the customer, that is a bank account 
   ]}
   detail={[
     {step: 1, text: 'The composite payment is validated as a whole before any instruction runs.'},
-    {step: 2, text: 'Then each instruction runs as its own `CreateImmediatePaymentWorkflow`, a child on the same cluster, and goes through [Pay my bill today](#pay-my-bill-today) with its own states.'},
+    {step: 2, text: 'Then each instruction runs as its own `CreateImmediatePaymentWorkflow`, a child on the same cluster, and goes through [Pay my bill today](#pay-my-bill-today) with its own states. How a points instruction runs inside it, with Loyalty, is still to be defined.'},
   ]}
 />
 

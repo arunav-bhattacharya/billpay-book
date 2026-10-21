@@ -1,6 +1,6 @@
 ---
 title: Journeys
-description: 'A journey is one thing a customer or a system asks Billpay to do, followed from the request to the money settling. Each one runs as one Temporal workflow, picked by the Router.'
+description: 'A journey is one thing a customer or a system asks Billpay to do, followed from the request to the money settling. Temporal workflows run it, one or several in turn.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Journeys
 
-<Lead>A journey is one thing a customer or a system asks Billpay to do, followed from the request to the money settling. Each one runs as one Temporal workflow, picked by the Router.</Lead>
+<Lead>A journey is one thing a customer or a system asks Billpay to do, followed from the request to the money settling. Temporal workflows run it, one or several in turn.</Lead>
 
 Most journeys start with a customer on a payment page, who waits for an answer. The rest start with an event, a callback or a date, with nobody waiting. These pages go from the page a customer sees, to what each journey does, to every layer a single journey passes through.
 

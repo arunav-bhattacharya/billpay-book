@@ -1,6 +1,6 @@
 ---
 title: Make a Payment Journey
-description: 'A customer answers three questions on a payment page: how much, from where, and when. The Router turns the answers into one journey, and one read call keeps the page and the Router on the same rules.'
+description: 'A customer answers three questions on a payment page: how much, from where, and when. The Router turns the answers into one journey, and a proposed read call keeps the page and the Router on the same rules.'
 sidebar_label: Make a Payment Journey
 hide_table_of_contents: true
 ---
@@ -10,7 +10,7 @@ import PaymentChoices from '@site/src/components/PaymentChoices';
 
 # Make a Payment Journey
 
-<Lead>A customer answers three questions on a payment page: how much, from where, and when. The Router turns the answers into one journey, and each journey runs as one Temporal workflow. One read call, <code>ReadPaymentChoices.v1</code>, keeps the page and the Router on the same rules.</Lead>
+<Lead>A customer answers three questions on a payment page: how much, from where, and when. The Router turns the answers into one journey and starts the Temporal workflow that runs it. One read call, <code>ReadPaymentChoices.v1</code> (Proposed), keeps the page and the Router on the same rules.</Lead>
 
 A channel that decided on its own what to offer would drift from what Billpay accepts. It could offer a date further out than the market allows, or a way to pay that needs a bank step the market doesn't run, and the customer would find out only when the payment came back with a 422 or `DECLINED`. So before the page shows anything, the channel asks Billpay what this market takes. The model below is that page. Change an answer and watch which calls run and which journey the Router picks.
 
@@ -27,7 +27,7 @@ The channel calls Payment Options and Payment Instruments itself, to fill the pa
 
 ## The market profile decides what the page offers
 
-Everything the read call returns already lives in the market's profile: the instrument types and the largest payment in its rule settings, the bank step in `requiresBankConfirmation`, the cancellation window and the go-ahead in its operations settings, and Pay & Plan in the APIs it takes. Two Proposed settings join them: the **scheduling horizon**, how many days ahead a payment can be scheduled (30 by default), and **Pay with MR Points**, on or off. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps each part of the page to the setting behind it.
+Everything the read call returns already lives in the market's profile: the instrument types and the largest payment in its rule settings, the bank step in `requiresBankConfirmation`, the cancellation window in its operations settings, and Pay & Plan in the APIs it takes. Two Proposed settings join them: the **scheduling horizon**, how many days ahead a payment can be scheduled (30 by default), and **Pay with MR Points**, on or off. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps each part of the page to the setting behind it.
 
 ## How the Router picks the journey
 
@@ -42,7 +42,7 @@ The page sends one request to one door, `CreatePayment.v3`, whatever the custome
 | [Pay while another payment is pending](./all-journeys.md#pay-while-another-payment-is-pending) | Another payment is pending, in a market with the go-ahead on | `CreatePaymentIntentWorkflow` |
 | [Pay with MR Points](./all-journeys.md#pay-with-mr-points) | Today, MR Points only | The Pay with MR Points composite |
 
-The table follows the order customers meet these journeys. The Router checks them in a different order, and the first that matches wins: a wait comes first, because a payment that waits for the customer has to run in the one workflow that can wait for them. Then a later date, then several instructions, then MR Points alone, and pay today last.
+The table follows the order customers meet these journeys. The Router checks them in a different order, and the first that matches wins: a wait comes first, because a payment that waits for the customer has to run in the one workflow that can wait for them. Then a later date, then several instructions, then MR Points alone, and pay today last. The ordered list is Proposed, and so is MR Points' place in it.
 
 Pay & Plan is not on this list because it doesn't come through this door. A customer who sets up a plan sends `CreatePaymentInstallment.v1`, and the Router starts the Pay & Plan composite.
 
@@ -58,4 +58,4 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. It appears on this page only.
 - A go-ahead on a composite create. The Router checks for a wait first, but the workflow that waits runs one instruction, so a create with several instructions or with MR Points alone has no settled path when another payment is pending in a market with the go-ahead on.
-- A later date with Pay with Bank Transfer. Only payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.
+- A later date with Pay with Bank Transfer. Only consumer payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.

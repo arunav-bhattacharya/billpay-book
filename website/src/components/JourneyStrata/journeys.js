@@ -15,7 +15,7 @@
  */
 
 const CREATE = {c: 'CreatePayment.v3', s: 'the pending check, then the create is stored'};
-const DELETE_END = {c: 'DeletePendingPayment.v1', s: 'called at the end: the stored create goes', at: 'last'};
+const DELETE_END = {c: 'DeletePendingPayment.v1', s: 'called at the end: the stored create and its pending entry go', at: 'last'};
 
 const PAID_SEGMENT = {
   phase: ['Settled and posted', 'when both events are in'],
@@ -84,7 +84,7 @@ export const GROUPS = [
             road: 'execute',
             customer: [{t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'}],
             oracle: [
-              {row: 'SCHED_EXEC row', st: 'DISPATCHING', s: 'claimed, then started', at: 'Reverify'},
+              {row: 'SCHED_EXEC row', st: 'DISPATCHED', s: 'DISPATCHING when claimed, DISPATCHED once started', at: 'Reverify'},
               {row: 'SCHED_EXEC row', st: 'DONE', s: 'the last commit', at: 'Fulfil'},
             ],
             ruler: [
@@ -359,7 +359,7 @@ export const GROUPS = [
               {t: 'Pays a corporate bill today', st: 'PENDING', m: 'on', at: 'Capture'},
               {t: 'Sees ACCEPTED', s: 'or DECLINED', st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
-            oneData: [{...CREATE, at: 'Capture'}],
+            oneData: [{...CREATE, at: 'Capture'}, DELETE_END],
             oracle: [{row: 'ALLOC_REQUEST row', st: 'SCHEDULED', s: "in Verify's commit, due at once", at: 'Verify'}],
           },
           {
@@ -379,11 +379,12 @@ export const GROUPS = [
             road: 'corpExecute',
             stages: ['Execute'],
             customer: [],
-            oracle: [{row: 'ALLOC_LEG rows', s: 'the legs are released', at: 'Execute'}],
+            oracle: [{row: 'legs', s: 'released in its commit', at: 'Execute'}],
           },
           {
             phase: ['Each leg', 'one workflow per leg'],
             road: 'leg',
+            oracle: [{row: 'ALLOC_LEG row', st: 'SCHEDULED', s: 'written by the leg dispatcher at release, one per leg', at: 'Execute'}],
             customer: [{t: 'Told PROCESSED', s: 'once every leg is done', st: 'PROCESSED', m: 'on', at: 'Fulfil'}],
           },
           {...PAID_SEGMENT, customer: [{t: 'Legs turn PAID', s: 'the parent stays PROCESSED', st: 'PAID', m: 'quiet', at: 'Settle'}]},
@@ -404,7 +405,7 @@ export const GROUPS = [
               {t: 'Pays for a later date', st: 'PENDING', m: 'on', at: 'Capture'},
               {t: 'Sees SCHEDULED', s: 'with a Raven message', st: 'SCHEDULED', m: 'on', at: 'Verify'},
             ],
-            oneData: [{...CREATE, at: 'Capture'}],
+            oneData: [{...CREATE, at: 'Capture'}, DELETE_END],
             oracle: [{row: 'ALLOC_REQUEST row', st: 'SCHEDULED', s: 'due at the fetch time', at: 'Verify'}],
             ruler: [
               {t: 'Day 0 · 0 s', at: 'Capture'},
@@ -414,7 +415,7 @@ export const GROUPS = [
           {
             phase: ['Until the fetch time', 'nothing runs'],
             wait: 'Nothing runs in Temporal.',
-            customer: [{t: 'Can change or cancel', s: 'until the fetch', m: 'choice'}],
+            customer: [{t: 'Can change or cancel', s: 'until the window closes or the fetch, whichever is first', m: 'choice'}],
             ruler: [{t: 'days'}],
           },
           {
@@ -436,12 +437,13 @@ export const GROUPS = [
             road: 'corpExecute',
             cond: {},
             customer: [],
-            oracle: [{row: 'ALLOC_LEG rows', s: 'the legs are released', at: 'Execute'}],
+            oracle: [{row: 'legs', s: 'released in its commit', at: 'Execute'}],
             ruler: [{t: 'Day N · execution time', at: 'Reverify'}],
           },
           {
             phase: ['Each leg', 'one workflow per leg'],
             road: 'leg',
+            oracle: [{row: 'ALLOC_LEG row', st: 'SCHEDULED', s: 'written by the leg dispatcher at release, one per leg', at: 'Execute'}],
             customer: [{t: 'Told PROCESSED', s: 'once every leg is done', st: 'PROCESSED', m: 'on', at: 'Fulfil'}],
           },
           {...PAID_SEGMENT, customer: [{t: 'Legs turn PAID', s: 'the parent stays PROCESSED', st: 'PAID', m: 'quiet', at: 'Settle'}]},
@@ -557,7 +559,7 @@ export const GROUPS = [
             road: 'execute',
             customer: [{t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'}],
             oracle: [
-              {row: 'SCHED_EXEC row', st: 'DISPATCHING', s: 'claimed, then started', at: 'Reverify'},
+              {row: 'SCHED_EXEC row', st: 'DISPATCHED', s: 'DISPATCHING when claimed, DISPATCHED once started', at: 'Reverify'},
               {row: 'SCHED_EXEC row', st: 'DONE', s: 'the last commit', at: 'Fulfil'},
             ],
             ruler: [{t: 'Day N · execution time', at: 'Reverify'}],

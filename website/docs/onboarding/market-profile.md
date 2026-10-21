@@ -49,9 +49,8 @@ The profile also decides what a channel's payment page shows. Before the custome
 | The largest payment | The verification rule settings |
 | Pay & Plan | Whether the profile takes `CreatePaymentInstallment.v1` |
 | Pay with MR Points | The Pay with MR Points setting (Proposed) |
-| Whether another pending payment needs a go-ahead | The go-ahead setting |
 
-The page and the Router read the same release, so a customer isn't offered what the Router would turn away. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
+The read only guides the page. The Router and Verify check the payment against the release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it refuses. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
 
 ## What the build can run
 

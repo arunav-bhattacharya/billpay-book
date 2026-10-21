@@ -28,7 +28,7 @@ Left to right is time. The journey is cut into stretches: one for each workflow 
 - **Systems.** What each stage calls, lined up under the stage. Two calls run under every stage, so they are bars across the whole band: the commit to Oracle through `PaymentStore`, and the lifecycle event to RTF.
 - **Oracle.** The state the payment row holds after each stage, and the Work Tracker rows that carry dated work from one run to the next.
 
-Whatever happens at a stage lines up under it, all the way down. On Pay on a future date, the column under Verify holds the customer seeing `SCHEDULED`, the calls to Payment Instruments, Payment Options and Plans, and the `SCHED_EXEC` row written in the same commit.
+Whatever happens at a stage lines up under it, all the way down. On Pay on a future date, the column under Verify holds the customer seeing `SCHEDULED`, the calls to Payment Instruments and Payment Options (and Plans, where the market requires a mandate), and the `SCHED_EXEC` row written in the same commit.
 
 ## By journey, or by workflow
 
@@ -40,7 +40,7 @@ A journey can take several workflows, and a workflow can serve several journeys.
 
 A few things are easier to see here than anywhere else.
 
-- The customer waits only while a request is answered: at the create, and again at a confirm. The solid line ends at Verify, or at the reply that carries the link, and everything after it runs with nobody waiting.
+- The customer waits only while a request is answered: at the create, and again at a confirm. The solid line ends at Verify, or at the reply that carries the link or the pending list, and everything after it runs with nobody waiting.
 - Work that waits for a date waits in Oracle, not in Temporal. Between runs, the Workflows band is empty and the Work Tracker row is what carries the payment forward.
 - A corporate payment takes six kinds of run to get from the request to `PAID`, and asks for its allocations before any money moves. Its own execution clears once, for the whole payment; its legs do the rest.
 - One journey skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.

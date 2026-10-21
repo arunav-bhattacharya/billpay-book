@@ -151,7 +151,7 @@ function decide(a) {
     return {
       kind: "open",
       met,
-      text: "Only payments made today take bank confirmation. What a later date with Pay with Bank Transfer does isn't in the design yet.",
+      text: "Only consumer payments made today take bank confirmation. What a later date with Pay with Bank Transfer does isn't in the design yet.",
     };
   }
   if (a.pending && a.goAhead && !bankStep) {
@@ -180,7 +180,10 @@ function decide(a) {
       kind: "pick",
       id: "bank",
       met,
-      text: `The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the provider's link and waits for the confirm.${ignored}`,
+      text:
+        a.pending && a.goAhead
+          ? "The Router starts CreatePaymentIntentWorkflow. It waits once: the reply carries the provider's link and the pending payments, and the bank confirm is the go-ahead."
+          : `The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the provider's link and waits for the confirm.${ignored}`,
     };
   }
   if (later) {
@@ -403,7 +406,7 @@ function ThePage({ a, set }) {
           <p className={styles.hint}>
             {a.points
               ? "MR Points pay today only."
-              : "Up to 30 days ahead by default. Each market sets its own horizon."}
+              : "Up to 30 days ahead by default. A per-market horizon is Proposed."}
           </p>
         </Field>
 
@@ -605,7 +608,7 @@ function TheRouter({ a, set, result }) {
 
       <p className={styles.legend}>
         <span className={styles.wfSwatch} aria-hidden="true" />
-        Each journey runs as one Temporal workflow, started by the Router.
+        The Router starts each journey as one Temporal workflow.
       </p>
 
       <ol className={styles.journeys}>
@@ -670,8 +673,8 @@ function TheRouter({ a, set, result }) {
         <li>
           <span className={styles.hollow} aria-hidden="true" />
           <span>
-            <strong>A corporate account</strong> takes the same journeys. Its
-            allocations come first.
+            <strong>A corporate account</strong> asks for its allocations before
+            any money moves. Bank confirmation is for consumer payments only.
           </span>
         </li>
         <li>
@@ -693,7 +696,8 @@ function TheRouter({ a, set, result }) {
       <p className={styles.footnote}>
         The list is in the order customers meet these journeys. The Router
         checks them in its own order: a wait first, then a later date, then
-        several instructions, then MR Points alone, then pay today.
+        several instructions, then MR Points alone, then pay today. The
+        ordered list is Proposed.
       </p>
     </section>
   );
