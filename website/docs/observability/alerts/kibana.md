@@ -47,7 +47,7 @@ Returns sit at the lowest priority, so during an execution window they can wait 
 
 | Alert | Fires when | People do |
 | --- | --- | --- |
-| Stale pending entries removed | A run of One-Data's hourly sweep removed entries more than 2 hours old whose payments billpay-core had decided, or never got. One alert per run, with the count and the payment IDs | Find why each delete never landed: the delete API, a create billpay-core never got, or the two Redis sites |
+| Stale pending entries | A run of One-Data's hourly sweep found entries more than 2 hours old. One alert per run, with two lists, each with its count and payment IDs: the entries it removed, because billpay-core had decided the payment or never got it, and the payments still `PENDING` whose entries it kept | Removed: find why each delete never landed, whether the delete API, a create billpay-core never got, or the two Redis sites. Kept: find why the payment is still undecided, such as a workflow that stopped before deciding or Verify's calls still failing. Its account can't pay until it is decided |
 | Creates and confirms held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-core and the Online cluster. A jump here is usually the first sign of trouble there |
 | Delete calls failing | billpay-core's delete calls to One-Data keep failing | Fix One-Data's delete API. Until then, the accounts with stale entries can't make a payment until the sweep clears them |
 | Redis memory or write errors | Redis memory is near its limit, or a write fails | Fix it before One-Data has to make the pending check through `ReadPayments.v1`, which can miss a create billpay-core hasn't captured yet |

@@ -61,7 +61,7 @@ An entry can be left behind when no delete ever lands: One-Data's delete API kee
 
 - The payment is no longer `PENDING`, whatever state it has reached, or billpay-core has no record of it: the sweep removes the entry, and the stored create if it is still there, as the missed delete would have. A create One-Data still holds for RTF is skipped, since it may still land.
 - The payment is still `PENDING` in billpay-core: the entry stays, so the account can't take a second payment while this one is undecided.
-- A run that removed any entries raises one alert, with the count and the payment IDs.
+- A run that removed or kept any entries raises one alert with two lists, each with its count and payment IDs: the entries it removed, and the payments still `PENDING` whose entries it kept.
 
 The sweep's name, `DeleteStalePendingPayments.v1`, is Proposed.
 

@@ -156,4 +156,4 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 `UpdateUnmatchedPayments.v1` has no SLA. One-Data runs it on a cron schedule and nobody calls it, so the measure is the alert it raises for a row `UNMATCHED` for 48 hours.
 
-The hourly sweep of pending entries has none either, for the same reason. Its measure is its alert, raised when a run removes entries whose delete never landed.
+The hourly sweep of pending entries has none either, for the same reason. Its measure is its alert, raised when a run removes entries whose delete never landed or finds payments still `PENDING` after 2 hours.

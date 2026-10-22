@@ -55,7 +55,7 @@ A payment stays on the account's pending list only until it is decided. Once it 
 - The check and the add are one atomic call to Redis (Proposed), so two creates that arrive together can't both get through.
 - It covers payments from channels: creates through `CreatePayment.v3`, and Pay & Plan's through `CreatePaymentInstallment.v1`. Payments Accounts Receivable raises, push payments from third parties and refunds never go through it.
 - When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-core alone. A create billpay-core hasn't captured yet can slip past that read, and the design accepts the gap.
-- If a delete never lands, the entry would block the account for good. So every hour One-Data sweeps the entries more than 2 hours old and asks billpay-core about each one. It removes those whose payment is decided or that billpay-core never got, and keeps those still `PENDING`.
+- If a delete never lands, the entry would block the account for good. So every hour One-Data sweeps the entries more than 2 hours old and asks billpay-core about each one. It removes those whose payment is decided or that billpay-core never got, keeps those still `PENDING`, and raises one alert listing both.
 
 ## Debit card
 
