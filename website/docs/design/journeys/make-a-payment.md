@@ -1,6 +1,6 @@
 ---
 title: Make a Payment Journey
-description: 'A customer answers three questions on a payment page: how much, from where, and when. Two reads fill the page, and the Router turns the answers into one journey and starts the Temporal workflow that runs it.'
+description: 'A customer answers three questions on a payment page: how much, when, and from where. Two reads fill the page, and the Router turns the answers into one journey and starts the Temporal workflow that runs it.'
 sidebar_label: Make a Payment Journey
 hide_table_of_contents: true
 ---
@@ -10,7 +10,7 @@ import PaymentChoices from '@site/src/components/PaymentChoices';
 
 # Make a Payment Journey
 
-<Lead>A customer answers three questions on a payment page: how much, from where, and when. Two reads fill the page, and the Router turns the answers into one journey and starts the Temporal workflow that runs it.</Lead>
+<Lead>A customer answers three questions on a payment page: how much, when, and from where. Two reads fill the page, and the Router turns the answers into one journey and starts the Temporal workflow that runs it.</Lead>
 
 A page that listed every instrument on file would let the customer pick one this payment can't use, and they would only find out when the payment came back `DECLINED`. The usual case is an instrument enrolled through Autopay that is still pending verification. It can carry its Autopay payments, but not a payment the customer makes now. So the page gets the customer's options from Payment Options, and their instruments through Billpay, which keeps only what the market's rules allow. The model below is that page. Change an answer and watch which calls run and which journey the Router picks.
 
@@ -20,8 +20,8 @@ A page that listed every instrument on file would let the customer pick one this
 
 1. **`ReadPaymentOptions`**, from Payment Options. It returns what the customer owes and the options to pay it: Statement Balance, Total Balance, Minimum Due and Other Amount. Each option carries a token ID, which Billpay verifies during execution. It also says whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take. If nothing is owed, the payment journey never starts and the channel calls nothing else.
 2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from. It is a One-Data function in front of a billpay-core endpoint, and billpay-core makes the one read that source needs:
-   - a bank account or a debit card: Payment Instruments' `ReadInstruments`, for the customer's bank accounts or their enrolled debit cards. The page offers the two separately;
-   - Pay with Bank Transfer: `ReadBanksForBankTransfer.v1`, for the banks the customer can start a transfer from;
+   - Enrolled Instruments: Payment Instruments' `ReadInstruments`, for the instruments the customer has enrolled;
+   - Pay with Bank Transfer or a debit card: `ReadBanksForRealtimePayments.v1`, for the list of banks the customer can pay from in real time;
    - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with.
 
    It replaces the channel's own call to Payment Instruments.
@@ -33,7 +33,7 @@ The reads only guide the page. Verify calls Payment Options and Payment Instrume
 
 ## What decides what the page offers
 
-The amounts, the payment options and the dates come from Payment Options, for this customer. The instruments come through Billpay, filtered by the market's rules, so an Autopay instrument still pending verification never shows up for a payment made now. Who will own the bank and wallet reads isn't decided yet; it will probably be the Instruments domain.
+The amounts, the payment options and the dates come from Payment Options, for this customer. The instruments come through Billpay, filtered by the market's rules, so an Autopay instrument still pending verification never shows up for a payment made now. Pay with Bank Transfer, a debit card and a US payment confirmed through Plaid pay today only, so once the customer picks a later date the page doesn't offer them, and a future-dated create with one gets 422 before any workflow starts. Who will own the bank and wallet reads isn't decided yet; it will probably be the Instruments domain.
 
 Where the page gets the rest is still open: the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show. `ReadPaymentOptions` is one option. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps the profile's settings that the Router and Verify check.
 
@@ -91,9 +91,8 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 
 - Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions` is one option.
 - The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-core endpoint behind it.
-- Who owns `ReadBanksForBankTransfer.v1` and `ReadEligibleWallets.v1`, and their contracts.
+- Who owns `ReadBanksForRealtimePayments.v1` and `ReadEligibleWallets.v1`, and their contracts.
 - The payment option token's contract, and whether Reverify checks it again for a scheduled payment.
 - Whether the market's Proposed scheduling horizon setting stays, now that `ReadPaymentOptions` gives each customer's date range.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. The page can read eligible wallets, but no journey takes one yet, and wallets appear on this page only.
-- A later date with Pay with Bank Transfer. Only consumer payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.

@@ -34,7 +34,7 @@ BOTH means a behavior applies to some journeys and not others. Onboarding stores
 
 Realtime clearing shows how this works. Only a pay-today payment from a channel gets Y. Every future-dated payment clears in batch, whether it came from a channel or from Accounts Receivable.
 
-Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a request with several instructions, or a Pay & Plan request, that would need it gets 422.
+Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a future-dated request, a request with several instructions, or a Pay & Plan request, that would need it gets 422. So Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
 
 A debit card's 3D Secure is not one of the five behaviors, because there is nothing to choose: every debit card needs it. The Router sets card authentication to Y for a debit card payment, and the stages pick their classes from it as from a behavior (Proposed). What a market does choose is whether it takes debit cards at all, through the instrument types in its rule settings, and which card provider runs 3D Secure and the authorization, in its operations settings. Any account type can pay by debit card: consumer, corporate and business travel. A debit card pays today only, with one instruction and no MR Points.
 

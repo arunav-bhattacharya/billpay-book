@@ -75,15 +75,24 @@ const JOURNEYS = [
 const JOURNEY = Object.fromEntries(JOURNEYS.map((j) => [j.id, j]));
 
 const METHODS = [
-  { id: "bank", label: "Bank account" },
-  { id: "debit", label: "Debit card", note: "checked with 3D Secure" },
+  { id: "bank", label: "Enrolled Instruments" },
+  {
+    id: "debit",
+    label: "Debit card",
+    note: "checked with 3D Secure",
+    todayOnly: true,
+  },
   { id: "wallet", label: "Wallet" },
   {
     id: "transfer",
     label: "Pay with Bank Transfer",
     note: "you confirm it at your bank",
+    todayOnly: true,
   },
 ];
+const TODAY_ONLY = new Set(
+  METHODS.filter((m) => m.todayOnly).map((m) => m.id),
+);
 
 const OPTIONS_RETURNS = [
   "what the customer owes. Nothing owed, and the journey never starts",
@@ -96,17 +105,17 @@ const OPTIONS_RETURNS = [
 const READS = {
   bank: {
     read: "ReadInstruments",
-    what: "the customer's bank accounts",
-    pick: "Which account",
+    what: "the instruments the customer has enrolled",
+    pick: "Which instrument",
   },
   debit: {
-    read: "ReadInstruments",
-    what: "the customer's enrolled debit cards",
-    pick: "Which card",
+    read: "ReadBanksForRealtimePayments.v1",
+    what: "the banks the customer can pay from by debit card",
+    pick: "Which bank",
   },
   transfer: {
-    read: "ReadBanksForBankTransfer.v1",
-    what: "the banks the customer can start a transfer from",
+    read: "ReadBanksForRealtimePayments.v1",
+    what: "the banks the customer can pay from in real time",
     pick: "Which bank",
   },
   wallet: {
@@ -199,9 +208,9 @@ function decide(a) {
   }
   if (bankStep && later) {
     return {
-      kind: "open",
+      kind: "refused",
       met,
-      text: "Only consumer payments made today take bank confirmation. What a later date with Pay with Bank Transfer does isn't in the design yet.",
+      text: "Pay with Bank Transfer pays today only, so a future-dated create gets 422 before any workflow starts.",
     };
   }
   if (bankStep) {
@@ -274,7 +283,7 @@ function ReadTag({ name }) {
 }
 
 const SOURCE_CHOICES = {
-  debit: [["enrolled", "Enrolled debit card"]],
+  debit: [["listed", "A bank from the list"]],
   transfer: [["listed", "A bank from the list"]],
   wallet: [["eligible", "An eligible wallet"]],
 };
@@ -317,6 +326,10 @@ function ThePage({ a, set }) {
   const uid = useId();
   const pointsOnly = a.points && a.pointsMode === "only";
   const method = METHODS.find((m) => m.id === a.method);
+  const later = a.date === "later";
+  /* A later date is not offered once the customer has picked something
+     that pays today only, and the reverse: no choice is undone for them. */
+  const todayOnly = a.points || (!pointsOnly && TODAY_ONLY.has(a.method));
   return (
     <section
       className={clsx(styles.col, styles.colPage)}
@@ -361,6 +374,28 @@ function ThePage({ a, set }) {
       <div className={clsx(styles.rest, !a.owed && styles.off)} inert={!a.owed}>
         <Field
           n={2}
+          term="When"
+          call={<CallTag n={1} name="ReadPaymentOptions" />}
+        >
+          <Segmented
+            label="When"
+            value={a.date}
+            onChange={(v) => set({ date: v })}
+            disabled={(id) => id === "later" && todayOnly}
+            options={[
+              { id: "today", label: "Today" },
+              { id: "later", label: "A later date" },
+            ]}
+          />
+          <p className={styles.hint}>
+            {todayOnly
+              ? `${a.points ? "MR Points pay" : `${method.label} pays`} today only.`
+              : "Today, or a date inside the range ReadPaymentOptions gives this customer."}
+          </p>
+        </Field>
+
+        <Field
+          n={3}
           term="From where"
           call={<CallTag n={2} name="ReadBillpayInstruments.v1" />}
         >
@@ -373,18 +408,29 @@ function ThePage({ a, set }) {
               onChange={(e) =>
                 set({
                   method: e.target.value,
-                  ...(e.target.value === "debit" ? { points: false, date: "today" } : {}),
+                  ...(e.target.value === "debit" ? { points: false } : {}),
                 })
               }
             >
               {METHODS.map((m) => (
-                <option key={m.id} value={m.id}>
+                <option
+                  key={m.id}
+                  value={m.id}
+                  disabled={later && m.todayOnly}
+                >
                   {m.label}
+                  {later && m.todayOnly ? " (today only)" : ""}
                 </option>
               ))}
             </select>
           </div>
-          {method.note && !pointsOnly && (
+          {later && !pointsOnly && (
+            <p className={styles.hint}>
+              Pay with Bank Transfer and a debit card pay today only, so a
+              later date doesn&apos;t offer them.
+            </p>
+          )}
+          {method.note && !pointsOnly && !later && (
             <p className={styles.hint}>{method.note}</p>
           )}
           {!pointsOnly && (
@@ -397,7 +443,7 @@ function ThePage({ a, set }) {
                 {a.method === "bank" ? (
                   <select
                     className={styles.select}
-                    aria-label="Which account"
+                    aria-label="Which instrument"
                     value={a.account}
                     onChange={(e) => set({ account: e.target.value })}
                   >
@@ -425,17 +471,16 @@ function ThePage({ a, set }) {
             <input
               type="checkbox"
               checked={a.points}
-              disabled={a.method === "debit"}
-              onChange={(e) =>
-                set({
-                  points: e.target.checked,
-                  date: e.target.checked ? "today" : a.date,
-                })
-              }
+              disabled={a.method === "debit" || later}
+              onChange={(e) => set({ points: e.target.checked })}
             />
             <span>Pay with MR Points</span>
             <span className={styles.checkNote}>
-              {a.method === "debit" ? "not with a debit card" : "where the market offers them"}
+              {a.method === "debit"
+                ? "not with a debit card"
+                : later
+                  ? "today only"
+                  : "where the market offers them"}
             </span>
           </label>
           {a.points && (
@@ -444,35 +489,11 @@ function ThePage({ a, set }) {
               value={a.pointsMode}
               onChange={(v) => set({ pointsMode: v })}
               options={[
-                { id: "with", label: "With the account above" },
+                { id: "with", label: "With the instrument above" },
                 { id: "only", label: "Points only" },
               ]}
             />
           )}
-        </Field>
-
-        <Field
-          n={3}
-          term="When"
-          call={<CallTag n={1} name="ReadPaymentOptions" />}
-        >
-          <Segmented
-            label="When"
-            value={a.date}
-            onChange={(v) => set({ date: v })}
-            disabled={(id) => id === "later" && (a.points || a.method === "debit")}
-            options={[
-              { id: "today", label: "Today" },
-              { id: "later", label: "A later date" },
-            ]}
-          />
-          <p className={styles.hint}>
-            {a.method === "debit"
-              ? "A debit card pays today only."
-              : a.points
-                ? "MR Points pay today only."
-                : "Today, or a date inside the range ReadPaymentOptions gives this customer."}
-          </p>
         </Field>
 
         <div className={styles.pay}>
@@ -616,8 +637,8 @@ function TheCalls({ a }) {
               <li key={id}>
                 <span className={styles.dotSquare} aria-hidden="true" />
                 <span>
-                  {id === "bank"
-                    ? "Bank account or debit card"
+                  {id === "transfer"
+                    ? "Pay with Bank Transfer or debit card"
                     : METHODS.find((m) => m.id === id).label}
                   <span className={styles.source}>{r.read}</span>
                 </span>
