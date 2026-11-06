@@ -1,6 +1,6 @@
 ---
 title: Make a Payment Journey
-description: 'A customer answers three questions on a payment page: how much, from where, and when. The Router turns the answers into one journey, and a proposed read call keeps the page and the Router on the same rules.'
+description: 'A customer answers three questions on a payment page: how much, from where, and when. Two reads fill the page, and the Router turns the answers into one journey and starts the Temporal workflow that runs it.'
 sidebar_label: Make a Payment Journey
 hide_table_of_contents: true
 ---
@@ -10,26 +10,32 @@ import PaymentChoices from '@site/src/components/PaymentChoices';
 
 # Make a Payment Journey
 
-<Lead>A customer answers three questions on a payment page: how much, from where, and when. The Router turns the answers into one journey and starts the Temporal workflow that runs it. One read call, <code>ReadPaymentChoices.v1</code> (Proposed), keeps the page and the Router on the same rules.</Lead>
+<Lead>A customer answers three questions on a payment page: how much, from where, and when. Two reads fill the page, and the Router turns the answers into one journey and starts the Temporal workflow that runs it.</Lead>
 
-A channel that decided on its own what to offer would drift from what Billpay accepts. It could offer a date further out than the market allows, or a way to pay that needs a bank step the market doesn't run, and the customer would find out only when the payment came back with a 422 or `DECLINED`. So before the page shows anything, the channel asks Billpay what this market takes. The model below is that page. Change an answer and watch which calls run and which journey the Router picks.
+A page that listed every instrument on file would let the customer pick one this payment can't use, and they would only find out when the payment came back `DECLINED`. The usual case is an instrument enrolled through Autopay that is still pending verification. It can carry its Autopay payments, but not a payment the customer makes now. So the page gets the customer's options from Payment Options, and their instruments through Billpay, which keeps only what the market's rules allow. The model below is that page. Change an answer and watch which calls run and which journey the Router picks.
 
 <PaymentChoices />
 
-## Four calls, in this order
+## Three calls, in this order
 
-1. **Payment Options API**, for what the customer owes. If nothing is owed, the payment journey never starts, and the channel calls nothing else.
-2. **`ReadPaymentChoices.v1`** (Proposed), for Billpay's own rules: the ways to pay the market takes, which of them need a bank step, and that a debit card needs 3D Secure, the dates it offers, the cancellation window, the limits, whether it offers Pay & Plan and MR Points, and any payment already pending on the account, so the page can tell the customer before they try.
-3. **Payment Instruments API**, for the customer's bank accounts, or for their debit cards. The page offers the two separately, and the channel calls it only when the customer picks one of them.
-4. **`CreatePayment.v3`**, when the customer reviews and pays. This is the only call that starts anything.
+1. **`ReadPaymentOptions`**, from Payment Options. It returns what the customer owes and the options to pay it: Statement Balance, Total Balance, Minimum Due and Other Amount. Each option carries a token ID, which Billpay verifies during execution. It also says whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take. If nothing is owed, the payment journey never starts and the channel calls nothing else.
+2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from. It is a One-Data function in front of a billpay-core endpoint, and billpay-core makes the one read that source needs:
+   - a bank account or a debit card: Payment Instruments' `ReadInstruments`, for the customer's bank accounts or their enrolled debit cards. The page offers the two separately;
+   - Pay with Bank Transfer: `ReadBanksForBankTransfer.v1`, for the banks the customer can start a transfer from;
+   - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with.
+
+   It replaces the channel's own call to Payment Instruments.
+3. **`CreatePayment.v3`**, when the customer reviews and pays. It carries the chosen option's token ID (Proposed), and it is the only call that starts anything.
 
 A debit card adds one more call, in the other direction. Billpay gives the market's card provider a callback URL when it starts 3D Secure, and the provider calls billpay-core back directly once the card is authenticated, not through One-Data and not from the channel.
 
-The channel calls Payment Options and Payment Instruments itself, to fill the page. Verify calls them again once the payment is created, and that second call is the one that decides. The same goes for the rules: `ReadPaymentChoices.v1` only guides the page, and the Router and Verify check the payment against the release that is active when it arrives. A release that goes live while the customer is on the page can't let through a payment it would refuse.
+The reads only guide the page. Verify calls Payment Options and Payment Instruments again once the payment is created, and those calls decide: Verify's Options check verifies the option's token (Proposed). The Router and Verify also check the payment against the market's release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it would refuse.
 
-## The market profile decides what the page offers
+## What decides what the page offers
 
-Everything the read call returns already lives in the market's profile: the instrument types and the largest payment in its rule settings, the bank step in `requiresBankConfirmation`, the cancellation window in its operations settings, and Pay & Plan in the APIs it takes. Two Proposed settings join them: the **scheduling horizon**, how many days ahead a payment can be scheduled (30 by default), and **Pay with MR Points**, on or off. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps each part of the page to the setting behind it.
+The amounts, the payment options and the dates come from Payment Options, for this customer. The instruments come through Billpay, filtered by the market's rules, so an Autopay instrument still pending verification never shows up for a payment made now. Who will own the bank and wallet reads isn't decided yet; it will probably be the Instruments domain.
+
+Where the page gets the rest is still open: the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show. `ReadPaymentOptions` is one option. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps the profile's settings that the Router and Verify check.
 
 ## How the Router picks the journey
 
@@ -50,7 +56,7 @@ The table follows the order customers meet these journeys. The Router checks the
 
 A customer who isn't sure a payment went through may pay again, and pay twice. So One-Data checks every create before billpay-core sees it. It keeps each card account's pending payments in Redis, and if the account already has one in `PENDING`, it declines the new create there and then: the channel gets 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed). billpay-core is never called, so no journey starts and Billpay holds no record of the attempt.
 
-A payment stays on the account's pending list only until it is decided. Once it is `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED`, billpay-core calls One-Data's delete API, `DeletePendingPayment.v1`, and the customer can pay again. So a scheduled payment never blocks the next one, and a payment that waits for bank confirmation or 3D Secure blocks it only while it waits, 10 or 2 minutes at most.
+A payment stays on the account's pending list only until it is decided. Once it is `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED`, billpay-core calls One-Data's delete API, `DeletePendingPayment.v1`, and the customer can pay again. So a scheduled payment never blocks the next one, and a payment that waits for bank confirmation or 3D Secure blocks it only while it waits: usually the market's confirmation window, up to 10 minutes, or the 2 minutes of 3D Secure.
 
 - The check and the add are one atomic call to Redis (Proposed), so two creates that arrive together can't both get through.
 - It covers payments from channels: creates through `CreatePayment.v3`, and Pay & Plan's through `CreatePaymentInstallment.v1`. Payments Accounts Receivable raises, push payments from third parties and refunds never go through it.
@@ -83,7 +89,11 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 
 ## Still to be defined
 
-- The contract of `ReadPaymentChoices.v1`, and the billpay-core read behind it.
+- Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions` is one option.
+- The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-core endpoint behind it.
+- Who owns `ReadBanksForBankTransfer.v1` and `ReadEligibleWallets.v1`, and their contracts.
+- The payment option token's contract, and whether Reverify checks it again for a scheduled payment.
+- Whether the market's Proposed scheduling horizon setting stays, now that `ReadPaymentOptions` gives each customer's date range.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
-- Wallet: which instrument it is, and whether it needs a bank step. It appears on this page only.
+- Wallet: which instrument it is, and whether it needs a bank step. The page can read eligible wallets, but no journey takes one yet, and wallets appear on this page only.
 - A later date with Pay with Bank Transfer. Only consumer payments made today take bank confirmation, and what happens to a scheduled one isn't written down yet.

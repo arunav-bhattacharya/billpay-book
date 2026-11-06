@@ -62,23 +62,27 @@ One-Data functions are the versioned contracts that channels and partner systems
 7. `CreateInboundPayment.v1`: take a payment pushed by a third party. One-Data stores it in its inbox and replies 202; the inbound dispatcher starts its workflow.
 8. `CreateConfirmPendingPayment.v1`: confirm a payment that waited for the customer. Channels call it with the same payment ID once the customer has confirmed their bank details on the provider's site, and it starts processing the payment.
 9. `CreatePaymentAllocations.v1`: the allocations callback for corporate payments. Asynchronous: 202 once the batch is stored and its workflow has started.
-10. `ReadPaymentChoices.v1` (Proposed, 2026-10-20): what a channel may offer a customer who is about to pay, read from Billpay's own rules for the market. It starts no workflow. See [Making a payment: the channel's calls](#making-a-payment-the-channels-calls).
+10. `ReadBillpayInstruments.v1` (agreed 2026-11-05): the instruments a customer can pay from, for the source they picked: bank accounts, enrolled debit cards, the banks for Pay with Bank Transfer, or eligible wallets. It fronts a billpay-core endpoint, which calls the instruments systems and filters what they return by the market's rules. It starts no workflow. See [Making a payment: the channel's calls](#making-a-payment-the-channels-calls).
 
 ### Making a payment: the channel's calls
 
-A channel's make-a-payment page calls up to four APIs, in this order (agreed 2026-10-20). Payment Options and Payment Instruments are called by the channel directly, separately from the calls Verify makes to them later.
+A channel's make-a-payment page calls three APIs, in this order (agreed 2026-11-05; it replaces the four calls agreed 2026-10-20):
 
-1. **Payment Options API**, for the amounts the customer owes. If nothing is owed, the payment journey never starts and nothing else is called.
-2. **`ReadPaymentChoices.v1`** (Proposed), for what the page may offer. It returns Billpay's own rules for the market and account type, from its active release:
-   - the ways to pay the market takes, from the instrument types in its rule settings, which of them need the customer to confirm at their bank, from `requiresBankConfirmation` and its BOTH rule, and that a debit card always needs 3D Secure;
-   - the dates it offers: today, or up to the market's scheduling horizon ahead ([Operations settings](#operations-settings)), and the cancellation window;
-   - its limits, such as the largest payment;
-   - what else it offers: several instructions, Pay & Plan where the profile takes `CreatePaymentInstallment.v1`, and Pay with MR Points where the market turns it on;
-   - the payments already pending on the account, from One-Data's Redis, so the page can tell the customer before they try (agreed 2026-10-21).
-3. **Payment Instruments API**, for the customer's bank accounts, or for their debit cards. Only when the customer picks a bank account or a debit card as the way to pay; the page offers the two separately (agreed 2026-10-20).
-4. **`CreatePayment.v3`**, when the customer reviews and pays. The Router picks the journey ([Routing and Start Modes](#routing-and-start-modes)).
+1. **Payment Options' `ReadPaymentOptions`**, called by the channel directly, separately from the calls Verify makes to Payment Options later. It returns:
+   - the amounts the customer owes. If nothing is owed, the payment journey never starts and nothing else is called;
+   - the payment options, such as Statement Balance, Total Balance, Minimum Due and Other Amount. Each carries a token ID, which Billpay verifies during execution (agreed 2026-11-05). The create carries the chosen option's token ID, and Verify's Options check verifies it (Proposed, 2026-11-05);
+   - whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take (agreed 2026-11-05).
+2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from (agreed 2026-11-05). It is a One-Data function in front of a billpay-core endpoint, and billpay-core makes the call the source needs:
+   - a bank account or a debit card: Payment Instruments' `ReadInstruments`, for the customer's bank accounts or enrolled debit cards. The page offers the two separately (agreed 2026-10-20);
+   - Pay with Bank Transfer: `ReadBanksForBankTransfer.v1`, for the banks the customer can start a bank transfer from;
+   - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with.
 
-What `ReadPaymentChoices.v1` returns guides the page; it decides nothing. The Router and Verify check the create against the release active when it arrives, so a release that goes live between the read and the create can't let through a payment it refuses.
+   billpay-core filters each list by the market's rules, so the page only offers what this payment can use. For example, an instrument enrolled through Autopay that is still pending verification can carry its Autopay payments, but isn't offered when the customer makes a realtime payment. `ReadBillpayInstruments.v1` replaces the channel's direct call to Payment Instruments (agreed 2026-11-05). Who owns the bank and wallet reads is not decided yet, probably the Instruments domain.
+3. **`CreatePayment.v3`**, when the customer reviews and pays. The Router picks the journey ([Routing and Start Modes](#routing-and-start-modes)).
+
+What the reads return guides the page; it decides nothing. The Router and Verify check the create against the release active when it arrives, so a release that goes live between a read and the create can't let through a payment it refuses.
+
+Where the page gets the rest of what it shows is open (2026-11-05): the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show (agreed 2026-10-21). `ReadPaymentOptions` is one option ([Open Items](#open-items)).
 
 **MR Points** (agreed 2026-10-20). Next to the way to pay, the customer can tick Pay with MR Points. Points alone run [Pay with MR Points](#composite-workflows). Points with a bank account are two instructions, and run as multiple instructions. Points pay today only: once they are ticked, the page offers no later date, and a future-dated create with points gets 422 before any workflow starts (Proposed). A debit card doesn't combine with MR Points (agreed 2026-10-20).
 
@@ -167,6 +171,7 @@ AR intake, returns and inbound payments never reach these APIs. One-Data stores 
 | `POST /refunds` | Refunds a credit balance | Update-With-Start | The refund's result |
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
 | `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment; with its redirect link while it waits for bank confirmation (agreed 2026-10-18) |
+| `GET /instruments/account/{account-id}?source={source}` | Behind `ReadBillpayInstruments.v1`: the instruments the customer can pay from, for one source, bank account, debit card, Pay with Bank Transfer or wallet (agreed 2026-11-05; the path is Proposed) | Calls `ReadInstruments`, `ReadBanksForBankTransfer.v1` or `ReadEligibleWallets.v1`, then filters by the market's rules. No workflow | The list the page may offer |
 
 AR learns the outcome of a request it sent from the SCHEDULED and DECLINED notifications and lifecycle events, or from `GET /payments/{payment-id}`.
 
@@ -681,7 +686,7 @@ Each journey is one workflow built from stages. Pay today and scheduled executio
 A scheduled payment is a row in Oracle from intake to its due date. Temporal sees it only while it is checked and while it executes.
 
 1. **Intake.** `CreateScheduledPaymentWorkflow` runs Capture and Verify, calling services in parallel where they don't depend on each other. One Oracle commit writes `SCHEDULED` and the `SCHED_EXEC` Work Tracker row (due at the market's execution time on the due date). A corporate payment gets an `ALLOC_REQUEST` row instead, due at its fetch time; its execution row comes once it is `ALLOCATED`. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
-2. **Wait.** Nothing runs in Temporal, for up to the market's scheduling horizon: 30 days by default (the setting is Proposed, 2026-10-20). Cancel and update work while the payment is `SCHEDULED`, until the cancellation window closes. A corporate payment leaves `SCHEDULED` when its allocations are requested.
+2. **Wait.** Nothing runs in Temporal until the due date. Payment Options gives each customer the range of dates they can pick (agreed 2026-11-05); the market's scheduling horizon, 30 days by default, is Proposed (2026-10-20), and whether it stays is open. Cancel and update work while the payment is `SCHEDULED`, until the cancellation window closes. A corporate payment leaves `SCHEDULED` when its allocations are requested.
 3. **Release.** At the market's execution time its dispatcher claims the row, calls the Router with today's config, and starts `ExecuteScheduledPaymentWorkflow` `{paymentId}-execute`. A corporate payment's `ALLOC_EXEC` row goes to the allocated-payments dispatcher instead.
 4. **Execute.** Reverify (`SCHEDULED`, or `ALLOCATED` for a corporate payment, → `ACCEPTED`), Execute (→ `PROCESSING`), Fulfil (→ `PROCESSED`; a corporate parent completes through the leg dispatcher instead). `PAID` follows once One-Data's inbox has both the settlement and the AR posting, and `ProcessPaidEventsWorkflow` picks the payment up. A split payment turns `PAID` leg by leg instead.
 5. **Close.** The last commit marks the Work Tracker row `DONE`, which frees an in-flight slot.
@@ -887,7 +892,7 @@ interface CreatePaymentIntentWorkflow {
     fun run(request: CreatePaymentRequest, profile: ResolvedProfile)
 
     @UpdateMethod
-    fun decision(): PaymentDecision                  // the create: PENDING with the link or the list, or DECLINED
+    fun decision(): PaymentDecision                  // the create: PENDING with the link, or DECLINED
 
     @UpdateMethod
     fun confirm(): PaymentDecision                   // update ID {paymentId}-confirm: Verify's decision
@@ -924,8 +929,8 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         waiting = decided == PaymentDecision.PENDING
         stages.capture.announce(paymentId)                             // the reply goes out with this task
         if (!waiting) {
-            stages.requestConfirmation.announce(paymentId)
-            return inbox.deletePending(paymentId)
+            inbox.deletePending(paymentId)                             // decided: the account's entry goes
+            return stages.requestConfirmation.announce(paymentId)
         }
         Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // One-Data keeps the entry;
                                                                        // the wait doesn't wait for this call
@@ -1575,9 +1580,9 @@ A step in the Market Onboarding UI. Each setting drives something at runtime.
 | Raven notifications: which status changes send a Raven message. By default SCHEDULED, DECLINED, CANCELLED, PROCESSED and RETURNED; a market can override the default, and an account type can override its market's: the account type's setting wins (agreed 2026-10-18) | Every stage's announcement: a status that is switched off sends no Raven message |
 | Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18). | Which provider RequestConfirmation asks for the redirect link, and when `CreatePaymentIntentWorkflow` cancels a payment still waiting: once the window and its grace have passed |
 | Card authentication: the card provider for a debit card's 3D Secure and authorization (Checkout.com in the UK), and the authentication window, 2 minutes (agreed 2026-10-20) | Which provider RequestConfirmation and Verify's Card authorization check call, and when `CreatePaymentIntentWorkflow` cancels a debit card payment still waiting for the callback: once the window and its grace have passed |
-| Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the resolved profile (agreed 2026-10-18). `ReadPaymentChoices.v1` reads them too, for the ways to pay and the limits a channel shows (Proposed, 2026-10-20) |
-| Scheduling horizon: how many days ahead a payment can be scheduled, 30 by default (Proposed, 2026-10-20) | `ReadPaymentChoices.v1`, which offers dates up to it, and the verification rules, which decline a create dated beyond it. Like the other rule settings, it reaches the workflow in the resolved profile |
-| Pay with MR Points: offered or not, off by default (Proposed, 2026-10-20) | `ReadPaymentChoices.v1`, which offers the MR Points choice only where it is on, and the Router, which answers 422 to a create with MR Points where it is off |
+| Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the resolved profile (agreed 2026-10-18). `ReadBillpayInstruments.v1` filters the instruments it returns by the market's rules (agreed 2026-11-05) |
+| Scheduling horizon: how many days ahead a payment can be scheduled, 30 by default (Proposed, 2026-10-20) | The verification rules, which decline a create dated beyond it. Like the other rule settings, it reaches the workflow in the resolved profile. `ReadPaymentOptions` now gives each customer's date range (agreed 2026-11-05), so whether this setting stays is open |
+| Pay with MR Points: offered or not, off by default (Proposed, 2026-10-20) | The Router, which answers 422 to a create with MR Points where it is off. How the page learns whether to offer it is open (2026-11-05) |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
 
@@ -1597,7 +1602,7 @@ Every build ships a manifest of the behavior combinations it can run, returned b
 - The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
 - The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`; onboarding maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring checks each new combination against the manifest.
-- The Operations step gains the scheduling horizon and the Pay with MR Points setting (Proposed, 2026-10-20).
+- The Operations step gains the scheduling horizon and the Pay with MR Points setting (Proposed, 2026-10-20). Whether the horizon stays is open, now that `ReadPaymentOptions` gives each customer's date range (2026-11-05).
 
 [^ Top](#table-of-contents)
 
@@ -1781,7 +1786,7 @@ The confirm and the no are not workflows. They are updates to the waiting paymen
 | Stale pending entries | A run of One-Data's hourly sweep found entries older than 2 hours. One alert per run, with two lists, each with its count and payment IDs: the entries it removed, because billpay-core had decided the payment or never got it, and the payments still `PENDING` whose entries it kept (agreed 2026-10-21) | Removed: find why each delete never landed, whether the delete API, a create billpay-core never got, or the two Redis sites. Kept: find why the payment is still undecided, such as a workflow that stopped before deciding or Verify's calls still failing, while its account stays blocked |
 | Creates and confirms held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-core and the Online cluster: this is usually the first sign |
 | Delete calls failing | billpay-core's delete calls to One-Data keep failing | Fix One-Data's delete API; until then, the accounts with stale entries can't make a payment until the sweep clears them |
-| Redis memory or write errors | Redis memory is near its limit, or a write fails | Fix it before One-Data has to create payments without the check |
+| Redis memory or write errors | Redis memory is near its limit, or a write fails | Fix it: while Redis is down, the check goes through `ReadPayments.v1`, which misses a create billpay-core hasn't captured yet |
 | Rejected request | A dispatcher marks a pulled request `REJECTED`: nothing live matches its market, account type or API | Find why traffic reached something that isn't live, since traffic is enabled only after a release is live in production. The sender is not told |
 | Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list, then reprocess or terminate each payment's workflow by hand |
 | Downstream outage | A `ds-*` queue drops to its 1 RPS probe | Contact the downstream's owner if it lasts |
@@ -1963,7 +1968,11 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Balance refund steps | They follow the payment path. Skipped for now (OK for now, 2026-10-18) | Detailed stages are still to be defined |
 | Represent's eligibility checks | Its own checks, not Verify's: no call to Payment Instruments, Payment Options or Plans (2026-10-18). A marked placeholder stands in for them (agreed 2026-10-19) | Which systems it calls, and what fails the recheck, are still to be defined |
 | Decline codes for verification rules | One table maps each rule ID to a `DeclineCode`. Until product sends the codes, each rule uses the closest one the current app has, and a test fails if any rule has no code (agreed 2026-10-19) | Product will send the codes; only the table changes. They decide what code a declined payment carries, and what the channel tells the customer |
-| `ReadPaymentChoices.v1` | A One-Data read of Billpay's rules for the market, called after Payment Options and before Payment Instruments (Proposed, 2026-10-20) | Its contract, and the billpay-core read behind it, are still to come |
+| `ReadBillpayInstruments.v1` | A One-Data function in front of a billpay-core endpoint, which calls `ReadInstruments`, `ReadBanksForBankTransfer.v1` or `ReadEligibleWallets.v1` and filters by the market's rules (agreed 2026-11-05) | Its contract, and the billpay-core endpoint's path, are still to come |
+| The bank and wallet reads | `ReadBanksForBankTransfer.v1` and `ReadEligibleWallets.v1` (agreed names, 2026-11-05) | Who owns them, probably the Instruments domain, and their contracts. Nothing is decided yet |
+| What else the payment page reads | Not covered (2026-11-05): the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account | Where each comes from. `ReadPaymentOptions` is one option |
+| The payment option's token | Each option `ReadPaymentOptions` returns carries a token ID that Billpay verifies during execution (agreed 2026-11-05). The create carries it, and Verify's Options check verifies it (Proposed) | The token's contract, and whether Reverify checks it again for a scheduled payment |
+| The scheduling horizon setting | Kept as a Proposed setting (2026-10-20) | `ReadPaymentOptions` now gives each customer's date range (agreed 2026-11-05). Whether the market setting stays |
 | Pay with MR Points | Points alone run their own composite across Billpay and Loyalty; with a bank account they run as multiple instructions; today only (agreed 2026-10-20) | Its children, its calls to Loyalty, and how a points instruction runs inside multiple instructions are still to be defined |
 | A later date with a bank step | Not covered. Only consumer payments made today take bank confirmation | What a future-dated create with a payment method that needs the customer to confirm at their bank does: whether BOTH resolves to N, or the create is refused |
 | Does US bank confirmation clear | No clearing for Pay with Bank Transfer (agreed 2026-10-20). `BankTransferSettlement` names bank confirmation with no market, so it would also catch a US payment confirmed through Plaid | Whether a Plaid payment's money moves at the bank too, or it still clears through MR/M3; if it clears, the class becomes GB's own |

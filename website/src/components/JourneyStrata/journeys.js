@@ -158,7 +158,7 @@ export const GROUPS = [
             road: 'card',
             waiting: true,
             customer: [
-              {t: 'Pays by debit card', s: 'a card from Payment Instruments', st: 'PENDING', m: 'on', at: 'Capture'},
+              {t: 'Pays by debit card', s: 'an enrolled card, from ReadBillpayInstruments.v1', st: 'PENDING', m: 'on', at: 'Capture'},
               {t: 'Gets the challenge link', s: 'or none, when the bank needs no challenge', st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
             oneData: [

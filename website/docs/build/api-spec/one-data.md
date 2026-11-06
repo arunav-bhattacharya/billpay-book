@@ -17,6 +17,7 @@ export const CORE = [
   {fn: 'CreateInboundPayment.v1', api: "None (One-Data's inbox)", link: false, purpose: 'Takes a payment a third party pushed. One-Data stores it and replies 202, and the inbound dispatcher starts its workflow.'},
   {fn: 'CreateConfirmPendingPayment.v1', method: 'POST', path: '/payments/{payment-id}/confirm', link: false, purpose: "Confirms a payment that waited for the customer, with the same payment ID: once the customer has confirmed their bank details on the provider's site. billpay-core sends it to the payment's waiting workflow, which carries on processing the payment. Channels call it."},
   {fn: 'CreatePaymentAllocations.v1', method: 'POST', path: '/payments/{payment-id}/allocations', link: false, purpose: 'The allocations callback for corporate payments, one numbered batch at a time. Replies 202 once the batch is stored and its workflow has started.'},
+  {fn: 'ReadBillpayInstruments.v1', method: 'GET', path: '/instruments/account/{account-id}?source={source}', link: false, purpose: 'The instruments a customer can pay from, for the source they picked: bank accounts and enrolled debit cards from Payment Instruments\' `ReadInstruments`, banks for Pay with Bank Transfer from `ReadBanksForBankTransfer.v1`, or eligible wallets from `ReadEligibleWallets.v1`. billpay-core makes the read and filters it by the market\'s rules. Starts no workflow. The path is Proposed.'},
 ];
 
 export const COMPOSITE = [

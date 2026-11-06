@@ -19,7 +19,7 @@ Most journeys start with a customer on a payment page, who waits for an answer. 
     {
       term: 'Make a Payment Journey',
       to: '/docs/design/journeys/make-a-payment',
-      desc: `The payment page a channel shows, the four calls behind it, and how the Router turns the customer's answers into one journey.`,
+      desc: `The payment page a channel shows, the three calls behind it, and how the Router turns the customer's answers into one journey.`,
     },
     {
       term: 'All Journeys',

@@ -40,20 +40,19 @@ A debit card's 3D Secure is not one of the five behaviors, because there is noth
 
 ## What the customer is offered
 
-The profile also decides what a channel's payment page shows. Before the customer pays, the channel calls `ReadPaymentChoices.v1` (Proposed), which reads this profile's active release and returns:
+The profile holds the rules a payment is checked against, and some of them shape the channel's payment page too. The page fills itself from two reads. Payment Options' `ReadPaymentOptions` gives the amounts, the payment options and the dates this customer can pay on. `ReadBillpayInstruments.v1` gives the instruments, and billpay-core filters them by the profile's rules first, so the page never offers an instrument this payment can't use.
 
-| The page shows | The profile holds it as |
+| What the Router and Verify check | The profile holds it as |
 | --- | --- |
 | The ways to pay | The instrument types in the verification rule settings |
 | Which of them send the customer to their bank first | `requiresBankConfirmation`, and its BOTH rule for payment methods |
 | That a debit card goes through 3D Secure | Nothing: every debit card does. The card provider is an operations setting |
-| Today, or a later date up to the horizon | The scheduling horizon, 30 days by default (Proposed) |
 | How late a scheduled payment can be changed | The cancellation window |
 | The largest payment | The verification rule settings |
 | Pay & Plan | Whether the profile takes `CreatePaymentInstallment.v1` |
 | Pay with MR Points | The Pay with MR Points setting (Proposed) |
 
-The read only guides the page. The Router and Verify check the payment against the release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it refuses. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
+How the page learns these, apart from the instruments, is still open; `ReadPaymentOptions` is one option. The dates now come from `ReadPaymentOptions` for each customer, so whether the profile keeps its Proposed scheduling horizon is open too. Either way, the reads only guide the page: the Router and Verify check the payment against the release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it refuses. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
 
 ## What the build can run
 

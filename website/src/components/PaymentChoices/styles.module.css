@@ -178,6 +178,16 @@
   color: var(--amex-mut);
 }
 
+.readVia {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.callsMore .asideNote {
+  margin: 0.55rem 0 1rem;
+}
+
 
 .segmented {
   display: flex;

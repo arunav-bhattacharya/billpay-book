@@ -142,7 +142,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
                                                                   // challenge link (or none), or DECLINED
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
         stages.capture.announce(paymentId)                        // the reply goes out with this task
-        if (!waiting) { /* announce, the delete, and end */ return }
+        if (!waiting) { /* the delete, the announcement, and end */ return }
         Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // the wait doesn't wait for it
 
         val window = checkNotNull(profile.confirmationWindow)    // 2 minutes for a debit card's 3D Secure

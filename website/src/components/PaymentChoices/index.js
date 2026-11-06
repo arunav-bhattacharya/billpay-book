@@ -8,9 +8,12 @@ import styles from "./styles.module.css";
  *
  * Three columns. The first is the page a channel shows a customer, with
  * working controls. The second is the calls the channel makes behind it, in
- * order, lit when this set of answers makes them. The third is the Router's
- * side: one door, CreatePayment.v3, and the journeys it can pick, each a
- * Temporal workflow. Change an answer and the picked journey moves.
+ * order, lit when this set of answers makes them: ReadPaymentOptions, then
+ * ReadBillpayInstruments.v1 for the source the customer picked (billpay-core
+ * makes the one read that source needs), then CreatePayment.v3. The third is
+ * the Router's side: one door, CreatePayment.v3, and the journeys it can
+ * pick, each a Temporal workflow. Change an answer and the picked journey
+ * moves.
  *
  * Before the Router, One-Data's pending check: a create on an account that
  * already has a payment in PENDING is declined there, and never reaches
@@ -82,27 +85,49 @@ const METHODS = [
   },
 ];
 
-const RETURNS = [
-  [
-    "the ways to pay this market takes, which need a bank step, and that a debit card needs 3D Secure",
-    "rule settings, bank confirmation",
-  ],
-  [
-    "the dates it offers: today, or up to the scheduling horizon, 30 days by default",
-    "operations settings",
-  ],
-  [
-    "the cancellation window, and limits such as the largest payment",
-    "operations and rule settings",
-  ],
-  ["whether it offers Pay & Plan and MR Points", "APIs it takes, a setting"],
-  ["payments already pending on the account", "One-Data"],
+const OPTIONS_RETURNS = [
+  "what the customer owes. Nothing owed, and the journey never starts",
+  "the payment options, Statement Balance, Total Balance, Minimum Due and Other Amount, each with a token ID that Billpay verifies",
+  "whether the customer can pay today, on a future date, or both",
+  "the range of dates a future payment can take",
 ];
+
+/* The read billpay-core makes behind ReadBillpayInstruments.v1, by source. */
+const READS = {
+  bank: {
+    read: "ReadInstruments",
+    what: "the customer's bank accounts",
+    pick: "Which account",
+  },
+  debit: {
+    read: "ReadInstruments",
+    what: "the customer's enrolled debit cards",
+    pick: "Which card",
+  },
+  transfer: {
+    read: "ReadBanksForBankTransfer.v1",
+    what: "the banks the customer can start a transfer from",
+    pick: "Which bank",
+  },
+  wallet: {
+    read: "ReadEligibleWallets.v1",
+    what: "the wallets the customer can pay with",
+    pick: "Which wallet",
+  },
+};
 
 const OPEN = [
   [
-    "ReadPaymentChoices.v1",
-    "its contract, and the billpay-core read behind it",
+    "The rest of the page",
+    "where it gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. ReadPaymentOptions is one option",
+  ],
+  [
+    "ReadBillpayInstruments.v1",
+    "its contract, and the billpay-core endpoint's path",
+  ],
+  [
+    "The bank and wallet reads",
+    "who owns them, probably the Instruments domain, and their contracts",
   ],
   ["Pay with MR Points", "its steps, and its calls to Loyalty"],
   ["Wallet", "which instrument it is, and whether it needs a bank step"],
@@ -239,6 +264,21 @@ function CallTag({ n, name }) {
   );
 }
 
+function ReadTag({ name }) {
+  return (
+    <span className={styles.callTag}>
+      <span className={styles.readVia}>via</span>
+      <span className={styles.mono}>{name}</span>
+    </span>
+  );
+}
+
+const SOURCE_CHOICES = {
+  debit: [["enrolled", "Enrolled debit card"]],
+  transfer: [["listed", "A bank from the list"]],
+  wallet: [["eligible", "An eligible wallet"]],
+};
+
 function Segmented({ label, options, value, onChange, disabled }) {
   return (
     <div className={styles.segmented} role="group" aria-label={label}>
@@ -294,7 +334,7 @@ function ThePage({ a, set }) {
       <Field
         n={1}
         term="How much"
-        call={<CallTag n={1} name="Payment Options API" />}
+        call={<CallTag n={1} name="ReadPaymentOptions" />}
       >
         <Segmented
           label="How much"
@@ -302,8 +342,9 @@ function ThePage({ a, set }) {
           onChange={(v) => set({ amount: v })}
           disabled={() => !a.owed}
           options={[
-            { id: "min", label: "Minimum due" },
             { id: "statement", label: "Statement balance" },
+            { id: "total", label: "Total balance" },
+            { id: "min", label: "Minimum due" },
             { id: "other", label: "Other amount" },
           ]}
         />
@@ -321,7 +362,7 @@ function ThePage({ a, set }) {
         <Field
           n={2}
           term="From where"
-          call={<CallTag n={2} name="ReadPaymentChoices.v1" />}
+          call={<CallTag n={2} name="ReadBillpayInstruments.v1" />}
         >
           <div className={styles.selectWrap}>
             <select
@@ -346,18 +387,14 @@ function ThePage({ a, set }) {
           {method.note && !pointsOnly && (
             <p className={styles.hint}>{method.note}</p>
           )}
-          {(a.method === "bank" || a.method === "debit") && !pointsOnly && (
+          {!pointsOnly && (
             <div className={styles.sub}>
               <div className={styles.subHead}>
-                <span>{a.method === "debit" ? "Which card" : "Which account"}</span>
-                <CallTag n={3} name="Payment Instruments API" />
+                <span>{READS[a.method].pick}</span>
+                <ReadTag name={READS[a.method].read} />
               </div>
               <div className={styles.selectWrap}>
-                {a.method === "debit" ? (
-                  <select className={styles.select} aria-label="Which card" defaultValue="saved">
-                    <option value="saved">Saved debit card</option>
-                  </select>
-                ) : (
+                {a.method === "bank" ? (
                   <select
                     className={styles.select}
                     aria-label="Which account"
@@ -366,6 +403,19 @@ function ThePage({ a, set }) {
                   >
                     <option value="checking">Checking account</option>
                     <option value="savings">Savings account</option>
+                  </select>
+                ) : (
+                  <select
+                    key={a.method}
+                    className={styles.select}
+                    aria-label={READS[a.method].pick}
+                    defaultValue={SOURCE_CHOICES[a.method][0][0]}
+                  >
+                    {SOURCE_CHOICES[a.method].map(([id, label]) => (
+                      <option key={id} value={id}>
+                        {label}
+                      </option>
+                    ))}
                   </select>
                 )}
               </div>
@@ -404,7 +454,7 @@ function ThePage({ a, set }) {
         <Field
           n={3}
           term="When"
-          call={<CallTag n={2} name="ReadPaymentChoices.v1" />}
+          call={<CallTag n={1} name="ReadPaymentOptions" />}
         >
           <Segmented
             label="When"
@@ -421,13 +471,13 @@ function ThePage({ a, set }) {
               ? "A debit card pays today only."
               : a.points
                 ? "MR Points pay today only."
-                : "Up to 30 days ahead by default. A per-market horizon is Proposed."}
+                : "Today, or a date inside the range ReadPaymentOptions gives this customer."}
           </p>
         </Field>
 
         <div className={styles.pay}>
           <span className={styles.payButton}>Review and pay</span>
-          <CallTag n={4} name="CreatePayment.v3" />
+          <CallTag n={3} name="CreatePayment.v3" />
         </div>
 
         <div className={styles.aside}>
@@ -454,37 +504,34 @@ function ThePage({ a, set }) {
 function TheCalls({ a }) {
   const uid = useId();
   const pointsOnly = a.points && a.pointsMode === "only";
-  const instruments = a.owed && (a.method === "bank" || a.method === "debit") && !pointsOnly;
+  const source = a.owed && !pointsOnly ? READS[a.method] : null;
   const calls = [
     {
       n: 1,
-      name: "Payment Options API",
-      line: "The amounts the customer owes. Nothing owed, nothing more.",
+      name: "ReadPaymentOptions",
+      line: "What the customer owes and the options to pay it, and when they can pay. Nothing owed, nothing more.",
       on: true,
+      status: "exists",
     },
     {
       n: 2,
-      name: "ReadPaymentChoices.v1",
-      line: "Billpay's own rules for the market: what to offer, and when.",
-      on: a.owed,
-      proposed: true,
+      name: "ReadBillpayInstruments.v1",
+      line: source
+        ? `billpay-core calls ${source.read} for ${source.what}, and keeps only what the market's rules allow for this payment.`
+        : "Where the customer pays from. Not called when MR Points pay alone.",
+      on: Boolean(source),
+      status: "new",
     },
     {
       n: 3,
-      name: "Payment Instruments API",
-      line: "The customer's bank accounts, or their debit cards.",
-      on: instruments,
-    },
-    {
-      n: 4,
       name: "CreatePayment.v3",
-      line: "The payment. The Router picks the journey.",
+      line: "The payment, with the chosen option's token ID (Proposed). The Router picks the journey.",
       on: a.owed,
+      status: "exists",
     },
   ];
   const gates = [
-    "when something is owed",
-    "only when a bank account or a debit card is picked",
+    "once the customer picks where to pay from",
     "on Review and pay",
   ];
   return (
@@ -513,7 +560,7 @@ function TheCalls({ a }) {
               <div
                 className={clsx(
                   styles.call,
-                  c.proposed && styles.callNew,
+                  c.status === "new" && styles.callNew,
                   !c.on && styles.callOff,
                 )}
               >
@@ -524,10 +571,10 @@ function TheCalls({ a }) {
                     <span
                       className={clsx(
                         styles.status,
-                        c.proposed && styles.statusNew,
+                        c.status === "new" && styles.statusNew,
                       )}
                     >
-                      {c.proposed ? "Proposed" : "exists"}
+                      {c.status}
                     </span>
                   </p>
                   <p className={styles.callLine}>{c.line}</p>
@@ -551,18 +598,37 @@ function TheCalls({ a }) {
       </div>
 
       <div className={styles.callsMore}>
-        <p className={styles.kickerQuiet}>What call 2 returns</p>
+        <p className={styles.kickerQuiet}>What call 1 returns</p>
         <ul className={styles.returns}>
-          {RETURNS.map(([what, from]) => (
+          {OPTIONS_RETURNS.map((what) => (
             <li key={what}>
               <span className={styles.dotSquare} aria-hidden="true" />
-              <span>
-                {what}
-                <span className={styles.source}>{from}</span>
-              </span>
+              <span>{what}</span>
             </li>
           ))}
         </ul>
+
+        <p className={styles.kickerQuiet}>Where call 2 looks</p>
+        <ul className={styles.returns}>
+          {Object.entries(READS)
+            .filter(([id]) => id !== "debit")
+            .map(([id, r]) => (
+              <li key={id}>
+                <span className={styles.dotSquare} aria-hidden="true" />
+                <span>
+                  {id === "bank"
+                    ? "Bank account or debit card"
+                    : METHODS.find((m) => m.id === id).label}
+                  <span className={styles.source}>{r.read}</span>
+                </span>
+              </li>
+            ))}
+        </ul>
+        <p className={styles.asideNote}>
+          The market&apos;s rules filter each list. An instrument enrolled
+          through Autopay that is still pending verification carries its
+          Autopay payments, but isn&apos;t offered for a payment made now.
+        </p>
 
         <p className={styles.kickerQuiet}>Still to be defined</p>
         <ul className={styles.open}>
