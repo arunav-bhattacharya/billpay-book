@@ -31,7 +31,7 @@ temporal task-queue config set --task-queue ds-clearing --task-queue-type activi
 
 ## Sharing a downstream between the clusters
 
-There is no fixed split. Online comes first, except during a SEPA run, which comes before it. Outside a run, Online's limit on a downstream is the full agreed rate (Proposed), and every 15 seconds the [governor](./pacing.md#the-governor) works out each downstream's offline share from what online traffic is actually using:
+There is no fixed split. Online comes first, except during a SEPA run, which comes before it. Outside a run, Online's limit on a downstream is the full agreed rate (agreed 2026-11-07), and every 15 seconds the [governor](./pacing.md#the-governor) works out each downstream's offline share from what online traffic is actually using:
 
 > Offline share = agreed TPS − online traffic's use (the peak of the last minute) − headroom
 

@@ -201,20 +201,30 @@ Every rule's decline code sits in one table, keyed by the rule's ID, and a rule'
 ```kotlin
 /** Every rule's decline code, in one place. */
 object DeclineCodes {
-    // the current app's closest codes, until product sends theirs
+    // placeholders, UPPERCASE with underscores, until product sends its codes
     private val byRule = mapOf(
-        "INSTRUMENT_FOUND" to DeclineCode.INVALID_INSTRUMENT,
-        "INSTRUMENT_OPEN" to DeclineCode.ACCOUNT_CLOSED,
-        "MANDATE_ACTIVE" to DeclineCode.MANDATE_INACTIVE,
+        "INSTRUMENT_FOUND" to DeclineCode.INSTRUMENT_NOT_FOUND,
+        "INSTRUMENT_OPEN" to DeclineCode.INSTRUMENT_CLOSED,
+        "MANDATE_ACTIVE" to DeclineCode.MANDATE_NOT_ACTIVE,
         "GB_FUNDS" to DeclineCode.INSUFFICIENT_FUNDS,
     )
     fun of(ruleId: String): DeclineCode? = byRule[ruleId]
 }
 ```
 
-*(A sketch: the names and decline codes are illustrative.)*
+*(A sketch: GB's funds rule is illustrative; the other codes are the agreed placeholders.)*
 
-The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INSTRUMENT_OPEN` and `MANDATE_ACTIVE`; a rule that the payment option is still valid, for the Options check; and rules on the market's rule settings: the largest payment, the instrument types the market takes and the scheduling horizon. Each rule's decline code stays a placeholder until product sends the codes.
+The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INSTRUMENT_OPEN` and `MANDATE_ACTIVE`; a rule that the payment option is still valid, for the Options check; and rules on the market's rule settings: the largest payment, the instrument types the market takes and the scheduling horizon. Each rule's decline code is a placeholder until product sends the codes, an UPPERCASE enum with its words joined by underscores (agreed 2026-11-07):
+
+| Rule | Placeholder decline code |
+| --- | --- |
+| `INSTRUMENT_FOUND` | `INSTRUMENT_NOT_FOUND` |
+| `INSTRUMENT_OPEN` | `INSTRUMENT_CLOSED` |
+| `MANDATE_ACTIVE` | `MANDATE_NOT_ACTIVE` |
+| The payment option is still valid | `PAYMENT_OPTION_INVALID` |
+| The largest payment | `AMOUNT_ABOVE_MAXIMUM` |
+| The instrument types the market takes | `INSTRUMENT_TYPE_NOT_ACCEPTED` |
+| The scheduling horizon | `DATE_BEYOND_SCHEDULING_HORIZON` |
 
 A test asks the rule registry for every rule it holds and fails if `DeclineCodes` has no code for one, so a new rule can't ship without its code.
 

@@ -40,7 +40,7 @@ Instruction 1:             01JVTC2M8K4Q7R1S5T9V3W6X0Y_01JVTBBGZQ1HEM0W7NRMM6MSQ1
 Instruction 2:             01JVTC2M8K4Q7R1S5T9V3W6X0Y_01JVTBBGZQ1HEM0W7NRMM6MSQ2-init
 ```
 
-Whether each instruction's row in Oracle stores the group ID is still open.
+Each instruction stays its own payment row in Oracle, and no row stores the group ID: it lives only in the workflow IDs and the `ParentPaymentId` search attribute (agreed 2026-11-07).
 
 1. Validate the composite payment as a whole.
 2. Run one `CreateImmediatePaymentWorkflow` per instruction, so each gets its own payment, its own lifecycle and its own outcome.
