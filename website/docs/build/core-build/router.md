@@ -240,7 +240,7 @@ The field names and values here are illustrative (Proposed, 2026-10-20). The spe
 
 The rule's logic is code and changes with a deploy. The number is config and changes with a release.
 
-The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg. `Journey` holds the journey's name and `ConfigVersion` the version number (Proposed, 2026-11-07).
+The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg, or the group ID for an instruction of a create with several instructions (Proposed). `Journey` holds the journey's name and `ConfigVersion` the version number (Proposed, 2026-11-07).
 
 ### 5. Choose the run site
 
@@ -248,7 +248,7 @@ The run site is the cluster, the task queue, the priority and fairness key, and 
 
 - Work a caller waits for runs on the Online cluster, on `online-wf`, and its Execute and Fulfil calls always go to the Online cluster's `ds-*` queues (agreed 2026-11-07). Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
 - Priority and fairness key are set once, from the traffic class, and every activity inherits them. They matter only on the Offline cluster's shared queues, and [Design → Throttling](../../design/throttling.md#priority-and-fairness) has the classes.
-- The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
+- The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. A create with several instructions is the exception: its composite is `{groupId}-init`, from the group ID One-Data passes for the request, and each instruction's child is `{groupId}_{paymentId}-init` (Proposed, 2026-11-07). Billpay derives no ID of its own. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
 
 Online's limits never change the run site. The governor writes them, a SEPA run's cap included, to `downstream_limit`, and billpay-online sets them on its own `ds-*` queues, so a cap changes a queue's limit, never where a call runs ([Design → Throttling](../../design/throttling.md#when-the-cutoff-wins)).
 

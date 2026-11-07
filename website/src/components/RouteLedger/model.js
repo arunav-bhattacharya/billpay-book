@@ -214,7 +214,7 @@ export const BANDS = [
             child: CVEF,
             childWf: 'CreateImmediatePayment',
             journey: 'Create payment, today, several instructions',
-            wfId: "its own unique ID, which each instruction's child takes with a suffix",
+            wfId: '{groupId}-init (Proposed); each child is {groupId}_{paymentId}-init',
             chips: five('CONSUMER', 'Y', 'N'),
             behave:
               'Example values. A request with several instructions never takes bank confirmation: one that would need it gets 422.',

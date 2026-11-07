@@ -22,7 +22,7 @@ Histories are kept for 30 days. After that the workflow is gone from the UI, but
 Every payment workflow sets its search attributes once, when it starts: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg. They answer questions like these:
 
 - Every workflow for one payment: search by `PaymentId`.
-- Every leg of a corporate payment: search by `ParentPaymentId`.
+- Every leg of a corporate payment, or every instruction of a create with several instructions: search by `ParentPaymentId`, which holds the parent's payment ID or the request's group ID (Proposed).
 - Everything a market ran on one date: search by `Market` and `DueDate`.
 - Payments started on a particular release of a market's config: search by `ConfigVersion`, which holds the version number. `Journey` holds the journey's name (Proposed).
 
