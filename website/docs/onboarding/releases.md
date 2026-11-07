@@ -44,6 +44,8 @@ Rollback switches the pointer back to the previous version, and its Schedules an
 
 A live market can also be paused and resumed. Pausing stops the market's dispatchers, so its due work waits in Oracle, and resuming starts them again. Neither changes the market's config.
 
+Taking a market out of service sets `IN_SERVICE_IN` to N on its active row (Proposed), so its active version stays readable. A new create for it gets 422, and a held create that arrives afterwards, which RTF delivers with an async flag, is captured and declined, so the customer is told.
+
 Load-test run 7 proves the whole cycle: publish, test, activate and roll back a release in E1 while payments are running. New payments must pick up the new version, running ones must keep theirs, and rollback must restore the old one.
 
 ## Changes to today's Market Onboarding UI

@@ -136,7 +136,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 20 ms | 40 ms | 100 ms | 200 ms | 400 ms |
 
-**SLI:** latency of the call every create workflow makes once its payment is decided, after the caller's reply, to remove the stored create and the account's pending entry. The workflow retries until it lands, so a breach shows up as entries that stay in Redis longer, and while one stays, One-Data declines that account's next payment. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
+**SLI:** latency of the call every create workflow makes once its payment is decided, after the caller's reply (an inbound payment makes none), to remove the stored create and the account's pending entry. The workflow retries until it lands, so a breach shows up as entries that stay in Redis longer, and while one stays, One-Data declines that account's next payment. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
 
 ## Read Inbox
 

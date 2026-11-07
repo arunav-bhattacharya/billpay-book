@@ -56,8 +56,8 @@ Where an activity runs, how long a call may take and how it retries are set on t
 private val clearing = Workflow.newActivityStub(
     ClearingActivities::class.java,
     ActivityOptions.newBuilder()
-        .setTaskQueue("ds-clearing")                            // the rate-limited queue on Offline
-        .setStartToCloseTimeout(Duration.ofSeconds(3))          // about 2 to 3 times clearing's p99
+        .setTaskQueue("ds-clearing")                            // the rate-limited queue, on either cluster
+        .setStartToCloseTimeout(Duration.ofSeconds(6))          // just above the 5 s HTTP timeout (Proposed)
         .setRetryOptions(RetryOptions.newBuilder()
             .setInitialInterval(Duration.ofSeconds(1))           // from 1 s, doubling,
             .setMaximumInterval(Duration.ofSeconds(60))          // capped at 60 s
@@ -67,7 +67,9 @@ private val clearing = Workflow.newActivityStub(
 )
 ```
 
-On the Offline cluster, a call to a throttled system runs on that system's `ds-*` queue, whose server-side limit is the throttle. A call nobody throttles, such as RTF or Payment Instruments, runs on the workflow's own queue with eager dispatch. A short start-to-close frees a hung call's slot fast; the schedule-to-close limit decides when to give up.
+A call to a throttled system runs on that system's `ds-*` queue, whose server-side limit is the throttle. That holds on both clusters: Execute's and Fulfil's calls on the Online cluster are always rate-limited too, at the limits the governor sets (agreed 2026-11-07). A call nobody throttles, such as RTF or Payment Instruments, runs on the workflow's own queue with eager dispatch.
+
+Every downstream HTTP call in Execute and Fulfil times out at 5 s, and its activity's start-to-close sits just above that (Proposed: 6 s), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls keep a shorter start-to-close, about 2 to 3 times the call's p99. The schedule-to-close limit decides when to give up.
 
 ## The decision's calls on the Online cluster
 
@@ -83,7 +85,7 @@ private val online =
 private val local = Workflow.newLocalActivityStub(
     InstrumentActivities::class.java,
     LocalActivityOptions.newBuilder()
-        .setStartToCloseTimeout(timeout)   // 2 to 3 times p99
+        .setStartToCloseTimeout(timeout)   // Verify's: about 2 to 3 times p99, shorter than Execute's 6 s
         .setRetryOptions(RetryOptions.newBuilder()
             .setMaximumAttempts(3).build())
         .build(),

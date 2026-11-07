@@ -620,7 +620,7 @@ function CallDetail({id, open, j, f, s, c, pickAct}) {
 }
 
 function CallLine({j, f, s, c, open, onToggle, pickAct}) {
-  const showQueue = j.cluster === 'Offline' && f.queue.startsWith('ds-');
+  const showQueue = f.queue.startsWith('ds-') && (j.cluster === 'Offline' || s === 'Execute' || s === 'Fulfil');
   const id = `rl-${j.id}-${s}-${f.name}`;
   return (
     <li>
@@ -702,8 +702,8 @@ function StagesStep({j, n, stages, corp, corpRow, open, onToggle, pickAct}) {
         {offline
           ? "Each call runs on its system's task queue, shown beside it."
           : j.stages.includes('Verify') || j.own.includes('RequestConfirmation')
-            ? "The decision's calls run as local activities, inside one workflow task. Every other call runs on online-wf, the Online cluster's main task queue, unless a SEPA run has capped its downstream."
-            : "Every call runs on online-wf, the Online cluster's main task queue, unless a SEPA run has capped its downstream."}
+            ? "The decision's calls run as local activities, inside one workflow task. Execute's and Fulfil's calls to a rate-limited downstream run on the Online cluster's own ds-* queues; every other call runs on online-wf, its main task queue."
+            : "Execute's and Fulfil's calls to a rate-limited downstream run on the Online cluster's own ds-* queues; every other call runs on online-wf, its main task queue."}
       </p>
       {!corp && j.first && <p className={styles.stepText}>{j.first}</p>}
       {!corp && j.tbd && <p className={styles.stepText}>{j.tbd}</p>}
@@ -1047,8 +1047,8 @@ function ActCard({f, go, onClear}) {
         </ul>
       )}
 
-      {f.queue.startsWith('ds-') && (
-        <p className={clsx(styles.quietLine, styles.gapTop)}>On the Online cluster these calls run on online-wf, its main task queue, unless a SEPA run has capped this downstream.</p>
+      {f.queue.startsWith('ds-') && f.queue !== 'ds-allocations' && (
+        <p className={clsx(styles.quietLine, styles.gapTop)}>On the Online cluster these calls run on its own copy of this queue, at the limit the governor sets for Online.</p>
       )}
       {f.name === 'InboxActivities' && (
         <p className={clsx(styles.quietLine, styles.gapTop)}>
@@ -1617,8 +1617,8 @@ export default function RouteLedger() {
             </span>
           </div>
           <p className={styles.note}>
-            Task queues are the Offline cluster&apos;s. On the Online cluster every regular activity runs on online-wf,
-            its main task queue, except calls to a downstream a SEPA run has capped. Raven calls follow the default Raven
+            Task queues are the Offline cluster&apos;s. The Online cluster has its own copy of each ds-* queue but ds-allocations,
+            for Execute&apos;s and Fulfil&apos;s calls; every other regular activity there runs on online-wf, its main task queue. Raven calls follow the default Raven
             setting, which a market or an account type can change. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
             it moves a corporate parent to PROCESSED, and ProcessMissingPaidEvents asks MR/M3 and GAR for a
             payment&apos;s state. The two payment reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}

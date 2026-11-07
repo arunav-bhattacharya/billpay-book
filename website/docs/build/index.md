@@ -10,7 +10,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 <Lead>[Design](../design/index.md) describes what the platform does: the lifecycle, the workflows, the component model. This section is how we build it. It covers the stack we chose and why, how the code is organised, and how to write each kind of component.</Lead>
 
-Everything here goes into one codebase, billpay-core, which builds one artifact. It runs as two apps, picked by a setting at start: billpay-online, with the core APIs channels call and the Online cluster's workers, and billpay-offline, with the dispatchers, the governor and the Offline cluster's workers. The build runs on JDK 25, with the latest stable Kotlin, Quarkus and Temporal Java SDK.
+Everything here goes into one codebase, billpay-core, which builds two apps from two Gradle app modules, each its own Quarkus artifact: billpay-online, with the core APIs channels call and the Online cluster's workers, and billpay-offline, with the dispatchers, the governor and the Offline cluster's workers. The build runs on JDK 25, with the latest stable Kotlin, Quarkus and Temporal Java SDK.
 
 The full request and response contracts aren't provided yet. The code uses placeholders behind a mapping layer, shaped by sample payloads, and request validations get a framework now, with their rules filled in later. The structure is built outside the organization's network; the field-level details, from client integrations to API requests, responses and validations, are finished later against the existing Billpay app.
 

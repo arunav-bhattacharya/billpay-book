@@ -44,7 +44,7 @@ In every case nothing is lost. Due work waits in Oracle, pulled work waits in On
 
 ## Why the governor did that
 
-`governor_decision` keeps every 15-second check: the inputs the governor read and the rates it set. When a rate drops, the row for that moment shows which signal was the worst and what budget followed from it. `downstream_limit` shows the same picture per downstream: its agreed TPS, the online margin, the current offline share, any cap on Online, and the last 429.
+`governor_decision` keeps every 15-second check: the inputs the governor read and the rates it set. When a rate drops, the row for that moment shows which signal was the worst and what budget followed from it. `downstream_limit` shows the same picture per downstream: its agreed TPS, the online margin, the current offline share, Online's limit and any SEPA cap on it, and the last 429.
 
 The governor has guardrails of its own. With metrics missing it holds rates, and after 5 minutes drops every class to its floor. If the governor itself stops, the dispatchers fall back to their floors once `rate_allocation` is 5 minutes old, and a Schedule starts the governor again.
 

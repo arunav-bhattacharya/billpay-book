@@ -17,7 +17,7 @@
 const CREATE = {c: 'CreatePayment.v3', s: 'the pending check, then the create is stored'};
 const DELETE_END = {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the stored create and the pending entry go', at: 'Verify'};
 /* every create workflow makes the delete call; for a create One-Data never stored it finds nothing */
-const DELETE_ANY = {c: 'DeletePendingPayment.v1', s: 'once Verify decides, after the reply', at: 'Verify'};
+const DELETE_ANY = {c: 'DeletePendingPayment.v1', s: 'once Verify decides; a placeholder for refunds', at: 'Verify'};
 const DELETE_NONE = {c: 'DeletePendingPayment.v1', s: 'once Verify decides: nothing to remove', at: 'Verify'};
 
 const PAID_SEGMENT = {

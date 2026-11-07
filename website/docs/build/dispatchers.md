@@ -140,7 +140,7 @@ The decision is plain code inside the activity, and it should read like the rule
 2. Raise the budget by 5%, but only after two calm checks in a row, because the metrics lag about 30 seconds. Cut it by multiplying by 0.8. Offline Aurora CPU over 70%, or online p99 over its SLO, halves it instead.
 3. Keep the budget in Temporal writes per second, never above the ceiling the load test measured, and charge each class its cost per workflow.
 4. Hand it out in order: online first, then the SEPA cutoff floor, the US floor, AR intake, and the rest by priority up to their demand. Cap every class by its downstreams' offline share.
-5. Write the rates to `rate_allocation`, change a downstream queue's limit through the task queue config API only when it moves, and record the inputs and outputs in a `governor_decision` row, so any rate can be explained later.
+5. Write the rates to `rate_allocation`, change an Offline downstream queue's limit through the task queue config API only when it moves, write Online's limits, a SEPA run's cap included, to `downstream_limit` for billpay-online to apply, and record the inputs and outputs in a `governor_decision` row, so any rate can be explained later.
 
 Missing metrics mean hold. Still missing after 5 minutes, the governor drops every class to its floor. Overrides always win, here as in the dispatchers.
 

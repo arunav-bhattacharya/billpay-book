@@ -35,6 +35,6 @@ Each `ds-*` queue carries the calls to one downstream, and each `ctl-*` queue th
 - For every `ds-*` and `ctl-*` queue, its backlog and the rate limit currently set on it.
 - A `ds-*` queue at its limit with a growing backlog means that downstream is what holds the run back.
 - A `ds-*` queue down to 1 request a second is a downstream outage: the queue is probing until the downstream answers again.
-- On the Online cluster, a `ds-*` queue carries calls only while a SEPA run caps Online on that downstream.
+- On the Online cluster, each `ds-*` queue carries Execute's and Fulfil's calls to its downstream all the time, at the limit the governor sets; during a SEPA run that limit is the cap.
 
 For one workflow rather than a whole cluster, use the [Temporal Web UI](../../operations/familiarity/temporal-web-ui.md) of the cluster that ran it.

@@ -327,7 +327,7 @@ sequenceDiagram
 
   rect rgba(0,23,90,0.12)
     Note over R,RTF: Offline cluster: the allocations manager calls back through One-Data, batch by batch
-    Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then admit, pin profile, run on Offline
+    Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then checks its traffic budget and starts on Offline
     R->>RC: async start ReceiveAllocationsWorkflow,<br/>{paymentId}-allocations-{batch}, then 202
     Note over RC: checks the batch and writes no legs
     rect rgba(102,169,226,0.40)

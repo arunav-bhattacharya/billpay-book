@@ -19,7 +19,7 @@ Market releases don't travel this way. A new market, or a change to one, is conf
     {
       term: 'Deployables',
       to: '/docs/deployment/deployables',
-      desc: `The five things we ship: billpay-core, deployed as billpay-online and billpay-offline, One-Data's functions and inbox, the Market Onboarding UI, the codec server and the mocks.`,
+      desc: `The six things we ship: billpay-online and billpay-offline, both built from the billpay-core codebase, One-Data's functions and inbox, the Market Onboarding UI, the codec server and the mocks.`,
     },
     {
       term: 'CI Checks',

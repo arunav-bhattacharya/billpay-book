@@ -214,6 +214,8 @@ object DeclineCodes {
 
 *(A sketch: the names and decline codes are illustrative.)*
 
+The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INSTRUMENT_OPEN` and `MANDATE_ACTIVE`; a rule that the payment option is still valid, for the Options check; and rules on the market's rule settings: the largest payment, the instrument types the market takes and the scheduling horizon. Each rule's decline code stays a placeholder until product sends the codes.
+
 A test asks the rule registry for every rule it holds and fails if `DeclineCodes` has no code for one, so a new rule can't ship without its code.
 
 `MandateCheck`, the check these rules read, and `DefaultPaymentVerifyStage`, which runs checks and rules for every payment, are on [Building the Stage Resolver](./stage-resolver.md#a-worked-example-verify). The stage asks the rule registry for the rules that apply to the payment, and gets back each rule's result: skipped, passed or failed.

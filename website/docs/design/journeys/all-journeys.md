@@ -468,7 +468,7 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
 
 ### Pay with multiple instructions
 
-One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. Billpay validates the composite payment as a whole, then runs each instruction as its own payment, all on the Online cluster. A request with several instructions never takes bank confirmation or a debit card: one that would need either gets 422 before any workflow starts.
+One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. One-Data sends one payment ID for each instruction. Billpay validates the composite payment as a whole, then runs each instruction as its own payment, all on the Online cluster. The composite's workflow has a unique ID of its own, and each instruction's child takes it with a suffix. A request with several instructions never takes bank confirmation or a debit card: one that would need either gets 422 before any workflow starts.
 
 <JourneyMap
   kind="customer"

@@ -55,7 +55,7 @@ The Router's first step, Admit, checks that the market, the account type and the
 | --- | --- |
 | A caller's request | 422, and the caller does not retry. |
 | A request One-Data stored | Its dispatcher marks it `REJECTED`, which raises an alert. The sender is not told. |
-| The allocations callback | 422, or 429 with `Retry-After` when it is over its traffic budget. |
+| The allocations callback | 429 with `Retry-After` when it is over its traffic budget. It carries no market, so it skips the profile check. |
 | A Work Tracker row | Refused only if its market was taken out of service after the row was written. Its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. |
 
 Workflow names on the cards drop the `Workflow` suffix to save room.

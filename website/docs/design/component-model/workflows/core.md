@@ -35,7 +35,7 @@ A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_RE
 
 A create that has to wait for its customer, for their bank or for their debit card's 3D Secure, runs as [Create Payment Intent](#create-payment-intent) instead.
 
-As soon as Verify has decided, every create workflow calls One-Data's delete API, `DeletePendingPayment.v1`, after the caller's reply and never on its path. For a create One-Data never stored, such as one from Accounts Receivable, the call finds nothing to remove. One-Data drops the stored create and the payment's entry in the card account's pending list, so the customer can make their next payment: while an entry stays, One-Data declines every other create on that account. Create Payment Intent calls the delete twice, because its payment keeps its entry while it waits.
+As soon as Verify has decided, every create workflow calls One-Data's delete API, `DeletePendingPayment.v1`, after the caller's reply and never on its path. For a create One-Data never stored, such as one from Accounts Receivable, the call finds nothing to remove. An inbound payment is not a create: it comes through its own One-Data API and makes no delete. A channel's credit balance refund makes the call too, as a placeholder until One-Data says whether it stores refunds. One-Data drops the stored create and the payment's entry in the card account's pending list, so the customer can make their next payment: while an entry stays, One-Data declines every other create on that account. Create Payment Intent calls the delete twice, because its payment keeps its entry while it waits.
 
 ## Create Scheduled Payment
 

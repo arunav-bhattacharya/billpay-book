@@ -214,7 +214,7 @@ export const BANDS = [
             child: CVEF,
             childWf: 'CreateImmediatePayment',
             journey: 'Create payment, today, several instructions',
-            wfId: '{paymentId}-init',
+            wfId: "its own unique ID, which each instruction's child takes with a suffix",
             chips: five('CONSUMER', 'Y', 'N'),
             behave:
               'Example values. A request with several instructions never takes bank confirmation: one that would need it gets 422.',
@@ -229,7 +229,7 @@ export const BANDS = [
             id: 'points',
             wf: 'Pay with MR Points',
             plain: true,
-            full: 'Pay with MR Points, a composite workflow',
+            full: 'Pay with MR Points, a composite workflow, PayWithMrPointsWorkflow (Proposed)',
             lead: 'Pay today with MR Points alone.',
             journey: 'Create payment, today, MR Points as the one instruction',
             wfId: '{paymentId}-init',
@@ -470,7 +470,7 @@ export const BANDS = [
             id: 'payplan',
             wf: 'Pay & Plan',
             plain: true,
-            full: 'Pay & Plan, a composite workflow',
+            full: 'Pay & Plan, a composite workflow, PayAndPlanWorkflow (Proposed)',
             lead: 'Pay today, and create a plan of future installments.',
             stages: CVEF,
             child: CVEF,
@@ -1096,7 +1096,7 @@ export function inboxUse(j) {
   }
   if (j.id === 'no') return "calls the delete API once Cancel decides, so the account's pending entry goes";
   if (UNSTORED.has(j.id)) return 'calls the delete API once Verify decides, after the reply, as every create workflow does; it finds nothing to remove';
-  if (j.id === 'refund') return 'calls the delete API once Verify decides, after the reply, as every create workflow does';
+  if (j.id === 'refund') return 'calls the delete API once Verify decides, after the reply, as every create workflow does; for now a placeholder, until One-Data says whether it stores refunds';
   if (DELETES.has(j.id)) return "calls the delete API once Verify decides, after the reply, so the stored create and the account's pending entry leave One-Data's Redis";
   return null;
 }
@@ -1144,10 +1144,13 @@ function runsOn(j, f, s) {
   if (localOnOnline(j, f, s)) {
     return `${sys}, as a local activity, inside the workflow task that makes the decision, so the caller's answer needs no task round trip. It has no rate limit for a local activity to skip.`;
   }
-  if (f.name === 'TransactionNotificationActivities' && j.cluster !== 'Online') {
-    return 'One method per system, each on its own queue: TFNE on ds-tfne, GPHDB on ds-gphdb and B2Notifier on ds-b2notifier. The governor sets each queue\'s rate limit, so each system keeps its own.';
+  if (f.name === 'TransactionNotificationActivities') {
+    return `One method per system, each on its own queue${j.cluster === 'Online' ? ' on the Online cluster' : ''}: TFNE on ds-tfne, GPHDB on ds-gphdb and B2Notifier on ds-b2notifier. The governor sets each queue\'s rate limit, so each system keeps its own.`;
   }
-  if (j.cluster === 'Online') return `${sys}, on online-wf, the Online cluster's main task queue. Online calls are capped only while a SEPA run needs the room.`;
+  if (j.cluster === 'Online' && f.queue.startsWith('ds-')) {
+    return `${sys}, on the Online cluster\'s own ${f.queue}. The governor sets its limit for Online too, so Execute\'s and Fulfil\'s calls are always rate-limited.`;
+  }
+  if (j.cluster === 'Online') return `${sys}, on online-wf, the Online cluster's main task queue.`;
   if (f.queue.startsWith('ds-')) {
     return `${sys}, on ${f.queue}. The governor sets that queue's rate limit, so it is the one choke point for ${f.system}.`;
   }
@@ -1226,7 +1229,7 @@ export function router(j) {
     j.cluster === 'Online'
       ? {
           main: `Online cluster, task queue online-wf, as ${j.wfId}.`,
-          note: "online-wf is the Online cluster's main task queue. Online calls to a downstream are capped only while a SEPA run needs the room.",
+          note: "online-wf is the Online cluster's main task queue. Execute's and Fulfil's calls to a rate-limited downstream run on the Online cluster's own ds-* queues, at the limits the governor sets.",
         }
       : {
           main: j.prio

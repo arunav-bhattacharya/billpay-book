@@ -159,7 +159,7 @@ Every database activity runs local first, which is what lets a payment ride out 
 | --- | --- | --- |
 | Oracle reads and writes, through the stores | A local activity on the first attempt; a regular activity for every retry | The first try needs no task round trip; a retry runs on a worker like any activity, with the full retry policy |
 | The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and the provider in RequestConfirmation | A local activity. A Verify call that fails 3 times runs again as a regular activity on `online-wf`, for up to 24 hours | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
-| Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
+| Calls a downstream may throttle, Execute's and Fulfil's on both clusters | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there. The governor sets the limits on both clusters (agreed 2026-11-07) |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 
 Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the last row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans everywhere except Verify on the Online cluster. Raven has an agreed rate, so its calls run on `ds-comms`.
@@ -170,6 +170,6 @@ Throttled calls stay off eager dispatch, because it hands the task straight back
 - A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
 - Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
 - RTF and Raven get a long schedule-to-close, like the database activities. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
-- Start-to-close is about two to three times the call's p99, so a hung call frees its slot quickly.
+- Every downstream HTTP call in Execute and Fulfil times out at 5 seconds, and its activity's start-to-close sits just above that (Proposed: 6 seconds), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls stay shorter, at about two to three times the call's p99.
 - HTTP clients inside activities don't retry on their own (no MicroProfile `@Retry`, for example). One task is one call, so a queue's limit stays the real call rate.
 - Every HTTP call carries an idempotency key, such as `{paymentId}-{step}`, because any activity can run twice.

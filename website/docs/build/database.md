@@ -18,7 +18,7 @@ The `BPYSCH` DDL shared on 2026-10-16 is current: it is what runs in production.
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment, per presentment | Its type in `trans_type_cd`, `PAYMENT` or `REFUND` for now, with `ADJUSTMENT` and `REVERSAL` to follow; adjustments and reversals across accounts move no money. Its source in `trans_srce_nm`, which mostly matches `PaymentSource`, and its money movement, when it has one, in `money_move_da`. The instrument's enrollment ID, and in `instrmt_dtl_da` only the instrument type, its token, its fingerprint, the bank's routing number and name, and the account number's last 4 digits: Billpay fetches the rest of the instrument from Payment Instruments when a step needs it. Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
+| `trans_dtl` | Payment, per presentment | Its type in `trans_type_cd`, `PAYMENT` or `REFUND` for now, with `ADJUSTMENT` and `REVERSAL` to follow; adjustments and reversals across accounts move no money. Its total in `tot_trans_am`: the create's total, which for one instruction equals `trans_am`, while a create with several instructions writes one row per instruction, each carrying the same total (agreed 2026-11-07). Its source in `trans_srce_nm`, which mostly matches `PaymentSource`, and its money movement, when it has one, in `money_move_da`. The instrument's enrollment ID, and in `instrmt_dtl_da` only the instrument type, its token, its fingerprint, the bank's routing number and name, and the account number's last 4 digits: Billpay fetches the rest of the instrument from Payment Instruments when a step needs it. Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate, per presentment | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached, per presentment | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
@@ -34,10 +34,10 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | --- | --- | --- |
 | `work_tracker` (new) | Piece of dated work | A scheduled execution, an allocation request, a corporate execution, a corporate leg or a representment, and when it is due. Written in the same commit as the state change that creates it. |
 | `market_config_version` (new) | Published version of a market profile | Immutable once saved. |
-| `market_config_active` (new) | Market and account type | The version that is live. The Router reads it, and only `MarketOnboardingWorkflow` writes it. |
+| `market_config_active` (new) | Market and account type | The version that is live, and `in_service_in`, N once the market is taken out of service, so the active version stays readable (Proposed). The Router reads it, and only `MarketOnboardingWorkflow` writes it. |
 | `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
 | `rate_allocation` (new) | Traffic class, market or corporate payment | The rate the governor sets, which dispatchers read every few seconds. Manual overrides live here too. |
-| `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, Online cap and when it ends, last 429. |
+| `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, Online's limit, which billpay-online sets on its own queue, a SEPA run's cap and when it ends, last 429. |
 | `governor_decision` (new) | Governor check, every 15 seconds | Its inputs and outputs, so any rate can be explained later. |
 | `exception_list` (new) | Payment or leg whose retries ran out | The stage and status it stopped in, the last error, and who resolved it and when. Operations work from it. |
 
@@ -89,7 +89,6 @@ The production DDL stays as it is. What the design adds goes to the DBAs as one 
 
 - New columns on `trans_dtl`: `legs_released_at`, `stlmt_ts`, `ar_pstd_ts`, `bank_cnfrm_ref` and `bank_cnfrm_url`. On `split_trans_dtl`: `stlmt_ts` and `ar_pstd_ts`. On both timelines: `cluster_nm` and `batch_id`.
 - New indexes: the batch-ID index on each timeline, and the indexes for the corporate completion check, the late-allocations check and the 48-hour check (Proposed).
-- New tables: `work_tracker`, `allocation_batch`, `exception_list`, `market_config_version`, `market_config_active`, `dispatch_run`, `rate_allocation`, `downstream_limit` and `governor_decision`.
+- New tables: `work_tracker`, `allocation_batch`, `exception_list`, `market_config_version`, `market_config_active` (with `in_service_in`, Proposed), `dispatch_run`, `rate_allocation`, `downstream_limit` and `governor_decision`.
 - New values: `ALLOCATING` and `ALLOCATED` in `trans_sta_cd`.
 
-What `tot_trans_am` holds is still open.

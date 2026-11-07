@@ -132,7 +132,7 @@ When One-Data's inbox database is down, One-Data can't store requests or events.
 
 Online response times climb while Oracle and the downstreams are healthy, and the governor cuts offline work, execution included, to protect them.
 
-1. Add billpay-online pods. Every pod runs the same mode, so there is nothing else to change: online work spreads across the new pods, and the governor raises offline rates again as the signals recover.
+1. Add billpay-online pods. Every pod runs the same app, so there is nothing else to change: online work spreads across the new pods, and the governor raises offline rates again as the signals recover.
 
 ## billpay-offline short of capacity
 

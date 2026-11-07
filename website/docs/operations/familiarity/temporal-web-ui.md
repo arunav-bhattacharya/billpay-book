@@ -24,7 +24,7 @@ Every payment workflow sets its search attributes once, when it starts: `Payment
 - Every workflow for one payment: search by `PaymentId`.
 - Every leg of a corporate payment: search by `ParentPaymentId`.
 - Everything a market ran on one date: search by `Market` and `DueDate`.
-- Payments started on a particular release of a market's config: search by `ConfigVersion`.
+- Payments started on a particular release of a market's config: search by `ConfigVersion`, which holds the version number. `Journey` holds the journey's name (Proposed).
 
 Dispatcher runs are named for their Schedule, such as `dispatch-sched-DE`, plus the trigger time Temporal appends. The governor runs as `governor`, also with its trigger time.
 

@@ -15,9 +15,11 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 ## Who calls it
 
 - The core APIs, for every write a caller waits on: `POST /payments`, `PUT` and `DELETE /payments/{payment-id}`, `POST /payments/{payment-id}/confirm`, `POST /refunds` and `POST /payment-installments`.
-- The 3D Secure callback, `POST /payments/{payment-id}/authentication`, which the market's card provider calls directly. Like the confirm, it is only admitted, then sent as an update to the waiting workflow.
-- The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it.
+- The 3D Secure callback, `POST /payments/{payment-id}/authentication`, which the market's card provider calls directly. It carries no market, so it skips the profile check (agreed 2026-11-07), then goes as an update to the waiting workflow.
+- The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it. It needs neither the market nor the account type: its payment already exists, and the payment's workflows keep the config version they started on.
 - The dispatchers, in billpay-offline, once for each Work Tracker row or inbox request they release.
+
+On every `/payments` call, the create, the update, the cancel and the confirm, One-Data passes the card account's market and account type, which it looks up with `ReadCustomerAccountInfo.v1`, so the Router makes no lookup of its own. A create also carries each instruction's instrument type and payment ID (agreed 2026-11-07). The wire names of these fields come with the API contracts and are placeholders until then.
 
 The confirm, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, as an update, so there is nothing to pick, pin or choose ([6. Start](#6-start) shows the call).
 
@@ -50,7 +52,6 @@ data class RunSite(
     val priority: Int?,                           // 1 to 5, on the Offline cluster
     val fairnessKey: String?,                     // a market, a parent payment ID, "returns"...
     val workflowId: String,                       // the payment ID plus its suffix
-    val cappedQueues: Map<Downstream, String>,    // Online only, while a SEPA run caps it
 )
 ```
 
@@ -76,16 +77,16 @@ fun route(request: RouteRequest): Routed {
 
 ### 1. Admit
 
-The Router checks that the market, the account type and the API are live in this environment. It checks them against the app's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
+The Router checks that the market, the account type and the API are live in this environment. It checks them against the copy of the onboarding config each app caches in its JVM, so admission adds no call to a database or another service (agreed 2026-10-18). Only a call that names a market is checked: the 3D Secure callback and the allocations callback carry none (agreed 2026-11-07). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
 
 | Caller | What a refusal becomes |
 | --- | --- |
 | A core API | 422, which senders don't retry |
-| A core API, for a create One-Data held while billpay-online was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19) |
+| A core API, for a create One-Data held while billpay-online was slow, which RTF delivers with an async flag that a direct call never carries (agreed 2026-11-07) | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19) |
 | An inbox dispatcher | The request is marked `REJECTED` through `UpdateStartRequests.v1`, and an alert tells operations. The sender is not told |
 | A Work Tracker dispatcher | The row goes from `DISPATCHING` to `FAILED`, which raises the retries-exhausted alert. A row is refused only when its market was taken out of service after the row was written |
 
-The allocations callback has one more check: its start must fit inside its traffic class's budget, or the API answers 429 with `Retry-After`, and the allocations manager retries. Dispatchers skip this check, because the [governor](../../design/pacing.md#the-governor) already sets their rate.
+The allocations callback has one more check: its start must fit inside its traffic class's budget, or the API answers 429 with `Retry-After`, and the allocations manager retries. Proposed (2026-11-07): the class is `ALLOCATION_CALLBACK`, with its `RATE_ALLOCATION` row scoped `'*'`. Its bucket holds one second of rate, a `PAUSE` override answers `Retry-After: 30`, `MAXIMUM` caps the rate, and a class with no row isn't limited. The callback runs in the corporate priority class, keyed on its payment. Dispatchers skip this check, because the [governor](../../design/pacing.md#the-governor) already sets their rate.
 
 ### 2. Pick the journey
 
@@ -156,6 +157,8 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 **A test keeps the code and the table together.** It walks every request type, item type, inbox type and create rule, writes the routing table as trigger, condition and journey, and compares it with a checked-in copy, the way the [stage report](./stage-resolver.md) works. A change to which journey a request takes fails the test until the same pull request updates the copy, so the reviewer sees the row that moved.
 
+The request's payment method comes from the instrument type One-Data passes for each instruction, so the Router knows before anything starts whether a way to pay needs bank confirmation (Pay with Bank Transfer, Plaid), is a debit card (3D Secure) or is MR Points (agreed 2026-11-07).
+
 A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
 
 No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-online ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
@@ -177,7 +180,7 @@ fun resolveFlag(rule: BehaviorRule, journey: Journey, method: PaymentMethod?): B
     }
 ```
 
-The version is the active one, with one exception. The onboarding workflow tests a new version with real payments before it goes live, so for test accounts only, the Router accepts a pinned version instead.
+The version is the active one, with one exception. A new version is tested with real payments before it goes live, from mock accounts set up for that version (agreed 2026-11-07). Proposed: the release's JSON lists them, `testAccounts` by account token, frozen with the release, and the Router pins that version for any payment from one of them, even before it is active. Every other account runs on the active version.
 
 ### 4. Pin the resolved profile
 
@@ -237,17 +240,17 @@ The field names and values here are illustrative (Proposed, 2026-10-20). The spe
 
 The rule's logic is code and changes with a deploy. The number is config and changes with a release.
 
-The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg.
+The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg. `Journey` holds the journey's name and `ConfigVersion` the version number (Proposed, 2026-11-07).
 
 ### 5. Choose the run site
 
 The run site is the cluster, the task queue, the priority and fairness key, and the workflow ID.
 
-- Work a caller waits for runs on the Online cluster, on `online-wf`. Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
+- Work a caller waits for runs on the Online cluster, on `online-wf`, and its Execute and Fulfil calls always go to the Online cluster's `ds-*` queues (agreed 2026-11-07). Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
 - Priority and fairness key are set once, from the traffic class, and every activity inherits them. They matter only on the Offline cluster's shared queues, and [Design → Throttling](../../design/throttling.md#priority-and-fairness) has the classes.
 - The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
 
-The Online cap is the one part of the run site that changes with time. While a SEPA run caps Online on a downstream, `downstream_limit` holds the cap and its end time, and the Router places that downstream's calls for each new Online payment on the Online cluster's `ds-*` queue for it. A cap past its end time is ignored, so a stopped governor can't leave customers capped. The run site is pinned at start, and a running payment never switches queues. Proposed: the capped queues travel into the workflow with the resolved profile, and the stages build their activity options from them.
+Online's limits never change the run site. The governor writes them, a SEPA run's cap included, to `downstream_limit`, and billpay-online sets them on its own `ds-*` queues, so a cap changes a queue's limit, never where a call runs ([Design → Throttling](../../design/throttling.md#when-the-cutoff-wins)).
 
 ### 6. Start
 

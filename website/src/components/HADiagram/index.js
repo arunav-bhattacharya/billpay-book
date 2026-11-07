@@ -22,7 +22,7 @@ import styles from './styles.module.css';
  * neither Amex infrastructure nor AWS. Each Temporal cluster has its own
  * Aurora PostgreSQL drum, and the standby drum it replicates to.
  *
- * Billpay runs as two apps from one artifact, drawn as two boxes on one pale
+ * Billpay runs as two apps from one codebase, drawn as two boxes on one pale
  * field in each site: active in IPC2, and a standby of each in IPC1. Each app
  * takes its cluster's tone and has its own gRPC run to its own cluster, so
  * the two runs never meet: billpay-online leaves over the top of the field,
@@ -224,7 +224,7 @@ const ORA_Y = 227;
 const OFF_CL_Y = 270;
 
 const LABEL =
-  'High-availability topology. On the far left, outside both estates, a caller near each on-prem site. Next, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: the caller reaches the One-Data gateway, active, which calls the core APIs in billpay-online. Billpay runs as two apps from one artifact, side by side on one pale field: billpay-online runs the core APIs, the Router and the Online cluster\'s workers, and billpay-offline runs the dispatchers, the governor, the allocations callback and the Offline cluster\'s workers. Both read and write the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis store of pending payments: One-Data writes every new payment there and checks the other pending payments on the card account, and when the core APIs are slow or cannot be reached, RTF retries the stored payment later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to billpay-online in IPC2, it holds a standby of each app, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. On the right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with OpenSearch 2 visibility and its own Aurora PostgreSQL database. Over gRPC, each app talks only to its own cluster: billpay-online to the Online cluster and billpay-offline to the Offline cluster, on two runs that never meet. us-west-1 holds a passive standby of each cluster, each with its own PostgreSQL database replicated from the east, and each promoted on its own.';
+  'High-availability topology. On the far left, outside both estates, a caller near each on-prem site. Next, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: the caller reaches the One-Data gateway, active, which calls the core APIs in billpay-online. Billpay runs as two apps from one codebase, side by side on one pale field: billpay-online runs the core APIs, the Router and the Online cluster\'s workers, and billpay-offline runs the dispatchers, the governor, the allocations callback and the Offline cluster\'s workers. Both read and write the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis store of pending payments: One-Data writes every new payment there and checks the other pending payments on the card account, and when the core APIs are slow or cannot be reached, RTF retries the stored payment later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to billpay-online in IPC2, it holds a standby of each app, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. On the right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with OpenSearch 2 visibility and its own Aurora PostgreSQL database. Over gRPC, each app talks only to its own cluster: billpay-online to the Online cluster and billpay-offline to the Offline cluster, on two runs that never meet. us-west-1 holds a passive standby of each cluster, each with its own PostgreSQL database replicated from the east, and each promoted on its own.';
 
 export default function HADiagram() {
   const eastOD = {x: OD.x, y: ROW - OD.h / 2};
@@ -385,11 +385,11 @@ export default function HADiagram() {
         <Label x={REDIS_X + 11} y={ROW + 55} cls="bufLabel" anchor="start">hold · RTF retry</Label>
         <Label x={REDIS_X + 11} y={m(ROW + 55) + 9} cls="bufLabel" anchor="start">hold · RTF retry</Label>
 
-        {/* ---- the two apps, one artifact: active in IPC2, a standby of each in IPC1 ---- */}
+        {/* ---- the two apps, one codebase: active in IPC2, a standby of each in IPC1 ---- */}
         <rect x={GROUP.x} y={GROUP.y} width={GROUP.w} height={GROUP.h} rx={13} className={styles.appGroup} />
         <AppBox x={ONL.x} y={ONL.y} w={ONL.w} h={ONL.h} tone="tOnline" title="billpay-online" lines={ONLINE_LINES} />
         <AppBox x={OFF.x} y={OFF.y} w={OFF.w} h={OFF.h} tone="tOffline" title="billpay-offline" lines={OFFLINE_LINES} />
-        <Label x={ONL.x} y={GROUP.y + GROUP.h - 9} cls="small" anchor="start">one artifact, two modes</Label>
+        <Label x={ONL.x} y={GROUP.y + GROUP.h - 9} cls="small" anchor="start">one codebase, two apps</Label>
         <Pill x={GROUP.x + GROUP.w - 6} y={GROUP.y + GROUP.h + 14} label="ACTIVE" tone="pActive" anchor="end" />
 
         <g className={styles.dim}>
@@ -397,7 +397,7 @@ export default function HADiagram() {
         </g>
         <AppBox x={ONL.x} y={westOnlY} w={ONL.w} h={ONL.h} tone="tOnline" title="billpay-online" lines={ONLINE_LINES} dim />
         <AppBox x={OFF.x} y={westOffY2} w={OFF.w} h={OFF.h} tone="tOffline" title="billpay-offline" lines={OFFLINE_LINES} dim />
-        <Label x={ONL.x} y={westGroupY + 18} cls="small" anchor="start">one artifact, two modes</Label>
+        <Label x={ONL.x} y={westGroupY + 18} cls="small" anchor="start">one codebase, two apps</Label>
         <Pill x={GROUP.x + GROUP.w - 6} y={westGroupY - 14} label="STANDBY" tone="pStandby" anchor="end" />
 
         {/* ---- Oracle ---- */}

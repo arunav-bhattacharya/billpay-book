@@ -44,7 +44,8 @@ The cutoff alert fires when the projected finish passes the cutoff minus 15 minu
 - its agreed TPS
 - the online margin
 - the current offline share
-- any cap on Online, and when it ends
+- Online's limit, which billpay-online sets on its own queue
+- any SEPA cap on Online, and when it ends
 - the last 429
 
 Read it with the task queues on [Temporal Health](./temporal-health.md):

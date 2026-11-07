@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Deployables
 
-<Lead>Every artifact the platform ships to production. There are five, and billpay-core, the one artifact deployed as Billpay's two apps, billpay-online and billpay-offline, is the one most changes touch.</Lead>
+<Lead>Every artifact the platform ships to production. There are six, and the two built from the billpay-core codebase, billpay-online and billpay-offline, are the ones most changes touch.</Lead>
 
 ## In this section
 
@@ -22,7 +22,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'billpay-online and billpay-offline',
       to: '/docs/deployment/deployables/worker-app',
-      desc: `One artifact, two apps: billpay-online runs the channel APIs and the Online cluster's workers, billpay-offline the dispatchers, the governor and the Offline cluster's workers.`,
+      desc: `Two Quarkus apps from one codebase: billpay-online runs the channel APIs and the Online cluster's workers, billpay-offline the dispatchers, the governor and the Offline cluster's workers.`,
     },
     {
       term: 'Codec Server App',

@@ -28,7 +28,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 ## The apps
 
-Billpay runs as two apps, built from one codebase, billpay-core, as one artifact. Each connects to its own Temporal cluster and nothing else in Temporal.
+Billpay runs as two apps, built from one codebase, billpay-core. Each connects to its own Temporal cluster and nothing else in Temporal.
 
 - billpay-online runs the REST APIs channels call, the card provider's 3D Secure callback, the [Billpay Router](../design/routing.md) for those requests and the workers for the Online cluster.
 - billpay-offline runs the dispatchers, the governor, the allocations callback, the Market Onboarding API and the workers for the Offline cluster.

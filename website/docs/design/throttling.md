@@ -14,15 +14,15 @@ Billpay calls clearing, Accounts Receivable and several other systems for every 
 
 ## One queue per downstream
 
-Every downstream endpoint with an agreed rate gets its own activity task queue on the Offline cluster:
+Every downstream endpoint with an agreed rate gets its own activity task queue on the Offline cluster, and the Online cluster has the same queues for the downstreams Execute and Fulfil call (all but `ds-allocations`):
 
 `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms` and `ds-allocations`.
 
-Every external call made after a payment is accepted can be rate-limited by how available its downstream is. Whether that covers the Online cluster's Execute and Fulfil calls, which run on `online-wf` with no rate limit outside a SEPA cap, is still to confirm.
+Every external call made after a payment is accepted can be rate-limited by how available its downstream is, and that includes the Online cluster's Execute and Fulfil calls (agreed 2026-11-07). They always run on Online's own `ds-*` queues, so Online is throttled all the time, not only during a SEPA run.
 
 Until each system's owner agrees a number, every one of them is taken at 100 calls a second. Payment Instruments and Payment Options have no limit, so calls to them run on the workflow's own queue.
 
-The queue's server-side rate limit is the overall limit for that downstream, however many pods are polling it. The governor changes it at runtime through the task queue config API, for example:
+The queue's server-side rate limit is the overall limit for that downstream, however many pods are polling it. The governor sets the limit on every `ds-*` queue of both clusters. On the Offline cluster it changes it at runtime through the task queue config API, for example:
 
 ```bash
 temporal task-queue config set --task-queue ds-clearing --task-queue-type activity \
@@ -31,7 +31,7 @@ temporal task-queue config set --task-queue ds-clearing --task-queue-type activi
 
 ## Sharing a downstream between the clusters
 
-There is no fixed split. Every 15 seconds the [governor](./pacing.md#the-governor) works out each downstream's offline share from what online traffic is actually using:
+There is no fixed split. Online comes first, except during a SEPA run, which comes before it. Outside a run, Online's limit on a downstream is the full agreed rate (Proposed), and every 15 seconds the [governor](./pacing.md#the-governor) works out each downstream's offline share from what online traffic is actually using:
 
 > Offline share = agreed TPS − online traffic's use (the peak of the last minute) − headroom
 
@@ -39,7 +39,7 @@ Say clearing has agreed to 100 calls a second. Online at 25 leaves offline 65, o
 
 The sum needs two inputs. Both are settled for now, and both will be looked at again:
 
-- Online's calls all run on one queue, so Temporal can't count them per downstream. Online workers count their own calls and 429s per downstream, and billpay-online publishes them with its other metrics. The Prometheus server that already scrapes Temporal's metrics scrapes both apps' pods too, and the governor reads it there. That server has to be sized for the extra volume, and how to scale it is a discussion of its own.
+- Online workers count their own calls and 429s per downstream, and billpay-online publishes them with its other metrics. The Prometheus server that already scrapes Temporal's metrics scrapes both apps' pods too, and the governor reads it there. That server has to be sized for the extra volume, and how to scale it is a discussion of its own.
 - The headroom covers how late offline can react, which is up to about 45 seconds. The governor checks every 15 seconds, and the numbers it reads are about 30 seconds old: the scrape interval plus the window a rate is computed over. So after online traffic jumps, offline can keep its old share for up to 45 seconds. The headroom is the larger of 10% of the agreed rate and the biggest 45-second jump in online traffic seen over the last 4 weeks and in the load test. A faster scrape shortens the lag, and the headroom with it, which is why the 45 seconds will be revisited.
 
 ## When the cutoff wins
@@ -48,7 +48,7 @@ A SEPA run has to reach the bank before its cutoff, and when it collides with on
 
 If online traffic would leave less than that, online is capped on that downstream at the agreed rate minus the run's need, until the cutoff passes. With clearing at 100 calls a second, the cap is 44. The US run has no cutoff, so it never caps online traffic.
 
-The cap works the same way as offline's limits, but the governor never touches the Online cluster to set it. The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor, in billpay-offline, writes the cap and its end time to `downstream_limit` in Oracle, and billpay-online reads it and sets the cap as that queue's limit on its own cluster. Proposed: each billpay-online pod reads it every 15 seconds and sets the limit only when it has changed. While a cap is on, the Router places that downstream's calls for each new online payment on the capped queue. The rest of the time they run on `online-wf` with eager dispatch, so normal traffic pays nothing for this. A cap lifts by itself at the cutoff: the Router ignores a cap past its end time and billpay-online lifts the queue's limit, so a stopped governor can't leave customers capped.
+The governor never touches the Online cluster to set Online's limits, the cap included, because nothing calls across clusters. It writes each Online limit, and a cap's end time, to `downstream_limit` in Oracle, and billpay-online reads it and sets the limit on its own cluster's `ds-*` queue. Proposed: each billpay-online pod reads it every 15 seconds and sets a limit only when it has changed. Online's Execute and Fulfil calls always run on those queues, so a cap changes a limit, never where a call runs. A cap lifts by itself at the cutoff: billpay-online ignores a cap past its end time and puts the queue back to Online's normal limit, so a stopped governor can't leave customers capped.
 
 The cost falls on customers, and only during the run. Some online payments wait for the downstream, and one the API can't decide in time gets a PENDING reply and finishes shortly after. Because a cap raises online p99 on purpose, online p99 never cuts a SEPA run below its floor. Two hours before each run, the governor warns when online traffic is likely to be capped.
 
@@ -108,4 +108,4 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
 
-On the Online cluster, the main queue is `online-wf`, which carries the workflow tasks and their regular activities, with eager dispatch on. The decision's calls, to Payment Instruments, Payment Options and Plans in Verify, to the card provider for a debit card's authorization, and to the provider in RequestConfirmation, skip the queue altogether: they run as local activities, inside the worker. None of those systems has a rate limit, so running outside the queue skips nothing. A Verify call that fails 3 times that way runs again as a regular activity on `online-wf`, for up to 24 hours. Its `ds-*` queues carry calls only while a SEPA run caps online traffic on a downstream ([When the cutoff wins](#when-the-cutoff-wins)). Online workers poll them, with slots sized to the cap.
+On the Online cluster, the main queue is `online-wf`, which carries the workflow tasks and the activities nobody throttles, such as RTF's, with eager dispatch on. The decision's calls, to Payment Instruments, Payment Options and Plans in Verify, to the card provider for a debit card's authorization, and to the provider in RequestConfirmation, skip the queue altogether: they run as local activities, inside the worker. None of those systems has a rate limit, so running outside the queue skips nothing. A Verify call that fails 3 times that way runs again as a regular activity on `online-wf`, for up to 24 hours. Execute's and Fulfil's calls run on its `ds-*` queues, one per downstream, always at the limit the governor sets, a SEPA run's cap included ([When the cutoff wins](#when-the-cutoff-wins)). Throttled calls stay off eager dispatch, which would skip the queue's limit. Online workers poll the queues, with slots sized to each one's limit.

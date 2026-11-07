@@ -32,9 +32,9 @@ One run takes one release through five steps in its environment.
 
 1. Check vN against the deployed build's capability manifest. A behavior combination the build can't run stops the release here, marked as needing a build. So does a profile whose cancellation window doesn't close before its execution time.
 2. Save vN as an inactive version, together with the Schedules, dispatcher settings, rate rows and fairness settings it needs, all inactive too.
-3. Test with payments against vN. The Router accepts a pinned config version for test accounts only, so test payments can use vN before anyone else can.
+3. Test with payments from mock accounts set up for vN, so test payments can use vN before anyone else can (agreed 2026-11-07). Proposed: vN's JSON lists them, `testAccounts` by account token, and the Router pins vN for any payment from one of them.
 4. Wait for sign-off, and in E3 for the change request (RFC) as well.
-5. Activate: switch `market_config_active` to vN and apply its Schedules and settings. Every running copy (pod) of both apps, billpay-online and billpay-offline, keeps the onboarding config in memory and reloads it now, so new payments use vN at once. A rollback reloads the same way.
+5. Activate: switch `market_config_active` to vN and apply its Schedules and settings. Every running copy (pod) of both apps, billpay-online and billpay-offline, keeps the onboarding config in memory and reloads it now, so new payments use vN at once. The workflow runs on the Offline cluster, so billpay-online learns of the change through Oracle (Proposed: each pod reads `market_config_active` every 15 seconds). A rollback reloads the same way.
 
 If a step fails, the workflow stops before activation and the readiness screen shows which step failed. The fix is to correct the profile, which makes a new release, vN+1, or to ship the build it needs. Until that build is deployed, the workflow stops at its first step.
 
@@ -44,10 +44,12 @@ Each environment keeps its published market config in its own Billpay schema, `B
 
 | Table | What it holds |
 | --- | --- |
-| `market_config_version` | Every published version of every profile. A version never changes once it is saved |
-| `market_config_active` | The active version for each market and account type |
+| `market_config_version` | Every published version of every profile, its release JSON in `CONFIG_DA`. A version never changes once it is saved |
+| `market_config_active` | The active version for each market and account type, and `IN_SERVICE_IN`: N once the market is taken out of service, so the active version stays readable (Proposed) |
 
-The Router reads both, and only `MarketOnboardingWorkflow` writes them. Because versions are immutable and activation is a pointer, rolling back is the same operation as going live: the pointer, and the Schedules and settings, move back to the previous version.
+The Router reads both, and only `MarketOnboardingWorkflow` writes them.
+
+The release JSON the Router reads holds billpay-ui's `apis` and behavior keys (`requiresArPosting`, `requiresRealtimeClearing`, `requiresMandateAuthorization`), plus `requiresBankConfirmation`, `bankConfirmation` (`provider`, `confirmationWindow`), `cardAuthentication` (`provider`, `authenticationWindow`), `payWithMrPoints`, `ruleSettings` and `testAccounts`, the mock accounts that test the version. A behavior set to BOTH lists the journeys that get Y as `yesForJourneys`. All of it is Proposed (2026-11-07). Because versions are immutable and activation is a pointer, rolling back is the same operation as going live: the pointer, and the Schedules and settings, move back to the previous version.
 
 ## How payments pick up a version
 

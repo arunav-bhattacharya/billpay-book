@@ -268,7 +268,7 @@
   fill: var(--amex-mut);
 }
 
-/* the pale field both apps sit on: one artifact, two modes */
+/* the pale field both apps sit on: one codebase, two apps */
 .appGroup {
   fill: var(--ha-group);
 }

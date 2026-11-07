@@ -12,4 +12,4 @@ import Lead from '@site/src/components/Lead';
 
 This is the outermost layer of [functional testing](./index.md). No containers or mocks stand in here: whether scripted or run by hand, an end-to-end test goes against the real integrations.
 
-A market release gets an end-to-end check of its own in every environment. Before anyone signs a new version off, test payments run against it: the Router accepts a pinned config version for test accounts only, so the new version can be tried while every other payment keeps the active one. [Releases](../../onboarding/releases.md) covers the sign-off that follows.
+A market release gets an end-to-end check of its own in every environment. Before anyone signs a new version off, test payments run against it from mock accounts set up for that version, so the new version can be tried while every other payment keeps the active one (agreed 2026-11-07). Proposed: the release's JSON lists its mock accounts, and the Router pins the version for any payment from one of them, even before it is active. [Releases](../../onboarding/releases.md) covers the sign-off that follows.

@@ -11,13 +11,13 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 <Lead>A composite workflow is a parent that runs core workflows as children, sometimes across domains. Composites start on the Online cluster with Update-With-Start, and their children always run on the same cluster.</Lead>
 
-A composite exists because the customer asked for one thing. Paying now and setting up a plan, or paying with several instructions at once, is one request to them, so it gets one answer and one workflow that owns it. Pay with MR Points, which spans Billpay and Loyalty, is the third composite the design names; its steps are still to be described.
+A composite exists because the customer asked for one thing. Paying now and setting up a plan, or paying with several instructions at once, is one request to them, so it gets one answer and one workflow that owns it. Pay with MR Points, which spans Billpay and Loyalty, is the third composite the design names, as `PayWithMrPointsWorkflow` (Proposed, 2026-11-07); its steps are still to be described.
 
 ## Create Payment & Installments
 
 <WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from POST /payment-installments" />
 
-Pay & Plan combines a payment today with a plan of future installments, across Billpay and GAR. It runs three steps in order:
+Pay & Plan combines a payment today with a plan of future installments, across Billpay and GAR. Its workflow type is `PayAndPlanWorkflow` (Proposed, 2026-11-07). It runs three steps in order:
 
 1. `CreateImmediatePaymentWorkflow` as a child, for the payment itself.
 2. The Installments API, to set up the plan.
@@ -27,9 +27,9 @@ Pay & Plan never takes bank confirmation or a debit card. A request that would n
 
 ## Create Payment with Multiple Instructions
 
-<WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from POST /payments with several instructions" />
+<WorkflowMeta cluster="Online" id="a unique ID of its own" start="Update-With-Start, from POST /payments with several instructions" />
 
-`CreatePaymentWithMultipleInstructionsWorkflow` handles one request that carries several payment instructions.
+`CreatePaymentWithMultipleInstructionsWorkflow` handles one request that carries several payment instructions. One-Data sends one payment ID for each instruction, so the request arrives with all of them (agreed 2026-11-07). The composite's own workflow ID is unique to it, and each instruction's child workflow takes that ID with a suffix; the form of both comes later.
 
 1. Validate the composite payment as a whole.
 2. Run one `CreateImmediatePaymentWorkflow` per instruction, so each gets its own payment, its own lifecycle and its own outcome.
