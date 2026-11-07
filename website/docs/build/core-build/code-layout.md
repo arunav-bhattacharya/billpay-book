@@ -1,6 +1,6 @@
 ---
 title: Code Layout
-description: 'billpay-core is one Gradle monorepo and one app, which runs the workers for both Temporal clusters.'
+description: 'billpay-core is one Gradle monorepo that builds one artifact, deployed as two apps, billpay-online and billpay-offline.'
 sidebar_label: Code Layout
 ---
 
@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Code Layout
 
-<Lead>billpay-core is one Gradle monorepo and one app, which runs the workers for both Temporal clusters. The layout follows a single idea: shared behavior lives once under <code>core/lib</code>, a market's own behavior lives only in that market's own module, and the build stops workflow code from reaching anything that would break its determinism.</Lead>
+<Lead>billpay-core is one Gradle monorepo that builds one artifact, deployed as two apps, billpay-online and billpay-offline. The layout follows a single idea: shared behavior lives once under <code>core/lib</code>, a market's own behavior lives only in that market's own module, and the build stops workflow code from reaching anything that would break its determinism.</Lead>
 
 ## Where everything lives
 
@@ -29,9 +29,11 @@ Much of what used to be market code isn't code at all now. A market's execution 
 
 Each layer may depend only on the interfaces of the layer below it:
 
-- Workflow code depends on stage interfaces and the stage resolver. It never sees an activity, a client or another cluster.
-- Stage code depends on activity interfaces, and gets their stubs through its `StageContext`. It never sees an activity's implementation or a client.
-- Activity implementations depend on clients. A client depends on nothing above it.
+- Workflow code depends on stage interfaces, activity interfaces and the stage resolver. It never sees an activity's implementation, a store, a client or another cluster.
+- Stage code depends on activity interfaces, and gets their stubs through its `StageContext`. It never sees an activity's implementation, a store or a client.
+- Activity implementations depend on stores and clients. A store reaches Oracle and a client its one system, and neither depends on anything above it.
+
+A workflow may call stages or activities, a stage calls activities, an activity calls stores or clients, and a client calls only its own system. There are no exceptions, for control and periodic workflows too (agreed 2026-11-07).
 
 The Gradle module graph makes a violation a compile error, not a review comment. That matters most at the top. Stage code runs inside the workflow, so keeping the implementations, where all the I/O lives, out of compile-time reach is how the build enforces [determinism](./workflows.md#why-workflow-code-must-be-deterministic): the workflow can't cheat, even by accident.
 
@@ -43,4 +45,4 @@ The Gradle module graph makes a violation a compile error, not a review comment.
 
 This is where naming classes for their jobs earns its keep. The check that verifies a mandate is `MandateCheck`, not a Germany check, so the next market that needs a mandate turns the behavior on and gets the same class. Only a class that really belongs to one market carries that market's code, at the front, such as `GBFundsCheck` ([the naming rule](../../design/component-model/stages.md#naming)).
 
-The deployables this monorepo produces are covered under [Deployment](../../deployment/deployables/index.md).
+The artifact this monorepo produces runs in one of two modes, online or offline, set when the app starts. [Deployment](../../deployment/deployables/index.md) covers the two apps and the other deployables.

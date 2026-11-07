@@ -10,6 +10,8 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>An instrument is <em>where the money comes from</em>: a bank account, a debit card, or a loyalty balance. Like payment options, instruments follow a resolve-then-trust pattern. Inputs arrive as references or provided details, and only a <strong>verified</strong> instrument can fund a payment.</Lead>
 
+Billpay doesn't store instrument details. It keeps the instrument's enrollment ID, and on the payment only the instrument type, its token, its fingerprint, the bank's routing number and name, and the last 4 digits of the account number. When a step needs the rest, Billpay fetches it from Payment Instruments through `ReadInstrumentByEnrollmentId.sor.v2`, and it travels in the workflow, encrypted in history, to the later calls of the same run.
+
 ## The instrument hierarchy
 
 ```kotlin

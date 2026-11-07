@@ -101,7 +101,7 @@ There was no payments domain to call. There was Arrangement Manager, and behind 
       legacy:
         'The trail was **split across systems**, so following one payment meant several lookups',
       modern:
-        '**One lifecycle, one set of states**, and one application provides traceability end to end',
+        '**One lifecycle, one set of states**, and one codebase provides traceability end to end',
     },
   ]}
 />

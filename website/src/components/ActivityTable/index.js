@@ -13,7 +13,8 @@ import styles from './styles.module.css';
  * "which of these are throttled". The filter answers that: every row is one of
  * three kinds of queue, worked out from its queue unless the row says so.
  *
- *   local     a local activity, in the workflow task itself (PaymentStore)
+ *   local     a local activity, in the workflow task itself (a store's first
+ *             attempt, or Verify's calls on the Online cluster)
  *   limited   a rate-limited `ds-*` queue, one per downstream
  *   workflow  the workflow's own queue, for calls nobody throttles
  *

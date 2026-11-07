@@ -19,7 +19,7 @@ A page that listed every instrument on file would let the customer pick one this
 ## Three calls, in this order
 
 1. **`ReadPaymentOptions.v1`**, from Payment Options. It returns what the customer owes and the options to pay it: Statement Balance, Total Balance, Minimum Due and Other Amount. Each option carries a payment option ID, unique to that option and the balance it pays. It also says whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take. If nothing is owed, the payment journey never starts and the channel calls nothing else.
-2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from. It is a One-Data function in front of a billpay-core endpoint, and billpay-core makes the one read that source needs:
+2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from. It is a One-Data function in front of a billpay-online endpoint, and billpay-online makes the one read that source needs:
    - Enrolled Instruments: Payment Instruments' `ReadInstruments`, for the instruments the customer has enrolled;
    - Pay with Bank Transfer or a debit card: `ReadBanksForRealtimePayments.v1`, for the list of banks the customer can pay from in real time;
    - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with.
@@ -27,9 +27,9 @@ A page that listed every instrument on file would let the customer pick one this
    It replaces the channel's own call to Payment Instruments.
 3. **`CreatePayment.v3`**, when the customer reviews and pays. It carries the ID of the option the customer chose, and it is the only call that starts anything.
 
-A debit card adds one more call, in the other direction. Billpay gives the market's card provider a callback URL when it starts 3D Secure, and the provider calls billpay-core back directly once the card is authenticated, not through One-Data and not from the channel.
+A debit card adds one more call, in the other direction. Billpay gives the market's card provider a callback URL when it starts 3D Secure, and the provider calls billpay-online back directly once the card is authenticated, not through One-Data and not from the channel.
 
-The reads only guide the page. Verify calls Payment Options and Payment Instruments again once the payment is created, and those calls decide. Verify's Options check validates the chosen option through Payment Options' `ReadPaymentOptionById.v1`. A scheduled payment is checked again on its due date: Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the option still holds, and declines the payment if not. A Statement Balance or Total Balance payment pays what the option gives that day, which can differ from the amount at the create. A payment with several instructions, such as a bank account plus MR Points, carries one option ID for the whole payment. Payments from Accounts Receivable, corporate payments and Pay with MR Points alone carry none, and their Verify skips the Options check. The Router and Verify also check the payment against the market's release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it would refuse.
+The reads only guide the page. Verify calls Payment Options and Payment Instruments again once the payment is created, and those calls decide. Verify's Options check validates the chosen option through Payment Options' `ReadPaymentOptionByIdentifier.v1`. A scheduled payment is checked again on its due date: Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the option still holds, and declines the payment if not. A Statement Balance or Total Balance payment pays what the option gives that day, which can differ from the amount at the create. A payment with several instructions, such as a bank account plus MR Points, carries one option ID for the whole payment. Payments from Accounts Receivable, corporate payments and Pay with MR Points alone carry none, and their Verify skips the Options check. The Router and Verify also check the payment against the market's release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it would refuse.
 
 ## What decides what the page offers
 
@@ -54,14 +54,14 @@ The table follows the order customers meet these journeys. The Router checks the
 
 ## When another payment is still pending
 
-A customer who isn't sure a payment went through may pay again, and pay twice. So One-Data checks every create before billpay-core sees it. It keeps each card account's pending payments in Redis, and if the account already has one in `PENDING`, it declines the new create there and then: the channel gets 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed). billpay-core is never called, so no journey starts and Billpay holds no record of the attempt.
+A customer who isn't sure a payment went through may pay again, and pay twice. So One-Data checks every create before billpay-online sees it. It keeps each card account's pending payments in Redis, and if the account already has one in `PENDING`, it declines the new create there and then: the channel gets 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed). billpay-online is never called, so no journey starts and Billpay holds no record of the attempt.
 
-A payment stays on the account's pending list only until it is decided. Once it is `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED`, billpay-core calls One-Data's delete API, `DeletePendingPayment.v1`, and the customer can pay again. So a scheduled payment never blocks the next one, and a payment that waits for bank confirmation or 3D Secure blocks it only while it waits: usually the market's confirmation window, up to 10 minutes, or the 2 minutes of 3D Secure.
+A payment stays on the account's pending list only until it is decided. Once it is `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED`, its workflow calls One-Data's delete API, `DeletePendingPayment.v1`, after the reply, and the customer can pay again. Every create workflow makes that call, even for a create One-Data never stored, such as one from Accounts Receivable, where it finds nothing to remove. So a scheduled payment never blocks the next one, and a payment that waits for bank confirmation or 3D Secure blocks it only while it waits: usually the market's confirmation window, up to 10 minutes, or the 2 minutes of 3D Secure.
 
 - The check and the add are one atomic call to Redis (Proposed), so two creates that arrive together can't both get through.
 - It covers payments from channels: creates through `CreatePayment.v3`, and Pay & Plan's through `CreatePaymentInstallment.v1`. Payments Accounts Receivable raises, push payments from third parties and refunds never go through it.
-- When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-core alone. A create billpay-core hasn't captured yet can slip past that read, and the design accepts the gap.
-- If a delete never lands, the entry would block the account for good. So every hour One-Data sweeps the entries more than 2 hours old and asks billpay-core about each one. It removes those whose payment is decided or that billpay-core never got, keeps those still `PENDING`, and raises one alert listing both.
+- When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-online alone. A create billpay-online hasn't captured yet can slip past that read, and the design accepts the gap.
+- If a delete never lands, the entry would block the account for good. So every hour One-Data sweeps the entries more than 2 hours old and asks billpay-online about each one. It removes those whose payment is decided or that billpay-online never got, keeps those still `PENDING`, and raises one alert listing both.
 
 ## Debit card
 
@@ -90,9 +90,9 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 ## Still to be defined
 
 - Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions.v1` is one option.
-- The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-core endpoint behind it.
+- The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-online endpoint behind it.
 - Who owns `ReadBanksForRealtimePayments.v1` and `ReadEligibleWallets.v1`, and their contracts.
-- The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionById.v1`, and the decline code for an option that no longer holds.
+- The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionByIdentifier.v1`, and the decline code for an option that no longer holds.
 - Whether the market's Proposed scheduling horizon setting stays, now that `ReadPaymentOptions.v1` gives each customer's date range.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. The page can read eligible wallets, but no journey takes one yet, and wallets appear on this page only.

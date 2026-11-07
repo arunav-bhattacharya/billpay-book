@@ -16,18 +16,18 @@ import Lead from '@site/src/components/Lead';
 - The hand-off between clusters. A payment accepted or scheduled on the Online cluster reaches the Offline cluster as a Work Tracker row, written in the same commit as its state change. Nothing calls across.
 - The control tables the dispatchers and the governor run on, and the exception list ([Dispatch Controls](./dispatch-controls.md)).
 
-Only `PaymentStore` reads or writes these tables, and each of its operations is one transaction. [Build → Database](../../build/database.md) lists the tables.
+Only Billpay's stores read or write these tables (`PaymentStore` for payment state, and one store each for the Work Tracker, allocation batches, the market config and the control tables), and each operation is one transaction. [Build → Database](../../build/database.md) lists the tables.
 
 ## During patching
 
 A short outage or a patching window doesn't fail payments:
 
-- `PaymentStore` retries short blips inside the same workflow task.
-- Once the wait between retries passes three times the workflow task timeout (30 seconds by default), it waits on a durable timer instead, and retries in a later task. The payment pauses and resumes when Oracle is back, even across a worker restart.
+- A database call runs as a local activity on its first attempt, inside the workflow task.
+- If that attempt fails, the call runs again as a regular activity with the full retry policy, for a few hours if need be. The payment pauses and resumes when Oracle is back, even across a worker restart.
 - The governor sees the Oracle errors and stops dispatching, so only payments already in flight wait.
 - On the Online cluster, Capture has a short deadline, so a caller gets a quick error rather than a long wait.
 
-Escalate only if the outage will outlast `PaymentStore`'s schedule-to-close, which is a few hours. Past that, its retries run out, and each waiting payment's Work Tracker row goes `FAILED` and the payment onto the exception list. [Oracle patching](../sops.md#oracle-patching) has the steps.
+Escalate only if the outage will outlast a database call's schedule-to-close, which is a few hours. Past that, its retries run out, and each waiting payment's Work Tracker row goes `FAILED` and the payment onto the exception list. [Oracle patching](../sops.md#oracle-patching) has the steps.
 
 ## Where it runs
 

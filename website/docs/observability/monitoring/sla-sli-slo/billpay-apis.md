@@ -78,7 +78,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **Billpay Core API** · `GET /instruments/account/{account-id}?source={source}` (path Proposed) · SLA availability: not set yet
 
-**SLI:** latency for one source's list, including billpay-core's call to `ReadInstruments`, `ReadBanksForRealtimePayments.v1` or `ReadEligibleWallets.v1` and the filter by the market's rules. Its targets are still to come.
+**SLI:** latency for one source's list, including billpay-online's call to `ReadInstruments`, `ReadBanksForRealtimePayments.v1` or `ReadEligibleWallets.v1` and the filter by the market's rules. Its targets are still to come.
 
 ## Payment Installments
 

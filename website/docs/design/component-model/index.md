@@ -29,7 +29,7 @@ A journey reads top to bottom across the three. `ExecuteScheduledPaymentWorkflow
     {
       term: 'Activities',
       to: '/docs/design/component-model/activities',
-      desc: `One activity interface per system, the task queue it runs on, and the stages that call it, plus PaymentStore, the only code that reaches Oracle.`,
+      desc: `One activity interface per system, the task queue it runs on, and the stages that call it, plus the stores, the only code that reaches Oracle.`,
     },
   ]}
 />

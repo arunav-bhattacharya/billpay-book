@@ -470,7 +470,7 @@ function Trigger({j, n, brief, go}) {
       </p>
       {!brief && (
         <p className={styles.stepNote}>
-          {req.direct ? 'Straight to billpay-core, not through One-Data' : `One-Data ${req.handler ? 'event handler' : 'function'}`}
+          {req.direct ? 'Straight to billpay-online, not through One-Data' : `One-Data ${req.handler ? 'event handler' : 'function'}`}
           {req.aside ? `, ${req.aside}` : ''}: {req.does}.
         </p>
       )}
@@ -494,8 +494,8 @@ function Lands({j, n, brief}) {
   } else if (req.api) {
     head = <Api method={req.api[0]} path={req.api[1]} big />;
     note = req.stores
-      ? 'billpay-core endpoint: it stores the batch in allocation_batch, then hands the request to the Router.'
-      : 'billpay-core endpoint: it hands the request to the Router.';
+      ? 'billpay-offline endpoint: it stores the batch in allocation_batch, then hands the request to the Router.'
+      : 'billpay-online endpoint: it hands the request to the Router.';
   } else if (req.inbox) {
     head = (
       <>
@@ -971,7 +971,7 @@ function ActCard({f, go, onClear}) {
 
       {f.rail && f.name === 'PaymentStore' && (
         <p className={clsx(styles.stepText, styles.gapTop)}>
-          It is the only code that reaches Oracle, and it runs as a local activity. Each stage commits its new state,
+          It is the store for payment state: only the stores reach Oracle. Its first attempt runs as a local activity and any retry as a regular one. Each stage commits its new state,
           a timeline entry and its Work Tracker rows in one guarded transaction.
         </p>
       )}
@@ -1086,7 +1086,7 @@ function Overview() {
           <p className={styles.stepHead}>
             <b>Where it lands</b>
           </p>
-          <p className={styles.stepNote}>A billpay-core endpoint, One-Data&apos;s inbox, or a dispatcher the governor paces.</p>
+          <p className={styles.stepNote}>An endpoint on billpay-online or billpay-offline, One-Data&apos;s inbox, or a dispatcher the governor paces.</p>
         </li>
         <li className={clsx(styles.step, styles.segTone)}>
           <Badge n={3} kind="router" />
@@ -1622,7 +1622,7 @@ export default function RouteLedger() {
             setting, which a market or an account type can change. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
             it moves a corporate parent to PROCESSED, and ProcessMissingPaidEvents asks MR/M3 and GAR for a
             payment&apos;s state. The two payment reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}
-            and <span className={styles.mono}>GET /payments/{'{payment-id}'}</span>, read Oracle in billpay-core
+            and <span className={styles.mono}>GET /payments/{'{payment-id}'}</span>, read Oracle in billpay-online
             (<span className={styles.mono}>ReadPayments.v1</span>, in front of the first, also reads One-Data&apos;s Redis). The
             instruments read calls the instruments systems instead. None of them starts a workflow.
           </p>

@@ -13,7 +13,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 ## The API
 
-Each environment's app exposes the Market Onboarding API, and only the Market Onboarding UI's backend calls it, with its own service identity.
+Each environment's billpay-offline exposes the Market Onboarding API, because the onboarding workflow runs on the Offline cluster, and only the Market Onboarding UI's backend calls it, with its own service identity.
 
 | Path | What it does |
 | --- | --- |
@@ -34,13 +34,13 @@ One run takes one release through five steps in its environment.
 2. Save vN as an inactive version, together with the Schedules, dispatcher settings, rate rows and fairness settings it needs, all inactive too.
 3. Test with payments against vN. The Router accepts a pinned config version for test accounts only, so test payments can use vN before anyone else can.
 4. Wait for sign-off, and in E3 for the change request (RFC) as well.
-5. Activate: switch `market_config_active` to vN and apply its Schedules and settings. Every running copy (pod) of billpay-core keeps the onboarding config in memory and reloads it now, so new payments use vN at once. A rollback reloads the same way.
+5. Activate: switch `market_config_active` to vN and apply its Schedules and settings. Every running copy (pod) of both apps, billpay-online and billpay-offline, keeps the onboarding config in memory and reloads it now, so new payments use vN at once. A rollback reloads the same way.
 
 If a step fails, the workflow stops before activation and the readiness screen shows which step failed. The fix is to correct the profile, which makes a new release, vN+1, or to ship the build it needs. Until that build is deployed, the workflow stops at its first step.
 
 ## The published config
 
-Each environment keeps its published market config in its own billpay-core database, in two tables:
+Each environment keeps its published market config in its own Billpay schema, `BPYSCH`, in two tables:
 
 | Table | What it holds |
 | --- | --- |

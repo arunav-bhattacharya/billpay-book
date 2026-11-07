@@ -1,6 +1,6 @@
 ---
 title: Billpay Core APIs
-description: "These are billpay-core's REST APIs, behind One-Data's functions, and every write lands on the Billpay Router first."
+description: "These are the REST APIs of Billpay's two apps, behind One-Data's functions, and every write lands on the Billpay Router first."
 sidebar_label: Billpay Core
 ---
 
@@ -8,13 +8,13 @@ import Lead from '@site/src/components/Lead';
 
 # Billpay Core APIs
 
-<Lead>These are billpay-core's REST APIs, behind One-Data's functions, and every write lands on the Billpay Router first. The endpoint defines the contract. The Router admits the request, picks the workflow and starts it the way its journey needs.</Lead>
+<Lead>These are the REST APIs of Billpay's two apps, behind One-Data's functions, and every write lands on the Billpay Router first. The endpoint defines the contract. The Router admits the request, picks the workflow and starts it the way its journey needs.</Lead>
 
 ## Admission
 
-The Router answers a write before any workflow starts when it can't take it. It checks billpay-core's in-memory copy of the onboarding config, so admission adds no call.
+The Router answers a write before any workflow starts when it can't take it. It checks the app's in-memory copy of the onboarding config, so admission adds no call.
 
-- 422 when the market, account type or API is not live in this environment. Senders don't retry a 422. A create One-Data held while billpay-core was slow, which RTF delivers after its market was taken out of service, is captured and declined instead, so the customer is told and the delete runs.
+- 422 when the market, account type or API is not live in this environment. Senders don't retry a 422. A create One-Data held while billpay-online was slow, which RTF delivers after its market was taken out of service, is captured and declined instead, so the customer is told and the delete runs.
 - 422 too when a request asks for what its way to pay can't do: a future-dated create that pays by Pay with Bank Transfer, debit card, Plaid or MR Points (Proposed for MR Points); a debit card with several instructions, MR Points, Pay & Plan or a corporate payment; bank confirmation with several instructions, Pay & Plan or a corporate payment.
 - 429 with `Retry-After` when an allocations callback arrives over its traffic class's budget. The allocations manager retries. No other API gets a 429.
 - 409 when an update or cancel arrives for a payment that is no longer `SCHEDULED`, or after the cancellation window has closed. A corporate payment leaves `SCHEDULED` when its allocations are requested. A confirm gets 409 too once its payment's workflow no longer waits, such as when the payment was cancelled because its confirmation window closed, and so does a cancel of a `PENDING` payment that isn't waiting for a confirmation. A confirm repeated after its workflow has closed gets the payment's current state instead.
@@ -22,20 +22,36 @@ The Router answers a write before any workflow starts when it can't take it. It 
 
 ## Endpoints
 
+billpay-online serves every endpoint here except the allocations callback, which billpay-offline serves, as it does the Market Onboarding API below. Each app serves the APIs whose work runs on its own cluster.
+
 | Endpoint | What it does | Start mode | Reply |
 | --- | --- | --- | --- |
-| `POST /payments` | Pays today or schedules for a future date. A create from a channel carries the chosen payment option ID, which Verify validates through `ReadPaymentOptionById.v1`. The Router picks the workflow from the date and the number of instructions. A payment that needs bank confirmation, or that pays by debit card, runs as `CreatePaymentIntentWorkflow` and stops at `PENDING`; a request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card | Update-With-Start | `PENDING`, `ACCEPTED`, `SCHEDULED` or `DECLINED`; `PENDING` with the redirect link when the customer must confirm at their bank, or with the 3D Secure challenge link (or none, Proposed) for a debit card, and the same reply, link included, on a repeated create; `DECLINED` if the bank provider gives no link, or the card provider no answer (Proposed). A create on an account that already has a payment in `PENDING` never gets here: One-Data declines it |
+| `POST /payments` | Pays today or schedules for a future date. A create from a channel carries the chosen payment option ID, which Verify validates through `ReadPaymentOptionByIdentifier.v1`. The Router picks the workflow from the date and the number of instructions. A payment that needs bank confirmation, or that pays by debit card, runs as `CreatePaymentIntentWorkflow` and stops at `PENDING`; a request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card | Update-With-Start | `PENDING`, `ACCEPTED`, `SCHEDULED` or `DECLINED`; `PENDING` with the redirect link when the customer must confirm at their bank, or with the 3D Secure challenge link (or none, Proposed) for a debit card, and the same reply, link included, on a repeated create; `DECLINED` if the bank provider gives no link, or the card provider no answer (Proposed). A create on an account that already has a payment in `PENDING` never gets here: One-Data declines it |
 | `PUT /payments/{payment-id}` | Updates a `SCHEDULED` payment inside the cancellation window, by cancelling it and creating a replacement with the same confirmation number | Update-With-Start | The new payment's result; 409 outside the window |
 | `DELETE /payments/{payment-id}` | Cancels a `SCHEDULED` payment inside the cancellation window, or a `PENDING` payment that waits for a confirmation when the customer says no | Update-With-Start; for a `PENDING` payment, an update to its waiting `CreatePaymentIntentWorkflow`, with the update ID `{paymentId}-no` | `CANCELLED`, again for a repeated cancel; 409 otherwise |
 | `POST /payments/{payment-id}/confirm` | Confirms a `PENDING` payment that waits for the customer, once they have confirmed their bank details. Then executes it | An update to the payment's waiting `CreatePaymentIntentWorkflow`, with the update ID `{paymentId}-confirm` | `ACCEPTED`, `DECLINED`, or `PENDING` if it isn't decided within 2.5 seconds. A repeated confirm gets the same answer, or the payment's current state once the workflow has closed; 409 for a cancelled payment |
-| `POST /payments/{payment-id}/authentication` | The 3D Secure callback. The market's card provider calls it directly, not through One-Data, once the customer's debit card is authenticated or authentication has failed. Verify then authorizes the payment, which debits the customer's account, or the card's bank declines it. The provider and billpay-core authenticate each other with mutual TLS (the path and mutual TLS are Proposed) | An update to the payment's waiting `CreatePaymentIntentWorkflow`, with the update ID `{paymentId}-authentication` | `ACCEPTED` or `DECLINED` once the authorization decides; a repeated callback gets the same answer; 409 once the workflow no longer waits |
+| `POST /payments/{payment-id}/authentication` | The 3D Secure callback. The market's card provider calls it directly, not through One-Data, once the customer's debit card is authenticated or authentication has failed. Verify then authorizes the payment, which debits the customer's account, or the card's bank declines it. The provider and billpay-online authenticate each other with mutual TLS (the path and mutual TLS are Proposed) | An update to the payment's waiting `CreatePaymentIntentWorkflow`, with the update ID `{paymentId}-authentication` | `ACCEPTED` or `DECLINED` once the authorization decides; a repeated callback gets the same answer; 409 once the workflow no longer waits |
 | `POST /payments/{payment-id}/allocations` | Takes one numbered batch of allocations for a corporate payment, from the allocations manager | Stores the batch, then an async start of `ReceiveAllocationsWorkflow` | 202 |
 | `POST /refunds` | Refunds a credit balance, from a channel | Update-With-Start | The refund's result |
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
 | `GET /payments/{payment-id}` | Returns one payment and its lifecycle events; `ReadPaymentEventsById.v1` calls it | Reads Oracle | The payment and its lifecycle events; with its redirect or challenge link while it waits for bank confirmation or 3D Secure |
 | `GET /instruments/account/{account-id}?source={source}` | Behind `ReadBillpayInstruments.v1`: the instruments the customer can pay from, for one source: Enrolled Instruments, Pay with Bank Transfer, debit card or wallet (the path is Proposed) | Calls `ReadInstruments`, `ReadBanksForRealtimePayments.v1` or `ReadEligibleWallets.v1`, then filters the list by the market's rules. No workflow | The list the payment page may offer |
 
-`PENDING` in a reply means the payment is captured but not yet decided: the API waits at most 2.5 seconds for the decision, then replies `PENDING`, so its answer reaches One-Data inside One-Data's own 3 seconds. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A debit card payment comes back `PENDING` with the 3D Secure challenge link, or with none when the card's bank needs no challenge; the card provider's callback, not the channel, then brings the decision. billpay-core knows the callback comes from the card provider because the two authenticate each other with mutual TLS: each side presents a certificate the other trusts (Proposed). [Stored creates and the pending check](./one-data.md#stored-creates-and-the-pending-check) has One-Data's side.
+A create's 200 reply, through `CreatePayment.v3`, carries a `payments` array, one entry per instruction, each with its `status`, its `identifier` (the payment ID) and its `enrollmentIdentifier` (the instrument's enrollment ID), and the request's `confirmationCode`:
+
+```json
+{
+  "payments": [
+    { "status": "ACCEPTED", "identifier": "01JVTBBGZQ1HEM0W7NRMM6MSQ1", "enrollmentIdentifier": "ae21fbc5-88df-44fe-8ce1-c422f273f06" },
+    { "status": "ACCEPTED", "identifier": "01JVTBBGZQ1HEM0W7NRMM6MSQ2", "enrollmentIdentifier": "be21fbc5-88df-44fe-8ce1-c422f273f06" }
+  ],
+  "confirmationCode": "W1642926062"
+}
+```
+
+A decline uses the same shape, and its exact fields come later. A `PENDING` entry that waits for bank confirmation or 3D Secure carries its link in an optional field, absent everywhere else (its name, `confirmationUrl`, is Proposed). How a create with several instructions gets one payment ID per instruction is still open, because One-Data makes payment IDs.
+
+`PENDING` in a reply means the payment is captured but not yet decided: the API waits at most 2.5 seconds for the decision, then replies `PENDING`, so its answer reaches One-Data inside One-Data's own 3 seconds. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with the provider's redirect link: the customer confirms on the provider's site, and the caller then confirms the payment with the same ID. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A debit card payment comes back `PENDING` with the 3D Secure challenge link, or with none when the card's bank needs no challenge; the card provider's callback, not the channel, then brings the decision. billpay-online knows the callback comes from the card provider because the two authenticate each other with mutual TLS: each side presents a certificate the other trusts (Proposed). [Stored creates and the pending check](./one-data.md#stored-creates-and-the-pending-check) has One-Data's side.
 
 One composite API runs core workflows as children:
 
@@ -47,23 +63,23 @@ One composite API runs core workflows as children:
 
 ## What never reaches these APIs
 
-Payments and refunds that Accounts Receivable (AR) raises, returns and inbound payments never call billpay-core. One-Data stores each one in its inbox (a return arrives as an event, which an event handler stores), and a dispatcher pulls it at the governor's pace and starts its workflow through the Router. A burst of returns waits its turn there instead of competing with a customer who is paying today. AR learns the outcome of a request it sent from the `SCHEDULED` and `DECLINED` notifications and lifecycle events, or from `GET /payments/{payment-id}`.
+Payments and refunds that Accounts Receivable (AR) raises, returns and inbound payments never call either app. One-Data stores each one in its inbox (a return arrives as an event, which an event handler stores), and a dispatcher pulls it at the governor's pace and starts its workflow through the Router. A burst of returns waits its turn there instead of competing with a customer who is paying today. AR learns the outcome of a request it sent from the `SCHEDULED` and `DECLINED` notifications and lifecycle events, or from `GET /payments/{payment-id}`.
 
 Nothing passes a return straight to a representment either. Process Returned Payment commits `REPRESENTING` with a `REPRESENT` Work Tracker row, and the representment dispatcher starts Process Representment on the date.
 
 ## Idempotency
 
-Every write is safe to send twice. `PaymentStore`, the only code that reaches Oracle, makes each write insert-if-absent or a conditional update on the current state, and the start modes make sure a repeated request finds the workflow it already started.
+Every write is safe to send twice. Billpay's stores, the only code that reaches Oracle, make each write insert-if-absent or a conditional update on the current state, and the start modes make sure a repeated request finds the workflow it already started.
 
 - A create is captured once. Capture inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent, and a repeated request joins the existing workflow (conflict policy `USE_EXISTING`). A duplicate gets the existing payment back. A repeat that comes after the workflow has closed starts a new run under the default reuse policy: Capture finds the payment, and the run carries on only if the payment is still `PENDING` with nothing waiting on it, because the last run died before deciding. Otherwise it returns the payment as it stands, so no stage runs twice.
-- As soon as a create's payment is decided, its workflow calls One-Data's delete API, `DeletePendingPayment.v1`, which clears the payment from One-Data's Redis, so the account can take its next payment. It retries until the call lands. `CreatePaymentIntentWorkflow` calls it twice: after its reply, saying the payment still waits, and again once Verify or Cancel has decided.
+- As soon as a create's payment is decided, its workflow calls One-Data's delete API, `DeletePendingPayment.v1`, after the caller's reply. Every create workflow makes the call, in either app. It clears the payment from One-Data's Redis, so the account can take its next payment. It retries until the call lands. `CreatePaymentIntentWorkflow` calls it twice: after its reply, saying the payment still waits, and again once Verify or Cancel has decided.
 - An update or cancel is a guarded update on `SCHEDULED`. If a cancel changes no row and the payment is already `CANCELLED`, the API returns that result again; otherwise the answer is 409.
 - A confirm is an update to the payment's waiting workflow, and Verify's commit is guarded on `PENDING`. A repeated confirm carries the same update ID and gets the same answer, or once the workflow has closed, gets the payment's current state from Oracle, so a retry after a lost reply never looks like a failure. A confirm the workflow turns away, because it already has an answer or no longer waits, gets 409.
 - An allocations callback stores its batch in `allocation_batch` first, then starts `ReceiveAllocationsWorkflow` with the ID `{paymentId}-allocations-{batch}`, which comes from the request. A repeated batch finds the same workflow: a start that fails as already started counts as done, and reuse policy `REJECT_DUPLICATE` stops a second run after the first one closes. The callback's full contract, including its idempotency rules, is still to be agreed with the allocations manager.
 
 ## Market Onboarding API
 
-Each environment's billpay-core also exposes the Market Onboarding API. Only the market-onboarding control plane, the Market Onboarding UI's backend, calls it, with its own service identity. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+Each environment's billpay-offline exposes the Market Onboarding API, because the onboarding workflow runs on the Offline cluster. Only the market-onboarding control plane, the Market Onboarding UI's backend, calls it, with its own service identity. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
 
 The bodies are Proposed (2026-10-18), for the Market Onboarding UI team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/market-onboarding/releases/{market}/{account-type}/{version}` and `{live}` for `/market-onboarding/markets/{market}/{account-type}`.
 

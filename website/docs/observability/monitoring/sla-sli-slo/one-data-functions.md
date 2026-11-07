@@ -20,7 +20,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
 
-**SLI:** caller-observed latency at the One-Data edge, including the contract validation and the pending check in Redis. If billpay-core doesn't answer within 3 seconds, One-Data holds the create for RTF and answers `PENDING`, so a caller's wait has a ceiling even when the core is slow. **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency at the One-Data edge, including the contract validation and the pending check in Redis. If billpay-online doesn't answer within 3 seconds, One-Data holds the create for RTF and answers `PENDING`, so a caller's wait has a ceiling even when the core is slow. **Error budget:** 0.05% / 30-day window.
 
 ## Update Payment
 
@@ -50,7 +50,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 50 ms | 100 ms | 210 ms | 420 ms | 750 ms |
 
-**SLI:** account-scoped read latency. The function reads Redis and billpay-core together and removes duplicates, so a payment shows from the moment it is made. **Error budget:** 0.01% / 30-day window.
+**SLI:** account-scoped read latency. The function reads Redis and billpay-online together and removes duplicates, so a payment shows from the moment it is made. **Error budget:** 0.01% / 30-day window.
 
 ## Read Payment Events By Id
 
@@ -96,7 +96,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
 
-**SLI:** caller-observed latency for a bank confirmation's confirm, until its answer. If billpay-core doesn't answer within 3 seconds, One-Data holds the confirm for RTF and answers `PENDING`, the same ceiling a create has. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency for a bank confirmation's confirm, until its answer. If billpay-online doesn't answer within 3 seconds, One-Data holds the confirm for RTF and answers `PENDING`, the same ceiling a create has. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
 
 ## Create Payment Allocations
 
@@ -136,7 +136,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 20 ms | 40 ms | 100 ms | 200 ms | 400 ms |
 
-**SLI:** latency of the call billpay-core makes as soon as a create's payment is decided, to remove the stored create and the account's pending entry. billpay-core retries until it lands, so a breach shows up as entries that stay in Redis longer, and while one stays, One-Data declines that account's next payment. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
+**SLI:** latency of the call every create workflow makes once its payment is decided, after the caller's reply, to remove the stored create and the account's pending entry. The workflow retries until it lands, so a breach shows up as entries that stay in Redis longer, and while one stays, One-Data declines that account's next payment. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
 
 ## Read Inbox
 

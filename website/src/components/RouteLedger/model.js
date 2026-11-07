@@ -45,7 +45,7 @@ export const MOVE = {
 /* One interface per system. `at` is every stage that calls it on some road;
    `rail` marks the two every stage calls. */
 export const IFACES = [
-  {name: 'PaymentStore', system: 'Oracle', queue: 'local activity', rail: true, note: 'every stage commits here'},
+  {name: 'PaymentStore', system: 'Oracle', queue: 'local first, then regular', rail: true, note: 'every stage commits here'},
   {
     name: 'LifecycleEventActivities',
     system: 'RTF',
@@ -78,7 +78,7 @@ export const IFACES = [
     fails: 'decline',
     queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify'],
-    note: 'ReadPaymentOptionById.v1 in Verify, ReadPaymentOptions.v1 in Reverify, only where the payment carries a payment option ID; it has no rate limit',
+    note: 'ReadPaymentOptionByIdentifier.v1 in Verify, ReadPaymentOptions.v1 in Reverify, only where the payment carries a payment option ID; it has no rate limit',
   },
   {
     name: 'PlansActivities',
@@ -157,7 +157,7 @@ export const IFACES = [
     system: 'One-Data',
     queue: "the workflow's queue",
     at: [],
-    note: 'no stage: the PAID drain, the inbox dispatchers and the delete call that ends a create from a channel',
+    note: 'no stage: the PAID drain, the inbox dispatchers and the delete call every create workflow makes',
   },
 ];
 
@@ -1056,7 +1056,7 @@ export function calls(j, f) {
         out[s] = {kind: 'skip', note: NO_OPTION_ID[j.id]};
         return;
       }
-      note = s === 'Reverify' ? 'ReadPaymentOptions.v1, to confirm the customer still owes and the option still holds' : "ReadPaymentOptionById.v1, with the create's payment option ID";
+      note = s === 'Reverify' ? 'ReadPaymentOptions.v1, to confirm the customer still owes and the option still holds' : "ReadPaymentOptionByIdentifier.v1, with the create's payment option ID";
       if (OPTION_ID_SOMETIMES[j.id]) {
         note = `${note}, ${OPTION_ID_SOMETIMES[j.id]}`;
         if (kind === 'call') kind = 'cond';
@@ -1070,15 +1070,21 @@ export function calls(j, f) {
   return out;
 }
 
-/* roads whose workflow calls the delete API at One-Data: a create from a
-   channel once Verify decides; a payment that waits, once after its reply
-   and again once the confirm, the callback or the no decides it */
-const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no']);
+/* roads whose workflow calls the delete API at One-Data, always after the
+   caller's reply: every create workflow once Verify decides, whatever
+   started it; a payment that waits, once after its reply and again once the
+   confirm, the callback or the no decides it */
+const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no', 'refund', 'arScheduled', 'arRefund']);
+/* creates One-Data never stored, so the delete finds nothing to remove */
+const UNSTORED = new Set(['arScheduled', 'arRefund']);
 
 /* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
   if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
-  if (j.band.key === 'pulled') return 'its dispatcher reads the request, and marks it once started';
+  if (j.band.key === 'pulled') {
+    const read = 'its dispatcher reads the request, and marks it once started';
+    return UNSTORED.has(j.id) ? `${read}; once Verify decides, the workflow calls the delete API after its reply, which finds nothing to remove, since One-Data never stored this create` : read;
+  }
   if (j.id === 'bank' || j.id === 'card') {
     return "calls the delete API after its reply, saying the payment still waits, so only the stored create leaves One-Data's Redis";
   }
@@ -1089,7 +1095,9 @@ export function inboxUse(j) {
     return "calls the delete API once Verify decides, so the account's pending entry goes. Execute hands One-Data the settlement event Billpay creates, dated when the money moved";
   }
   if (j.id === 'no') return "calls the delete API once Cancel decides, so the account's pending entry goes";
-  if (DELETES.has(j.id)) return "calls the delete API once Verify decides, so the stored create and the account's pending entry leave One-Data's Redis";
+  if (UNSTORED.has(j.id)) return 'calls the delete API once Verify decides, after the reply, as every create workflow does; it finds nothing to remove';
+  if (j.id === 'refund') return 'calls the delete API once Verify decides, after the reply, as every create workflow does';
+  if (DELETES.has(j.id)) return "calls the delete API once Verify decides, after the reply, so the stored create and the account's pending entry leave One-Data's Redis";
   return null;
 }
 
@@ -1124,7 +1132,7 @@ function localOnOnline(j, f, s) {
 /* where a call runs, on road j's cluster, at stage s */
 function runsOn(j, f, s) {
   if (f.name === 'PaymentStore') {
-    return 'Oracle, through a local activity, so there is no task round trip. If Oracle is down, the payment pauses and carries on when it is back.';
+    return 'Oracle, through a local activity on the first attempt, so a healthy write has no task round trip. A failed attempt runs again as a regular activity with the full retry policy, so if Oracle is down the payment pauses and carries on when it is back.';
   }
   if (f.name === 'LifecycleEventActivities') {
     return "RTF, on the workflow's own queue, since RTF has no rate limit. The workflow sends one state change at a time, so the payment's events reach RTF in order.";

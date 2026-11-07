@@ -126,7 +126,7 @@ For a debit card, RequestConfirmation starts 3D Secure, the card schemes' check 
 
 ## Verify
 
-Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and, where the create carries a payment option ID, Payment Options, to validate the option the customer chose through `ReadPaymentOptionById.v1`.
+Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and, where the create carries a payment option ID, Payment Options, to validate the option the customer chose through `ReadPaymentOptionByIdentifier.v1`.
 
 - A business failure, such as a closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, a payment option that no longer holds, or a mandate that fails its check, is not retried. The payment goes to `DECLINED`.
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
@@ -139,7 +139,7 @@ Verify has one flow, and only its checks vary. Where the profile requires mandat
 
 ## Reverify
 
-Checks a scheduled payment again on its due date, with the same checks as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Where the payment carries an option ID, its Options check calls `ReadPaymentOptions.v1` instead of `ReadPaymentOptionById.v1`: a customer who no longer owes money, or an option that no longer holds, means `DECLINED`, and a Statement Balance or Total Balance payment takes that day's amount. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
+Checks a scheduled payment again on its due date, with the same checks as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Where the payment carries an option ID, its Options check calls `ReadPaymentOptions.v1` instead of `ReadPaymentOptionByIdentifier.v1`: a customer who no longer owes money, or an option that no longer holds, means `DECLINED`, and a Statement Balance or Total Balance payment takes that day's amount. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
 
 ## Execute
 

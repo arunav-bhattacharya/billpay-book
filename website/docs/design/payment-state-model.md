@@ -17,7 +17,7 @@ import StateLegend from '@site/src/components/StateLegend';
 
 Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal. A payment that waits for the customer, to confirm at their bank or to authenticate their debit card, stays `PENDING`, with its own workflow waiting on a timer, until the caller confirms it, the card provider calls back, the customer says no, or the window closes.
 
-`PENDING` also blocks the card account. While one payment on it is `PENDING`, One-Data declines any new create from a channel before Billpay sees it. The block lifts as soon as the payment is decided, whichever of `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED` it reaches, because billpay-core then calls One-Data's delete API.
+`PENDING` also blocks the card account. While one payment on it is `PENDING`, One-Data declines any new create from a channel before Billpay sees it. The block lifts as soon as the payment is decided, whichever of `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED` it reaches, because its workflow then calls One-Data's delete API, after the reply.
 
 <Tabs groupId="payment-type" className="toggle-tabs">
 <TabItem value="consumer" label="Consumer" default>

@@ -11,7 +11,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 <Lead>[Tech Stack](../tech-stack/index.md) covers what we buy. This covers what we write: how the component model from Design becomes code, one layer at a time, and the rules that keep each layer doing only its own job.</Lead>
 
-The call chain is strict, **Workflow → Stage → Activity → Client → external system**, exactly as the [component model](../../design/principles.md#the-four-layers) defines it. Nothing calls up or sideways. A stage may also call the checks and methods the stage resolver gives it, and plain helper functions, and a workflow may start child workflows, but only on its own cluster. The Router sits in front of all of it: it is the only code that starts a payment workflow.
+The call chain is strict, **Workflow → Stage → Activity → Client → external system**, exactly as the [component model](../../design/principles.md#the-four-layers) defines it, with two shortcuts it allows: a workflow may call an activity directly, and an activity calls a store to reach Oracle as it calls a client to reach a system. There are no exceptions, for control and periodic workflows too. Nothing calls up or sideways. A stage may also call the checks and methods the stage resolver gives it, and plain helper functions, and a workflow may start child workflows, but only on its own cluster. The Router sits in front of all of it: it is the only code that starts a payment workflow.
 
 ## In this section
 
@@ -45,7 +45,7 @@ The call chain is strict, **Workflow → Stage → Activity → Client → exter
     {
       term: 'Activities',
       to: '/docs/build/core-build/activities',
-      desc: `The calls to one system: {System}Activities, PaymentStore for Oracle, and RTF and Raven as activities like the rest.`,
+      desc: `The calls to one system: {System}Activities, the stores for Oracle, and RTF and Raven as activities like the rest.`,
     },
     {
       term: 'Clients',

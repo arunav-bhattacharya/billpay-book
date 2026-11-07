@@ -12,8 +12,9 @@ import Lead from '@site/src/components/Lead';
 
 ## Project defaults
 
-Four choices sit underneath everything and are not revisited per component:
+Five choices sit underneath everything and are not revisited per component:
 
+- JDK 25, with the latest stable Kotlin, Quarkus and Temporal Java SDK (agreed 2026-11-07).
 - Kotlin is the platform language, top to bottom. The domain model leans hard on sealed hierarchies and null-safety, and the [Domain Model](../domain-model/index.md) pages show why.
 - Quarkus (ArC/CDI) does the dependency injection and app wiring. We use it lightly: `@ApplicationScoped` and `@Singleton` beans, constructor injection, and `@All List<T>` to hand the stage registries every class of a kind, and none of the rest of the framework.
 - Gradle builds everything from one multi-module monorepo. The [code layout](../core-build/code-layout.md) page shows how the modules map to the component model.

@@ -14,7 +14,7 @@ It has three parts: the frontend, which is the Market Onboarding UI; the backend
 ## The boundary
 
 - One backend serves E1, E2 and E3. There is no copy of the control plane per environment.
-- The authoring tables (drafts, revisions, releases, approvals, deployments and audit) sit outside billpay-core. No environment reads them.
+- The authoring tables (drafts, revisions, releases, approvals, deployments and audit) sit outside Billpay's schema. No environment reads them.
 - The Market Onboarding UI never reads or writes an environment's Oracle or Temporal. Everything crosses through the Market Onboarding API, which the backend calls with its own service identity.
 - Every send is idempotent: one onboarding workflow per market, account type, version and environment, so a repeated send never starts a second one.
 

@@ -101,7 +101,7 @@ Two problems shape almost every decision on this page. The first is variety. Eve
 A workflow is built from three kinds of part:
 
 - A **stage** is one business step, such as Verify or Execute. It makes its calls in parallel, then commits the result in one transaction. Stages are the only part that changes with a market's behaviors.
-- An **activity** is the set of calls to one system, such as `ClearingActivities`. Oracle has one of its own, `PaymentStore`, the only code that reads or writes the payments database.
+- An **activity** is the set of calls to one system, such as `ClearingActivities`. Oracle is reached through **stores**, such as `PaymentStore` for payment state, and only the stores read or write the payments database.
 - A **client** is the adapter that talks to one external system.
 
 The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md), the routing rules in [Design → Routing](../design/routing.md), and the component model in [Design → Principles](../design/principles.md).

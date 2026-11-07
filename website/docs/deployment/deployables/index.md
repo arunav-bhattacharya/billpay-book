@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Deployables
 
-<Lead>Every artifact the platform ships to production. There are five, and billpay-core, the one app that runs the APIs and the workflows, is the one most changes touch.</Lead>
+<Lead>Every artifact the platform ships to production. There are five, and billpay-core, the one artifact deployed as Billpay's two apps, billpay-online and billpay-offline, is the one most changes touch.</Lead>
 
 ## In this section
 
@@ -20,9 +20,9 @@ import SectionIndex from '@site/src/components/SectionIndex';
       desc: `The API gateway, the functions it fronts, and the inbox database that holds work nobody waits for.`,
     },
     {
-      term: 'billpay-core',
+      term: 'billpay-online and billpay-offline',
       to: '/docs/deployment/deployables/worker-app',
-      desc: `The one app: the core APIs, the Router, the dispatchers, the governor and the workers for both Temporal clusters.`,
+      desc: `One artifact, two apps: billpay-online runs the channel APIs and the Online cluster's workers, billpay-offline the dispatchers, the governor and the Offline cluster's workers.`,
     },
     {
       term: 'Codec Server App',

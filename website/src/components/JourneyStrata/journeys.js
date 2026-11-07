@@ -16,6 +16,9 @@
 
 const CREATE = {c: 'CreatePayment.v3', s: 'the pending check, then the create is stored'};
 const DELETE_END = {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the stored create and the pending entry go', at: 'Verify'};
+/* every create workflow makes the delete call; for a create One-Data never stored it finds nothing */
+const DELETE_ANY = {c: 'DeletePendingPayment.v1', s: 'once Verify decides, after the reply', at: 'Verify'};
+const DELETE_NONE = {c: 'DeletePendingPayment.v1', s: 'once Verify decides: nothing to remove', at: 'Verify'};
 
 const PAID_SEGMENT = {
   phase: ['Settled and posted', 'when both events are in'],
@@ -306,7 +309,7 @@ export const GROUPS = [
             road: 'refund',
             waiting: true,
             customer: [{t: 'Asks for a refund', s: 'of a credit balance', m: 'on', at: 'Capture'}],
-            oneData: [{c: 'CreateCreditBalanceRefund.v1', s: 'from a channel', at: 'Capture'}],
+            oneData: [{c: 'CreateCreditBalanceRefund.v1', s: 'from a channel', at: 'Capture'}, DELETE_ANY],
           },
         ],
       },
@@ -327,7 +330,7 @@ export const GROUPS = [
             entry: {c: 'GET /payments/account/{account-id}', s: 'a read: the Router has nothing to pick'},
             waiting: true,
             customer: [{t: 'Opens their payment list', s: 'web, mobile app or a servicing rep', m: 'on'}],
-            oneData: [{c: 'ReadPayments.v1', s: 'reads Redis and billpay-core, removes duplicates; Oracle wins'}],
+            oneData: [{c: 'ReadPayments.v1', s: 'reads Redis and billpay-online, removes duplicates; Oracle wins'}],
             oracle: [{row: 'payments', s: 'read, every payment on the account'}],
           },
         ],
@@ -553,7 +556,7 @@ export const GROUPS = [
             phase: ['Intake', 'nobody waits'],
             road: 'arScheduled',
             customer: [{t: 'Told SCHEDULED', s: 'with a Raven message', st: 'SCHEDULED', m: 'quiet', at: 'Verify'}],
-            oneData: [{c: 'CreateBillpayTransactionFromAccountsReceivable.v1', s: 'stores it, replies 202', at: 'Capture'}],
+            oneData: [{c: 'CreateBillpayTransactionFromAccountsReceivable.v1', s: 'stores it, replies 202', at: 'Capture'}, DELETE_NONE],
             oracle: [{row: 'SCHED_EXEC row', st: 'SCHEDULED', s: "written in Verify's commit", at: 'Verify'}],
             ruler: [{t: 'Day 0 · when it is pulled', at: 'Capture'}],
           },
@@ -587,7 +590,7 @@ export const GROUPS = [
             phase: ['Intake', 'nobody waits'],
             road: 'arRefund',
             customer: [],
-            oneData: [{c: 'CreateBillpayTransactionFromAccountsReceivable.v1', s: 'stores it, replies 202', at: 'Capture'}],
+            oneData: [{c: 'CreateBillpayTransactionFromAccountsReceivable.v1', s: 'stores it, replies 202', at: 'Capture'}, DELETE_NONE],
           },
         ],
       },

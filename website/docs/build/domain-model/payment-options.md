@@ -33,7 +33,7 @@ A `PaymentOptionReference` may hold nothing but the option type, while a `Verifi
 
 ## The option ID
 
-The channel's payment page reads the customer's options from Payment Options' `ReadPaymentOptions.v1`, and each comes with a payment option ID, unique to that option and the balance it pays. The create carries the ID of the option the customer chose, so the reference holds it from the start (Proposed: in the `id` the reference already has). Verify's Options check validates it through `ReadPaymentOptionById.v1`, and the answer turns the reference into a verified option.
+The channel's payment page reads the customer's options from Payment Options' `ReadPaymentOptions.v1`, and each comes with a payment option ID, unique to that option and the balance it pays. The create carries the ID of the option the customer chose, so the reference holds it from the start (Proposed: in the `id` the reference already has). Verify's Options check validates it through `ReadPaymentOptionByIdentifier.v1`, and the answer turns the reference into a verified option.
 
 A scheduled payment is checked again on its due date. Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the chosen option still holds, and declines the payment if not. For an option whose amount follows a balance, such as the statement balance or the total balance, the amount is taken again that day, so the payment can pay a different amount from the one it showed at the create. A payment with several instructions carries one option ID for the whole payment. Proposed: the parent checks it once as it validates the payment, so its children run no Options check. Payments from Accounts Receivable, corporate payments and Pay with MR Points alone carry no option ID.
 

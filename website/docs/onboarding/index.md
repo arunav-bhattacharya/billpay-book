@@ -41,10 +41,10 @@ There are only two human checks: approval once, on the content, by a maker and a
 | --- | --- | --- |
 | Market Onboarding UI frontend | The onboarding wizard, with an Operations step, BOTH rules, and pause and resume | The control plane |
 | Market Onboarding UI backend | The control plane itself: single sign-on, maker-checker, audit, versioned releases | The control plane, one for all environments |
-| Authoring tables | Drafts, revisions, releases, approvals, deployments and audit | The control plane's own schema, outside billpay-core |
+| Authoring tables | Drafts, revisions, releases, approvals, deployments and audit | The control plane's own schema, outside Billpay's |
 | Market Onboarding API | Takes releases, sign-offs, pause and resume; reports progress and the build's capability manifest | Each environment's app |
 | `MarketOnboardingWorkflow` | Checks, tests and activates a release | Each environment's Offline cluster |
-| Published config | `market_config_version` and `market_config_active` | Each environment's billpay-core database |
+| Published config | `market_config_version` and `market_config_active` | Each environment's Billpay schema, `BPYSCH` |
 
 The control plane never reads or writes an environment's Oracle or Temporal, and an environment never reads the authoring tables. Everything crosses through the Market Onboarding API.
 

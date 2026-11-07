@@ -16,7 +16,7 @@ Most failures need nobody: payments wait out a slow downstream, a patch or a los
 
 During a patch, Oracle returns errors, the dispatchers stop claiming work, and payments in flight pause where they are.
 
-Billpay is already handling it. `PaymentStore` retries short blips inside the workflow task, then waits on a durable timer and retries later, so a payment resumes when Oracle is back, even across a worker restart. The governor sees the errors and stops dispatching, so only payments already in flight wait. A caller creating a payment gets a quick error rather than a long wait.
+Billpay is already handling it. A database call that fails its first, local attempt runs again as a regular activity that keeps retrying, so a payment resumes when Oracle is back, even across a worker restart. The governor sees the errors and stops dispatching, so only payments already in flight wait. A caller creating a payment gets a quick error rather than a long wait.
 
 1. For a planned window shorter than `PaymentStore`'s schedule-to-close, a few hours, do nothing.
 2. If the window will run longer, raise it on `#oracle-dbo-support` before it does. Past the schedule-to-close, the waiting payments run out of retries and land on the exception list.
@@ -79,7 +79,7 @@ The Offline cluster down alert fires when the cluster stops answering.
 Promote a standby when its cluster can't be restored in time, or when all of us-east-1 is down. Promotion is always a decision someone makes: one write site at a time, the same rule as for Oracle.
 
 1. Promote the us-west-1 standby of the cluster that is down. The Online and Offline clusters are promoted separately, each with its own database.
-2. Point billpay-core's Temporal client for that cluster at the us-west-1 frontend.
+2. Point that cluster's app, billpay-online or billpay-offline, at the us-west-1 frontend.
 3. Work picks up again on its own. Workflows carry on from the histories the standby received, including announcements they still owed, and the dispatchers start releasing due rows and pulling from One-Data's inbox.
 
 [High Availability](../architecture/high-availability.md#when-us-east-1-goes-down) covers losing the whole region.
@@ -128,8 +128,14 @@ When One-Data's inbox database is down, One-Data can't store requests or events.
 1. Restore the database, with One-Data's team.
 2. Nothing else. The dispatchers and the `PAID` drain catch up on their own, at the governor's pace.
 
-## billpay-core short of capacity
+## billpay-online short of capacity
 
 Online response times climb while Oracle and the downstreams are healthy, and the governor cuts offline work, execution included, to protect them.
 
-1. Add billpay-core pods. Every pod is the same app, so there is nothing else to change: online and offline work spread across the new pods, and the governor raises offline rates again as the signals recover.
+1. Add billpay-online pods. Every pod runs the same mode, so there is nothing else to change: online work spreads across the new pods, and the governor raises offline rates again as the signals recover.
+
+## billpay-offline short of capacity
+
+Offline backlogs grow and schedule-to-start climbs while the governor's signals are healthy, so the limit is billpay-offline's own pods, not Oracle or the downstreams.
+
+1. Add billpay-offline pods. Online traffic isn't touched, because it runs in billpay-online.

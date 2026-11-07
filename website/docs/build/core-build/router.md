@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # Building the Router
 
-<Lead>The Router is the only code that starts a payment workflow. It is a library inside billpay-core, not a service: the core APIs call it while a caller waits, and the dispatchers call it for every row and request they release, so every start is admitted, pinned and given a run site the same way.</Lead>
+<Lead>The Router is the only code that starts a payment workflow. It is a library in the billpay-core codebase, not a service, so it runs inside both apps: in billpay-online the core APIs call it while a caller waits, and in billpay-offline the dispatchers call it for every row and request they release, so every start is admitted, pinned and given a run site the same way.</Lead>
 
 Without it, two kinds of code would start payments, the API handlers and the dispatchers, and each would carry its own copy of the market rules. The copies would drift. [Design → Routing](../../design/routing.md) explains what the Router decides and why. This page is about building it: the two types it hands on, its six steps as code, and the details that are easy to get wrong.
 
@@ -16,12 +16,12 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 
 - The core APIs, for every write a caller waits on: `POST /payments`, `PUT` and `DELETE /payments/{payment-id}`, `POST /payments/{payment-id}/confirm`, `POST /refunds` and `POST /payment-installments`.
 - The 3D Secure callback, `POST /payments/{payment-id}/authentication`, which the market's card provider calls directly. Like the confirm, it is only admitted, then sent as an update to the waiting workflow.
-- The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch.
-- The dispatchers, once for each Work Tracker row or inbox request they release.
+- The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it.
+- The dispatchers, in billpay-offline, once for each Work Tracker row or inbox request they release.
 
 The confirm, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, as an update, so there is nothing to pick, pin or choose ([6. Start](#6-start) shows the call).
 
-Calling it is a plain function call inside billpay-core. The app holds a Temporal client for each cluster, and the Router takes the one its run site names. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
+Calling it is a plain function call inside the app. Each app holds a Temporal client for its own cluster only, so the run site always names that cluster: billpay-online starts on the Online cluster and billpay-offline on the Offline cluster. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
 
 Control workflows don't go through the Router. The dispatchers, the governor and market onboarding start from their Schedules or their own API.
 
@@ -76,12 +76,12 @@ fun route(request: RouteRequest): Routed {
 
 ### 1. Admit
 
-The Router checks that the market, the account type and the API are live in this environment. It checks them against billpay-core's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
+The Router checks that the market, the account type and the API are live in this environment. It checks them against the app's in-memory copy of the onboarding config, so admission adds no call to a database or another service (agreed 2026-10-18). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
 
 | Caller | What a refusal becomes |
 | --- | --- |
 | A core API | 422, which senders don't retry |
-| A core API, for a create One-Data held while billpay-core was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19) |
+| A core API, for a create One-Data held while billpay-online was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19) |
 | An inbox dispatcher | The request is marked `REJECTED` through `UpdateStartRequests.v1`, and an alert tells operations. The sender is not told |
 | A Work Tracker dispatcher | The row goes from `DISPATCHING` to `FAILED`, which raises the retries-exhausted alert. A row is refused only when its market was taken out of service after the row was written |
 
@@ -158,7 +158,7 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
 
-No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-core ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
+No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-online ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
 ### 3. Resolve the behaviors
 

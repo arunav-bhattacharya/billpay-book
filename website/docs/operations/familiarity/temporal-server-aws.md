@@ -47,4 +47,4 @@ Every Temporal Schedule lives on the Offline cluster: one per dispatcher (the sc
 
 ## Scaling
 
-The cluster isn't where capacity is usually added. History shards are fixed when a cluster is created, with room for more markets. More throughput for payments comes from more billpay-core pods, and the pace of offline work is the governor's to set. The Offline database can grow from 64 to 192 vCPU ([Temporal DB on AWS](./temporal-db-aws.md)).
+The cluster isn't where capacity is usually added. History shards are fixed when a cluster is created, with room for more markets. More throughput comes from more pods of the app that needs it, billpay-online for online traffic or billpay-offline for offline work, and the pace of offline work is the governor's to set. The Offline database can grow from 64 to 192 vCPU ([Temporal DB on AWS](./temporal-db-aws.md)).

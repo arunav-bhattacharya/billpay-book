@@ -7,13 +7,13 @@ import Lead from '@site/src/components/Lead';
 
 # Deployment Pipeline
 
-<Lead>The pipeline takes a release or hotfix branch to production as one build of billpay-core. The app deploys as one, and a new build never changes the code under a payment that is already running.</Lead>
+<Lead>The pipeline takes a release or hotfix branch to production as one build of billpay-core. The same build goes out as both apps, billpay-online and billpay-offline, and a new build never changes the code under a payment that is already running.</Lead>
 
 What the pipeline ships is catalogued under [Deployables](./deployables/index.md), and the gates a change clears before it merges are on [CI Checks](./ci-checks.md), and the branches it travels on are on [Code Merge Strategy](./code-merge-strategy.md). The stage-by-stage description of the pipeline itself is still to come.
 
-## One app, one deploy
+## One build, two apps
 
-billpay-core runs the APIs and the workers for both Temporal clusters, and it ships as one app. There is no online build and offline build to keep in step. When the platform needs more capacity, it gets more pods of the same app, not a new deployable.
+billpay-core builds one artifact, and the pipeline deploys it twice: in online mode as billpay-online, which connects to the Online cluster, and in offline mode as billpay-offline, which connects to the Offline cluster. A setting read at start picks the mode, so there is no online build and offline build to keep in step. Proposed: one pipeline run deploys both, and each app registers the build with its own cluster under Worker Versioning. More capacity means more pods of the app that needs it.
 
 ## Old builds keep running for a while
 
@@ -35,11 +35,11 @@ The check runs the other way too. Before a build rolls out to an environment, th
 
 ## Three environments
 
-A build moves through E1, E2 and E3, and E3 is production. Each environment has its own billpay-core, its own Online and Offline clusters and its own Oracle schema.
+A build moves through E1, E2 and E3, and E3 is production. Each environment has its own billpay-online and billpay-offline, its own Online and Offline clusters and its own Oracle schema.
 
 How a build is set up per environment:
 
 - One build runs in every environment. What differs is config or a secret, read when the app starts. Nothing environment-specific goes into the image.
-- Both Temporal namespaces keep their names everywhere, `billpay-online` and `billpay-offline`, so moving between environments changes only the cluster endpoints.
-- Config per environment: the two Temporal endpoints, the Oracle connection for each pool, One-Data's base URL, each downstream's base URL, the Prometheus address and the OpenTelemetry collector's address.
-- Secrets come from the organization's secret store, under one path per environment: the two Oracle pools' logins, the client certificate for each Temporal cluster, the credentials One-Data and each downstream take (held the way the current app holds them), and the Prometheus login the governor reads with. No secret sits in a config file.
+- Both Temporal namespaces keep their names everywhere, `billpay-online` and `billpay-offline`, the names of the apps that serve them, so moving between environments changes only the cluster endpoints.
+- Config per environment and app: the app's mode, its cluster's Temporal endpoint, its Oracle pool's connection, One-Data's base URL, each downstream's base URL, the Prometheus address and the OpenTelemetry collector's address.
+- Secrets come from the organization's secret store, under one path per environment: each app's Oracle pool login, the client certificate for each app's Temporal cluster, the credentials One-Data and each downstream take (held the way the current app holds them), and the Prometheus login the governor reads with. No secret sits in a config file.

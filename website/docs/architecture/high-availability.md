@@ -10,7 +10,7 @@ import HADiagram from '@site/src/components/HADiagram';
 
 # High Availability
 
-<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against **two self-hosted Temporal clusters** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: the app, the write side of the database and each Temporal cluster have a standby that does nothing until someone promotes it. And when the core APIs are slow or can't be reached, One-Data holds a new payment in **Redis** rather than turning the caller away, for **RTF** to retry later.</Lead>
+<Lead>Billpay runs from **two on-prem Hydra sites**, IPC2 in the east and IPC1 in the west, against **two self-hosted Temporal clusters** in AWS us-east-1. Only the front door is live in both sites. Everything behind it processes in one place at a time: each of Billpay's two apps, the write side of the database and each Temporal cluster have a standby that does nothing until someone promotes it. And when the core APIs are slow or can't be reached, One-Data holds a new payment in **Redis** rather than turning the caller away, for **RTF** to retry later.</Lead>
 
 ## Topology
 
@@ -23,19 +23,19 @@ import HADiagram from '@site/src/components/HADiagram';
 - Each site also has a **Redis** store. The two are one active-active database (Redis calls this a CRDB), so what one site writes, the other can read.
 - One-Data writes every new payment to Redis before it calls the core APIs, in the same call that checks the card account for other pending payments. If one is still `PENDING`, One-Data declines the new payment there and then, and the core APIs never see it. That stops a customer who wasn't sure the first payment went through from paying twice by mistake. [When another payment is still pending](../design/journeys/make-a-payment.md#when-another-payment-is-still-pending) has the rule. If Redis is down, One-Data makes the same check through `ReadPayments.v1`, which reads the core alone.
 - If the core APIs don't answer within 3 seconds, or answer with a server error (a 5xx), One-Data hands the stored payment to **RTF** (the Reliable Transaction Framework) instead of failing the caller. RTF retries it into the core, with the same payment ID, until it lands. New payments and confirms are held this way. An update or a cancel needs the core.
-- As soon as a payment is decided, billpay-core tells One-Data, which clears the payment out of Redis, so the account can take its next payment. If that call never lands, an hourly sweep clears an entry more than 2 hours old once billpay-core shows the payment decided. Persistence is on and nothing is evicted, so a restart or a full memory can't lose an entry.
+- As soon as a payment is decided, its workflow tells One-Data, after the caller's reply, and One-Data clears the payment out of Redis, so the account can take its next payment. If that call never lands, an hourly sweep clears an entry more than 2 hours old once billpay-online shows the payment decided. Persistence is on and nothing is evicted, so a restart or a full memory can't lose an entry.
 - The trade is on purpose. The caller gets an answer now and the payment processes a little later. An outage in the core becomes a delay instead of a dropped payment.
 
-## The app
+## The apps
 
-billpay-core is one app that runs the work for both Temporal clusters.
+Billpay runs as two apps, built from one codebase, billpay-core, as one artifact. Each connects to its own Temporal cluster and nothing else in Temporal.
 
-- It runs the REST APIs, the [Billpay Router](../design/routing.md), the dispatchers, the governor and the workers for both clusters, with a Temporal client for each.
-- Offline work has its own Oracle connection pool and a cap on how many offline tasks run at once, so it can never take a whole pod. The governor also cuts offline rates as soon as online response times climb.
-- It ships and deploys as one app. There is no separate online or offline app: when it needs more capacity, it gets more pods of the same app.
-- It runs in IPC2. IPC1 keeps a standby of the same app, deployed and ready, which an operator promotes if IPC2 goes.
-- It reads and writes the Oracle primary next to it in IPC2, and it is the only component that talks to Temporal.
-- So each kind of work runs in exactly one place, which is also one place to look when a payment is stuck. Deployment detail is on the [billpay-core deployable page](../deployment/deployables/worker-app.md).
+- billpay-online runs the REST APIs channels call, the card provider's 3D Secure callback, the [Billpay Router](../design/routing.md) for those requests and the workers for the Online cluster.
+- billpay-offline runs the dispatchers, the governor, the allocations callback, the Market Onboarding API and the workers for the Offline cluster.
+- They share no pod, so offline work can never take one a customer's payment needs. Each app has its own Oracle pool and its own pods, and scales on its own. The governor still cuts offline rates as soon as online response times climb, because Oracle and the downstreams are shared.
+- Both run in IPC2. IPC1 keeps a standby of each, deployed and ready, which an operator promotes if IPC2 goes.
+- Both read and write the Oracle primary next to them in IPC2, and they are the only components that talk to Temporal.
+- So each kind of work runs in exactly one place, which is also one place to look when a payment is stuck. Deployment detail is on the [billpay-online and billpay-offline page](../deployment/deployables/worker-app.md).
 
 ## Oracle
 
@@ -43,7 +43,7 @@ billpay-core is one app that runs the work for both Temporal clusters.
 - IPC1 holds the **Oracle Data Guard** standby plus one more read-only replica. Data Guard ships redo from the primary to it continuously, and the standby stays read-only until someone promotes it.
 - Promotion is a decision an operator makes, not something that happens on its own. That's the point: one write site at a time, no split brain.
 - Oracle is also the only hand-off between the two Temporal clusters, so it carries more than payment data: the Work Tracker rows that hold dated work. Work nobody waits for, from bulk intake and inbound payments to returns, settlement and posting, is held in One-Data's inbox instead, and Billpay pulls it from there. The inbox is a Postgres database of its own, separate from Temporal's, with one primary replicated across IPC1 and IPC2.
-- Short outages and patching windows don't fail payments. `PaymentStore`, the only code that touches Oracle, keeps retrying and then waits on a durable timer, so a payment pauses and carries on when the database is back. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
+- Short outages and patching windows don't fail payments. Only Billpay's stores touch Oracle, and a database call that fails its first, local attempt runs again as a regular activity that keeps retrying, so a payment pauses and carries on when the database is back, even across a worker restart. Dispatchers stop releasing new work for as long as Oracle is unhealthy.
 - This is the [same Oracle setup](../build/tech-stack/database.md) the DBO team runs day to day.
 
 ## Temporal
@@ -52,7 +52,7 @@ billpay-core is one app that runs the work for both Temporal clusters.
 - Each cluster has its own **Aurora PostgreSQL** database for its histories and its own **OpenSearch 2** store for visibility, the search behind the Temporal UI. Online runs 2,000 history shards and Offline 4,000, a number fixed when a cluster is created.
 - Nothing calls from one cluster to the other. A payment scheduled on Online reaches Offline through Oracle, so either cluster can go down while the other keeps working.
 - **us-west-1 holds a passive standby for each cluster**, with its database replicated from the east. Neither serves anything in normal operation. Each is promoted on its own, by hand, the same rule as the Oracle standby in IPC1: one write site at a time, no split brain.
-- Only the app in IPC2 talks to the clusters, over gRPC, with a client for each. Its standby in IPC1 is wired the same way but carries nothing until it's promoted.
+- Only the two apps in IPC2 talk to the clusters, over gRPC, each with a client for its own cluster: billpay-online for Online, billpay-offline for Offline. Their standbys in IPC1 are wired the same way but carry nothing until they're promoted.
 - Workflow state lives in each cluster's database, never in worker memory. Restart the workers and in-flight payments carry on from their event histories.
 - Cluster settings are on the [Temporal Server](../deployment/temporal-server.md) page.
 
@@ -81,10 +81,11 @@ Temporal is the only part of the platform that does not run on Hydra. Its cluste
 
 | What fails | What happens |
 | --- | --- |
-| **The app in IPC2** | Both One-Data instances keep taking new payments and confirms. They answer `PENDING` and hold each one for **RTF**, and work nobody waits for keeps landing in One-Data's inbox. An update or a cancel gets an error until the app is back. Dispatchers stop and the workers go quiet, so dated work waits in Oracle and running payments pause where they are. Nothing is dropped: RTF retries what it holds, and work resumes once the app is back, or once an operator promotes the IPC1 standby. |
-| **A whole site** | Losing IPC1 costs the front door on that side and the standbys there, and nothing stops, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and holding new payments and confirms until an operator promotes the app and the **Data Guard** standby there. |
-| **Redis** | One-Data makes the pending check through `ReadPayments.v1` instead, which reads billpay-core alone, and stores nothing. A create it held, or one billpay-core hasn't captured yet, can be missed, so a customer may get a second payment through while it lasts. The fix is to restore Redis. |
-| **Oracle primary** | `PaymentStore` waits out a short outage or a patch on its own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
+| **billpay-online in IPC2** | Both One-Data instances keep taking new payments and confirms. They answer `PENDING` and hold each one for **RTF**. An update or a cancel gets an error until the app is back, and the Online cluster's workers go quiet, so running online payments pause where they are. Nothing is dropped: RTF retries what it holds, and work resumes once the app is back, or once an operator promotes its IPC1 standby. Offline work carries on in billpay-offline. |
+| **billpay-offline in IPC2** | Dispatchers stop and the Offline cluster's workers go quiet, so dated work waits in Oracle, pulled work keeps landing in One-Data's inbox, allocation callbacks get an error and are sent again, and running offline payments pause where they are. Customers' payments carry on in billpay-online. Work resumes once the app is back, or once an operator promotes its IPC1 standby. |
+| **A whole site** | Losing IPC1 costs the front door on that side and the standbys there, and nothing stops, since IPC1 was already sending its traffic east. Losing IPC2 leaves IPC1's One-Data answering and holding new payments and confirms until an operator promotes both apps and the **Data Guard** standby there. |
+| **Redis** | One-Data makes the pending check through `ReadPayments.v1` instead, which reads billpay-online alone, and stores nothing. A create it held, or one billpay-online hasn't captured yet, can be missed, so a customer may get a second payment through while it lasts. The fix is to restore Redis. |
+| **Oracle primary** | The stores wait out a short outage or a patch on their own. A longer one means promoting the standby in IPC1. Until then, reads still work off the read-only replicas, but nothing new can be written. |
 | **One-Data's inbox** | Nothing new can be stored, so senders of bulk intake, inbound payments, returns, settlement and posting get an error and retry. Payments stay `PROCESSED` until the inbox is back. Nothing is lost: the dispatchers and `PAID` catch up on their own. |
 | **The Online cluster** | Journeys where a caller waits can't start until the cluster returns or an operator promotes its us-west-1 standby. The Offline cluster carries on, since nothing calls across. |
 | **The Offline cluster** | Dated work waits in Oracle and pulled work in One-Data's inbox, allocation callbacks get 503 with `Retry-After` and are sent again, and running offline payments pause, notifications included. The Online cluster keeps serving. The fix is to restore the cluster or promote its standby. |
@@ -105,7 +106,7 @@ While the region is down:
 To bring Temporal back in us-west-1:
 
 1. An operator promotes the us-west-1 standby of each cluster to primary. The Online and Offline clusters are promoted separately, each with its own database.
-2. The app is pointed at the west: its two Temporal clients, one per cluster, switch to the us-west-1 frontends.
+2. Each app is pointed at the west: billpay-online's Temporal client switches to the Online cluster's us-west-1 frontend, and billpay-offline's to the Offline cluster's.
 3. Work picks up again. Workflows carry on from the histories the standby received, including any notifications they still owed, and dispatchers start releasing due rows and pulling from One-Data's inbox.
 
 A step that ran just before the outage may run a second time after the switch. That is safe by design: every downstream call carries an idempotency key and every Oracle write is a guarded update, so the retry finds the work already done and money never moves twice. The step-by-step runbook sits with the other [SOPs](../operations/sops.md).

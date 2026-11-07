@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 - On the Online cluster, a caller is waiting, so the question is response time. The signal that matters most is p99 for `POST /payments`, against its 500 ms SLO.
 - On the Offline cluster, work arrives at the governor's pace, so the question is whether the database can take the rate it is being given, and whether queues drain.
 
-Separate databases mean offline load can't slow realtime traffic inside Temporal. Oracle, the downstreams and the app are still shared, which is why the governor watches the Online cluster too.
+Separate databases mean offline load can't slow realtime traffic inside Temporal. Oracle and the downstreams are still shared by both apps, which is why the governor watches the Online cluster too.
 
 ## The governor's inputs
 

@@ -58,9 +58,9 @@ One target is fixed by the design rather than by contract: p99 for `POST /paymen
 
 ## Work nobody waits for
 
-AR intake, returns and inbound payments never call billpay-core. One-Data stores each one in its inbox and answers 202, so what the sender experiences is the time to that 202, once the request is stored. From then on the measure is the backlog age: how long the request waits before a dispatcher starts its workflow. Waiting there is by design, because the governor releases this work at the pace the platform can take. What gets watched is the age: the returns and `PAID` backlog-age alerts fire when the oldest waiting item passes its threshold ([Kibana Alerts](../../alerts/kibana.md#backlogs)).
+AR intake, returns and inbound payments never call either app. One-Data stores each one in its inbox and answers 202, so what the sender experiences is the time to that 202, once the request is stored. From then on the measure is the backlog age: how long the request waits before a dispatcher starts its workflow. Waiting there is by design, because the governor releases this work at the pace the platform can take. What gets watched is the age: the returns and `PAID` backlog-age alerts fire when the oldest waiting item passes its threshold ([Kibana Alerts](../../alerts/kibana.md#backlogs)).
 
-The allocations callback is the only payment work billpay-core still starts asynchronously. It replies 202 once the batch is stored and its workflow has started, and 429 with `Retry-After` when its traffic class is over budget, which the allocations manager retries.
+The allocations callback, served by billpay-offline, is the only payment work Billpay still starts asynchronously. It replies 202 once the batch is stored and its workflow has started, and 429 with `Retry-After` when its traffic class is over budget, which the allocations manager retries.
 
 ## Error budget at a glance
 

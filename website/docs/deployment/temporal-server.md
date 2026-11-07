@@ -35,7 +35,7 @@ All Temporal Schedules live on the Offline cluster. One Offline namespace serves
 
 ## Standbys and failover
 
-Each cluster runs active-passive, like the single cluster it replaces. The standby in us-west-1 replicates its database from the east and takes no traffic. An operator promotes each standby on its own, and billpay-core points its client for that cluster at the new frontend. Workflows carry on from the histories the standby received.
+Each cluster runs active-passive, like the single cluster it replaces. The standby in us-west-1 replicates its database from the east and takes no traffic. An operator promotes each standby on its own, and the app for that cluster, billpay-online or billpay-offline, points its client at the new frontend. Workflows carry on from the histories the standby received.
 
 When the Offline cluster is down, the Online cluster keeps serving. Dated work waits in Oracle, pulled work waits in One-Data's inbox, and allocation callbacks get 503 with `Retry-After` until the cluster is back. [High Availability](../architecture/high-availability.md#when-things-break) covers every failure, including losing all of us-east-1.
 

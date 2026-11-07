@@ -35,7 +35,7 @@ A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_RE
 
 A create that has to wait for its customer, for their bank or for their debit card's 3D Secure, runs as [Create Payment Intent](#create-payment-intent) instead.
 
-As soon as Verify has decided, a create from a channel calls One-Data's delete API, `DeletePendingPayment.v1`. One-Data drops the stored create and the payment's entry in the card account's pending list, so the customer can make their next payment: while an entry stays, One-Data declines every other create on that account. Create Payment Intent calls the delete twice, because its payment keeps its entry while it waits.
+As soon as Verify has decided, every create workflow calls One-Data's delete API, `DeletePendingPayment.v1`, after the caller's reply and never on its path. For a create One-Data never stored, such as one from Accounts Receivable, the call finds nothing to remove. One-Data drops the stored create and the payment's entry in the card account's pending list, so the customer can make their next payment: while an entry stays, One-Data declines every other create on that account. Create Payment Intent calls the delete twice, because its payment keeps its entry while it waits.
 
 ## Create Scheduled Payment
 
@@ -47,7 +47,7 @@ As soon as Verify has decided, a create from a channel calls One-Data's delete A
 2. The `SCHEDULED` commit writes the `SCHED_EXEC` Work Tracker row, due at the market's execution time on the due date. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time, and its execution row comes once it is `ALLOCATED`.
 3. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
 
-A create from a channel makes the same delete call as [Create Immediate Payment](#create-immediate-payment), once Verify has decided. `SCHEDULED` is a decision, so a scheduled payment never keeps the customer from making another payment while it waits.
+It makes the same delete call as [Create Immediate Payment](#create-immediate-payment), once Verify has decided, whether a channel or Accounts Receivable started it. `SCHEDULED` is a decision, so a scheduled payment never keeps the customer from making another payment while it waits.
 
 ## Execute Scheduled Payment
 
@@ -167,7 +167,7 @@ A `PENDING` payment that waits for its customer isn't cancelled here. [Create Pa
 
 The customer's no is an update too. Cancel moves the payment from `PENDING` to `CANCELLED`, with no window check. A yes and a no from two browser tabs are two updates to one workflow, so the first one it accepts wins and the other gets 409. If the timer fires with no answer, Cancel runs the same way, and as for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven. The workflow never ends by a terminate or a timeout, because either would leave the payment `PENDING` with nobody told.
 
-The confirm and the no are updates rather than signals because a signal can't answer the caller, and the channel needs the decision in the confirm's reply. The 3D Secure callback is an update for the same reason: the card provider calls billpay-core directly, at `POST /payments/{payment-id}/authentication` (Proposed), not through One-Data, and gets the decision back. Billpay authenticates that call by mutual TLS (Proposed). An update can also be turned away before anything is written: once the workflow has an answer, or no longer waits, it refuses any more, and the API answers 409.
+The confirm and the no are updates rather than signals because a signal can't answer the caller, and the channel needs the decision in the confirm's reply. The 3D Secure callback is an update for the same reason: the card provider calls billpay-online directly, at `POST /payments/{payment-id}/authentication` (Proposed), not through One-Data, and gets the decision back. Billpay authenticates that call by mutual TLS (Proposed). An update can also be turned away before anything is written: once the workflow has an answer, or no longer waits, it refuses any more, and the API answers 409.
 
 The server fires a timer on time, and a worker normally handles it within about a second. One handled more than a minute late means the Online cluster or its workers were down while the customer was meant to confirm. The workflow then gives the customer one more confirmation window before it cancels. A confirm the customer sent during the outage isn't lost: One-Data held it and answered `PENDING`, and RTF retries it at least once a minute (Proposed), so it lands in that window ([Stored creates and the pending check](../../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
@@ -183,7 +183,7 @@ The workflow calls One-Data's delete API twice: once after its reply, saying the
 
 ## Creates that arrive late or twice
 
-A create can reach billpay-core more than once, or late. One-Data holds it while billpay-core is slow, and RTF retries it ([Stored creates and the pending check](../../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)). Every try carries the same payment ID.
+A create can reach billpay-online more than once, or late. One-Data holds it while billpay-online is slow, and RTF retries it ([Stored creates and the pending check](../../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)). Every try carries the same payment ID.
 
 - A repeat that arrives while `{paymentId}-init` runs joins it (conflict policy `USE_EXISTING`).
 - A repeat that arrives after the run has closed starts a new run, under the default reuse policy. Capture's idempotency check finds the payment. If it is still `PENDING` with nothing waiting on it, because the last run died before deciding, the new run carries on with the next stage, so the payment isn't stuck. Otherwise the run returns the payment as it stands and ends, so no stage runs twice. A payment that waits for a confirmation comes back with its redirect or challenge link. Workflows and activities are idempotent, so this needs no special reuse policy.

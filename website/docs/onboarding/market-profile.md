@@ -40,7 +40,7 @@ A debit card's 3D Secure is not one of the five behaviors, because there is noth
 
 ## What the customer is offered
 
-The profile holds the rules a payment is checked against, and some of them shape the channel's payment page too. The page fills itself from two reads. Payment Options' `ReadPaymentOptions.v1` gives the amounts, the payment options and the dates this customer can pay on. `ReadBillpayInstruments.v1` gives the instruments, and billpay-core filters them by the profile's rules first, so the page never offers an instrument this payment can't use.
+The profile holds the rules a payment is checked against, and some of them shape the channel's payment page too. The page fills itself from two reads. Payment Options' `ReadPaymentOptions.v1` gives the amounts, the payment options and the dates this customer can pay on. `ReadBillpayInstruments.v1` gives the instruments, and billpay-online filters them by the profile's rules first, so the page never offers an instrument this payment can't use.
 
 | What the Router and Verify check | The profile holds it as |
 | --- | --- |

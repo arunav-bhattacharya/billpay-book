@@ -33,7 +33,7 @@ Three conventions to keep:
 
 ## One mapper for every boundary
 
-billpay-core builds one `ObjectMapper` at startup and uses it everywhere: Quarkus REST for request and response bodies, the [clients](../core-build/clients.md) for downstream calls, and Temporal for workflow and activity payloads on both clusters. Temporal's Java SDK already writes JSON through Jackson, so we hand it our mapper instead of adding a converter of our own:
+Each app builds one `ObjectMapper` at startup and uses it everywhere: Quarkus REST for request and response bodies, the [clients](../core-build/clients.md) for downstream calls, and Temporal for workflow and activity payloads on its cluster. Temporal's Java SDK already writes JSON through Jackson, so we hand it our mapper instead of adding a converter of our own:
 
 ```kotlin
 val mapper: ObjectMapper = jacksonObjectMapper()   // registers the Kotlin module

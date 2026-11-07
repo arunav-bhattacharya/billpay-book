@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 
 | Reason | Why it matters for Billpay |
 | --- | --- |
-| Connection pooling out of the box | billpay-core fans out to many downstreams per payment. A pooled, keep-alive client is the difference between tens and tens of thousands of connections under load. |
+| Connection pooling out of the box | Each app fans out to many downstreams per payment. A pooled, keep-alive client is the difference between tens and tens of thousands of connections under load. |
 | HTTP/2 with transparent negotiation | Several Amex internal services are HTTP/2. OkHttp negotiates it via ALPN without per-service configuration. |
 | Four independent timeouts | Connect, read, write, and full-call timeouts are set separately, and none inherits silently. Every activity has a Temporal deadline; a misconfigured downstream must not be able to hang an activity past it. |
 | First-class interceptors | Auth, tracing headers, and correlation IDs are layered once as interceptors, never re-implemented per service. |

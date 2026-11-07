@@ -9,9 +9,9 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # API Spec
 
-<Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data functions</strong> are the versioned contracts the rest of Amex calls. Most of them front a <strong>billpay-core REST API</strong>, where the Router admits the request and starts its workflow. The rest keep work nobody waits for in One-Data's inbox, and Billpay's dispatchers pull it from there.</Lead>
+<Lead>Two contract layers stand between a channel and a workflow. <strong>One-Data functions</strong> are the versioned contracts the rest of Amex calls. Most of them front a <strong>REST API</strong> on one of Billpay's two apps, billpay-online or billpay-offline, where the Router admits the request and starts its workflow. The rest keep work nobody waits for in One-Data's inbox, and Billpay's dispatchers pull it from there.</Lead>
 
-Each layer has its own job. One-Data makes the payment ID, runs the check for other pending payments, and holds a create while billpay-core is slow. billpay-core decides what happens to the payment.
+Each layer has its own job. One-Data makes the payment ID, runs the check for other pending payments, and holds a create while billpay-online is slow. Billpay's apps decide what happens to the payment.
 
 ## In this section
 
@@ -20,7 +20,7 @@ Each layer has its own job. One-Data makes the payment ID, runs the check for ot
     {
       term: 'One-Data Functions',
       to: '/docs/build/api-spec/one-data',
-      desc: `Every function and the billpay-core API behind it, the pending check in Redis, the event handlers, and the inbox functions Billpay pulls work through.`,
+      desc: `Every function and the Billpay API behind it, the pending check in Redis, the event handlers, and the inbox functions Billpay pulls work through.`,
     },
     {
       term: 'Billpay Core APIs',

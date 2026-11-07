@@ -10,13 +10,15 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>One row in <code>trans_dtl</code> is the truth about a payment's current state. The rest of Billpay's Oracle schema records how the payment got there, guards against doing the same work twice, and holds the work that is still to start.</Lead>
 
-`PaymentStore` is the only code that reads or writes these tables. Each of its operations is one transaction, and every write in it is either insert-if-absent or a conditional update on the current status, so a retried step can never apply twice. Settlement and AR posting events aren't here: they wait in One-Data's inbox, in its own Postgres database, and Billpay reaches them only through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions). There is no outbox either, because lifecycle events and customer messages are activity calls.
+Only the stores read or write these tables: `PaymentStore` for payment state, `WorkTrackerStore` for the Work Tracker, `AllocationBatchStore` for allocation batches, `ConfigStore` for the published market config and `ControlStore` for the control tables. Each operation is one transaction, and every write in it is either insert-if-absent or a conditional update on the current status, so a retried step can never apply twice. Settlement and AR posting events aren't here: they wait in One-Data's inbox, in its own Postgres database, and Billpay reaches them only through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions). There is no outbox either, because lifecycle events and customer messages are activity calls.
+
+The `BPYSCH` DDL shared on 2026-10-16 is current: it is what runs in production. Everything marked new below goes on a [separate list for the DBAs](#new-tables-and-columns-for-the-dbas).
 
 ## Payment tables
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment, per presentment | Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
+| `trans_dtl` | Payment, per presentment | Its type in `trans_type_cd`, `PAYMENT` or `REFUND` for now, with `ADJUSTMENT` and `REVERSAL` to follow; adjustments and reversals across accounts move no money. Its source in `trans_srce_nm`, which mostly matches `PaymentSource`, and its money movement, when it has one, in `money_move_da`. The instrument's enrollment ID, and in `instrmt_dtl_da` only the instrument type, its token, its fingerprint, the bank's routing number and name, and the account number's last 4 digits: Billpay fetches the rest of the instrument from Payment Instruments when a step needs it. Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate, per presentment | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached, per presentment | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
@@ -66,6 +68,8 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 
 ## What PaymentStore does
 
+`PaymentStore` holds payment state. Each of its operations is one transaction, and every write is insert-if-absent or a guarded update. The other stores follow the same rules.
+
 | Operation | In one transaction |
 | --- | --- |
 | Capture | Insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table |
@@ -78,3 +82,14 @@ A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetch
 | Settle | A batch of up to 500 inbox rows as JDBC batches: each a guarded update from `PROCESSED` to `PAID`, with a `PAID` timeline row tagged with the batch ID wherever the update changed a row |
 
 Every table has one [Exposed](./tech-stack/orm.md) `Table` object, and those objects are the only place column names appear in Kotlin. Workflow code never touches any of this, because it has to [stay deterministic](./core-build/workflows.md#why-workflow-code-must-be-deterministic).
+
+## New tables and columns for the DBAs
+
+The production DDL stays as it is. What the design adds goes to the DBAs as one list:
+
+- New columns on `trans_dtl`: `legs_released_at`, `stlmt_ts`, `ar_pstd_ts`, `bank_cnfrm_ref` and `bank_cnfrm_url`. On `split_trans_dtl`: `stlmt_ts` and `ar_pstd_ts`. On both timelines: `cluster_nm` and `batch_id`.
+- New indexes: the batch-ID index on each timeline, and the indexes for the corporate completion check, the late-allocations check and the 48-hour check (Proposed).
+- New tables: `work_tracker`, `allocation_batch`, `exception_list`, `market_config_version`, `market_config_active`, `dispatch_run`, `rate_allocation`, `downstream_limit` and `governor_decision`.
+- New values: `ALLOCATING` and `ALLOCATED` in `trans_sta_cd`.
+
+What `tot_trans_am` holds is still open.

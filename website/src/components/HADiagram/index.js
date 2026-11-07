@@ -22,9 +22,11 @@ import styles from './styles.module.css';
  * neither Amex infrastructure nor AWS. Each Temporal cluster has its own
  * Aurora PostgreSQL drum, and the standby drum it replicates to.
  *
- * billpay-core is one app, drawn as one box in each site: active in IPC2, and
- * a standby of the same app in IPC1. It talks to both Temporal clusters over
- * one gRPC run that forks at the gutter, one client per cluster.
+ * Billpay runs as two apps from one artifact, drawn as two boxes on one pale
+ * field in each site: active in IPC2, and a standby of each in IPC1. Each app
+ * takes its cluster's tone and has its own gRPC run to its own cluster, so
+ * the two runs never meet: billpay-online leaves over the top of the field,
+ * and billpay-offline climbs the gap at its right and runs just below it.
  *
  * Coordinates are hand-placed on a 1560 x 860 canvas. Lines run in lanes
  * chosen so that none of them cross.
@@ -118,25 +120,26 @@ function Box({x, y, w, h, tone, title, sub, dim, mark}) {
   );
 }
 
-/* billpay-core: one app, so one box, with what it runs listed inside. */
-const APP_LINES = ['Core APIs · Router', 'Dispatchers · governor', 'Workers for both clusters', 'A Temporal client per cluster'];
-function AppBox({x, y, w, h, dim}) {
+/* One of the two apps: a box in its cluster's tone, with what it runs. */
+function AppBox({x, y, w, h, tone, title, lines, dim}) {
   const block = `M${x + R},${y} A${R},${R} 0 0 0 ${x},${y + R} V${y + h - R} A${R},${R} 0 0 0 ${x + R},${y + h} Z`;
   return (
-    <g className={clsx(styles.box, styles.tApp, dim && styles.dim)}>
+    <g className={clsx(styles.box, styles[tone], dim && styles.dim)}>
       <rect x={x} y={y} width={w} height={h} rx={R} className={styles.boxBody} />
       <path d={block} className={styles.boxBlock} />
-      <text x={x + 22} y={y + 34} className={styles.boxTitle}>
-        billpay-core
+      <text x={x + 22} y={y + 28} className={styles.boxTitle}>
+        {title}
       </text>
-      {APP_LINES.map((line, i) => (
-        <text key={line} x={x + 22} y={y + 62 + i * 22} className={styles.boxSub}>
+      {lines.map((line, i) => (
+        <text key={line} x={x + 22} y={y + 50 + i * 19} className={styles.boxSub}>
           {line}
         </text>
       ))}
     </g>
   );
 }
+const ONLINE_LINES = ['Core APIs · Router', 'Online workers'];
+const OFFLINE_LINES = ['Dispatchers · governor', 'Offline workers'];
 
 /* A database drum, flat-filled: body, a lighter lid, two cut lines. */
 function Drum({cx, cy, rx, h, tone, dim}) {
@@ -198,14 +201,19 @@ const CALLER_X = 46;
 const OD = {x: 96 + DX, w: 166, h: 64}; /* One-Data */
 const REDIS_X = 179 + DX;
 const CROSS_X = 318 + DX; /* the cross-site riser */
-const APP = {x: 342 + DX, w: 266, h: 152, y: 148}; /* billpay-core, east; the west one mirrors it */
+const GROUP = {x: 330 + DX, w: 290, y: 124, h: 210}; /* the two apps' field, east; the west one mirrors it */
+const ONL = {x: 342 + DX, w: 214, y: 136, h: 80}; /* billpay-online */
+const OFF = {x: 342 + DX, w: 266, y: 228, h: 80}; /* billpay-offline */
+const OFF_RISE = OFF.x + 240; /* billpay-offline's gRPC climbs here, right of billpay-online */
+const OFF_RUN = 112; /* and runs east at this height, below billpay-online's */
 const GUARD_X = 660 + DX; /* Data Guard */
 const ORA = {cx: 714 + DX, rx: 30, h: 40};
 const REP = [808 + DX, 864 + DX];
 
 /* the AWS column */
 const CL = {x: 1068, w: 250, h: 70};
-const LANE = 1030; /* the app's gRPC, forking to both clusters in the gutter */
+const LANE = 1030; /* billpay-online's gRPC, down the gutter */
+const LANE_OFF = 1010; /* billpay-offline's gRPC, just inside it */
 const PG = {cx: 1380, rx: 22, h: 32}; /* each cluster's Aurora PostgreSQL */
 const REPL_IN = 1432; /* Offline database replication, inner lane */
 const REPL_OUT = 1450; /* Online database replication, outer lane */
@@ -216,17 +224,19 @@ const ORA_Y = 227;
 const OFF_CL_Y = 270;
 
 const LABEL =
-  'High-availability topology. On the far left, outside both estates, a caller near each on-prem site. Next, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: the caller reaches the One-Data gateway, active, which calls the core APIs in the app. billpay-core is one app, active there: it runs the core APIs, the Router, the dispatchers, the governor and the workers for both Temporal clusters, with a client for each, and it reads and writes the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis store of pending payments: One-Data writes every new payment there and checks the other pending payments on the card account, and when the core APIs are slow or cannot be reached, RTF retries the stored payment later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to the app in IPC2, it holds a standby of the same billpay-core app, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. On the right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with OpenSearch 2 visibility and its own Aurora PostgreSQL database. Over gRPC, billpay-core talks to both clusters. us-west-1 holds a passive standby of each cluster, each with its own PostgreSQL database replicated from the east, and each promoted on its own.';
+  'High-availability topology. On the far left, outside both estates, a caller near each on-prem site. Next, the American Express on-prem Hydra estate, in two bands. US East, IPC2, is live: the caller reaches the One-Data gateway, active, which calls the core APIs in billpay-online. Billpay runs as two apps from one artifact, side by side on one pale field: billpay-online runs the core APIs, the Router and the Online cluster\'s workers, and billpay-offline runs the dispatchers, the governor, the allocations callback and the Offline cluster\'s workers. Both read and write the Oracle primary, which feeds two read-only replicas. Under One-Data is a Redis store of pending payments: One-Data writes every new payment there and checks the other pending payments on the card account, and when the core APIs are slow or cannot be reached, RTF retries the stored payment later. US West, IPC1, mirrors it below: its One-Data is also active but routes across to billpay-online in IPC2, it holds a standby of each app, and it holds the Oracle Data Guard standby and one read-only replica. The two Redis stores are one active-active CRDB database. On the right, the AWS estate. us-east-1, active, runs two self-hosted Temporal clusters on EKS: the Online cluster with 2,000 shards and the Offline cluster with 4,000, each with OpenSearch 2 visibility and its own Aurora PostgreSQL database. Over gRPC, each app talks only to its own cluster: billpay-online to the Online cluster and billpay-offline to the Offline cluster, on two runs that never meet. us-west-1 holds a passive standby of each cluster, each with its own PostgreSQL database replicated from the east, and each promoted on its own.';
 
 export default function HADiagram() {
   const eastOD = {x: OD.x, y: ROW - OD.h / 2};
   const westOD = {x: OD.x, y: m(ROW) - OD.h / 2};
-  const westAppY = m(APP.y + APP.h); /* 532 */
+  const westGroupY = m(GROUP.y + GROUP.h);
+  const westOnlY = m(ONL.y + ONL.h);
+  const westOffY2 = m(OFF.y + OFF.h);
   const onCl = {y: ROW - CL.h / 2};
   const offCl = {y: OFF_CL_Y};
   const westOffCl = {y: m(OFF_CL_Y + CL.h)};
   const westOnCl = {y: m(ROW + CL.h / 2)};
-  const appMidX = APP.x + APP.w / 2;
+  const onlMidX = ONL.x + ONL.w / 2;
   const westOra = m(ORA_Y); /* 605 */
 
   /* the middle of each cluster row, where its database sits */
@@ -280,13 +290,13 @@ export default function HADiagram() {
         {/* ============================ lines ============================ */}
         {/* drawn before the boxes, so every box and label sits on top */}
 
-        {/* east: caller to One-Data to billpay-core */}
+        {/* east: caller to One-Data to billpay-online */}
         <path d={`M${CALLER_X + 18},${ROW} H${OD.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
-        <path d={`M${OD.x + OD.w},${ROW} H${APP.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
-        {/* west: caller to One-Data, then across to IPC2's app */}
+        <path d={`M${OD.x + OD.w},${ROW} H${ONL.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
+        {/* west: caller to One-Data, then across to IPC2's billpay-online */}
         <path d={`M${CALLER_X + 18},${m(ROW)} H${OD.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
         <path
-          d={`M${OD.x + OD.w},${m(ROW)} H${CROSS_X} V${ROW + 15} H${APP.x - 4}`}
+          d={`M${OD.x + OD.w},${m(ROW)} H${CROSS_X} V${ROW + 15} H${ONL.x - 4}`}
           className={styles.req}
           markerEnd="url(#had-req)"
         />
@@ -297,9 +307,9 @@ export default function HADiagram() {
         {/* the two Redis stores are one active-active database */}
         <path d={`M${REDIS_X},${ROW + 114} V${m(ROW + 114)}`} className={styles.buf} markerStart="url(#had-buf)" markerEnd="url(#had-buf)" />
 
-        {/* the app to Oracle; the IPC1 standby is wired the same way, idle until promoted */}
-        <path d={`M${APP.x + APP.w},${ORA_Y} H${ORA.cx - ORA.rx - 4}`} className={styles.req} markerEnd="url(#had-req)" />
-        <path d={`M${APP.x + APP.w},${westOra} H${ORA.cx - ORA.rx - 4}`} className={styles.idle} markerEnd="url(#had-idle)" />
+        {/* both apps to Oracle, from their shared field; the IPC1 standbys are wired the same way, idle until promoted */}
+        <path d={`M${GROUP.x + GROUP.w},${ORA_Y} H${ORA.cx - ORA.rx - 4}`} className={styles.req} markerEnd="url(#had-req)" />
+        <path d={`M${GROUP.x + GROUP.w},${westOra} H${ORA.cx - ORA.rx - 4}`} className={styles.idle} markerEnd="url(#had-idle)" />
 
         {/* Oracle replication */}
         <path d={`M${ORA.cx + ORA.rx},${ORA_Y - 2} H${REP[0] - 23}`} className={styles.rep} markerEnd="url(#had-rep)" />
@@ -310,15 +320,19 @@ export default function HADiagram() {
           markerEnd="url(#had-rep)"
         />
 
-        {/* gRPC: billpay-core to both clusters, one client each. The run leaves
-            over the top of the band and forks in the gutter. */}
+        {/* gRPC: each app to its own cluster, on two runs that never meet.
+            billpay-online leaves over the top of the field; billpay-offline
+            climbs the gap at the field's right and runs just below it. */}
         <path
-          d={`M${appMidX},${APP.y} V96 H${LANE} V${ROW} H${CL.x - 4}`}
+          d={`M${onlMidX},${ONL.y} V96 H${LANE} V${ROW} H${CL.x - 4}`}
           className={styles.req}
           markerEnd="url(#had-req)"
         />
-        <path d={`M${LANE},${ROW} V${OFF_CL_Y + 35} H${CL.x - 4}`} className={styles.req} markerEnd="url(#had-req)" />
-        <circle cx={LANE} cy={ROW} r={3.6} className={styles.junction} />
+        <path
+          d={`M${OFF_RISE},${OFF.y} V${OFF_RUN} H${LANE_OFF} V${OFF_CL_Y + 35} H${CL.x - 4}`}
+          className={styles.req}
+          markerEnd="url(#had-req)"
+        />
 
         {/* each cluster writes its own database */}
         {[onY, offY].map((y) => (
@@ -371,11 +385,20 @@ export default function HADiagram() {
         <Label x={REDIS_X + 11} y={ROW + 55} cls="bufLabel" anchor="start">hold · RTF retry</Label>
         <Label x={REDIS_X + 11} y={m(ROW + 55) + 9} cls="bufLabel" anchor="start">hold · RTF retry</Label>
 
-        {/* ---- billpay-core: one app, active in IPC2, its standby in IPC1 ---- */}
-        <AppBox x={APP.x} y={APP.y} w={APP.w} h={APP.h} />
-        <Pill x={APP.x + APP.w - 6} y={APP.y - 14} label="ACTIVE" tone="pActive" anchor="end" />
-        <AppBox x={APP.x} y={westAppY} w={APP.w} h={APP.h} dim />
-        <Pill x={APP.x + APP.w - 6} y={westAppY + APP.h + 14} label="STANDBY" tone="pStandby" anchor="end" />
+        {/* ---- the two apps, one artifact: active in IPC2, a standby of each in IPC1 ---- */}
+        <rect x={GROUP.x} y={GROUP.y} width={GROUP.w} height={GROUP.h} rx={13} className={styles.appGroup} />
+        <AppBox x={ONL.x} y={ONL.y} w={ONL.w} h={ONL.h} tone="tOnline" title="billpay-online" lines={ONLINE_LINES} />
+        <AppBox x={OFF.x} y={OFF.y} w={OFF.w} h={OFF.h} tone="tOffline" title="billpay-offline" lines={OFFLINE_LINES} />
+        <Label x={ONL.x} y={GROUP.y + GROUP.h - 9} cls="small" anchor="start">one artifact, two modes</Label>
+        <Pill x={GROUP.x + GROUP.w - 6} y={GROUP.y + GROUP.h + 14} label="ACTIVE" tone="pActive" anchor="end" />
+
+        <g className={styles.dim}>
+          <rect x={GROUP.x} y={westGroupY} width={GROUP.w} height={GROUP.h} rx={13} className={styles.appGroup} />
+        </g>
+        <AppBox x={ONL.x} y={westOnlY} w={ONL.w} h={ONL.h} tone="tOnline" title="billpay-online" lines={ONLINE_LINES} dim />
+        <AppBox x={OFF.x} y={westOffY2} w={OFF.w} h={OFF.h} tone="tOffline" title="billpay-offline" lines={OFFLINE_LINES} dim />
+        <Label x={ONL.x} y={westGroupY + 18} cls="small" anchor="start">one artifact, two modes</Label>
+        <Pill x={GROUP.x + GROUP.w - 6} y={westGroupY - 14} label="STANDBY" tone="pStandby" anchor="end" />
 
         {/* ---- Oracle ---- */}
         <Drum cx={ORA.cx} cy={ORA_Y} rx={ORA.rx} h={ORA.h} tone="tOracle" />
@@ -431,7 +454,7 @@ export default function HADiagram() {
           <path d={`M${PREM.x + 14},830 H${PREM.x + 50}`} className={styles.rep} markerEnd="url(#had-rep)" />
           <text x={PREM.x + 60} y={835}>replication</text>
           <text x={PREM.x + 356} y={835} className={styles.legendMut}>
-            dimmed parts are standbys, idle until promoted: IPC1&apos;s app and Oracle, and each cluster&apos;s standby in us-west-1
+            dimmed parts are standbys, idle until promoted: IPC1&apos;s two apps and Oracle, and each cluster&apos;s standby in us-west-1
           </text>
         </g>
       </svg>

@@ -13,18 +13,19 @@ import Highlights from '@site/src/components/Highlights';
 
 The layers exist so that a difference between markets lives in exactly one place. If one market verifies a mandate before it processes a payment and another doesn't, that difference is one class, `MandateCheck`, which Verify runs where the profile requires a mandate: it fetches the mandate details from Plans, and the rules check them. The workflow above it and the activities below it stay the same in both markets.
 
-## Eight rules behind every choice
+## Nine rules behind every choice
 
 When a design choice is unclear, these rules decide it.
 
 1. **Oracle is the source of truth.** Every status change is a conditional update that applies only if the status is still what the writer expects. Whoever loses backs off.
 2. **Work that waits for a date waits in Oracle, as a Work Tracker row.** It never waits in a sleeping workflow or on a Temporal timer. The one wait that stays in a workflow is a payment waiting minutes for its customer's confirmation, which `CreatePaymentIntentWorkflow` holds on a durable timer.
-3. **Nothing calls across clusters.** Oracle is the only hand-off between the Online and Offline clusters.
+3. **Nothing calls across clusters.** Oracle is the only hand-off between the Online and Offline clusters, and each of Billpay's two apps, billpay-online and billpay-offline, connects to its own cluster only.
 4. **Every payment workflow starts through the Router.** No API or dispatcher starts one on its own. Control workflows (the dispatchers, the governor and market onboarding) start from Schedules or their own APIs.
 5. **Pace at the door.** Admit only what a cluster and its downstream systems can carry. Big bursts wait in Oracle or in One-Data's inbox, not in Temporal.
 6. **One workflow per journey.** Stages are the only thing that varies by market behavior, so there are no market-specific workflows.
 7. **One Oracle commit per stage.** A stage makes its calls first, in parallel where they don't depend on each other, then commits the state change and its timeline entry together. Its lifecycle event (RTF) and, where the customer is told, its message (Raven) go out right after the commit. Fulfil is the exception: `PROCESSED` waits for both.
 8. **Pin the resolved profile and the build at start.** A running workflow never has its code or its config changed under it.
+9. **Speed never costs a retry.** Look for bottlenecks and optimize, but never at the cost of retryability, and never make an activity local just for speed.
 
 ## The four layers
 
@@ -43,7 +44,7 @@ When a design choice is unclear, these rules decide it.
       term: 'Activity',
       desc: (
         <>
-          The calls to one system, on that system's task queue. Every Oracle read and write goes through one of them, <code>PaymentStore</code>.
+          The calls to one system, on that system's task queue. Every Oracle read and write goes through an activity that calls a store, such as <code>PaymentStore</code>.
         </>
       ),
     },
@@ -58,13 +59,13 @@ A stage returns its outcome, so the workflow never has to pick between stages fo
 
 ## Call rules
 
-Work flows one way: workflow, stage, activity, client, external system. Nothing calls up or sideways, so a stage never calls another stage, an activity never calls another activity, and a client never calls another client.
+Work flows one way: a workflow calls stages or activities, a stage calls activities, an activity calls stores or clients, and a client calls only its own system. There are no exceptions, for control and periodic workflows too. Nothing calls up or sideways, so a stage never calls another stage, an activity never calls another activity, and a client never calls another client.
 
 | Layer | May call | Must not call |
 | --- | --- | --- |
-| Workflow | Stages; child workflows on its own cluster | Activities, clients, external systems, anything on the other cluster |
+| Workflow | Stages; activities; child workflows on its own cluster | Stores, clients, external systems, anything on the other cluster |
 | Stage | Activities; the checks and methods the stage resolver gives it; plain helper functions | Workflows, other stages, clients, external systems |
-| Activity | Clients | Workflows, stages, other activities, external systems |
+| Activity | Stores and clients | Workflows, stages, other activities, external systems |
 | Client | Its one system | Other clients, workflows, stages, activities |
 
 ## Naming
@@ -73,7 +74,7 @@ Work flows one way: workflow, stage, activity, client, external system. Nothing 
 | --- | --- | --- |
 | Workflow | `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow` | `core/lib/workflows/impl/` |
 | Stage | A `Payment{Step}Stage` interface, named for the journey step, such as `PaymentVerifyStage`. The stage every market runs is `DefaultPayment{Step}Stage`; its checks and methods are named for their jobs, such as `MandateCheck`, and a market's own class starts with the market's code, such as `GBFundsCheck` ([the full rule](./component-model/stages.md#naming)) | `core/lib/stages/impl/{step}/`; a market's own classes in `market/{m}/` |
-| Activity | `{System}Activities`, such as `ClearingActivities`. Oracle reads and writes are in `PaymentStore` | `core/lib/activities/` and `impl/` |
+| Activity | `{System}Activities`, such as `ClearingActivities`. Oracle reads and writes go through the stores: `PaymentStore`, `WorkTrackerStore`, `AllocationBatchStore`, `ConfigStore` and `ControlStore` | `core/lib/activities/` and `impl/` |
 | Client | `{System}Client` | `core/lib/clients/` |
 
 Naming a class for its job rather than its market means a check that several markets share is written once.

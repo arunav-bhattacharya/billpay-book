@@ -99,7 +99,7 @@ sequenceDiagram
   par Amex's own checks at once
     S->>A: Payment Instruments: the instrument
   and
-    S->>A: Payment Options: ReadPaymentOptionById.v1
+    S->>A: Payment Options: ReadPaymentOptionByIdentifier.v1
   end
   A-->>S: the first facts
   S->>R: which rules apply, and do they pass?
@@ -139,7 +139,7 @@ Six checks exist today. Each is a class, and each says where it applies:
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
 | `InstrumentCheck` | `INSTRUMENT` | Everywhere | Payment Instruments, about the payment's instrument |
-| `OptionsCheck` | `OPTIONS` | Everywhere, and it runs where the create carries an option ID (agreed 2026-11-06). Proposed: an option ID isn't part of the profile, so the check makes no call for a payment without one | Payment Options. In Verify, `ReadPaymentOptionById.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
+| `OptionsCheck` | `OPTIONS` | Everywhere, and it runs where the create carries an option ID (agreed 2026-11-06). Proposed: an option ID isn't part of the profile, so the check makes no call for a payment without one | Payment Options. In Verify, `ReadPaymentOptionByIdentifier.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
 | `TokenCheck` | `TOKEN` | Bank confirmation Y | Payment Instruments, whether the verification token it holds for the instrument is valid |
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
 | `GBFundsCheck` | `FUNDS` | GB, bank confirmation Y | The bank-confirmation provider, whether the customer's bank account holds enough money for the payment |
@@ -246,7 +246,7 @@ A GB customer pays their bill with Pay with Bank Transfer. The Router pins the r
 | `MandateCheck` | Mandate authorization Y | Not picked |
 | `GBFundsCheck` | GB, bank confirmation Y | Runs |
 
-3. The calls go out in two parts, because the payment waits for its customer. At the create, before the redirect, Amex's own checks call Payment Instruments and Payment Options' `ReadPaymentOptionById.v1` at the same time. After the customer confirms, the bank-side checks call Payment Instruments, for the token, and the bank-confirmation provider, for the funds, at the same time.
+3. The calls go out in two parts, because the payment waits for its customer. At the create, before the redirect, Amex's own checks call Payment Instruments and Payment Options' `ReadPaymentOptionByIdentifier.v1` at the same time. After the customer confirms, the bank-side checks call Payment Instruments, for the token, and the bank-confirmation provider, for the funds, at the same time.
 4. The answers become one set of facts. The rule registry picks the payment's rules the same way it picked the checks: GB's funds rule names GB and bank confirmation, as its check does, and it runs because a funds answer is among the facts. If the account holds less than the payment, the funds rule fails and the payment is `DECLINED`.
 5. One guarded commit writes the decision and the timeline row, with the ID of the rule that failed.
 

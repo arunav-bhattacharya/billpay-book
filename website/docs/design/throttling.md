@@ -18,6 +18,8 @@ Every downstream endpoint with an agreed rate gets its own activity task queue o
 
 `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms` and `ds-allocations`.
 
+Every external call made after a payment is accepted can be rate-limited by how available its downstream is. Whether that covers the Online cluster's Execute and Fulfil calls, which run on `online-wf` with no rate limit outside a SEPA cap, is still to confirm.
+
 Until each system's owner agrees a number, every one of them is taken at 100 calls a second. Payment Instruments and Payment Options have no limit, so calls to them run on the workflow's own queue.
 
 The queue's server-side rate limit is the overall limit for that downstream, however many pods are polling it. The governor changes it at runtime through the task queue config API, for example:
@@ -37,7 +39,7 @@ Say clearing has agreed to 100 calls a second. Online at 25 leaves offline 65, o
 
 The sum needs two inputs. Both are settled for now, and both will be looked at again:
 
-- Online's calls all run on one queue, so Temporal can't count them per downstream. Online workers count their own calls and 429s per downstream, and billpay-core publishes them with its other metrics. The Prometheus server that already scrapes Temporal's metrics scrapes billpay-core's pods too, and the governor reads it there. That server has to be sized for the extra volume, and how to scale it is a discussion of its own.
+- Online's calls all run on one queue, so Temporal can't count them per downstream. Online workers count their own calls and 429s per downstream, and billpay-online publishes them with its other metrics. The Prometheus server that already scrapes Temporal's metrics scrapes both apps' pods too, and the governor reads it there. That server has to be sized for the extra volume, and how to scale it is a discussion of its own.
 - The headroom covers how late offline can react, which is up to about 45 seconds. The governor checks every 15 seconds, and the numbers it reads are about 30 seconds old: the scrape interval plus the window a rate is computed over. So after online traffic jumps, offline can keep its old share for up to 45 seconds. The headroom is the larger of 10% of the agreed rate and the biggest 45-second jump in online traffic seen over the last 4 weeks and in the load test. A faster scrape shortens the lag, and the headroom with it, which is why the 45 seconds will be revisited.
 
 ## When the cutoff wins
@@ -46,7 +48,7 @@ A SEPA run has to reach the bank before its cutoff, and when it collides with on
 
 If online traffic would leave less than that, online is capped on that downstream at the agreed rate minus the run's need, until the cutoff passes. With clearing at 100 calls a second, the cap is 44. The US run has no cutoff, so it never caps online traffic.
 
-The cap works the same way as offline's limits. The Online cluster has a `ds-*` queue for each downstream a cutoff run calls, and the governor sets the cap as that queue's limit. While a cap is on, the Router places that downstream's calls for each new online payment on the capped queue. The rest of the time they run on `online-wf` with eager dispatch, so normal traffic pays nothing for this. A cap lifts by itself at the cutoff, so a stopped governor can't leave customers capped.
+The cap works the same way as offline's limits, but the governor never touches the Online cluster to set it. The Online cluster has a `ds-*` queue for each downstream a cutoff run calls. The governor, in billpay-offline, writes the cap and its end time to `downstream_limit` in Oracle, and billpay-online reads it and sets the cap as that queue's limit on its own cluster. Proposed: each billpay-online pod reads it every 15 seconds and sets the limit only when it has changed. While a cap is on, the Router places that downstream's calls for each new online payment on the capped queue. The rest of the time they run on `online-wf` with eager dispatch, so normal traffic pays nothing for this. A cap lifts by itself at the cutoff: the Router ignores a cap past its end time and billpay-online lifts the queue's limit, so a stopped governor can't leave customers capped.
 
 The cost falls on customers, and only during the run. Some online payments wait for the downstream, and one the API can't decide in time gets a PENDING reply and finishes shortly after. Because a cap raises online p99 on purpose, online p99 never cuts a SEPA run below its floor. Two hours before each run, the governor warns when online traffic is likely to be capped.
 
@@ -101,8 +103,8 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 | Task queue | Carries | Workers |
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
-| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-onboard` | One control queue per dispatcher kind, plus the governor and market onboarding | Control workers in the app |
-| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in the app, its slots sized to the queue's limit |
+| `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-onboard` | One control queue per dispatcher kind, plus the governor and market onboarding | Control workers in billpay-offline |
+| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in billpay-offline, its slots sized to the queue's limit |
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
 

@@ -64,7 +64,7 @@ sequenceDiagram
       CAP->>PS: state → PENDING, idempotency checked
     end
     WF->>VER: run
-    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionById.v1), and Plans<br/>for a mandate, in parallel
+    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionByIdentifier.v1), and Plans<br/>for a mandate, in parallel
     rect rgba(102,169,226,0.40)
       VER->>PS: state → ACCEPTED or DECLINED
     end
@@ -136,7 +136,7 @@ sequenceDiagram
     Note over CW,PS: Online cluster, the day it is created
     Note over CW: Capture first: PENDING
     CW->>VER: run
-    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionById.v1), and Plans<br/>for a mandate, in parallel
+    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionByIdentifier.v1), and Plans<br/>for a mandate, in parallel
     rect rgba(102,169,226,0.40)
       VER->>PS: state → SCHEDULED,<br/>with the SCHED_EXEC row,<br/>one commit
     end
@@ -963,7 +963,7 @@ sequenceDiagram
 
 ## 15. A new payment while another is pending
 
-One-Data checks every create from a channel before billpay-core sees it. In one atomic call to Redis, a Lua script (Proposed), it reads the card account's pending payments and, if there are none, adds the new payment and stores the create. If the account already has a payment in `PENDING`, One-Data answers 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed), and never calls billpay-core, so no payment exists in Billpay for the attempt. When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-core alone, so a create billpay-core hasn't captured yet can be missed. A payment keeps its entry only until it is decided: then billpay-core calls One-Data's delete API, and the account can take its next payment. Payments AR raises, push payments from third parties and refunds skip the check.
+One-Data checks every create from a channel before billpay-online sees it. In one atomic call to Redis, a Lua script (Proposed), it reads the card account's pending payments and, if there are none, adds the new payment and stores the create. If the account already has a payment in `PENDING`, One-Data answers 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed), and never calls billpay-online, so no payment exists in Billpay for the attempt. When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-online alone, so a create billpay-online hasn't captured yet can be missed. A payment keeps its entry only until it is decided: then its workflow calls One-Data's delete API, after the reply, and the account can take its next payment. Payments AR raises, push payments from third parties and refunds skip the check.
 
 ```mermaid
 ---
@@ -993,12 +993,12 @@ sequenceDiagram
     RD-->>OD: another payment is PENDING,<br/>or added and stored
   else Redis is down
     OD->>RP: the account's payments
-    Note over RD,RP: it reads billpay-core alone, so a create<br/>not captured yet is missed (accepted)
+    Note over RD,RP: it reads billpay-online alone, so a create<br/>not captured yet is missed (accepted)
     RP-->>OD: a PENDING payment, or none.<br/>Nothing is stored
   end
 
   alt the account already has a PENDING payment
-    Note over OD,RD: 200 DECLINED, with a reason such as ANOTHER_PAYMENT_PENDING<br/>(Proposed). billpay-core is never called
+    Note over OD,RD: 200 DECLINED, with a reason such as ANOTHER_PAYMENT_PENDING<br/>(Proposed). billpay-online is never called
   else none is pending
     OD->>R: POST /payments
     Note over R: admit, pick the journey,<br/>pin profile, run on Online
@@ -1024,7 +1024,7 @@ sequenceDiagram
 
 ## 16. Pay by Debit card: create, 3D Secure and authorization
 
-A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-core directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS (Proposed). Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
+A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-online directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS (Proposed). Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
 
 ```mermaid
 ---

@@ -11,7 +11,7 @@ export const ACTIVITIES = [
   {
     name: 'PaymentStore',
     system: 'Oracle',
-    queue: 'Local activity',
+    queue: 'A local activity on the first attempt, then a regular activity for every retry',
     calledBy: "Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update",
   },
   {
@@ -22,9 +22,9 @@ export const ACTIVITIES = [
   },
   {
     name: 'OptionsActivities',
-    system: 'Payment Options: `ReadPaymentOptionById.v1` and `ReadPaymentOptions.v1`',
+    system: 'Payment Options: `ReadPaymentOptionByIdentifier.v1` and `ReadPaymentOptions.v1`',
     queue: "Verify's calls on the Online cluster: a local activity. Otherwise the workflow's queue: Payment Options has no rate limit",
-    calledBy: "Verify, to validate the create's payment option ID through `ReadPaymentOptionById.v1`; Reverify, through `ReadPaymentOptions.v1`, to confirm the customer still owes and the option still holds",
+    calledBy: "Verify, to validate the create's payment option ID through `ReadPaymentOptionByIdentifier.v1`; Reverify, through `ReadPaymentOptions.v1`, to confirm the customer still owes and the option still holds",
   },
   {
     name: 'PlansActivities',
@@ -96,7 +96,7 @@ export const ACTIVITIES = [
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create from a channel once its payment is decided, and `CreatePaymentIntentWorkflow` once after its reply and again once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a Pay with Bank Transfer or debit card payment (Proposed)',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create workflow once its payment is decided, and `CreatePaymentIntentWorkflow` once after its reply and again once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a Pay with Bank Transfer or debit card payment (Proposed)',
   },
   {
     name: 'LifecycleEventActivities',
@@ -126,15 +126,15 @@ Activities take IDs, not payment objects, and load what they need. Capture's wri
 
 `BankConfirmationActivities` asks the provider for the redirect link, and in GB, for the Funds check. The provider verifies the customer's bank details itself, and for Pay with Bank Transfer the money moves at the bank during the customer's bank connection.
 
-`CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-core's callback, and the waiting workflow takes it as an update.
+`CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-online's callback, and the waiting workflow takes it as an update.
 
 `TransactionNotificationActivities` is the one interface that spans systems. TFNE, GPHDB and B2Notifier are all told the same news at the same moment, so they share an interface, but each gets a method of its own, and each method runs on its own system's queue, so every system keeps its own rate limit: `ds-tfne`, `ds-gphdb` and `ds-b2notifier`.
 
 A corporate payment is never declined because its allocations are slow. It waits in `ALLOCATING`, where nothing clears and no leg runs until the last batch arrives, and an alert fires at the market's alert point.
 
-## PaymentStore, the only way into Oracle
+## The stores, the way into Oracle
 
-`PaymentStore` is the only code that reads or writes Oracle. Each of its operations is one transaction:
+Every store reads and writes Oracle directly, called from an activity: `PaymentStore` for payment state, and `WorkTrackerStore`, `AllocationBatchStore`, `ConfigStore` and `ControlStore` for the Work Tracker, allocation batches, the published market config and the control tables. Each operation is one transaction. `PaymentStore`'s are:
 
 | Operation | What it writes |
 | --- | --- |
@@ -147,18 +147,17 @@ A corporate payment is never declined because its allocations are slow. It waits
 | Settle | A batch of inbox rows as JDBC batches in one transaction: a guarded update from `PROCESSED` to `PAID` on `trans_dtl` for a payment or on `split_trans_dtl` for a leg, and a `PAID` timeline row tagged with the batch ID wherever the update changed a row. Then a read-back by batch ID |
 | Reads | The fields an activity or stage needs, by ID |
 
-It runs as a local activity, which is what lets a payment ride out an Oracle outage or a patching window without anyone stepping in:
+Every database activity runs local first, which is what lets a payment ride out an Oracle outage or a patching window without anyone stepping in:
 
-- Short blips retry inside the same workflow task.
-- Once the wait between retries passes the local retry threshold (three times the workflow task timeout, 30 seconds by default in the Java SDK), the SDK schedules a durable timer and retries in a later task. The payment pauses and resumes when Oracle is back, even across a worker restart.
-- `PaymentStore` gets a schedule-to-close timeout of a few hours and a maximum retry interval of about a minute. A Java local activity with neither a schedule-to-close nor a maximum number of attempts is not retried at all, so both are set.
+- The first attempt runs as a local activity, inside the workflow task, so a healthy read or write costs no task round trip.
+- If it fails, the retry runs as a regular activity with the full retry policy: a schedule-to-close of a few hours and a maximum retry interval of about a minute. The payment pauses and resumes when Oracle is back, even across a worker restart, and no workflow task waits while it does.
 - During an outage the governor sees the Oracle errors and stops dispatching, so only the payments already in flight wait.
 
 ## Where each call runs
 
 | Call | Runs as | Why |
 | --- | --- | --- |
-| Oracle reads and writes | A local activity (`PaymentStore`) | No task round trip, and one marker in history when the workflow task completes |
+| Oracle reads and writes, through the stores | A local activity on the first attempt; a regular activity for every retry | The first try needs no task round trip; a retry runs on a worker like any activity, with the full retry policy |
 | The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and the provider in RequestConfirmation | A local activity. A Verify call that fails 3 times runs again as a regular activity on `online-wf`, for up to 24 hours | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
 | Calls a downstream may throttle | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
@@ -170,7 +169,7 @@ Throttled calls stay off eager dispatch, because it hands the task straight back
 - Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate that fails its check, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
 - A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
 - Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
-- RTF and Raven get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
+- RTF and Raven get a long schedule-to-close, like the database activities. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
 - Start-to-close is about two to three times the call's p99, so a hung call frees its slot quickly.
 - HTTP clients inside activities don't retry on their own (no MicroProfile `@Retry`, for example). One task is one call, so a queue's limit stays the real call rate.
 - Every HTTP call carries an idempotency key, such as `{paymentId}-{step}`, because any activity can run twice.

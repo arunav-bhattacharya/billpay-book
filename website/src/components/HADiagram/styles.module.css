@@ -17,7 +17,6 @@
   --ha-group: color-mix(in srgb, var(--amex-blue) 6%, var(--amex-panel));
   --ha-oracle: var(--amex-midnight);
   --ha-offline-block: var(--amex-temporal);
-  --ha-app-block: var(--amex-midnight);
 
   margin: 1.5rem 0 2rem;
   padding: 10px 8px 6px;
@@ -32,7 +31,6 @@
   --ha-group: color-mix(in srgb, var(--amex-blue-bright) 9%, var(--amex-card));
   --ha-oracle: var(--amex-worker-offline);
   --ha-offline-block: var(--amex-banner-block);
-  --ha-app-block: var(--amex-banner-block);
 }
 
 .svg {
@@ -120,12 +118,6 @@
 }
 .tOracle {
   --tone: var(--ha-oracle);
-}
-/* billpay-core runs both clusters' work, so it takes neither cluster's tone:
-   the brand's Deep Blue block on the pale blue the estate uses for Billpay. */
-.tApp {
-  --block: var(--ha-app-block);
-  --body: var(--ha-group);
 }
 
 .boxBody {
@@ -274,4 +266,9 @@
 }
 .legend .legendMut {
   fill: var(--amex-mut);
+}
+
+/* the pale field both apps sit on: one artifact, two modes */
+.appGroup {
+  fill: var(--ha-group);
 }

@@ -142,9 +142,11 @@ private val notifications = Workflow.newActivityStub(
 
 A worker on each of the three queues registers the same implementation, and each only ever receives its own method's tasks. Each method calls one client, so the rule that a call reaches one system still holds.
 
-## PaymentStore
+## The stores and Oracle
 
-`PaymentStore` is the one activity that reaches Oracle, and no other code does. It runs as a local activity, inside the workflow task, so a commit costs no task round trip. Each operation is one transaction. A stage commit, for example, is the guarded status update, the timeline row with the cluster, and any Work Tracker rows the step opens or closes:
+Every store reads and writes Oracle directly: `PaymentStore` for payment state, `WorkTrackerStore` for the Work Tracker's claims and sweeps, `AllocationBatchStore` for allocation batches, `ConfigStore` for the published market config and `ControlStore` for the dispatcher runs, the rate and downstream limits and the governor's decisions. An activity calls a store, as it calls a client, and nothing else holds a connection.
+
+Every database activity runs as a local activity on its first attempt, inside the workflow task, so a healthy commit costs no task round trip. If that attempt fails, the retry runs as a regular activity with the full retry policy. Each operation is one transaction. A stage commit, for example, is the guarded status update, the timeline row with the cluster, and any Work Tracker rows the step opens or closes:
 
 ```kotlin
 override fun commit(c: StageCommit): Boolean = transaction(pool) {
@@ -161,12 +163,12 @@ override fun commit(c: StageCommit): Boolean = transaction(pool) {
 }
 ```
 
-A commit that changes no row isn't an error. It means another writer, such as a cancel, moved the payment first, and the stage returns the payment as it stands. Because local activities run again if a worker dies mid-task, every write in `PaymentStore` is insert-if-absent or a guarded update, so running it twice changes nothing.
+A commit that changes no row isn't an error. It means another writer, such as a cancel, moved the payment first, and the stage returns the payment as it stands. Because a local activity runs again if a worker dies mid-task, and the regular retry runs it again after that, every write in a store is insert-if-absent or a guarded update, so running it twice changes nothing.
 
-Give `PaymentStore` a schedule-to-close of a few hours and a maximum retry interval of about a minute. That is what lets a payment wait out an Oracle outage and carry on when Oracle is back, and a Java local activity with neither a schedule-to-close nor a maximum number of attempts isn't retried at all. Capture on the Online cluster is the exception: it gets a short deadline, so a caller gets a quick error instead of a long wait.
+Give the local attempt one try, and the regular retry a schedule-to-close of a few hours and a maximum retry interval of about a minute. That is what lets a payment wait out an Oracle outage and carry on when Oracle is back, without holding a workflow task while it waits. Capture on the Online cluster is the exception: it gets a short deadline, so a caller gets a quick error instead of a long wait. Don't make any other call local just for speed: speed never costs a retry.
 
 ## RTF and Raven are activities too
 
-There is no outbox. A stage's announcement calls `LifecycleEventActivities`, which sends the lifecycle event to RTF, and `CommunicationActivities`, which sends the customer's message through Raven. Both carry idempotency keys, and both get a long schedule-to-close, like `PaymentStore`: they must succeed, so an outage pauses payments where they are instead of failing them.
+There is no outbox. A stage's announcement calls `LifecycleEventActivities`, which sends the lifecycle event to RTF, and `CommunicationActivities`, which sends the customer's message through Raven. Both carry idempotency keys, and both get a long schedule-to-close, like the database activities: they must succeed, so an outage pauses payments where they are instead of failing them.
 
 RTF has no rate limit, and it guarantees delivery once it has an event, so its calls run on the workflow's own queue. Raven has an agreed rate, so its calls run on `ds-comms` like any other throttled system.

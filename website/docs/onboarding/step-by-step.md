@@ -26,7 +26,7 @@ The unit of onboarding is a **profile**: one market and one account type. So "on
 
 ## The manifest, in plain words
 
-Before any path, it helps to know what the build can run. A **behavior combination** is an account type plus Y or N for each of the other four behaviors: AR posting, realtime clearing, mandate authorization and bank confirmation. The **capability manifest** is the list of combinations the deployed build of billpay-core can run.
+Before any path, it helps to know what the build can run. A **behavior combination** is an account type plus Y or N for each of the other four behaviors: AR posting, realtime clearing, mandate authorization and bank confirmation. The **capability manifest** is the list of combinations the deployed build of billpay-core can run, the same build in both apps.
 
 Nobody writes the manifest by hand. When the app starts, the stage registries look at every stage, check and method class in the build and work out which combinations they cover. Mandate authorization Y needs `MandateCheck`, for example, so combinations with mandate authorization appear only once that class is in the build. It is the same lookup a workflow uses to find its stages, so the manifest and the running code can't disagree.
 
@@ -57,7 +57,7 @@ A profile whose combinations are all in the manifest goes live with config alone
 3. **Fill in the Operations step.** Time zone and execution time, cancellation window, cutoff, allocation timing for corporate payments, representment rules, which status changes send a Raven message, the bank-confirmation provider and window, the card provider and authentication window for debit cards, the verification rule settings, the scheduling horizon and Pay with MR Points (both Proposed), and the expected volumes ([Operations Settings](./operations-settings.md)).
 4. **Get it approved.** A second person checks the content and approves it. The backend then freezes it as release **v1**: the full profile as JSON, a checksum, the author and the approver. A release never changes after this.
 5. **Send it to E1.** The backend calls E1's Market Onboarding API with v1. In E1, `MarketOnboardingWorkflow` checks v1 against the manifest, saves it as an inactive version with the Schedules, dispatcher settings and rate rows it needs, and sends test payments through it. The Router takes the pinned v1 for test accounts only, so nothing else sees it.
-6. **Sign off in E1.** Once the test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. The workflow activates v1: `market_config_active` points at it, its Schedules and settings go live, and every billpay-core pod reloads its copy of the config.
+6. **Sign off in E1.** Once the test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. The workflow activates v1: `market_config_active` points at it, its Schedules and settings go live, and every pod of both apps reloads its copy of the config.
 7. **Repeat in E2.** The same v1 goes to E2, and steps 5 and 6 run there.
 8. **Repeat in E3, with the RFC.** Raise the change request first. The E3 sign-off counts only once the RFC passes the ServiceNow check.
 9. **Channels start sending.** Live in E3 doesn't mean traffic. Payments come from the channels, mostly through One-Data, and the market gets none until they start sending it. Before the profile is live, a request for it gets 422.

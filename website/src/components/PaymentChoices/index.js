@@ -9,7 +9,7 @@ import styles from "./styles.module.css";
  * Three columns. The first is the page a channel shows a customer, with
  * working controls. The second is the calls the channel makes behind it, in
  * order, lit when this set of answers makes them: ReadPaymentOptions.v1, then
- * ReadBillpayInstruments.v1 for the source the customer picked (billpay-core
+ * ReadBillpayInstruments.v1 for the source the customer picked (billpay-online
  * makes the one read that source needs), then CreatePayment.v3. The third is
  * the Router's side: one door, CreatePayment.v3, and the journeys it can
  * pick, each a Temporal workflow. Change an answer and the picked journey
@@ -101,7 +101,7 @@ const OPTIONS_RETURNS = [
   "the range of dates a future payment can take",
 ];
 
-/* The read billpay-core makes behind ReadBillpayInstruments.v1, by source. */
+/* The read billpay-online makes behind ReadBillpayInstruments.v1, by source. */
 const READS = {
   bank: {
     read: "ReadInstruments",
@@ -132,7 +132,7 @@ const OPEN = [
   ],
   [
     "ReadBillpayInstruments.v1",
-    "its contract, and the billpay-core endpoint's path",
+    "its contract, and the billpay-online endpoint's path",
   ],
   [
     "The bank and wallet reads",
@@ -174,7 +174,7 @@ function decide(a) {
     return {
       kind: "declined",
       met,
-      text: "One-Data's pending check finds the payment already PENDING on the account, and declines this one there and then: 200 with DECLINED and its reason. billpay-core is never called, so no payment exists in Billpay. The customer can pay again once the pending one is decided.",
+      text: "One-Data's pending check finds the payment already PENDING on the account, and declines this one there and then: 200 with DECLINED and its reason. billpay-online is never called, so no payment exists in Billpay. The customer can pay again once the pending one is decided.",
     };
   }
   if (instructions.includes("wallet")) {
@@ -538,7 +538,7 @@ function TheCalls({ a }) {
       n: 2,
       name: "ReadBillpayInstruments.v1",
       line: source
-        ? `billpay-core calls ${source.read} for ${source.what}, and keeps only what the market's rules allow for this payment.`
+        ? `billpay-online calls ${source.read} for ${source.what}, and keeps only what the market's rules allow for this payment.`
         : "Where the customer pays from. Not called when MR Points pay alone.",
       on: Boolean(source),
       status: "new",
@@ -615,7 +615,7 @@ function TheCalls({ a }) {
           <span className={styles.hollow} aria-hidden="true" />
           <span>
             For a debit card, one more call comes in after the create: the card provider&apos;s 3D Secure callback,
-            straight to billpay-core and not from the channel.
+            straight to billpay-online and not from the channel.
           </span>
         </p>
       </div>

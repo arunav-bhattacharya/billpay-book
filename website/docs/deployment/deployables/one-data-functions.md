@@ -11,17 +11,17 @@ import Lead from '@site/src/components/Lead';
 
 ## What it hosts
 
-- The functions channels and other platforms call, each a versioned contract. Most front one billpay-core API. [Build → One-Data Functions](../../build/api-spec/one-data.md) lists every one.
+- The functions channels and other platforms call, each a versioned contract. Most front one billpay-online API. [Build → One-Data Functions](../../build/api-spec/one-data.md) lists every one.
 - The event handlers for money movement, Accounts Receivable (AR) and authorization events. The first two store what arrives, and the authorization handler only acknowledges its events. None of them starts a workflow.
 - The inbox functions Billpay calls to read and update the inbox, and `UpdateUnmatchedPayments.v1`, which One-Data runs on its own schedule.
-- The hourly sweep of pending entries, which One-Data also runs on its own schedule. It removes entries more than 2 hours old whose payments billpay-core has decided, or never got ([Stored creates and the pending check](../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)).
-- A Redis store in each site, IPC1 and IPC2, run as one active-active database. It holds every create as Pending and each card account's pending payments, so One-Data can hold a create while billpay-core is slow ([High Availability](../../architecture/high-availability.md#gateway)).
+- The hourly sweep of pending entries, which One-Data also runs on its own schedule. It removes entries more than 2 hours old whose payments billpay-online has decided, or never got ([Stored creates and the pending check](../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)).
+- A Redis store in each site, IPC1 and IPC2, run as one active-active database. It holds every create as Pending and each card account's pending payments, so One-Data can hold a create while billpay-online is slow ([High Availability](../../architecture/high-availability.md#gateway)).
 
 One-Data runs active in both sites, so losing a site doesn't close the front door.
 
 ## The inbox
 
-Bulk intake from AR, returns, inbound payments, settlements and AR postings don't reach billpay-core when they arrive. One-Data stores them, and Billpay's dispatchers pull them at the governor's pace. Oracle holds no inbox.
+Bulk intake from AR, returns, inbound payments, settlements and AR postings don't reach billpay-online when they arrive. One-Data stores them, and Billpay's dispatchers pull them at the governor's pace. Oracle holds no inbox.
 
 The inbox is one Postgres database with one primary, replicated across IPC1 and IPC2. Both sites' handlers write to that primary, so every event for a payment lands in the same database. It has three tables:
 
