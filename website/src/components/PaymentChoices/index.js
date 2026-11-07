@@ -196,7 +196,7 @@ function decide(a) {
       kind: "pick",
       id: "card",
       met,
-      text: `The Router starts CreatePaymentIntentWorkflow. It starts 3D Secure with the card provider and replies PENDING with the challenge link, or none. The card provider's callback brings the result, and Verify authorizes the payment last: approved, the money leaves the customer's account; declined by the card's bank, the payment is DECLINED. No callback in 2 minutes, and the payment is cancelled.`,
+      text: `The Router starts CreatePaymentIntentWorkflow. Amex's own checks run first, and a payment that fails them is DECLINED before 3D Secure. Then it starts 3D Secure with the card provider and replies PENDING with the challenge link, or none. The card provider's callback brings the result, and Verify authorizes the payment last: approved, the money leaves the customer's account; declined by the card's bank, the payment is DECLINED. No callback in 2 minutes, and the payment is cancelled.`,
     };
   }
   if (bankStep && several) {
@@ -218,7 +218,7 @@ function decide(a) {
       kind: "pick",
       id: "bank",
       met,
-      text: "The Router starts CreatePaymentIntentWorkflow, which replies PENDING with the provider's link and waits for the confirm.",
+      text: "The Router starts CreatePaymentIntentWorkflow. Amex's own checks run first, and a payment that fails them is DECLINED with no link. Otherwise it replies PENDING with the provider's link and waits for the confirm.",
     };
   }
   if (later) {
@@ -546,7 +546,9 @@ function TheCalls({ a }) {
     {
       n: 3,
       name: "CreatePayment.v3",
-      line: "The payment, with the chosen option's ID. The Router picks the journey.",
+      line: pointsOnly
+        ? "The payment, with no option ID: MR Points alone carry none. The Router picks the journey."
+        : "The payment, with the chosen option's ID. The Router picks the journey.",
       on: a.owed,
       status: "exists",
     },

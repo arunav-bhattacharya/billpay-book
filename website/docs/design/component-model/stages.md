@@ -32,8 +32,8 @@ Which changes send a Raven message is a market setting. By default they are `SCH
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the bank provider gives no link, or the card provider no answer (Proposed). It runs only for bank confirmation or a debit card, whose 3D Secure it starts | Bank confirmation or card authentication, which pick the request |
-| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | Mandate authorization, bank confirmation and card authentication, which decide its checks |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the bank provider gives no link, or the card provider no answer (Proposed). It runs only for bank confirmation or a debit card, whose 3D Secure it starts, and only once Verify's own checks have passed | Bank confirmation or card authentication, which pick the request |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED`. For a payment that waits for its customer it runs in two parts: its own checks at the create, which can only decline, and the bank-side checks after the answer | Mandate authorization, bank confirmation and card authentication, which decide its checks |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | Account type, AR posting, realtime clearing, mandate authorization |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls. Pay with Bank Transfer and a debit card make no clearing call, and hand One-Data the settlement event Billpay creates | Account type, AR posting, realtime clearing, bank confirmation, card authentication |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
@@ -118,7 +118,7 @@ Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_d
 
 ## RequestConfirmation
 
-Runs after Capture, in place of Verify, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y), or pays by debit card. It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link, with one try that fits inside the API's wait. One commit guarded on `PENDING` stores the link and the provider's reference. The payment stays `PENDING`, the caller's update returns with the link, and [Create Payment Intent](./workflows/core.md#create-payment-intent) waits for the customer. The link is stored so that a caller who loses it can get it again, from a repeated create or from `GET /payments/{payment-id}`.
+Runs after Capture and Verify's own checks, when a payment needs the customer to confirm their bank details (`requiresBankConfirmation` resolves to Y), or pays by debit card. A payment that fails the own checks is declined before RequestConfirmation runs, so it never gets a link. It asks the market's provider, such as Plaid in the US or Pay with Bank Transfer in the UK, for the customer's redirect link, with one try that fits inside the API's wait. One commit guarded on `PENDING` stores the link and the provider's reference. The payment stays `PENDING`, the caller's update returns with the link, and [Create Payment Intent](./workflows/core.md#create-payment-intent) waits for the customer. The link is stored so that a caller who loses it can get it again, from a repeated create or from `GET /payments/{payment-id}`.
 
 If no link comes back, because the provider is down or too slow, the commit moves the payment to `DECLINED` instead, and the caller gets `DECLINED`. No payment is ever left `PENDING` without a link. The money moves at the bank, during the customer's bank connection, so Execute makes no clearing call for Pay with Bank Transfer.
 
@@ -126,7 +126,7 @@ For a debit card, RequestConfirmation starts 3D Secure, the card schemes' check 
 
 ## Verify
 
-Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and Payment Options, to confirm the amount.
+Decides whether a pending payment can go ahead. It calls Payment Instruments, to confirm the way the customer is paying, and, where the create carries a payment option ID, Payment Options, to validate the option the customer chose through `ReadPaymentOptionById.v1`.
 
 - A business failure, such as a closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, a payment option that no longer holds, or a mandate that fails its check, is not retried. The payment goes to `DECLINED`.
 - A future-dated payment commits `SCHEDULED` together with its `SCHED_EXEC` Work Tracker row. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time.
@@ -139,7 +139,7 @@ Verify has one flow, and only its checks vary. Where the profile requires mandat
 
 ## Reverify
 
-Checks a scheduled payment again on its due date, with the same calls as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
+Checks a scheduled payment again on its due date, with the same checks as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Where the payment carries an option ID, its Options check calls `ReadPaymentOptions.v1` instead of `ReadPaymentOptionById.v1`: a customer who no longer owes money, or an option that no longer holds, means `DECLINED`, and a Statement Balance or Total Balance payment takes that day's amount. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
 
 ## Execute
 

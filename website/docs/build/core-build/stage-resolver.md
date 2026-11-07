@@ -68,7 +68,7 @@ A strategy whose key no other strategy shares simply runs wherever it applies. T
 
 ## The complete picture
 
-Here is everything at once for the payment the worked example below follows: a GB customer paying with Pay with Bank Transfer. The workflow finds its stage, the stage finds its checks, the checks make their calls, and the rules decide:
+Here is everything at once for the payment the worked example below follows: a GB customer paying with Pay with Bank Transfer. The workflow finds its stage, the stage finds its checks, the checks make their calls, and the rules decide. Because this payment waits for its customer, Verify runs in two parts: Amex's own checks at the create, and the bank-side checks after the confirm.
 
 ```mermaid
 ---
@@ -91,20 +91,27 @@ sequenceDiagram
   W->>X: resolve(profile): GB, consumer, bank confirmation Y
   X->>X: makes the stubs and picks the Verify stage
   X-->>W: the stages, bound to this payment
-  W->>S: verify.run(paymentId)
+  W->>S: verify.ownChecks(paymentId), at the create
   S->>C: which checks apply?
   C-->>S: Instrument, Options, Token, GBFunds
   Note over C: GBFundsCheck is picked because it exists and says GB. Nothing else names GB.
-  par every call at once
+  Note over S: Token and GBFunds need the bank step, so only Amex's own checks run now.
+  par Amex's own checks at once
     S->>A: Payment Instruments: the instrument
   and
+    S->>A: Payment Options: ReadPaymentOptionById.v1
+  end
+  A-->>S: the first facts
+  S->>R: which rules apply, and do they pass?
+  R-->>S: they pass, so nothing is committed yet
+  Note over W: RequestConfirmation gets the redirect link, and the workflow waits for the customer.
+  W->>S: verify.bankChecks(paymentId, the first facts), after the confirm
+  par the bank-side checks at once
     S->>A: Payment Instruments: the token
-  and
-    S->>A: Payment Options: the amount
   and
     S->>A: the provider: the funds
   end
-  A-->>S: four answers, one set of facts
+  A-->>S: all the facts
   S->>R: which rules apply, and do they pass?
   Note over R: Each rule: runsWhen first, then passes. A rule that doesn't fit the facts is skipped, not failed.
   R-->>S: GB's funds rule failed, so DECLINED
@@ -116,9 +123,9 @@ sequenceDiagram
 
 What the design does for this payment:
 
-- No code maps the payment to classes. Picking the stage (step 2), the checks (step 5) and the rules (step 12) are lookups in answers the registries worked out when the app started.
+- No code maps the payment to classes. Picking the stage (step 2), the checks (step 5) and the rules (steps 10 and 16) are lookups in answers the registries worked out when the app started.
 - GB's difference is one class in GB's module. The stage, the shared checks and the shared rules are the same code every market runs.
-- The calls run in parallel and the commit happens once, so the customer's answer isn't held up by a list of checks run one after another.
+- Each part's calls run in parallel and the commit happens once, so the customer's answer isn't held up by a list of checks run one after another. A payment that failed Amex's own checks would get its one commit, `DECLINED`, right after step 11, and never a redirect link.
 - The order of the checks is fixed, so a replay of this workflow makes the same calls in the same order.
 
 ## A worked example: Verify
@@ -132,7 +139,7 @@ Six checks exist today. Each is a class, and each says where it applies:
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
 | `InstrumentCheck` | `INSTRUMENT` | Everywhere | Payment Instruments, about the payment's instrument |
-| `OptionsCheck` | `OPTIONS` | Everywhere; it makes no call for a payment with no option ID (Proposed) | Payment Options. In Verify, `ReadPaymentOptionById.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
+| `OptionsCheck` | `OPTIONS` | Everywhere, and it runs where the create carries an option ID (agreed 2026-11-06). Proposed: an option ID isn't part of the profile, so the check makes no call for a payment without one | Payment Options. In Verify, `ReadPaymentOptionById.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
 | `TokenCheck` | `TOKEN` | Bank confirmation Y | Payment Instruments, whether the verification token it holds for the instrument is valid |
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
 | `GBFundsCheck` | `FUNDS` | GB, bank confirmation Y | The bank-confirmation provider, whether the customer's bank account holds enough money for the payment |
@@ -234,7 +241,7 @@ A GB customer pays their bill with Pay with Bank Transfer. The Router pins the r
 | Check | `appliesTo` | This payment |
 | --- | --- | --- |
 | `InstrumentCheck` | Everywhere | Runs |
-| `OptionsCheck` | Everywhere | Runs |
+| `OptionsCheck` | Everywhere, with an option ID | Runs |
 | `TokenCheck` | Bank confirmation Y | Runs |
 | `MandateCheck` | Mandate authorization Y | Not picked |
 | `GBFundsCheck` | GB, bank confirmation Y | Runs |

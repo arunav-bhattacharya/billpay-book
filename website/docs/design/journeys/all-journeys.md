@@ -504,7 +504,7 @@ One request, more than one instruction. To the customer, that is a bank account 
     },
   ]}
   detail={[
-    {step: 1, text: 'The composite payment is validated as a whole before any instruction runs.'},
+    {step: 1, text: 'The composite payment is validated as a whole before any instruction runs. The request carries one payment option ID for the whole payment. Proposed: the parent checks it once here, through `ReadPaymentOptionById.v1`, so the children run no Options check.'},
     {step: 2, text: 'Then each instruction runs as its own `CreateImmediatePaymentWorkflow`, a child on the same cluster, and goes through [Pay my bill today](#pay-my-bill-today) with its own states. How a points instruction runs inside it, with Loyalty, is still to be defined.'},
   ]}
 />
@@ -782,7 +782,7 @@ The customer gets the same quick answer a consumer does. Behind it, the payment 
       state: 'ACCEPTED',
       mode: 'live',
       caption: 'customer gets a response',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
+      systems: ['Payment Instruments', 'Plans'],
       parallel: true,
       fanNote: 'at once; Plans for a mandate',
       exit: {state: 'DECLINED'},
@@ -874,7 +874,7 @@ The same path, started by the date. The allocations are fetched on the due date 
       state: 'SCHEDULED',
       mode: 'live',
       caption: 'customer gets a response',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
+      systems: ['Payment Instruments', 'Plans'],
       parallel: true,
       fanNote: 'at once; Plans for a mandate',
       exit: {state: 'DECLINED'},
@@ -1265,7 +1265,7 @@ Some payments start inside Amex. Accounts Receivable raises them on the customer
       name: 'Verify',
       state: 'SCHEDULED',
       mode: 'background',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
+      systems: ['Payment Instruments', 'Plans'],
       parallel: true,
       fanNote: 'at once; Plans for a mandate',
       exit: {state: 'DECLINED'},

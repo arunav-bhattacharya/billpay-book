@@ -165,7 +165,7 @@ No rule here looks at the account's other payments. A create on an account that 
 Each behavior in the market's version is Y, N or BOTH, and a workflow must only ever see Y or N. BOTH becomes one or the other here, by the rule onboarding stored with it:
 
 - For most behaviors the rule lists the journeys that get Y. Realtime clearing is the usual example: only a pay-today payment from a channel gets it.
-- For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Bank confirmation takes only payments made today. Which account types can take it is configurable: consumer for now, and business travel can be turned on later. A corporate payment whose method would need it is refused with 422. A future-dated request, or one with several instructions, that would need it is refused with 422: Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
+- For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Bank confirmation takes only payments made today. Which account types can take it is configurable: consumer for now, and business travel can be turned on later. Until then, a business travel request whose method needs it is refused with 422 (Proposed). A corporate payment whose method would need it is refused with 422. A future-dated request, or one with several instructions, that would need it is refused with 422: Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
 - Card authentication is never BOTH, because no market chooses it: the Router sets it to Y whenever the payment method is a debit card (Proposed).
 
 ```kotlin

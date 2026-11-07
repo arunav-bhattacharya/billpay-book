@@ -115,7 +115,7 @@ export const GROUPS = [
             waiting: true,
             customer: [
               {t: 'Pays with a bank step', s: 'Pay with Bank Transfer, say', st: 'PENDING', m: 'on', at: 'Capture'},
-              {t: "Gets the provider's link", s: 'or DECLINED with none', st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
+              {t: "Gets the provider's link", s: "or DECLINED, when Amex's own checks fail or no link comes", st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
             oneData: [
               {...CREATE, at: 'Capture'},
@@ -159,7 +159,7 @@ export const GROUPS = [
             waiting: true,
             customer: [
               {t: 'Pays by debit card', s: 'a bank from the list, through ReadBillpayInstruments.v1', st: 'PENDING', m: 'on', at: 'Capture'},
-              {t: 'Gets the challenge link', s: 'or none, when the bank needs no challenge', st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
+              {t: 'Gets the challenge link', s: "or none, when the bank needs no challenge; DECLINED if Amex's own checks fail", st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
             oneData: [
               {...CREATE, at: 'Capture'},

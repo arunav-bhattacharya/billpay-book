@@ -114,7 +114,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
               via: 'uws',
               name: 'CreatePaymentIntent',
               cluster: 'Online',
-              caption: ['Capture, RequestConfirmation for a bank or a card, then the wait', 'After the confirm or the callback: Verify, Execute, Fulfil'],
+              caption: ['Capture, Verify\'s own checks, RequestConfirmation for a bank or a card, then the wait', 'After the confirm or the callback: the bank-side checks, Execute, Fulfil'],
             },
           ],
           note: "The confirm and the no arrive as updates. No answer by the window's end: cancelled.",
@@ -272,7 +272,7 @@ The behaviors pick the branch at each fork: `accountType` for consumer and corpo
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs, and the parent commits `PROCESSED` once every leg has finished.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
 - A request with several instructions never takes bank confirmation or a debit card, and neither does Pay & Plan or a corporate payment: one that would need either gets 422 before any workflow starts.
-- A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` replies `PENDING` with the provider's redirect link, or the 3D Secure challenge link for a debit card, and waits. The caller's confirm, the card provider's callback and the customer's no are updates to that same workflow, and if none comes in time, its timer runs Cancel. After a confirm or a callback it runs Verify, Execute and Fulfil itself. No corporate payment waits here: corporate payments take neither bank confirmation nor a debit card.
+- A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` runs Verify's own checks first, and declines a payment that fails them with no link. Otherwise it replies `PENDING` with the provider's redirect link, or the 3D Secure challenge link for a debit card, and waits. The caller's confirm, the card provider's callback and the customer's no are updates to that same workflow, and if none comes in time, its timer runs Cancel. After a confirm or a callback it runs Verify's bank-side checks, then Execute and Fulfil, itself. No corporate payment waits here: corporate payments take neither bank confirmation nor a debit card.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
 

@@ -78,7 +78,7 @@ export const IFACES = [
     fails: 'decline',
     queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify'],
-    note: 'ReadPaymentOptionById.v1 in Verify, ReadPaymentOptions.v1 in Reverify; it has no rate limit',
+    note: 'ReadPaymentOptionById.v1 in Verify, ReadPaymentOptions.v1 in Reverify, only where the payment carries a payment option ID; it has no rate limit',
   },
   {
     name: 'PlansActivities',
@@ -220,6 +220,9 @@ export const BANDS = [
               'Example values. A request with several instructions never takes bank confirmation: one that would need it gets 422.',
             first:
               'It validates the composite payment, then runs one CreateImmediatePayment per instruction, each a child on the Online cluster.',
+            exc: {
+              'Verify|OptionsActivities': {kind: 'call', note: "once, by the parent, for the whole payment's one option ID, so the children run no Options check (Proposed)"},
+            },
             then: [{to: 'immediate', text: 'each instruction runs as a child'}],
           },
           {
@@ -257,7 +260,7 @@ export const BANDS = [
             move: {Verify: 'PENDING, unchanged; DECLINED with no link'},
             journey: 'Create payment, today, one instruction, with bank confirmation: a payment that waits for the customer',
             wfId: '{paymentId}-init',
-            answer: 'with PENDING and the redirect link, or DECLINED with none',
+            answer: "with PENDING and the redirect link; DECLINED when Amex's own checks fail, or when no link comes",
             chips: five('CONSUMER', 'Y', 'Y'),
             behave:
               'Example values. A BOTH turns bank confirmation to Y when the payment method needs the customer to confirm at their bank. It is on for consumer payments made today; business travel can be turned on later.',
@@ -288,7 +291,7 @@ export const BANDS = [
             exc: {'Verify|CardActivities': {kind: 'skip', note: 'the authorization waits for the callback'}},
             journey: 'Create payment, today, one instruction, by debit card: a payment that waits for 3D Secure',
             wfId: '{paymentId}-init',
-            answer: 'with PENDING and the challenge link, or none; DECLINED when the provider gives no answer',
+            answer: "with PENDING and the challenge link, or none; DECLINED when Amex's own checks fail, or when the provider gives no answer",
             chips: five('CONSUMER', 'Y', 'N'),
             behave:
               'Example values. Card authentication is Y: the Router sets it for every debit card, and no market chooses it. A debit card pays today only, with one instruction and no MR Points.',
@@ -411,6 +414,7 @@ export const BANDS = [
               'Verify|InstrumentActivities': {kind: 'call', note: "only whether the instrument's verification token is valid: Amex's own checks ran at the create"},
               'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
               'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
+              'Verify|BankConfirmationActivities': {kind: 'cond', note: "in GB only, for GB's Funds check: whether the customer's bank account holds enough money"},
               'Execute|ClearingActivities': {kind: 'cond', note: 'not for Pay with Bank Transfer: its money moved at the bank, and Billpay creates its settlement event'},
             },
             then: [PAID],
@@ -974,6 +978,19 @@ function ravenAtVerify(j) {
   return 'only if it declines';
 }
 
+/* roads whose payments carry no payment option ID, so Verify and Reverify
+   make no Options call; and roads where only some payments carry one */
+const NO_OPTION_ID = {
+  arScheduled: 'a payment AR raises carries no payment option ID',
+  corpExecute: 'a corporate payment carries no payment option ID',
+  inbound: "a push payment doesn't come from a channel, so it carries no payment option ID",
+};
+const OPTION_ID_SOMETIMES = {
+  immediate: 'only where the create carries one: a corporate payment carries none',
+  scheduled: 'only where the create carries one: a corporate payment carries none',
+  execute: 'only where the payment carries an option ID: not one AR raised',
+};
+
 /* {stage: {kind, note}} for the calls road j makes to interface f.
    kind: call; child (a child workflow makes it); cond (only in some cases);
    or skip (this road never does, though the stage usually would). */
@@ -1033,6 +1050,17 @@ export function calls(j, f) {
     if (f.name === 'PlansActivities') {
       note = 'only where the profile requires mandate authorization';
       if (kind === 'call') kind = 'cond';
+    }
+    if (f.name === 'OptionsActivities') {
+      if (NO_OPTION_ID[j.id]) {
+        out[s] = {kind: 'skip', note: NO_OPTION_ID[j.id]};
+        return;
+      }
+      note = s === 'Reverify' ? 'ReadPaymentOptions.v1, to confirm the customer still owes and the option still holds' : "ReadPaymentOptionById.v1, with the create's payment option ID";
+      if (OPTION_ID_SOMETIMES[j.id]) {
+        note = `${note}, ${OPTION_ID_SOMETIMES[j.id]}`;
+        if (kind === 'call') kind = 'cond';
+      }
     }
     if (f.name === 'InstrumentActivities' && s === 'Execute') {
       note = 'first, for the clear-text details open-to-buy and the notifications need';
