@@ -88,7 +88,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 | --- | --- | --- | --- | --- |
 | 220 ms | 450 ms | 900 ms | 1.6 s | 2.4 s |
 
-**SLI:** end-to-end latency at the core API, covering the child `CreateImmediatePaymentWorkflow`, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
+**SLI:** end-to-end latency at the core API, covering the composite's own decision, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
 
 ## Confirm Payment
 

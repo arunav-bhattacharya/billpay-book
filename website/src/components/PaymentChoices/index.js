@@ -234,7 +234,7 @@ function decide(a) {
       kind: "pick",
       id: "multi",
       met,
-      text: `The Router starts CreatePaymentWithMultipleInstructionsWorkflow, which runs one CreateImmediatePaymentWorkflow per instruction.`,
+      text: `The Router starts CreatePaymentWithMultipleInstructionsWorkflow, which decides every instruction itself and replies, then runs each accepted instruction's Execute and Fulfil in a child.`,
     };
   }
   if (pointsOnly) {

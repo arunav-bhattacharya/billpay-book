@@ -203,7 +203,7 @@ export const BANDS = [
             behave: 'Example values. A BOTH turns realtime clearing to Y only for pay today from a channel.',
             corp: 'today',
             after:
-              "A consumer split writes its legs in the parent's commit, and each leg runs ExecuteSplitPayment as a child on the Online cluster.",
+              "A consumer split writes its legs in the parent's commit, and each leg runs ExecuteSplitPayment as a child on the Online cluster. The parent stays ACCEPTED while its legs move on.",
             then: [PAID],
           },
           {
@@ -211,19 +211,20 @@ export const BANDS = [
             wf: 'CreatePaymentWith|MultipleInstructions',
             lead: 'Pay today, with several instructions.',
             stages: CVEF,
-            child: CVEF,
-            childWf: 'CreateImmediatePayment',
+            child: ['Execute', 'Fulfil'],
+            childWf: 'for Execute and Fulfil',
             journey: 'Create payment, today, several instructions',
             wfId: '{groupId}-init (Proposed); each child is {groupId}_{paymentId}-init',
+            answer: 'once Verify has decided every instruction',
             chips: five('CONSUMER', 'Y', 'N'),
             behave:
               'Example values. A request with several instructions never takes bank confirmation: one that would need it gets 422.',
             first:
-              'It validates the composite payment, then runs one CreateImmediatePayment per instruction, each a child on the Online cluster.',
+              'It captures each instruction under its own idempotency key, verifies each and replies with every decision. Each accepted instruction then runs Execute and Fulfil in a child on the Online cluster.',
             exc: {
-              'Verify|OptionsActivities': {kind: 'call', note: "once, by the parent, for the whole payment's one option ID, so the children run no Options check (Proposed)"},
+              'Verify|OptionsActivities': {kind: 'call', note: "once, by the composite, for the whole payment's one option ID; an option that no longer holds declines every instruction with PAYMENT_OPTION_INVALID (Proposed)"},
             },
-            then: [{to: 'immediate', text: 'each instruction runs as a child'}],
+            then: [{to: 'immediate', text: 'each accepted instruction runs Execute and Fulfil in a child'}],
           },
           {
             id: 'points',
@@ -232,7 +233,7 @@ export const BANDS = [
             full: 'Pay with MR Points, a composite workflow, PayWithMrPointsWorkflow (Proposed)',
             lead: 'Pay today with MR Points alone.',
             journey: 'Create payment, today, MR Points as the one instruction',
-            wfId: '{paymentId}-init',
+            wfId: '{paymentId}-points',
             behave: 'Its steps are still to be defined, so there are no example values yet.',
             tbd: 'A composite across Billpay and Loyalty, today only. Its steps and its calls to Loyalty are still to be defined.',
           },
@@ -473,15 +474,16 @@ export const BANDS = [
             full: 'Pay & Plan, a composite workflow, PayAndPlanWorkflow (Proposed)',
             lead: 'Pay today, and create a plan of future installments.',
             stages: CVEF,
-            child: CVEF,
-            childWf: 'CreateImmediatePayment',
+            child: ['Execute', 'Fulfil'],
+            childWf: 'for Execute and Fulfil',
             journey: 'Pay & Plan',
-            wfId: '{paymentId}-init',
+            wfId: '{paymentId}-plan',
+            answer: 'once Verify decides',
             chips: five('CONSUMER', 'Y', 'N'),
             behave: 'Example values.',
-            first: 'It runs CreateImmediatePayment as a child on the Online cluster.',
-            after: 'Then it calls the Installments API, then makes an optional Autopay update.',
-            then: [{to: 'immediate', text: 'the payment runs as a child'}],
+            first: 'It captures and verifies its one payment itself and replies with the decision (one instruction, Proposed).',
+            after: 'For an ACCEPTED payment it calls the Installments API and makes an optional Autopay update, on online-wf until their owners set a limit, and a child runs Execute and Fulfil as {paymentId}-init. A declined payment gets no plan (Proposed).',
+            then: [{to: 'immediate', text: 'Execute and Fulfil run as for pay today, in a child'}],
           },
         ],
       },
@@ -1183,7 +1185,7 @@ export function callDetail(j, f, s, c) {
     out.push(`This road never makes this call: ${c.note}.`);
   } else if (c.kind === 'child' && j.childWf) {
     /* the call's own note is already on its line, so it is not repeated */
-    out.push(`The child ${j.childWf} makes this call.`);
+    out.push(j.childWf.startsWith('for ') ? `A child ${j.childWf} makes this call.` : `The child ${j.childWf} makes this call.`);
   }
   const fails = (s && f.failsAt && f.failsAt[s]) || f.fails;
   if (fails && !(s && c.kind === 'skip')) out.push(FAILS[fails]);

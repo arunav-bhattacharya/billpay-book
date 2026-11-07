@@ -11,7 +11,7 @@ import Lead from '@site/src/components/Lead';
 
 ## Finding a payment's workflows
 
-Every workflow ID is the payment ID plus a suffix: `{paymentId}-init` for the create, `{paymentId}-execute` for a scheduled execution, `{paymentId}_{seq}-execute` for a leg, and so on. [Workflow IDs](../../design/routing.md#workflow-ids) lists them all. So with a payment ID and the cluster, you can open the workflow directly, without searching.
+Every workflow ID is the payment ID plus a suffix: `{paymentId}-init` for the create, `{paymentId}-execute` for a scheduled execution, `{paymentId}_{seq}-execute` for a leg, `{paymentId}-plan` or `{paymentId}-points` for a Pay & Plan or MR Points composite, and so on. [Workflow IDs](../../design/routing.md#workflow-ids) lists them all. So with a payment ID and the cluster, you can open the workflow directly, without searching.
 
 A payment that waits for its customer, to confirm their bank details or to authenticate their debit card, has one workflow from the create to its end: `{paymentId}-init` on the Online cluster. Its history shows the wait as a timer, and the answer as an update with the ID `{paymentId}-confirm`, `{paymentId}-no` or, for the card provider's 3D Secure callback, `{paymentId}-authentication`. When the timer fires first, the history shows the cancel that followed.
 
@@ -22,7 +22,9 @@ Histories are kept for 30 days. After that the workflow is gone from the UI, but
 Every payment workflow sets its search attributes once, when it starts: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg. They answer questions like these:
 
 - Every workflow for one payment: search by `PaymentId`.
-- Every leg of a corporate payment, or every instruction of a create with several instructions: search by `ParentPaymentId`, which holds the parent's payment ID or the request's group ID (Proposed).
+- Every leg of a split payment, or every instruction of a create with several instructions: search by `ParentPaymentId`, which holds the parent's payment ID or the request's group ID (Proposed).
+- The composite of a create with several instructions: search by `PaymentId` with the group ID, which the composite takes as its own (Proposed).
+- An allocations callback's workflow has no `DueDate`, and, because it starts with no profile, no `Market` or `ConfigVersion` either (Proposed); find it by `PaymentId`.
 - Everything a market ran on one date: search by `Market` and `DueDate`.
 - Payments started on a particular release of a market's config: search by `ConfigVersion`, which holds the version number. `Journey` holds the journey's name (Proposed).
 

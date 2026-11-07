@@ -29,7 +29,23 @@ On the Online cluster, the decision's calls run as local activities, inside the 
 4. Execute moves it to `PROCESSING`: clearing, AR and open-to-buy in parallel. Open-to-buy first fetches the instrument's clear-text details from Payment Instruments, and Fulfil reuses them.
 5. Fulfil runs accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier in parallel, then sends the RTF event and the Raven message, then commits `PROCESSED`. TFNE and GPHDB are legacy systems that need to know when a payment is processed, and B2Notifier passes the news on to other downstream systems. Comms go last, so the customer hears only once everything else has worked.
 
-A consumer split payment's legs are written by Verify's `ACCEPTED` commit, and each leg runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster. The parent doesn't clear, because its legs clear on their own. Once every leg has finished, the parent sends its RTF event and Raven message and commits `PROCESSED`, the same way a corporate parent completes.
+A consumer split payment's legs are written by Verify's `ACCEPTED` commit, named `{paymentId}_{seq}`, and each leg runs `ExecuteSplitPaymentWorkflow` as a child on the Online cluster. The parent doesn't clear, because its legs clear on their own. It stays `ACCEPTED`: each leg moves through `PROCESSING` and `PROCESSED` and sends its own RTF event and Raven message, and the parent's workflow ends once every leg has finished (agreed 2026-11-07). Whether the parent sends anything of its own at that point is still open.
+
+### When a consumer payment splits
+
+Most consumer payments never split. A split happens only in a few exceptions (agreed 2026-11-07):
+
+- In Mexico (MX), a payment over 50,000 pesos from a particular set of banks is split into payments of 49,900, 49,800 and so on, each 100 pesos less than the one before.
+- A push payment can be split across several card accounts ([Process Inbound Payment](#process-inbound-payment)). It runs on the Offline cluster, and how its legs are chosen and whether its parent clears are still open.
+
+MX's split is a market rule in `market/mx/`, the way GB's funds rule sits in `market/gb/` (Proposed, 2026-11-07). It shapes the legs Verify's `ACCEPTED` commit writes, and the last leg takes what remains. Its numbers are rule settings in MX's release, so they change with a release and no deploy:
+
+| Setting | Value | What it does |
+| --- | --- | --- |
+| `splitThreshold` | `"50000 MXN"` | A payment above it splits |
+| `splitBanks` | The banks that split | Matched on the instrument's institution identifier |
+| `splitFirstSlice` | `"49900"` | The first leg's amount |
+| `splitDecrement` | `"100"` | How much smaller each next leg is |
 
 A corporate payment stops after Verify. Verify's commit also writes an `ALLOC_REQUEST` row, due at once, and the workflow ends after its announcements, with no Execute or Fulfil. Dispatchers take every later step from rows in Oracle, the same way as for a scheduled corporate payment (see [Corporate Allocations](../../corporate-allocations.md)).
 
@@ -67,7 +83,7 @@ For a corporate payment, Execute clears the parent once, at payment level, and m
 
 `ExecuteSplitPaymentWorkflow` runs one leg of a split payment. Consumer legs run on their parent's cluster; corporate legs run only on the Offline cluster.
 
-1. Execute updates the AR balance and open-to-buy in parallel, open-to-buy once Payment Instruments has returned the clear-text details. Consumer legs also clear. Corporate legs never clear per allocation; the parent clears once, as a whole, at payment level.
+1. Execute moves the leg to `PROCESSING` and updates the AR balance and open-to-buy in parallel, open-to-buy once Payment Instruments has returned the clear-text details. Consumer legs also clear, while their parent stays `ACCEPTED`. Corporate legs never clear per allocation; the parent clears once, as a whole, at payment level.
 2. Fulfil runs accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then sends the leg's RTF event and Raven message, then commits `PROCESSED`.
 
 Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment can't starve the others. Each leg turns `PAID` on its own later, once it has posted and its parent has settled.
@@ -154,6 +170,8 @@ A `PENDING` payment that waits for its customer isn't cancelled here. [Create Pa
 
 `ProcessInboundPaymentWorkflow` takes a push payment: one a third party sends in. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil. A push payment is the only kind that can end `DISALLOWED`.
 
+One inbound payment can be split across several card accounts, each leg running `ExecuteSplitPaymentWorkflow` (agreed 2026-11-07). Two things are still open: what decides the legs, meaning which card accounts and how much each, and whether the parent clears or leaves clearing to its legs.
+
 ## Create Payment Intent
 
 <WorkflowMeta cluster="Online" id="{paymentId}-init" start="Update-With-Start, from channels; the confirm and the no arrive as updates, and so does the card provider's 3D Secure callback" behaviors={['accountType', 'requiresArPosting', 'requiresRealtimeClearing', 'requiresMandateAuthorization', 'requiresBankConfirmation']} />
@@ -188,4 +206,4 @@ A create can reach billpay-online more than once, or late. One-Data holds it whi
 - A repeat that arrives while `{paymentId}-init` runs joins it (conflict policy `USE_EXISTING`).
 - A repeat that arrives after the run has closed starts a new run, under the default reuse policy. Capture's idempotency check finds the payment. If it is still `PENDING` with nothing waiting on it, because the last run died before deciding, the new run carries on with the next stage, so the payment isn't stuck. Otherwise the run returns the payment as it stands and ends, so no stage runs twice. A payment that waits for a confirmation comes back with its redirect or challenge link. Workflows and activities are idempotent, so this needs no special reuse policy.
 - Nothing is declined for arriving late. One-Data stamps each create with the customer's submit date, which is the payment date. A scheduled payment that lands on its date runs that day as pay today. One that lands after its date runs when it lands and keeps its scheduled date. A payment whose amount Verify works out uses the balance as of the submit date, if Payment Options can give a balance as of a past date.
-- A held create that arrives after its market was taken out of service is captured and declined, so the customer is told and the delete still runs. The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it.
+- A held create that arrives after its market was taken out of service is captured and declined, so the customer is told and the delete still runs. The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it with `MARKET_OUT_OF_SERVICE`, a placeholder code like the others (Proposed, 2026-11-07).

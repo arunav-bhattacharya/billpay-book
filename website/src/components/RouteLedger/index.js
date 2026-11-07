@@ -620,7 +620,10 @@ function CallDetail({id, open, j, f, s, c, pickAct}) {
 }
 
 function CallLine({j, f, s, c, open, onToggle, pickAct}) {
-  const showQueue = f.queue.startsWith('ds-') && (j.cluster === 'Offline' || s === 'Execute' || s === 'Fulfil');
+  // Raven runs on ds-comms on both clusters, at every stage (Proposed, 2026-11-07).
+  const showQueue =
+    f.queue.startsWith('ds-') &&
+    (j.cluster === 'Offline' || s === 'Execute' || s === 'Fulfil' || f.name === 'CommunicationActivities');
   const id = `rl-${j.id}-${s}-${f.name}`;
   return (
     <li>
@@ -702,8 +705,8 @@ function StagesStep({j, n, stages, corp, corpRow, open, onToggle, pickAct}) {
         {offline
           ? "Each call runs on its system's task queue, shown beside it."
           : j.stages.includes('Verify') || j.own.includes('RequestConfirmation')
-            ? "The decision's calls run as local activities, inside one workflow task. Execute's and Fulfil's calls to a rate-limited downstream run on the Online cluster's own ds-* queues; every other call runs on online-wf, its main task queue."
-            : "Execute's and Fulfil's calls to a rate-limited downstream run on the Online cluster's own ds-* queues; every other call runs on online-wf, its main task queue."}
+            ? "The decision's calls run as local activities, inside one workflow task. Execute's and Fulfil's calls to a rate-limited downstream, and Raven's at any stage (Proposed), run on the Online cluster's own ds-* queues; every other call runs on online-wf, its main task queue."
+            : "Execute's and Fulfil's calls to a rate-limited downstream, and Raven's at any stage (Proposed), run on the Online cluster's own ds-* queues; every other call runs on online-wf, its main task queue."}
       </p>
       {!corp && j.first && <p className={styles.stepText}>{j.first}</p>}
       {!corp && j.tbd && <p className={styles.stepText}>{j.tbd}</p>}
@@ -1618,7 +1621,7 @@ export default function RouteLedger() {
           </div>
           <p className={styles.note}>
             Task queues are the Offline cluster&apos;s. The Online cluster has its own copy of each ds-* queue but ds-allocations,
-            for Execute&apos;s and Fulfil&apos;s calls; every other regular activity there runs on online-wf, its main task queue. Raven calls follow the default Raven
+            for Execute&apos;s and Fulfil&apos;s calls and Raven&apos;s (Proposed); every other regular activity there runs on online-wf, its main task queue. Raven calls follow the default Raven
             setting, which a market or an account type can change. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
             it moves a corporate parent to PROCESSED, and ProcessMissingPaidEvents asks MR/M3 and GAR for a
             payment&apos;s state. The two payment reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}

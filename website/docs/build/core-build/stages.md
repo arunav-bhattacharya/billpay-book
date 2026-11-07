@@ -226,6 +226,8 @@ The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INS
 | The instrument types the market takes | `INSTRUMENT_TYPE_NOT_ACCEPTED` |
 | The scheduling horizon | `DATE_BEYOND_SCHEDULING_HORIZON` |
 
+A held create that arrives after its market went out of service is declined with `MARKET_OUT_OF_SERVICE`, by the same placeholder rule (Proposed, 2026-11-07).
+
 A test asks the rule registry for every rule it holds and fails if `DeclineCodes` has no code for one, so a new rule can't ship without its code.
 
 `MandateCheck`, the check these rules read, and `DefaultPaymentVerifyStage`, which runs checks and rules for every payment, are on [Building the Stage Resolver](./stage-resolver.md#a-worked-example-verify). The stage asks the rule registry for the rules that apply to the payment, and gets back each rule's result: skipped, passed or failed.
@@ -234,7 +236,7 @@ A test asks the rule registry for every rule it holds and fails if `DeclineCodes
 - There is one Verify stage. A payment that needs no mandate never gets `MandateCheck` or `MANDATE_ACTIVE`, so it gathers no mandate details and runs no mandate rule.
 - `runsWhen` replaces any list of rule dependencies. `INSTRUMENT_OPEN` only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed, and the decision carries `INSTRUMENT_FOUND`'s code.
 - A rule keeps one decline code. Specifications combine inside a rule only when one code fits the whole condition; otherwise they are two rules.
-- The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. GB's funds rule sits beside `GBFundsCheck` in `market/gb/` and names GB and bank confirmation, as the check does.
+- The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. GB's funds rule sits beside `GBFundsCheck` in `market/gb/` and names GB and bank confirmation, as the check does. MX's split also lives in `market/mx/`, with its numbers as rule settings in MX's release (Proposed, 2026-11-07), but it shapes the legs Verify's `ACCEPTED` commit writes rather than passing or declining the payment; [When a consumer payment splits](../../design/component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.
 - `fetchAll` waits for every check. An activity returns what its system said, such as a closed account or an expired mandate, as data, and throws only on an error, which Temporal retries. So an outage never declines a payment, and a "no" is never retried.
 - The shared rules sit in `core/lib/verification/rules/`, each with the steps it runs in. Reverify runs the same `MandateCheck` and `MANDATE_ACTIVE` on the due date. Represent calls none of Payment Instruments, Payment Options and Plans: it will add checks and rules of its own once they are defined.
 - A rule reads only the facts, never `Instant.now()` or a service. That is what makes it safe inside the workflow, where a replay must reach the same decision.

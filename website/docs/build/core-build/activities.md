@@ -32,7 +32,7 @@ class ClearingActivitiesImpl(
         return try {
             client.clear(p, idempotencyKey = "$paymentId-clear")
         } catch (e: TooManyRequests) {
-            // Wait out Retry-After, plus a little jitter, instead of the policy's interval.
+            // Wait out Retry-After, plus up to 250 ms of jitter (Proposed), instead of the policy's interval.
             throw ApplicationFailure.newFailureWithCauseAndDelay(
                 "429 from clearing", "RateLimited", e, e.retryAfter.plusMillis(jitter()))
         }
@@ -69,7 +69,9 @@ private val clearing = Workflow.newActivityStub(
 
 A call to a throttled system runs on that system's `ds-*` queue, whose server-side limit is the throttle. That holds on both clusters: Execute's and Fulfil's calls on the Online cluster are always rate-limited too, at the limits the governor sets (agreed 2026-11-07). A call nobody throttles, such as RTF or Payment Instruments, runs on the workflow's own queue with eager dispatch.
 
-Every downstream HTTP call in Execute and Fulfil times out at 5 s, and its activity's start-to-close sits just above that (Proposed: 6 s), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls keep a shorter start-to-close, about 2 to 3 times the call's p99. The schedule-to-close limit decides when to give up.
+Every downstream HTTP call in Execute and Fulfil times out at 5 s, and its activity's start-to-close sits just above that (Proposed: 6 s), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls keep a shorter start-to-close, about 2 to 3 times the call's p99. Payment Instruments, Payment Options and Plans answer within 300 to 400 ms at p99 (agreed 2026-11-07), so Verify's start-to-close is at most about 1.2 s, held in a setting of its own. The schedule-to-close limit decides when to give up.
+
+Which HTTP answers are business failures, and so never retried, is set per contract. Until the contracts arrive, a 422 is the only one, and every other error retries (Proposed, 2026-11-07).
 
 ## The decision's calls on the Online cluster
 
@@ -85,7 +87,7 @@ private val online =
 private val local = Workflow.newLocalActivityStub(
     InstrumentActivities::class.java,
     LocalActivityOptions.newBuilder()
-        .setStartToCloseTimeout(timeout)   // Verify's: about 2 to 3 times p99, shorter than Execute's 6 s
+        .setStartToCloseTimeout(timeout)   // Verify's: 2 to 3 times a p99 of at most 300 to 400 ms
         .setRetryOptions(RetryOptions.newBuilder()
             .setMaximumAttempts(3).build())
         .build(),
@@ -173,4 +175,4 @@ Give the local attempt one try, and the regular retry a schedule-to-close of a f
 
 There is no outbox. A stage's announcement calls `LifecycleEventActivities`, which sends the lifecycle event to RTF, and `CommunicationActivities`, which sends the customer's message through Raven. Both carry idempotency keys, and both get a long schedule-to-close, like the database activities: they must succeed, so an outage pauses payments where they are instead of failing them.
 
-RTF has no rate limit, and it guarantees delivery once it has an event, so its calls run on the workflow's own queue. Raven has an agreed rate, so its calls run on `ds-comms` like any other throttled system.
+RTF has no rate limit, and it guarantees delivery once it has an event, so its calls run on the workflow's own queue. Raven has an agreed rate, so its calls run on `ds-comms` like any other throttled system, on both clusters, the announcements at Verify's decision included (Proposed, 2026-11-07).

@@ -51,6 +51,7 @@ The profile holds the rules a payment is checked against, and some of them shape
 | The largest payment | The verification rule settings |
 | Pay & Plan | Whether the profile takes `CreatePaymentInstallment.v1` |
 | Pay with MR Points | The Pay with MR Points setting (Proposed) |
+| When a payment splits, in a market that splits | The split rule settings, such as MX's `splitThreshold`, `splitBanks`, `splitFirstSlice` and `splitDecrement` (Proposed) |
 
 How the page learns these, apart from the instruments, is still open; `ReadPaymentOptions.v1` is one option. The dates now come from `ReadPaymentOptions.v1` for each customer, so whether the profile keeps its Proposed scheduling horizon is open too. Either way, the reads only guide the page: the Router and Verify check the payment against the release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it refuses. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
 

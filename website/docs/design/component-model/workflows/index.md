@@ -62,7 +62,7 @@ export const CLUSTERS = [
     {
       term: 'Composite',
       to: '/docs/design/component-model/workflows/composite',
-      desc: `A parent that runs core workflows as children, such as Pay & Plan or a payment with several instructions.`,
+      desc: `A parent that makes the decision itself and hands Execute and Fulfil to children, such as Pay & Plan or a payment with several instructions.`,
     },
     {
       term: 'Periodic and control',
@@ -85,7 +85,7 @@ Each cluster has its own app too. billpay-online runs the Online cluster's worke
 ## Four kinds of workflow
 
 - Core workflows run one business journey each, such as paying today, executing a scheduled payment or processing a return.
-- Composite workflows are a parent that runs core workflows as children, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), and payments with several instructions. They run on the Online cluster, with their children on the same cluster.
+- Composite workflows are a parent that makes the decision itself and runs each payment's Execute and Fulfil as a child, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), and payments with several instructions. They run on the Online cluster, with their children on the same cluster.
 - Periodic workflows are jobs that Temporal Schedules start on the Offline cluster.
 - Control workflows are the dispatchers, the governor and market onboarding. They pace and configure payment work; they aren't payment journeys themselves.
 

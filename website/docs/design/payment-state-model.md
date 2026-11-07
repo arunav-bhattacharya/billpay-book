@@ -134,7 +134,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when the bank provider gives no redirect link, or the card provider gives no answer (Proposed) |
 | `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify, once the caller confirms or the card provider calls back. For a debit card, `ACCEPTED` means the authorization has debited the customer's account |
 | `PENDING` (bank confirmation or 3D Secure) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed or the 2-minute authentication window closes with no callback, or on the customer's no |
-| `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines |
+| `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines, with `MARKET_OUT_OF_SERVICE` (Proposed) |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
 | `SCHEDULED` (corporate) | `ALLOCATING` | RequestAllocations, at the market's fetch time |
@@ -143,7 +143,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `ALLOCATED` (scheduled) | `ACCEPTED` or `DECLINED` | Reverify, at the execution time |
 | `ALLOCATED` (pay today) | `PROCESSING` | Execute |
 | `ACCEPTED` | `PROCESSING` | Execute |
-| `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check; for a consumer split's parent, the parent itself once every leg has finished |
+| `PROCESSING` | `PROCESSED` | Fulfil; for a corporate parent, the leg dispatcher's completion check. A consumer split's parent never gets here: it stays `ACCEPTED`, and only its legs move on |
 | `PROCESSED` | `PAID` | Settle, in `ProcessPaidEventsWorkflow`; for a split payment, each leg, never the parent |
 | `PROCESSING`, `PROCESSED` or `PAID` | `RETURNED` | Return |
 | `RETURNED` | The next presentment, a new row in `REPRESENTING`; the returned row stays `RETURNED` | QueueRepresentment |
@@ -185,7 +185,9 @@ A corporate payment's allocation request races a cancel the same way. Both are g
 
 A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}` and the card account it pays, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through the same states as any payment, `PROCESSING`, `PROCESSED` and on.
 
-`PAID` is set on legs, never on the parent. The bank settles a split payment once, as a whole, while Accounts Receivable posts each leg on its own. So each leg turns `PAID` once its own posting and its parent's settlement are both in, and the parent stays `PROCESSED`. That holds for consumer and corporate splits alike.
+`PAID` is set on legs, never on the parent. The bank settles a split payment once, as a whole, while Accounts Receivable posts each leg on its own. So each leg turns `PAID` once its own posting and its parent's settlement are both in. That holds for consumer and corporate splits alike.
+
+Where the parent stops differs (agreed 2026-11-07). A consumer split's parent doesn't clear, because its legs clear on their own, so it stays `ACCEPTED` while its legs move through `PROCESSING`, `PROCESSED` and `PAID`. A corporate parent clears once, as a whole, so it reaches `PROCESSED` and stays there. Consumer splits happen only in a few exceptions, such as a large payment from certain banks in Mexico; [Core Workflows](./component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.
 
 The [Domain Model](./domain-model.md) shows how the code models a leg as its own set of classes.
 

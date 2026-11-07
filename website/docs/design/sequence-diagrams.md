@@ -765,7 +765,7 @@ sequenceDiagram
 
 ## 12. Pay & Plan
 
-Pay & Plan is a composite. It starts on Online, runs the payment as a child `CreateImmediatePaymentWorkflow` on the same cluster, then calls the Installments API and, when asked, updates Autopay. One-Data runs the same pending check first, as in diagram 15, so a request on an account with a payment already `PENDING` never gets here.
+Pay & Plan is a composite. It starts on Online as `{paymentId}-plan`, captures and verifies the payment itself and replies with the decision, because a child that decided would be heard only when it ended (agreed 2026-11-07). For an `ACCEPTED` payment it calls the Installments API and, when asked, updates Autopay, and a child on the same cluster runs Execute and Fulfil as `{paymentId}-init`. A declined payment gets no plan (Proposed). One-Data runs the same pending check first, as in diagram 15, so a request on an account with a payment already `PENDING` never gets here.
 
 ```mermaid
 ---
@@ -783,19 +783,21 @@ sequenceDiagram
   box rgba(0,111,207,0.05) Billpay Platform
     participant R as Billpay Router
     participant PP as Pay #amp; Plan<br/>composite
-    participant CIW as CreateImmediate<br/>PaymentWorkflow
+    participant CH as Execute and<br/>Fulfil child
   end
 
   OD->>R: POST<br/>/payment-installments
   Note over R: admit, pin profile, run on Online
-  R->>PP: Update-With-Start,<br/>{paymentId}-init
+  R->>PP: Update-With-Start,<br/>{paymentId}-plan
 
   rect rgba(0,111,207,0.12)
-    Note over PP,CIW: Online cluster. The child runs on the same cluster
-    PP->>CIW: child workflow
-    Note over CIW: Capture, Verify, Execute and Fulfil, as for pay today
-    CIW-->>PP: the child's result
-    Note over PP,CIW: then the Installments API, then an optional Autopay update
+    Note over PP,CH: Online cluster. The child runs on the same cluster
+    Note over PP: Capture and Verify, as for pay today
+    PP-->>R: the decision
+    R-->>OD: the decision,<br/>or PENDING at 2.5 s
+    Note over PP: for ACCEPTED: the Installments API and an optional Autopay update
+    PP->>CH: child workflow,<br/>{paymentId}-init
+    Note over CH: Execute and Fulfil, as for pay today
   end
 ```
 

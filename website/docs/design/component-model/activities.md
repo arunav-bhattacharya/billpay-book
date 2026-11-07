@@ -107,7 +107,7 @@ export const ACTIVITIES = [
   {
     name: 'CommunicationActivities',
     system: 'Raven, customer messages',
-    queue: 'ds-comms',
+    queue: 'ds-comms, on both clusters, the announcements at Verify\'s decision included (Proposed)',
     calledBy: 'Announcements the customer is told about; Fulfil and the corporate completion check, before their commit',
   },
 ];
@@ -162,14 +162,14 @@ Every database activity runs local first, which is what lets a payment ride out 
 | Calls a downstream may throttle, Execute's and Fulfil's on both clusters | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there. The governor sets the limits on both clusters (agreed 2026-11-07) |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 
-Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the last row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans everywhere except Verify on the Online cluster. Raven has an agreed rate, so its calls run on `ds-comms`.
+Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the last row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans everywhere except Verify on the Online cluster. Raven has an agreed rate, so its calls run on `ds-comms`, on both clusters, including the announcements made at Verify's decision (Proposed, 2026-11-07).
 
 ## Retries and timeouts
 
-- Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate that fails its check, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
-- A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
+- Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate that fails its check, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops. Which HTTP answers count as business failures is set per contract. Until the contracts arrive, a 422 is the only one, and every other error retries (Proposed, 2026-11-07).
+- A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus up to 250 ms of jitter (Proposed, 2026-11-07). Temporal uses it in place of the retry policy's interval for that attempt.
 - Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
 - RTF and Raven get a long schedule-to-close, like the database activities. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
-- Every downstream HTTP call in Execute and Fulfil times out at 5 seconds, and its activity's start-to-close sits just above that (Proposed: 6 seconds), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls stay shorter, at about two to three times the call's p99.
+- Every downstream HTTP call in Execute and Fulfil times out at 5 seconds, and its activity's start-to-close sits just above that (Proposed: 6 seconds), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls stay shorter, at about two to three times the call's p99. For Payment Instruments, Payment Options and Plans that p99 is at most 300 to 400 ms (agreed 2026-11-07), so their start-to-close is at most about 1.2 seconds, behind a setting of its own.
 - HTTP clients inside activities don't retry on their own (no MicroProfile `@Retry`, for example). One task is one call, so a queue's limit stays the real call rate.
 - Every HTTP call carries an idempotency key, such as `{paymentId}-{step}`, because any activity can run twice.

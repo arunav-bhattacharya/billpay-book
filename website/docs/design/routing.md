@@ -20,11 +20,11 @@ Some creates never get this far. When the card account already has a payment in 
 
 The Router runs the same six steps for every request that starts a workflow.
 
-1. **Admit the request.** The market, account type and API must be live in this environment, which the Router checks against the copy of the onboarding config its app caches in the JVM, so admission adds no call. One-Data passes the market and account type on every `/payments` call, from its own `ReadCustomerAccountInfo.v1` lookup, so Billpay makes no lookup either. If the market, account type or API isn't live, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). The 3D Secure callback and the allocations callback carry no market and skip this check (agreed 2026-11-07). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them. One create is never refused: a create One-Data held while billpay-online was slow, which RTF delivers with an async flag, is captured and declined instead when its market was taken out of service in the meantime, so the customer is told.
+1. **Admit the request.** The market, account type and API must be live in this environment, which the Router checks against the copy of the onboarding config its app caches in the JVM, so admission adds no call. One-Data passes the market and account type on every `/payments` call, from its own `ReadCustomerAccountInfo.v1` lookup, so Billpay makes no lookup either. If the market, account type or API isn't live, the API answers 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED` (only operations hear of it, through an alert). The 3D Secure callback and the allocations callback carry no market and skip this check (agreed 2026-11-07), and the allocations callback starts with no resolved profile (Proposed). A Work Tracker row is refused only if its market was taken out of service after the row was written. Its dispatcher then marks the row `FAILED`, which raises the retries-exhausted alert. An allocation callback must also fit its traffic class's budget, or it gets 429 with `Retry-After`. Dispatchers never see a 429, because the governor already paces them. One create is never refused: a create One-Data held while billpay-online was slow, which RTF delivers with an async flag, is captured and declined instead when its market was taken out of service in the meantime, so the customer is told.
 2. **Pick the journey.** Each kind of request names its own journey, so there is no central switch to edit when a request type is added. A create is the one with conditions, and it asks an ordered list of rules, first match wins: waits for the customer, future-dated, several instructions, MR Points alone, then pay today (the order, and MR Points' place in it, are Proposed). A create that waits for the customer, for bank confirmation or a debit card's 3D Secure, takes `CreatePaymentIntentWorkflow`. A debit card pays today only, with one instruction, no MR Points and no Pay & Plan, and never for a corporate payment; a create that breaks this gets 422.
 3. **Resolve the behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's rule for this journey. Realtime clearing, for example, is Y only for a pay-today payment from a channel. Bank confirmation set to BOTH follows the request's payment method instead: a method that needs the customer to confirm at their bank gets Y. The method comes from the instrument type One-Data passes for each instruction, so the Router knows it before anything starts (agreed 2026-11-07). Card authentication isn't a market's answer at all: every debit card needs 3D Secure, so the Router sets it to Y for a debit card payment (Proposed).
 4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version. The market is there so a market's own classes can apply, such as GB's funds check for Pay with Bank Transfer. The profile also carries the market's rule settings from that version, which the [verification rules](./component-model/stages.md#how-verification-decides) read, and for a payment that waits for the customer, its confirmation window, or for a debit card, its 2-minute authentication window. The workflow looks up its stages from the profile at runtime ([From profile to stages](#from-profile-to-stages) walks through one).
-5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID.
+5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID. The cluster also decides which `ds-*` queues the downstream calls use: the queues have the same names on both clusters, so the run site doesn't list them.
 6. **Start** it in the journey's start mode.
 
 The resolved profile is the market's profile, resolved for this one payment and pinned. Its rule settings are a good example of why it carries values rather than a pointer to config. Say GB's consumer release v7 sets the largest payment at 25,000 GBP. A payment started while v7 is active carries 25,000 in its profile, and Verify's largest-payment rule declines a 30,000 GBP payment against it. If v8 raises the limit the next day, payments already running still use 25,000, and new ones use the new value. [Building the Router](../build/core-build/router.md#4-pin-the-resolved-profile) shows the settings as code.
@@ -92,7 +92,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
           flow: [{via: 'uws', name: 'CreateImmediatePayment', cluster: 'Online'}],
           fork: [
             {term: 'Consumer, one amount', self: ['Capture, Verify, Execute, Fulfil', 'Execute runs clearing, AR and OTB']},
-            {term: 'Consumer, split', via: 'child', detail: 'one per leg', flow: [{name: 'ExecuteSplitPayment', cluster: 'Online'}]},
+            {term: 'Consumer, split', via: 'child', detail: 'one per leg', flow: [{name: 'ExecuteSplitPayment', cluster: 'Online'}], notes: ['The parent stays ACCEPTED; only its legs move on.']},
             {
               term: 'Corporate',
               via: 'row',
@@ -122,8 +122,8 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         {
           desc: 'Today, several instructions',
           flow: [
-            {via: 'uws', name: 'CreatePaymentWithMultipleInstructions', cluster: 'Online'},
-            {via: 'child', detail: 'one per instruction', name: 'CreateImmediatePayment', cluster: 'Online'},
+            {via: 'uws', name: 'CreatePaymentWithMultipleInstructions', cluster: 'Online', caption: ['Capture and Verify for every instruction, then the reply']},
+            {via: 'child', detail: 'one per accepted instruction', name: 'Execute and Fulfil', cluster: 'Online'},
           ],
         },
         {
@@ -144,6 +144,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
                 {name: 'ExecuteScheduledPayment', cluster: 'Offline'},
                 {via: 'child', detail: 'one per leg', name: 'ExecuteSplitPayment', cluster: 'Offline'},
               ],
+              notes: ['The parent stays ACCEPTED; only its legs move on.'],
             },
             {
               term: 'Corporate',
@@ -167,8 +168,8 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         {
           desc: 'Pay today, plan future installments',
           flow: [
-            {via: 'uws', name: 'Create Payment & Installments', cluster: 'Online'},
-            {via: 'child', name: 'CreateImmediatePayment', cluster: 'Online'},
+            {via: 'uws', name: 'Create Payment & Installments', cluster: 'Online', caption: ['Capture and Verify, then the reply', 'For ACCEPTED: the plan and the optional Autopay update']},
+            {via: 'child', name: 'Execute and Fulfil', cluster: 'Online'},
           ],
         },
       ],
@@ -247,6 +248,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         {
           desc: 'Pushed by a third party',
           flow: [{via: 'inbox', detail: 'inbound dispatcher', name: 'ProcessInboundPayment', cluster: 'Offline'}],
+          note: 'It can split across several card accounts; how is still open',
         },
       ],
     },
@@ -267,9 +269,9 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 
 ## Child workflows
 
-The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and a debit card for 3D Secure. A consumer payment of one amount starts no child: its workflow runs every stage itself. The child in the several-instructions route runs once per instruction.
+The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and a debit card for 3D Secure. A consumer payment of one amount starts no child: its workflow runs every stage itself. A composite makes the decision itself and replies, so the child in the several-instructions route runs once per accepted instruction, for Execute and Fulfil only, and so does Pay & Plan's.
 
-- A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs, and the parent commits `PROCESSED` once every leg has finished.
+- A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs. The parent stays `ACCEPTED`, and each leg moves through `PROCESSING` and `PROCESSED` on its own. Splits are rare: [When a consumer payment splits](./component-model/workflows/core.md#when-a-consumer-payment-splits) lists the cases.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
 - A request with several instructions never takes bank confirmation or a debit card, and neither does Pay & Plan or a corporate payment: one that would need either gets 422 before any workflow starts.
 - A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` runs Verify's own checks first, and declines a payment that fails them with no link. Otherwise it replies `PENDING` with the provider's redirect link, or the 3D Secure challenge link for a debit card, and waits. The caller's confirm, the card provider's callback and the customer's no are updates to that same workflow, and if none comes in time, its timer runs Cancel. After a confirm or a callback it runs Verify's bank-side checks, then Execute and Fulfil, itself. No corporate payment waits here: corporate payments take neither bank confirmation nor a debit card.
@@ -289,6 +291,8 @@ The payment ID is a ULID, and every workflow ID is the payment ID plus a suffix,
 | Thing | Workflow ID |
 | --- | --- |
 | Create or schedule, including a payment that waits for its customer | `{paymentId}-init` |
+| Pay & Plan and MR Points composites | `{paymentId}-plan`, `{paymentId}-points`, so the payment's own workflow keeps `{paymentId}-init` |
+| Several instructions | `{groupId}-init` for the composite, `{groupId}_{paymentId}-init` for each instruction (Proposed) |
 | Scheduled or corporate execution | `{paymentId}-execute` |
 | Update and cancel | `{paymentId}-update`, `{paymentId}-cancel` |
 | Allocation request and received batch | `{paymentId}-allocations`, `{paymentId}-allocations-{batch}` |

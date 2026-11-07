@@ -468,7 +468,7 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
 
 ### Pay with multiple instructions
 
-One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. One-Data sends one payment ID for each instruction. Billpay validates the composite payment as a whole, then runs each instruction as its own payment, all on the Online cluster. The composite's workflow has a unique ID of its own, and each instruction's child takes it with a suffix: `{groupId}-init` and `{groupId}_{paymentId}-init` (Proposed). A request with several instructions never takes bank confirmation or a debit card: one that would need either gets 422 before any workflow starts.
+One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. One-Data sends one payment ID and one idempotency key for each instruction. The composite captures and verifies every instruction itself and replies with each decision, then hands each accepted instruction's Execute and Fulfil to a child, all on the Online cluster. The composite's workflow has a unique ID of its own, and each instruction's child takes it with a suffix: `{groupId}-init` and `{groupId}_{paymentId}-init` (Proposed). A request with several instructions never takes bank confirmation or a debit card: one that would need either gets 422 before any workflow starts.
 
 <JourneyMap
   kind="customer"
@@ -487,25 +487,25 @@ One request, more than one instruction. To the customer, that is a bank account 
   core={[{kind: 'api', label: 'POST /payments'}]}
   workflow={[
     {label: 'CreatePaymentWithMultipleInstructionsWorkflow'},
-    {label: 'CreateImmediatePaymentWorkflow', via: 'runs', child: true, note: 'one per instruction'},
+    {label: 'Execute and Fulfil', via: 'runs', child: true, note: 'one per accepted instruction'},
   ]}
   persist={false}
   band={false}
   steps={[
     {
       icon: 'shieldCheck',
-      name: 'Validate',
-      caption: 'the composite payment',
+      name: 'Decide',
+      caption: 'every instruction, then the reply',
     },
     {
       icon: 'parallelArrows',
-      name: 'Run each instruction',
-      caption: 'a child workflow each',
+      name: 'Execute and Fulfil',
+      caption: 'a child for each accepted one',
     },
   ]}
   detail={[
-    {step: 1, text: 'The composite payment is validated as a whole before any instruction runs. The request carries one payment option ID for the whole payment. Proposed: the parent checks it once here, through `ReadPaymentOptionByIdentifier.v1`, so the children run no Options check.'},
-    {step: 2, text: 'Then each instruction runs as its own `CreateImmediatePaymentWorkflow`, a child on the same cluster, and goes through [Pay my bill today](#pay-my-bill-today) with its own states. How a points instruction runs inside it, with Loyalty, is still to be defined.'},
+    {step: 1, text: 'The composite captures each instruction under its own idempotency key, so each is its own payment with its own states, then verifies each and replies with every decision. The request carries one payment option ID for the whole payment. Proposed: the composite checks it once, through `ReadPaymentOptionByIdentifier.v1`, and if the option no longer holds, every instruction is declined with `PAYMENT_OPTION_INVALID`.'},
+    {step: 2, text: 'Each accepted instruction then runs Execute and Fulfil in a child on the same cluster, the same steps as [Pay my bill today](#pay-my-bill-today). How a points instruction runs inside it, with Loyalty, is still to be defined.'},
   ]}
 />
 
@@ -517,7 +517,7 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 
 ### Pay & Plan
 
-The customer pays today and sets up a plan of future installments in the same request. One composite workflow, Create Payment & Installments, runs both in order on the Online cluster.
+The customer pays today and sets up a plan of future installments in the same request. One composite workflow, Create Payment & Installments, makes the decision itself and replies, then sets up the plan, on the Online cluster. It takes one instruction (Proposed).
 
 <JourneyMap
   kind="customer"
@@ -535,20 +535,22 @@ The customer pays today and sets up a plan of future installments in the same re
   core={[{kind: 'api', label: 'POST /payment-installments'}]}
   workflow={[
     {label: 'Create Payment & Installments'},
-    {label: 'CreateImmediatePaymentWorkflow', via: 'runs', child: true},
+    {label: 'Execute and Fulfil', via: 'runs', child: true},
   ]}
   persist={false}
   band={false}
   steps={[
-    {icon: 'orchestrate', name: 'Pay now', caption: 'a child workflow'},
+    {icon: 'shieldCheck', name: 'Decide', caption: 'Capture and Verify, then the reply'},
     {icon: 'calendar', name: 'Plan', caption: 'future installments', systems: ['Installments']},
     {icon: 'recheck', name: 'Autopay', caption: 'an optional update'},
+    {icon: 'orchestrate', name: 'Pay', caption: 'Execute and Fulfil in a child'},
   ]}
   detail={[
     {text: 'One-Data runs the same pending check as on a payment: if the card account already has a payment in `PENDING`, it declines the request there and then, and Billpay never sees it.'},
-    {step: 1, text: 'The payment is [Pay my bill today](#pay-my-bill-today), run as a child workflow. Nothing about the plan changes how the money moves or settles.'},
-    {step: 2, text: 'Then the composite calls the Installments API to set up the plan of future installments. Billpay asks for the plan; it doesn\'t own it.'},
-    {step: 3, text: 'Last, an optional update to the customer\'s Autopay.'},
+    {step: 1, text: 'The composite captures and verifies the payment itself, as [Pay my bill today](#pay-my-bill-today) does, and replies with the decision. A child that decided would be heard only when it ended, after Execute and Fulfil.'},
+    {step: 2, text: 'For an `ACCEPTED` payment, the composite calls the Installments API to set up the plan of future installments. Billpay asks for the plan; it doesn\'t own it. A declined payment gets no plan (Proposed).'},
+    {step: 3, text: 'An optional update to the customer\'s Autopay. The Installments and Autopay calls run on the workflow\'s own queue until their owners set a rate limit (Proposed).'},
+    {step: 4, text: 'A child on the same cluster runs the payment\'s Execute and Fulfil, as `{paymentId}-init`. Nothing about the plan changes how the money moves or settles.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#12-pay--plan', label: 'Sequence diagram'}}
 />
@@ -1049,7 +1051,7 @@ This is where a payment turns `PAID`, or for a split payment, each of its legs. 
     {step: 2, text: 'Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a guarded update, and tags each `PAID` timeline row with the batch\'s ID. A retried Settle finds the payments it already moved by that ID.'},
     {step: 3, text: 'The `PAID` events go to RTF.'},
     {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data\'s own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row is `DONE` only once its event has gone out.'},
-    {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its parent has settled, and the parent stays `PROCESSED`.'},
+    {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its parent has settled. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split.'},
     {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a Pay with Bank Transfer or debit card payment, which MR/M3 never settles: it asks GAR alone, and hands over Billpay\'s own settlement event again if the inbox lacks it (Proposed).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#10-paid-events', label: 'Sequence diagram'}}

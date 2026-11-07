@@ -286,10 +286,12 @@ function WorkflowCell({seg}) {
           <p className={styles.cardNote}>
             <span className={clsx(styles.stageSq, styles.stageChild, styles.inlineSq)} aria-hidden="true" />
             {j.id === 'multiple'
-              ? `${j.childWf} runs these, one child per instruction`
-              : j.id === 'update'
-                ? `${j.childWf} runs these, as a child, for the new payment`
-                : `${j.childWf} runs these, as a child`}
+              ? 'A child runs Execute and Fulfil, one per accepted instruction'
+              : j.id === 'payplan'
+                ? 'A child runs Execute and Fulfil'
+                : j.id === 'update'
+                  ? `${j.childWf} runs these, as a child, for the new payment`
+                  : `${j.childWf} runs these, as a child`}
           </p>
         )}
         {j.stop && <p className={styles.cardNote}>{j.stop.title}</p>}

@@ -47,9 +47,9 @@ Every one of these starts goes through the Router, and the Router places it: the
 
 A child always runs on its parent's cluster. These journeys use them:
 
-- A composite runs core workflows as children. Multiple instructions runs one `CreateImmediatePaymentWorkflow` per instruction, and Pay & Plan runs one before it calls the Installments API.
+- A composite makes the decision itself, so it can reply with it, and runs each accepted payment's Execute and Fulfil as a child (agreed 2026-11-07). Multiple instructions starts one child per accepted instruction, and Pay & Plan one for its payment. Which workflow those children run is still to be named.
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
-- Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child.
+- Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child, and the parent stays `ACCEPTED` while its legs move on.
 
 A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a debit card's 3D Secure starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the confirm, the callback and the no as updates, and cancels the payment on its own timer if none comes.
 

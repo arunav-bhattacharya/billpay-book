@@ -159,7 +159,7 @@ Tells everyone who needs to know, then commits `PROCESSED`, in this order:
 2. The RTF event and the Raven message go out.
 3. The commit to `PROCESSED` happens last.
 
-For a scheduled payment, the same commit marks its `SCHED_EXEC` row `DONE`. A corporate parent has no Fulfil: Execute's commit marks its `ALLOC_EXEC` row `DONE`, and the leg dispatcher's completion check moves it to `PROCESSED` once every leg is done. A consumer split's parent has none either: its legs run Fulfil, and the parent commits `PROCESSED` once every leg has finished.
+For a scheduled payment, the same commit marks its `SCHED_EXEC` row `DONE`. A corporate parent has no Fulfil: Execute's commit marks its `ALLOC_EXEC` row `DONE`, and the leg dispatcher's completion check moves it to `PROCESSED` once every leg is done. A consumer split's parent has none either: its legs run Fulfil, and the parent stays `ACCEPTED` (agreed 2026-11-07).
 
 ## RequestAllocations
 

@@ -16,7 +16,7 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 
 - The core APIs, for every write a caller waits on: `POST /payments`, `PUT` and `DELETE /payments/{payment-id}`, `POST /payments/{payment-id}/confirm`, `POST /refunds` and `POST /payment-installments`.
 - The 3D Secure callback, `POST /payments/{payment-id}/authentication`, which the market's card provider calls directly. It carries no market, so it skips the profile check (agreed 2026-11-07), then goes as an update to the waiting workflow.
-- The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it. It needs neither the market nor the account type: its payment already exists, and the payment's workflows keep the config version they started on.
+- The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it. It needs neither the market nor the account type: its payment already exists, and the payment's workflows keep the config version they started on. So it starts with no resolved profile, and its workflow has no `Market`, `ConfigVersion` or `DueDate` search attribute (`DueDate` agreed 2026-11-07, the rest Proposed).
 - The dispatchers, in billpay-offline, once for each Work Tracker row or inbox request they release.
 
 On every `/payments` call, the create, the update, the cancel and the confirm, One-Data passes the card account's market and account type, which it looks up with `ReadCustomerAccountInfo.v1`, so the Router makes no lookup of its own. A create also carries each instruction's instrument type and payment ID (agreed 2026-11-07). The wire names of these fields come with the API contracts and are placeholders until then.
@@ -29,7 +29,7 @@ Control workflows don't go through the Router. The dispatchers, the governor and
 
 ## The two types it hands on
 
-Every start produces a resolved profile, which the workflow receives, and a run site, which says where and how it starts. A sketch: the resolved profile's fields are the spec's, and the other names are illustrative.
+Every start but the allocations callback's produces a resolved profile, which the workflow receives, and every start produces a run site, which says where and how it starts. A sketch: the resolved profile's fields are the spec's, and the other names are illustrative.
 
 ```kotlin
 data class ResolvedProfile(
@@ -48,7 +48,7 @@ data class ResolvedProfile(
 
 data class RunSite(
     val cluster: Cluster,                         // ONLINE or OFFLINE
-    val taskQueue: String,                        // online-wf or offline-wf
+    val taskQueue: String,                        // online-wf or offline-wf; the cluster picks the ds-* queues
     val priority: Int?,                           // 1 to 5, on the Offline cluster
     val fairnessKey: String?,                     // a market, a parent payment ID, "returns"...
     val workflowId: String,                       // the payment ID plus its suffix
@@ -77,7 +77,7 @@ fun route(request: RouteRequest): Routed {
 
 ### 1. Admit
 
-The Router checks that the market, the account type and the API are live in this environment. It checks them against the copy of the onboarding config each app caches in its JVM, so admission adds no call to a database or another service (agreed 2026-10-18). Only a call that names a market is checked: the 3D Secure callback and the allocations callback carry none (agreed 2026-11-07). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
+The Router checks that the market, the account type and the API are live in this environment. It checks them against the copy of the onboarding config each app caches in its JVM, so admission adds no call to a database or another service (agreed 2026-10-18). Only a call that names a market is checked: the 3D Secure callback and the allocations callback carry none (agreed 2026-11-07). Each pod reloads its copy when the onboarding workflow activates or rolls back a version (agreed 2026-10-19). That workflow runs on the Offline cluster, so the news reaches billpay-online through Oracle. Proposed: every 15 s each pod reads `market_config_active` and reloads when the version or `IN_SERVICE_IN` changed, and the same read takes `market_config_version`'s keys, because a version set up for mock accounts can exist before it is active, and adding one doesn't change `market_config_active` (2026-11-07). If the check fails, the Router refuses the start, and the caller turns the refusal into the right outcome:
 
 | Caller | What a refusal becomes |
 | --- | --- |
@@ -240,17 +240,17 @@ The field names and values here are illustrative (Proposed, 2026-10-20). The spe
 
 The rule's logic is code and changes with a deploy. The number is config and changes with a release.
 
-The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg, or the group ID for an instruction of a create with several instructions (Proposed). `Journey` holds the journey's name and `ConfigVersion` the version number (Proposed, 2026-11-07).
+The start also sets the search attributes, once: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for a leg, or the group ID for an instruction of a create with several instructions (Proposed). `Journey` holds the journey's name and `ConfigVersion` the version number (Proposed, 2026-11-07). The composite of several instructions takes the group ID as its own `PaymentId`, so `PaymentId = groupId` finds it and `ParentPaymentId = groupId` finds its children (Proposed, 2026-11-07). The allocations callback starts with no profile, so its workflow carries no `Market` or `ConfigVersion` (Proposed), and no `DueDate` (agreed 2026-11-07).
 
 ### 5. Choose the run site
 
 The run site is the cluster, the task queue, the priority and fairness key, and the workflow ID.
 
-- Work a caller waits for runs on the Online cluster, on `online-wf`, and its Execute and Fulfil calls always go to the Online cluster's `ds-*` queues (agreed 2026-11-07). Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
+- Work a caller waits for runs on the Online cluster, on `online-wf`, and its Execute and Fulfil calls always go to the Online cluster's `ds-*` queues (agreed 2026-11-07). The run site doesn't name those queues: they have the same names on both clusters, so the cluster picks them (agreed 2026-11-07). Work a dispatcher or the allocations callback starts runs on the Offline cluster, on `offline-wf`. Three workflows run on either, depending on what started them ([Workflows](./workflows.md#which-cluster-runs-it)).
 - Priority and fairness key are set once, from the traffic class, and every activity inherits them. They matter only on the Offline cluster's shared queues, and [Design → Throttling](../../design/throttling.md#priority-and-fairness) has the classes.
-- The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. A create with several instructions is the exception: its composite is `{groupId}-init`, from the group ID One-Data passes for the request, and each instruction's child is `{groupId}_{paymentId}-init` (Proposed, 2026-11-07). Billpay derives no ID of its own. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
+- The workflow ID is the payment ID, a ULID, plus a suffix such as `-init` or `-execute`. A create with several instructions is the exception: its composite is `{groupId}-init`, from the group ID One-Data passes for the request, and each instruction's child is `{groupId}_{paymentId}-init` (Proposed, 2026-11-07). Pay & Plan's and MR Points' composites are `{paymentId}-plan` and `{paymentId}-points`, so the payment's own workflow keeps `{paymentId}-init` (agreed 2026-11-07). Billpay derives no ID of its own. For pulled work and async starts it comes from the request: the payment ID in its idempotency key or, for a return, the returned payment and its presentment sequence. That is what lets a repeated request find the same workflow.
 
-Online's limits never change the run site. The governor writes them, a SEPA run's cap included, to `downstream_limit`, and billpay-online sets them on its own `ds-*` queues, so a cap changes a queue's limit, never where a call runs ([Design → Throttling](../../design/throttling.md#when-the-cutoff-wins)).
+Online's limits never change the run site. The governor writes them, a SEPA run's cap included, to `downstream_limit`, and billpay-online sets them on its own `ds-*` queues, so a cap changes a queue's limit, never where a call runs ([Design → Throttling](../../design/throttling.md#when-the-cutoff-wins)). Proposed (2026-11-07): a queue's limit is `ONLINE_CAP_TPS` while `ONLINE_CAP_END_TS` is in the future, and `AGREED_TPS` otherwise. A queue with no row keeps the limit it has, and a cap with no end time is ignored, since the governor always writes the two together.
 
 ### 6. Start
 

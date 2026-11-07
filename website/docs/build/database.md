@@ -37,7 +37,7 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 | `market_config_active` (new) | Market and account type | The version that is live, and `in_service_in`, N once the market is taken out of service, so the active version stays readable (Proposed). The Router reads it, and only `MarketOnboardingWorkflow` writes it. |
 | `dispatch_run` (new) | Dispatcher run | The ops view: counts, current rate, paused or not. |
 | `rate_allocation` (new) | Traffic class, market or corporate payment | The rate the governor sets, which dispatchers read every few seconds. Manual overrides live here too. |
-| `downstream_limit` (new) | Downstream endpoint | Agreed TPS, online margin, current offline share, Online's limit, which billpay-online sets on its own queue, a SEPA run's cap and when it ends, last 429. |
+| `downstream_limit` (new) | Downstream endpoint | Agreed TPS (`agreed_tps`), online margin, current offline share, Online's cap during a SEPA run and when it ends (`online_cap_tps`, `online_cap_end_ts`), last 429. billpay-online sets its queue's limit from them: the cap while it lasts, the agreed TPS otherwise. Column names Proposed (2026-11-07). |
 | `governor_decision` (new) | Governor check, every 15 seconds | Its inputs and outputs, so any rate can be explained later. |
 | `exception_list` (new) | Payment or leg whose retries ran out | The stage and status it stopped in, the last error, and who resolved it and when. Operations work from it. |
 

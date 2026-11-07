@@ -86,7 +86,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 240 ms | 480 ms | 950 ms | 1.7 s | 2.5 s |
 
-**SLI:** end-to-end latency at the function edge, covering the child `CreateImmediatePaymentWorkflow`, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
+**SLI:** end-to-end latency at the function edge, covering the composite's own decision, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
 
 ## Confirm Pending Payment
 
