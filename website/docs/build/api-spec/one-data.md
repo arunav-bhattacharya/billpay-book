@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 import ApiTable from '@site/src/components/ApiTable';
 
 export const CORE = [
-  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link, or `DECLINED` if the provider gives none. A debit card payment comes back `PENDING` with the 3D Secure challenge link. A create on a card account that already has a payment in `PENDING` is declined here, with 200 `DECLINED` and a reason, and never reaches billpay-core.'},
+  {fn: 'CreatePayment.v3', method: 'POST', path: '/payments', purpose: 'Pays today or schedules a payment for a future date. A create from a channel carries the payment option ID the customer chose, from `ReadPaymentOptions.v1`. A payment that needs the customer to confirm their bank details comes back `PENDING` with the provider\'s redirect link, or `DECLINED` if the provider gives none. A debit card payment comes back `PENDING` with the 3D Secure challenge link. A create on a card account that already has a payment in `PENDING` is declined here, with 200 `DECLINED` and a reason, and never reaches billpay-core.'},
   {fn: 'UpdatePayment.v1', method: 'PUT', path: '/payments/{payment-id}', purpose: 'Updates a `SCHEDULED` payment inside the market\'s cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.'},
   {fn: 'DeletePayment.v1', method: 'DELETE', path: '/payments/{payment-id}', purpose: 'Cancels a `SCHEDULED` payment inside the cancellation window; after it, 409. A corporate payment leaves `SCHEDULED` when its allocations are requested. It also cancels a `PENDING` payment that waits for a confirmation, when the customer says no.'},
   {fn: 'ReadPayments.v1', method: 'GET', path: '/payments/account/{account-id}', purpose: 'Lists the payments on a card account, from One-Data\'s Redis and billpay-core together, with duplicates removed and Oracle winning.'},
@@ -74,7 +74,7 @@ The sweep's name, `DeleteStalePendingPayments.v1`, is Proposed.
 
 ## Event handlers
 
-Event handlers take events from other platforms. None of them starts or waits on a workflow: they store what arrives in One-Data's inbox, and call Billpay only to find a payment an event doesn't name.
+Event handlers take events from other platforms. None of them starts or waits on a workflow: the money movement and AR handlers store what arrives in One-Data's inbox, and call Billpay only to find a payment an event doesn't name.
 
 | Handler | What it takes |
 | --- | --- |

@@ -63,7 +63,7 @@ export const GROUPS = [
         term: 'Pay on a future date',
         kind: 'customer',
         days: true,
-        meta: ['customer initiated', 'Online, then Offline', 'up to 30 days between, by default'],
+        meta: ['customer initiated', 'Online, then Offline', 'until the date the customer picked'],
         segments: [
           {
             phase: ['Day 0', 'seconds, while they wait'],
@@ -81,11 +81,11 @@ export const GROUPS = [
             ],
           },
           {
-            phase: ['Up to 30 days', 'by default'],
+            phase: ['Until the due date', 'the date the customer picked'],
             wait: 'Nothing runs in Temporal. The payment is a row in Oracle.',
             customer: [{t: 'Can change or cancel', s: 'until the window closes', m: 'choice'}],
             oracle: [{row: 'SCHED_EXEC row', s: 'waits for its due time'}],
-            ruler: [{t: 'up to 30 days'}],
+            ruler: [{t: 'until the due date'}],
           },
           {
             phase: ['The due date', "the market's execution time"],
@@ -158,7 +158,7 @@ export const GROUPS = [
             road: 'card',
             waiting: true,
             customer: [
-              {t: 'Pays by debit card', s: 'an enrolled card, from ReadBillpayInstruments.v1', st: 'PENDING', m: 'on', at: 'Capture'},
+              {t: 'Pays by debit card', s: 'a bank from the list, through ReadBillpayInstruments.v1', st: 'PENDING', m: 'on', at: 'Capture'},
               {t: 'Gets the challenge link', s: 'or none, when the bank needs no challenge', st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
             oneData: [

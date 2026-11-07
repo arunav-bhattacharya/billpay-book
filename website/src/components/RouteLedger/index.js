@@ -1621,9 +1621,10 @@ export default function RouteLedger() {
             its main task queue, except calls to a downstream a SEPA run has capped. Raven calls follow the default Raven
             setting, which a market or an account type can change. Outside the roads, the leg dispatcher&apos;s completion check calls RTF and Raven before
             it moves a corporate parent to PROCESSED, and ProcessMissingPaidEvents asks MR/M3 and GAR for a
-            payment&apos;s state. The two reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}
-            and <span className={styles.mono}>GET /payments/{'{payment-id}'}</span>, go straight to Oracle and start no
-            workflow.
+            payment&apos;s state. The two payment reads, <span className={styles.mono}>GET /payments/account/{'{account-id}'}</span>{' '}
+            and <span className={styles.mono}>GET /payments/{'{payment-id}'}</span>, read Oracle in billpay-core
+            (<span className={styles.mono}>ReadPayments.v1</span>, in front of the first, also reads One-Data&apos;s Redis). The
+            instruments read calls the instruments systems instead. None of them starts a workflow.
           </p>
         </div>
       </div>

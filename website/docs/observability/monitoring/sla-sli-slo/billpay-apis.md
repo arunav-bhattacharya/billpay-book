@@ -74,6 +74,12 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **SLI:** read latency for one payment from Oracle, with its redirect or challenge link while it waits for bank confirmation or 3D Secure. **Error budget:** 0.01% / 30-day window.
 
+## Read Instruments
+
+**Billpay Core API** · `GET /instruments/account/{account-id}?source={source}` (path Proposed) · SLA availability: not set yet
+
+**SLI:** latency for one source's list, including billpay-core's call to `ReadInstruments`, `ReadBanksForRealtimePayments.v1` or `ReadEligibleWallets.v1` and the filter by the market's rules. Its targets are still to come.
+
 ## Payment Installments
 
 **Billpay Core API (composite)** · `POST /payment-installments` · SLA availability: **99.9%**

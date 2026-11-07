@@ -34,13 +34,13 @@ BOTH means a behavior applies to some journeys and not others. Onboarding stores
 
 Realtime clearing shows how this works. Only a pay-today payment from a channel gets Y. Every future-dated payment clears in batch, whether it came from a channel or from Accounts Receivable.
 
-Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Only consumer payments made today take bank confirmation, and only one payment at a time: a future-dated request, a request with several instructions, or a Pay & Plan request, that would need it gets 422. So Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
+Bank confirmation is resolved by how the customer pays rather than by the journey. Set to BOTH, it is Y for a payment method that needs the customer to confirm at their bank, and N for the rest. Which account types can take bank confirmation is configurable: it is on for consumer payments for now, and business travel can be turned on later without a code change. Corporate payments never take it. It takes only payments made today, and only one payment at a time: a future-dated request, a request with several instructions, a Pay & Plan request or a corporate payment that would need it gets 422. So Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
 
-A debit card's 3D Secure is not one of the five behaviors, because there is nothing to choose: every debit card needs it. The Router sets card authentication to Y for a debit card payment, and the stages pick their classes from it as from a behavior (Proposed). What a market does choose is whether it takes debit cards at all, through the instrument types in its rule settings, and which card provider runs 3D Secure and the authorization, in its operations settings. Any account type can pay by debit card: consumer, corporate and business travel. A debit card pays today only, with one instruction and no MR Points.
+A debit card's 3D Secure is not one of the five behaviors, because there is nothing to choose: every debit card needs it. The Router sets card authentication to Y for a debit card payment, and the stages pick their classes from it as from a behavior (Proposed). What a market does choose is whether it takes debit cards at all, through the instrument types in its rule settings, and which card provider runs 3D Secure and the authorization, in its operations settings. Consumer and business travel profiles can take debit cards; a corporate profile can't. A debit card pays today only, with one instruction, no MR Points and no Pay & Plan.
 
 ## What the customer is offered
 
-The profile holds the rules a payment is checked against, and some of them shape the channel's payment page too. The page fills itself from two reads. Payment Options' `ReadPaymentOptions` gives the amounts, the payment options and the dates this customer can pay on. `ReadBillpayInstruments.v1` gives the instruments, and billpay-core filters them by the profile's rules first, so the page never offers an instrument this payment can't use.
+The profile holds the rules a payment is checked against, and some of them shape the channel's payment page too. The page fills itself from two reads. Payment Options' `ReadPaymentOptions.v1` gives the amounts, the payment options and the dates this customer can pay on. `ReadBillpayInstruments.v1` gives the instruments, and billpay-core filters them by the profile's rules first, so the page never offers an instrument this payment can't use.
 
 | What the Router and Verify check | The profile holds it as |
 | --- | --- |
@@ -52,7 +52,7 @@ The profile holds the rules a payment is checked against, and some of them shape
 | Pay & Plan | Whether the profile takes `CreatePaymentInstallment.v1` |
 | Pay with MR Points | The Pay with MR Points setting (Proposed) |
 
-How the page learns these, apart from the instruments, is still open; `ReadPaymentOptions` is one option. The dates now come from `ReadPaymentOptions` for each customer, so whether the profile keeps its Proposed scheduling horizon is open too. Either way, the reads only guide the page: the Router and Verify check the payment against the release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it refuses. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
+How the page learns these, apart from the instruments, is still open; `ReadPaymentOptions.v1` is one option. The dates now come from `ReadPaymentOptions.v1` for each customer, so whether the profile keeps its Proposed scheduling horizon is open too. Either way, the reads only guide the page: the Router and Verify check the payment against the release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it refuses. [Make a Payment Journey](../design/journeys/make-a-payment.md) shows the page and the calls behind it.
 
 ## What the build can run
 

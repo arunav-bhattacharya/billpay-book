@@ -107,7 +107,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 
 | State | Meaning | Terminal? |
 | --- | --- | --- |
-| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the customer to confirm their bank details, to authenticate their debit card with 3D Secure, While a payment is `PENDING`, One-Data declines any other create on its card account. | No |
+| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the customer to confirm their bank details or to authenticate their debit card with 3D Secure. While a payment is `PENDING`, One-Data declines any other create from a channel on its card account. | No |
 | `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
 | `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. | No |
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager. Batches may be arriving. | No |

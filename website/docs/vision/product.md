@@ -19,7 +19,7 @@ Each market used to build its own version of this. Billpay replaces them with on
 
 ## Payment journeys
 
-Requests reach Billpay through its API gateway, the **One-Data Functions**, and its core APIs. Across those entry points the platform runs eight journeys:
+Requests reach Billpay through its API gateway, the **One-Data Functions**, and its core APIs. Across those entry points the platform runs nine journeys:
 
 <Highlights
   items={[
@@ -37,7 +37,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
     },
     {
       term: 'Inbound payments',
-      desc: `Take a payment that a third party starts or confirms on the customer's behalf.`,
+      desc: `Take a payment that a third party pushes in on the customer's behalf.`,
     },
     {
       term: 'Returns and representment',

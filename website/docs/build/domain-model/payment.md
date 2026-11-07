@@ -74,7 +74,7 @@ object LegacyPayment {
 }
 ```
 
-Money is `javax.money.MonetaryAmount` from JSR 354, the Java money API, with Moneta's `Money` behind it, so an amount is never a floating-point number. On the wire it is an amount and a currency code. `PaymentSource` and `DeclineCode` keep the current app's values exactly: they are part of what other systems already read.
+Money is `javax.money.MonetaryAmount` from JSR 354, the Java money API, with Moneta's `Money` behind it, so an amount is never a floating-point number. On the wire it is an amount and a currency code. `PaymentSource` and `DeclineCode` keep the current app's values: they are part of what other systems already read.
 
 ## What each state must hold
 

@@ -49,6 +49,8 @@ Two more tests run against the built app. Every stage, check and method class on
 
 The onboarding workflow checks every market release against the manifest, so a gap the tests miss turns into a release that can't go live.
 
+The Router has a report of its own (Proposed). A test walks every request type, Work Tracker item type, inbox request type and create rule, writes the routing table as trigger, condition and journey, and compares it with a checked-in copy. A change to which journey a request takes fails the test until the same pull request updates the copy ([Billpay Router](../../build/core-build/router.md)).
+
 ## Workflows
 
 A workflow test runs the real workflow code in the SDK's test environment (`TestWorkflowEnvironment`, in the Java SDK), with the activities mocked. It checks the journey's order and where it stops, not what each step does:

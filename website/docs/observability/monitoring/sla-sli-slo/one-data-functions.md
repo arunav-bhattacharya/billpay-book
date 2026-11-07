@@ -8,7 +8,7 @@ import Lead from '@site/src/components/Lead';
 
 # One-Data Functions SLAs
 
-<Lead>The public contracts consumers integrate against. SLA targets here are tighter than the underlying APIs because this is the visible surface.</Lead>
+<Lead>The public contracts consumers integrate against. Each function's availability matches the core API behind it, and its latency targets are a little looser, because they include the function edge: the contract validation and, for a create, the pending check.</Lead>
 
 For definitions of SLA, SLI and SLO, and how to read each entry, see the [overview page](./index.md).
 
@@ -61,6 +61,12 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | 40 ms | 85 ms | 180 ms | 360 ms | 650 ms |
 
 **SLI:** latency for fetching one payment and the lifecycle states it has been through. **Error budget:** 0.01% / 30-day window.
+
+## Read Billpay Instruments
+
+**One-Data Function** · `ReadBillpayInstruments.v1` · SLA availability: not set yet
+
+**SLI:** latency for the list of instruments, banks or wallets the payment page may offer, for one source. Its targets are still to come.
 
 ## Create Credit Balance Refund
 
@@ -120,7 +126,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 30 ms | 70 ms | 150 ms | 300 ms | 600 ms |
 
-**SLI:** time to the acknowledgement, which goes out only after the raw event and the payment's inbox row commit together. A sender that gets an error retries, so a failed acknowledgement delays an event but never loses it. Targets Proposed (2026-10-20). **Error budget:** 0.01% / 30-day window.
+**SLI:** time to the acknowledgement. For money movement and AR events it goes out only after the raw event and the payment's inbox row commit together. A sender that gets an error retries, so a failed acknowledgement delays an event but never loses it. The authorization handler stores nothing: it only acknowledges its events. Targets Proposed (2026-10-20). **Error budget:** 0.01% / 30-day window.
 
 ## Delete Pending Payment
 

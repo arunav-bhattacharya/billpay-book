@@ -58,7 +58,7 @@ export const STEPS = [
   {
     via: 'picks the stages of',
     title: 'The workflow',
-    note: 'One per journey, the same in every market. A running payment keeps the key it started with.',
+    note: 'One per journey, the same in every market. A running payment keeps the profile it started with.',
   },
 ];
 
@@ -123,7 +123,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
       desc: (
         <>
           When the Router starts a payment it pins a resolved profile: the market, the journey, the behaviors
-          resolved for it and the market's config version. The workflow looks up its stages from that key, and every
+          resolved for it and the market's config version. The workflow looks up its stages from that profile, and every
           stage, check and method says where it applies, so no market decision is left in the workflow code. Worker
           Versioning pins the workflow to the build it started on, so neither a deploy nor a new release
           changes a payment already running. Nothing is inherited: workflows and stages are never{' '}
@@ -174,7 +174,7 @@ The gateway contracts are in [Build → API Spec](../build/api-spec/one-data.md)
 
 A market reaches the platform as configuration. In the Market Onboarding UI the team picks the One-Data APIs the market takes, answers the behavior questions and fills in the operations settings, once per account type, because consumer and corporate rules differ. A second person approves it, and it becomes a frozen release.
 
-Each environment then onboards that release on its own. It checks every combination against what the deployed build can run, saves it inactive, sends test payments through it and waits for sign-off. Once the release is active, the Router uses it for every new payment: it resolves the behaviors for the journey, so a BOTH becomes Y or N, and pins them with the config version in the resolved profile. The workflow picks its stages from that key. What each behavior means is on the [Product Vision](./product.md).
+Each environment then onboards that release on its own. It checks every combination against what the deployed build can run, saves it inactive, sends test payments through it and waits for sign-off. Once the release is active, the Router uses it for every new payment: it resolves the behaviors for the journey, so a BOTH becomes Y or N, and pins them with the config version in the resolved profile. The workflow picks its stages from that profile. What each behavior means is on the [Product Vision](./product.md).
 
 <CompositionMap
   apis={['CreatePayment.v3', 'UpdatePayment.v1', 'DeletePayment.v1']}

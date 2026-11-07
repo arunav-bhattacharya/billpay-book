@@ -22,9 +22,9 @@ export const ACTIVITIES = [
   },
   {
     name: 'OptionsActivities',
-    system: 'Payment Options',
+    system: 'Payment Options: `ReadPaymentOptionById.v1` and `ReadPaymentOptions.v1`',
     queue: "Verify's calls on the Online cluster: a local activity. Otherwise the workflow's queue: Payment Options has no rate limit",
-    calledBy: 'Verify, Reverify',
+    calledBy: "Verify, to validate the create's payment option ID through `ReadPaymentOptionById.v1`; Reverify, through `ReadPaymentOptions.v1`, to confirm the customer still owes and the option still holds",
   },
   {
     name: 'PlansActivities',

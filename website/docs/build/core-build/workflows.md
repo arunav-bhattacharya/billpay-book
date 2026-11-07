@@ -55,7 +55,7 @@ A corporate payment starts no child at all. It can have 100K legs, so its alloca
 
 ## Versioning
 
-Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor are pinned too, but they move to a new build when they continue-as-new. They pass `ContinueAsNewOptions` with `InitialVersioningBehavior.AUTO_UPGRADE`, so each new run starts on the newest build, and the governor, which runs all the time, continues-as-new early once `Workflow.getInfo().isTargetWorkerDeploymentVersionChanged()` turns true. Upgrading on continue-as-new is in Public Preview in Temporal.
+Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor are pinned too, but they move to a new build when they continue-as-new (Proposed). They pass `ContinueAsNewOptions` with `InitialVersioningBehavior.AUTO_UPGRADE`, so each new run starts on the newest build, and the governor, which runs all the time, continues-as-new early once `Workflow.getInfo().isTargetWorkerDeploymentVersionChanged()` turns true. Upgrading on continue-as-new is in Public Preview in Temporal.
 
 Config is pinned the same way. The resolved profile carries the resolved behaviors, the config version and the market's rule settings, and for a payment that waits, its confirmation window, so a replay finds the same stages, thresholds and window. A scheduled payment gets a new resolved profile on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
 
@@ -138,7 +138,9 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
         stages.capture.run(request)                              // PENDING: the request
-        decided = stages.requestConfirmation.run(paymentId)       // PENDING with the bank's link or the card's
+        val own = stages.verify.ownChecks(paymentId)             // Amex's checks first: Instrument, Options, Mandate
+        decided = if (own.decision == PaymentDecision.DECLINED) own.decision   // DECLINED, with no link
+                  else stages.requestConfirmation.run(paymentId)  // PENDING with the bank's link or the card's
                                                                   // challenge link (or none), or DECLINED
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
         stages.capture.announce(paymentId)                        // the reply goes out with this task
@@ -153,7 +155,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         }
         waiting = false                                          // the validators turn answers away now
 
-        result = if (answer == Answer.YES) stages.verify.run(paymentId, authentication).decision  // then Execute, Fulfil
+        result = if (answer == Answer.YES) stages.verify.bankChecks(paymentId, own, authentication).decision  // the bank side only
                  else stages.cancel.run(paymentId)                                  // the no, or the timer
         inbox.deletePending(paymentId)                           // decided: the account's entry goes
         // ... the announcements, then Execute and Fulfil for ACCEPTED
@@ -168,7 +170,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
     }
     // decision() answers the create, as in Create Immediate Payment; decline() and checkDecline() mirror confirm,
     // and authenticated(result), the card provider's 3D Secure callback, mirrors it too: it keeps the result
-    // in `authentication` for Verify, whose card authorization check runs last
+    // in `authentication` for Verify, whose card authorization check is all that is left to run
 }
 ```
 
@@ -178,6 +180,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 - The validator runs before anything is written. A confirm that comes after the workflow has its answer, or once it no longer waits, is turned away with no history event, and the API answers 409.
 - When the timer fires with no answer, the workflow runs Cancel itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer handled well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.
+- Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. After the answer, Verify runs only the checks that need the bank step, with the first part's facts carried in the workflow (the split is Proposed).
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a confirm away.
 - The workflow calls One-Data's delete twice: after its reply, saying the payment still waits, and again as soon as Verify or Cancel has decided, so the customer can pay again without waiting for Execute and Fulfil. The first call runs alongside the wait, so a slow delete never keeps the workflow from taking an answer.
 - For Pay with Bank Transfer and a debit card, Execute makes no clearing call. Its clearing method creates the payment's settlement event and hands it to One-Data's money movement handler instead, dated when the money moved (Proposed).

@@ -70,7 +70,7 @@ export const GROUPS = [
         title: 'External Systems',
         role: 'Where the money and the side effects land',
         icon: 'external',
-        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider'],
+        items: ['Clearing', 'Accounts Receivable', 'Authorization / OTB', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'Comms (Raven)', 'Events (RTF)', 'Allocations manager', 'Bank provider', 'Card provider'],
       },
     ],
   },

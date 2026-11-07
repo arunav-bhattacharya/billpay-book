@@ -151,7 +151,7 @@ A customer picks an amount and a way to pay, and wants it to count today. The jo
   detail={[
     {text: 'One-Data checks the card account first. If another payment on it is still `PENDING`, One-Data declines this one there and then, with 200 `DECLINED` and a reason, and Billpay never sees it. Otherwise One-Data adds the payment to the account\'s pending list, stores the create and calls billpay-core.'},
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent. A repeated request joins the workflow that is already running, so the customer gets the original answer back and is never charged twice.'},
-    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, Payment Options confirms the amount they picked, and Plans returns the mandate details where the market requires one. Billpay\'s verification rules check the answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. Once Verify has decided, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, which takes the payment off the account\'s pending list, so the customer can pay again. A payment the customer must confirm at their bank goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does a debit card, on [Pay by Debit card](#pay-by-debit-card).'},
+    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionById.v1` confirms the payment option they picked, and Plans returns the mandate details where the market requires one. Billpay\'s verification rules check the answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. Once Verify has decided, billpay-core calls One-Data\'s delete API, `DeletePendingPayment.v1`, which takes the payment off the account\'s pending list, so the customer can pay again. A payment the customer must confirm at their bank goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does a debit card, on [Pay by Debit card](#pay-by-debit-card).'},
     {text: 'Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF after the reply, in order.'},
     {step: 3, text: 'Three calls go out at once: clearing with the bank, the statement balance down in Accounts Receivable, and available credit up in Authorizations. Authorizations needs the instrument\'s details in clear text, so its branch first asks Payment Instruments for them, while the other two calls are already under way. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
     {step: 4, text: 'Accounting, eBNC, risk and three notification systems are told first, in parallel: two legacy systems, the Transaction Notification Engine (TFNE) and the Payments History Database (GPHDB), and B2Notifier, which passes the news on to other downstream systems. The three use the clear-text details Execute fetched. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
@@ -245,8 +245,8 @@ The customer picks a date inside the range Payment Options gives them. Billpay c
   detail={[
     {step: 1, text: 'The same insert-if-absent as an immediate payment, so a repeated request gets the original back.'},
     {step: 2, text: 'Checked now, not on the day. The answer is `SCHEDULED`, and the same commit writes a `SCHED_EXEC` row in the Work Tracker, due at the market\'s execution time on that date. `SCHEDULED` is a decision, so the delete takes the payment off the account\'s pending list, and the customer can make another payment while this one waits. Then the workflow closes.'},
-    {step: 3, text: 'Until its date, up to 30 days away by default, the payment is a row in Oracle and nothing more. The customer can update or cancel it until the market\'s cancellation window closes, which is always before execution starts.'},
-    {step: 4, text: 'At the market\'s execution time, that market\'s dispatcher claims the row, calls the Router again so the payment runs with today\'s config, and starts `ExecuteScheduledPaymentWorkflow` on the Offline cluster at the rate the governor allows. Reverify checks the payment again, the mandate included where the market requires one, because an account can close or a balance can move while a payment waits.'},
+    {step: 3, text: 'Until its date, one of the dates Payment Options offered the customer, the payment is a row in Oracle and nothing more. The customer can update or cancel it until the market\'s cancellation window closes, which is always before execution starts.'},
+    {step: 4, text: 'At the market\'s execution time, that market\'s dispatcher claims the row, calls the Router again so the payment runs with today\'s config, and starts `ExecuteScheduledPaymentWorkflow` on the Offline cluster at the rate the governor allows. Reverify checks the payment again, the mandate included where the market requires one, because an account can close or a balance can move while a payment waits. Payment Options\' `ReadPaymentOptions.v1` confirms the customer still owes money and the option they picked still holds; if not, the payment is `DECLINED`. A Statement Balance or Total Balance payment pays what the option gives that day.'},
     {text: 'A future-dated payment never clears in real time. It clears in batch, whichever channel it came from.'},
     {text: 'From Execute on, the journey is [Pay my bill today](#pay-my-bill-today). The last commit marks the Work Tracker row `DONE`.'},
   ]}
@@ -282,6 +282,17 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   steps={[
     {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
     {
+      icon: 'shieldCheck',
+      name: 'Own checks',
+      state: 'PENDING',
+      mode: 'live',
+      caption: 'before the bank step',
+      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
+      parallel: true,
+      fanNote: 'at once; Plans for a mandate',
+      exit: {state: 'DECLINED'},
+    },
+    {
       icon: 'redirect',
       name: 'Redirect',
       state: 'PENDING',
@@ -303,9 +314,9 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
       state: 'ACCEPTED',
       mode: 'live',
       caption: 'caller confirms, gets a response',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
+      systems: ['Payment Instruments', 'Bank provider'],
       parallel: true,
-      fanNote: 'at once; Plans for a mandate',
+      fanNote: 'the token; in GB, the funds',
       exit: {state: 'DECLINED'},
       handoffAfter: true,
     },
@@ -337,13 +348,14 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   ]}
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
-    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`, and RequestConfirmation runs in place of Verify. It asks the market\'s provider for the customer\'s redirect link and stores it on the payment. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If the provider gives no link, the payment is `DECLINED` instead.'},
-    {step: 3, text: 'The customer confirms their bank details on the provider\'s site while the workflow waits on its timer: the market\'s confirmation window and a short grace. If no confirm comes in that time, the workflow runs Cancel itself, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
-    {step: 4, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details. To guard against fraud, Verify asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer\'s bank account holds enough money for the payment, and declines it if not. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
+    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before the bank step: Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionById.v1` confirms the option they picked, and Plans returns the mandate details where the market requires one. A payment that fails them is `DECLINED` at once, with no redirect link. One that passes stays `PENDING`, and nothing is committed.'},
+    {step: 3, text: 'RequestConfirmation asks the market\'s provider for the customer\'s redirect link and stores it on the payment. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If the provider gives no link, the payment is `DECLINED` instead.'},
+    {step: 4, text: 'The customer confirms their bank details on the provider\'s site while the workflow waits on its timer: the market\'s confirmation window and a short grace. If no confirm comes in that time, the workflow runs Cancel itself, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
+    {step: 5, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details, and Amex\'s own checks passed at the create, so Verify runs only the bank-side checks. To guard against fraud, it asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer\'s bank account holds enough money for the payment, and declines it if not. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
     {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
-    {step: 5, text: 'For Pay with Bank Transfer there is no clearing call: the money moved at the bank, during the customer\'s bank connection. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). Otherwise Execute clears with the bank as usual (whether a payment confirmed through Plaid in the US clears is still open). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
-    {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 7, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox. For Pay with Bank Transfer, the settlement is the one Billpay created in Execute.'},
+    {step: 6, text: 'For Pay with Bank Transfer there is no clearing call: the money moved at the bank, during the customer\'s bank connection. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). Otherwise Execute clears with the bank as usual (whether a payment confirmed through Plaid in the US clears is still open). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
+    {step: 7, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
+    {step: 8, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox. For Pay with Bank Transfer, the settlement is the one Billpay created in Execute.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
 />
@@ -377,6 +389,17 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
   steps={[
     {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
     {
+      icon: 'shieldCheck',
+      name: 'Own checks',
+      state: 'PENDING',
+      mode: 'live',
+      caption: 'before 3D Secure',
+      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
+      parallel: true,
+      fanNote: 'at once; Plans for a mandate',
+      exit: {state: 'DECLINED'},
+    },
+    {
       icon: 'card',
       name: '3D Secure',
       state: 'PENDING',
@@ -397,10 +420,8 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
       name: 'Verify',
       state: 'ACCEPTED',
       mode: 'background',
-      caption: 'checks, then the authorization',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans', 'Card provider'],
-      parallel: true,
-      fanNote: 'checks at once; the card provider last',
+      caption: 'the authorization',
+      systems: ['Card provider'],
       exit: {state: 'DECLINED'},
     },
     {
@@ -431,15 +452,16 @@ A customer can pay with a debit card, a way to pay of its own, apart from a bank
   ]}
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. The customer chose their bank from the list the channel read through `ReadBillpayInstruments.v1`.'},
-    {step: 2, text: 'The payment method is a debit card, so the Router sets card authentication to Y (Proposed) and starts `CreatePaymentIntentWorkflow`. RequestConfirmation asks the market\'s card provider to start 3D Secure, and gives it Billpay\'s callback URL. When the card\'s bank wants a challenge, the provider returns the challenge link, and the caller\'s update returns `PENDING` with it. When it needs none, the caller gets `PENDING` with no link (Proposed). If the provider doesn\'t answer, the payment is `DECLINED` instead (Proposed).'},
-    {step: 3, text: 'The customer completes the challenge, such as a one-time code or a banking-app approval, while the workflow waits on its timer: 2 minutes and a short grace. If no callback comes in that time, the workflow runs Cancel itself, the payment ends `CANCELLED`, and nothing has been taken.'},
-    {step: 4, text: 'The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed) directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D Secure result is `DECLINED` with no authorization. Otherwise Verify runs its usual checks, then authorizes the payment with the card provider, last (the check is Proposed): the authorization debits the customer\'s account if it holds enough money, and the card\'s bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the callback\'s reply returns here. The customer learns the outcome from the channel, through the payment\'s state. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
+    {step: 2, text: 'The payment method is a debit card, so the Router sets card authentication to Y (Proposed) and starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before 3D Secure: Payment Instruments, Payment Options\' `ReadPaymentOptionById.v1` for the option the customer picked, and Plans where the market requires a mandate. A payment that fails them is `DECLINED` at once, and 3D Secure never starts.'},
+    {step: 3, text: 'RequestConfirmation asks the market\'s card provider to start 3D Secure, and gives it Billpay\'s callback URL. When the card\'s bank wants a challenge, the provider returns the challenge link, and the caller\'s update returns `PENDING` with it. When it needs none, the caller gets `PENDING` with no link (Proposed). If the provider doesn\'t answer, the payment is `DECLINED` instead (Proposed).'},
+    {step: 4, text: 'The customer completes the challenge, such as a one-time code or a banking-app approval, while the workflow waits on its timer: 2 minutes and a short grace. If no callback comes in that time, the workflow runs Cancel itself, the payment ends `CANCELLED`, and nothing has been taken.'},
+    {step: 5, text: 'The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed) directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D Secure result is `DECLINED` with no authorization. Otherwise, since Amex\'s own checks passed at the create, Verify only authorizes the payment with the card provider (the check is Proposed): the authorization debits the customer\'s account if it holds enough money, and the card\'s bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the callback\'s reply returns here. The customer learns the outcome from the channel, through the payment\'s state. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
     {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
-    {step: 5, text: 'No clearing call: the authorization has already moved the money. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once.'},
-    {step: 6, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 7, text: '`PAID` follows once the settlement Billpay created and the AR posting are both in One-Data\'s inbox.'},
-    {text: 'Any account type can pay by debit card. A corporate one stops at `ACCEPTED` and asks for its allocations, as on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
-    {text: 'A debit card pays today only, with one instruction, and never with MR Points. A create that breaks this gets 422 before any workflow starts.'},
+    {step: 6, text: 'No clearing call: the authorization has already moved the money. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once.'},
+    {step: 7, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
+    {step: 8, text: '`PAID` follows once the settlement Billpay created and the AR posting are both in One-Data\'s inbox.'},
+    {text: 'Consumer and business travel payments can pay by debit card. A corporate payment can\'t.'},
+    {text: 'A debit card pays today only, with one instruction, never with MR Points and never through Pay & Plan. A create that breaks this, or a corporate one, gets 422 before any workflow starts.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#16-pay-by-debit-card-create-3d-secure-and-authorization', label: 'Sequence diagram'}}
 />
@@ -671,7 +693,7 @@ When an account carries a credit balance, the money goes back to the customer. A
 
 ## Read payments
 
-Reading touches none of the machinery above: no Router, no workflow, no state change. Both reads go straight to Oracle.
+Reading touches none of the machinery above: no Router, no workflow, no state change. Both reads reach billpay-core, which reads Oracle. `ReadPayments.v1` also reads One-Data's Redis and removes duplicates, with Oracle's copy winning, so a payment shows from the moment it is made.
 
 ### Read payments by card account
 
@@ -694,7 +716,7 @@ Everything a customer has paid on one card. This is the payment history behind t
   core={[{kind: 'api', label: 'GET /payments/account/{account-id}'}]}
   status={{
     kind: 'read-only',
-    note: 'Lists every payment on the account, read from Oracle. One-Data\'s event handlers use the same function to find the payment an event doesn\'t name.',
+    note: 'Lists every payment on the account, from Redis and Oracle together, so a payment shows from the moment it is made. One-Data\'s event handlers use the same function to find the payment an event doesn\'t name.',
   }}
 />
 

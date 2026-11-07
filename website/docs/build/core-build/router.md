@@ -81,7 +81,7 @@ The Router checks that the market, the account type and the API are live in this
 | Caller | What a refusal becomes |
 | --- | --- |
 | A core API | 422, which senders don't retry |
-| A core API, for a create One-Data held while billpay-core was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a plan that only captures and declines, and Verify declines it (agreed 2026-10-19) |
+| A core API, for a create One-Data held while billpay-core was slow | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19) |
 | An inbox dispatcher | The request is marked `REJECTED` through `UpdateStartRequests.v1`, and an alert tells operations. The sender is not told |
 | A Work Tracker dispatcher | The row goes from `DISPATCHING` to `FAILED`, which raises the retries-exhausted alert. A row is refused only when its market was taken out of service after the row was written |
 
@@ -156,7 +156,7 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 **A test keeps the code and the table together.** It walks every request type, item type, inbox type and create rule, writes the routing table as trigger, condition and journey, and compares it with a checked-in copy, the way the [stage report](./stage-resolver.md) works. A change to which journey a request takes fails the test until the same pull request updates the copy, so the reviewer sees the row that moved.
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
 
 No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-core ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
@@ -165,7 +165,7 @@ No rule here looks at the account's other payments. A create on an account that 
 Each behavior in the market's version is Y, N or BOTH, and a workflow must only ever see Y or N. BOTH becomes one or the other here, by the rule onboarding stored with it:
 
 - For most behaviors the rule lists the journeys that get Y. Realtime clearing is the usual example: only a pay-today payment from a channel gets it.
-- For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Only consumer payments made today take bank confirmation, so a corporate payment always resolves to N. A future-dated request, or one with several instructions, that would need it is refused with 422: Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
+- For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Bank confirmation takes only payments made today. Which account types can take it is configurable: consumer for now, and business travel can be turned on later. A corporate payment whose method would need it is refused with 422. A future-dated request, or one with several instructions, that would need it is refused with 422: Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
 - Card authentication is never BOTH, because no market chooses it: the Router sets it to Y whenever the payment method is a debit card (Proposed).
 
 ```kotlin
@@ -291,7 +291,7 @@ val options = WorkflowOptions.newBuilder()
     .build()
 val wf = offlineClient.newWorkflowStub(ExecuteScheduledPaymentWorkflow::class.java, options)
 try {
-    WorkflowClient.start(wf::run, request.paymentId, plan)  // a row names a payment already in Oracle
+    WorkflowClient.start(wf::run, request.paymentId, profile)  // a row names a payment already in Oracle
 } catch (e: WorkflowExecutionAlreadyStarted) {
     // A repeated tick or a retried activity already started it. That counts as done.
 }

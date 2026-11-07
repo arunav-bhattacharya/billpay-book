@@ -49,10 +49,10 @@ Each entry on the two sub-pages has:
 
 ## The two surfaces
 
-- [One-Data Functions](./one-data-functions.md) carries the SLA, SLI and SLO for the versioned, contract-level functions. The SLAs are tighter because these are the visible surface.
+- [One-Data Functions](./one-data-functions.md) carries the SLA, SLI and SLO for the versioned, contract-level functions. Each function's availability matches the core API behind it, and its latency targets are a little looser, because they include the function edge.
 - [Billpay Core APIs](./billpay-apis.md) carries the same for the REST endpoints behind them. Latency targets are slightly tighter, because there is no function-edge overhead.
 
-Between them, the two pages cover every API and function in [Build → API Spec](../../../build/api-spec/index.md): the confirm, the allocations callback, AR and inbound intake, the event handlers, the inbox functions and the Market Onboarding API included. Where the spec sets no number, the entry says its targets are Proposed.
+Between them, the two pages cover every API and function in [Build → API Spec](../../../build/api-spec/index.md): the confirm, the allocations callback, AR and inbound intake, the event handlers, the inbox functions and the Market Onboarding API included. Every figure is assumed for now, until it is agreed. An entry whose targets are marked Proposed had them proposed with its API, and the instruments read has no targets yet.
 
 One target is fixed by the design rather than by contract: p99 for `POST /payments` is held to 500 ms. The governor watches it: past 70% of that it stops raising offline rates, and past 90% it cuts them.
 

@@ -8,7 +8,7 @@ import styles from "./styles.module.css";
  *
  * Three columns. The first is the page a channel shows a customer, with
  * working controls. The second is the calls the channel makes behind it, in
- * order, lit when this set of answers makes them: ReadPaymentOptions, then
+ * order, lit when this set of answers makes them: ReadPaymentOptions.v1, then
  * ReadBillpayInstruments.v1 for the source the customer picked (billpay-core
  * makes the one read that source needs), then CreatePayment.v3. The third is
  * the Router's side: one door, CreatePayment.v3, and the journeys it can
@@ -96,7 +96,7 @@ const TODAY_ONLY = new Set(
 
 const OPTIONS_RETURNS = [
   "what the customer owes. Nothing owed, and the journey never starts",
-  "the payment options, Statement Balance, Total Balance, Minimum Due and Other Amount, each with a token ID that Billpay verifies",
+  "the payment options, Statement Balance, Total Balance, Minimum Due and Other Amount, each with a payment option ID the create carries",
   "whether the customer can pay today, on a future date, or both",
   "the range of dates a future payment can take",
 ];
@@ -128,7 +128,7 @@ const READS = {
 const OPEN = [
   [
     "The rest of the page",
-    "where it gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. ReadPaymentOptions is one option",
+    "where it gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. ReadPaymentOptions.v1 is one option",
   ],
   [
     "ReadBillpayInstruments.v1",
@@ -347,7 +347,7 @@ function ThePage({ a, set }) {
       <Field
         n={1}
         term="How much"
-        call={<CallTag n={1} name="ReadPaymentOptions" />}
+        call={<CallTag n={1} name="ReadPaymentOptions.v1" />}
       >
         <Segmented
           label="How much"
@@ -375,7 +375,7 @@ function ThePage({ a, set }) {
         <Field
           n={2}
           term="When"
-          call={<CallTag n={1} name="ReadPaymentOptions" />}
+          call={<CallTag n={1} name="ReadPaymentOptions.v1" />}
         >
           <Segmented
             label="When"
@@ -390,7 +390,7 @@ function ThePage({ a, set }) {
           <p className={styles.hint}>
             {todayOnly
               ? `${a.points ? "MR Points pay" : `${method.label} pays`} today only.`
-              : "Today, or a date inside the range ReadPaymentOptions gives this customer."}
+              : "Today, or a date inside the range ReadPaymentOptions.v1 gives this customer."}
           </p>
         </Field>
 
@@ -529,7 +529,7 @@ function TheCalls({ a }) {
   const calls = [
     {
       n: 1,
-      name: "ReadPaymentOptions",
+      name: "ReadPaymentOptions.v1",
       line: "What the customer owes and the options to pay it, and when they can pay. Nothing owed, nothing more.",
       on: true,
       status: "exists",
@@ -546,7 +546,7 @@ function TheCalls({ a }) {
     {
       n: 3,
       name: "CreatePayment.v3",
-      line: "The payment, with the chosen option's token ID (Proposed). The Router picks the journey.",
+      line: "The payment, with the chosen option's ID. The Router picks the journey.",
       on: a.owed,
       status: "exists",
     },
@@ -775,7 +775,8 @@ function TheRouter({ a, set, result }) {
           <span className={styles.hollow} aria-hidden="true" />
           <span>
             <strong>A corporate account</strong> asks for its allocations before
-            any money moves. Bank confirmation is for consumer payments only.
+            any money moves, and takes neither bank confirmation nor a debit
+            card: a corporate create with either gets 422.
           </span>
         </li>
         <li>

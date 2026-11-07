@@ -52,7 +52,7 @@ Search is the one thing `npm start` cannot show you. The index is built from the
 | A new section | Create `docs/<section>/index.md` and add a `category` entry in `sidebars.js`. |
 | A shared component | Put it in `src/components/<Name>/` (see `Lead`, `Highlights`, `RouteMap`, `WorkflowMeta` for the pattern) and import it from your page. |
 
-Two content rules trump everything else. `docs/Wiki_Spec.md` (at the repo root) is the source of truth for every technical fact, and the Design and Build sections must never gain a "Services" subsection in any form, because the platform's component model deliberately has no such layer.
+Two content rules trump everything else. `docs/Wiki_Spec.md` (at the repo root) is the source of truth for every technical fact, and neither Design nor Build gains a services layer in any form: no "Payment Services" subsection in Design and no "Services" subsection in Build, because the platform's component model deliberately has no such layer.
 
 ## Project layout
 

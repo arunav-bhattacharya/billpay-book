@@ -132,7 +132,7 @@ Six checks exist today. Each is a class, and each says where it applies:
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
 | `InstrumentCheck` | `INSTRUMENT` | Everywhere | Payment Instruments, about the payment's instrument |
-| `OptionsCheck` | `OPTIONS` | Everywhere | Payment Options, whether it accepts the amount |
+| `OptionsCheck` | `OPTIONS` | Everywhere; it makes no call for a payment with no option ID (Proposed) | Payment Options. In Verify, `ReadPaymentOptionById.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
 | `TokenCheck` | `TOKEN` | Bank confirmation Y | Payment Instruments, whether the verification token it holds for the instrument is valid |
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
 | `GBFundsCheck` | `FUNDS` | GB, bank confirmation Y | The bank-confirmation provider, whether the customer's bank account holds enough money for the payment |
@@ -220,6 +220,8 @@ class DefaultPaymentVerifyStage(
 
 *(A sketch.)*
 
+A payment that waits for its customer runs Verify in two parts. Amex's own checks, `InstrumentCheck`, `OptionsCheck` and `MandateCheck`, run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06). The checks that need the customer's bank step, `TokenCheck`, `GBFundsCheck` and `CardAuthorizationCheck`, run after the confirm or the callback. Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
+
 The stage never asks which market it is in or which behaviors are on. It asks the registries for its checks and its rules and runs the same flow every time, so there is no `if` on a behavior anywhere in Verify.
 
 ### One payment, start to finish
@@ -237,7 +239,7 @@ A GB customer pays their bill with Pay with Bank Transfer. The Router pins the r
 | `MandateCheck` | Mandate authorization Y | Not picked |
 | `GBFundsCheck` | GB, bank confirmation Y | Runs |
 
-3. Four calls go out at the same time: two to Payment Instruments, one to Payment Options and one to the bank-confirmation provider. The stage waits for all four.
+3. The calls go out in two parts, because the payment waits for its customer. At the create, before the redirect, Amex's own checks call Payment Instruments and Payment Options' `ReadPaymentOptionById.v1` at the same time. After the customer confirms, the bank-side checks call Payment Instruments, for the token, and the bank-confirmation provider, for the funds, at the same time.
 4. The answers become one set of facts. The rule registry picks the payment's rules the same way it picked the checks: GB's funds rule names GB and bank confirmation, as its check does, and it runs because a funds answer is among the facts. If the account holds less than the payment, the funds rule fails and the payment is `DECLINED`.
 5. One guarded commit writes the decision and the timeline row, with the ID of the rule that failed.
 

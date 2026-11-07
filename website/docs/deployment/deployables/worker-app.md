@@ -32,7 +32,7 @@ Workflow workers keep a sticky cache at least as big as the number of workflows 
 
 ## Versions and deploys
 
-Payment workflows are pinned to the build they started on, through Worker Versioning. A deploy starts new payments on the new build and never changes the code under one already running. The dispatchers and the governor are not pinned the same way: they move to the new build when they continue-as-new. [Deployment Pipeline](../pipeline.md) covers what that means for a release.
+Payment workflows are pinned to the build they started on, through Worker Versioning. A deploy starts new payments on the new build and never changes the code under one already running. The dispatchers and the governor are pinned too, but each continues-as-new onto the newest build, and the governor does so as soon as a new build is the target (Proposed). [Deployment Pipeline](../pipeline.md) covers what that means for a release.
 
 ## Where it runs
 

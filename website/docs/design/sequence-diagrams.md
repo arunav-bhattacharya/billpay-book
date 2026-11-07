@@ -64,7 +64,7 @@ sequenceDiagram
       CAP->>PS: state → PENDING, idempotency checked
     end
     WF->>VER: run
-    Note over VER: Instruments, Options, and Plans<br/>for a mandate, in parallel
+    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionById.v1), and Plans<br/>for a mandate, in parallel
     rect rgba(102,169,226,0.40)
       VER->>PS: state → ACCEPTED or DECLINED
     end
@@ -100,7 +100,7 @@ sequenceDiagram
 
 ## 2. Scheduled payment, created today and executed later
 
-A scheduled payment costs Temporal nothing while it waits. Intake on Online commits `SCHEDULED` together with a `SCHED_EXEC` row, replies and ends, and the row sits in Oracle for up to 30 days. On the due date the market's dispatcher routes the payment again, with that day's config, and starts `ExecuteScheduledPaymentWorkflow` on Offline. Reverify's guarded update settles any race with a late cancel.
+A scheduled payment costs Temporal nothing while it waits. Intake on Online commits `SCHEDULED` together with a `SCHED_EXEC` row, replies and ends, and the row sits in Oracle until the due date. On the due date the market's dispatcher routes the payment again, with that day's config, and starts `ExecuteScheduledPaymentWorkflow` on Offline. Reverify's guarded update settles any race with a late cancel.
 
 ```mermaid
 ---
@@ -136,6 +136,7 @@ sequenceDiagram
     Note over CW,PS: Online cluster, the day it is created
     Note over CW: Capture first: PENDING
     CW->>VER: run
+    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionById.v1), and Plans<br/>for a mandate, in parallel
     rect rgba(102,169,226,0.40)
       VER->>PS: state → SCHEDULED,<br/>with the SCHED_EXEC row,<br/>one commit
     end
@@ -152,7 +153,7 @@ sequenceDiagram
   end
 
   rect rgba(83,86,90,0.14)
-    Note over CW,XW: The SCHED_EXEC row waits in Oracle, up to 30 days. Nothing runs in Temporal
+    Note over CW,XW: The SCHED_EXEC row waits in Oracle until the due date. Nothing runs in Temporal
   end
 
   rect rgba(0,23,90,0.12)
@@ -163,10 +164,11 @@ sequenceDiagram
     R->>XW: dispatcher start, {paymentId}-execute
     SD->>PS: mark the row<br/>DISPATCHED
     XW->>REV: run
+    Note over REV: Options again (ReadPaymentOptions.v1):<br/>still owed, the option still holds,<br/>the amount taken again for a balance
     rect rgba(102,169,226,0.40)
-      REV->>PS: state → ACCEPTED, guarded: only if still SCHEDULED
+      REV->>PS: state → ACCEPTED or DECLINED,<br/>guarded: only if still SCHEDULED
     end
-    XW->>RTF: ACCEPTED event
+    XW->>RTF: ACCEPTED or DECLINED event
     Note over XW,REV: Execute, then Fulfil, as for pay today. The last commit marks the row DONE
   end
 ```
@@ -857,7 +859,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call and hands One-Data the settlement event Billpay creates instead. Once Verify or Cancel has decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15). A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. Amex's own checks run first, before the bank step, and a payment that fails them is `DECLINED` with no link. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify runs only the bank-side checks and decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call and hands One-Data the settlement event Billpay creates instead. Once Verify or Cancel has decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15). A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
 
 ```mermaid
 ---
@@ -893,15 +895,23 @@ sequenceDiagram
   rect rgba(0,111,207,0.12)
     Note over WF,PS: Online cluster, the first workflow task
     Note over WF: Capture first: PENDING
-    WF->>RQC: run
-    RQC->>BP: ask for the customer's<br/>redirect link, one try
-    alt the link comes back
+    WF->>VER: own checks, before the bank step
+    Note over VER: Instruments, Options by option ID,<br/>and Plans for a mandate, in parallel
+    alt a check's rule fails
       rect rgba(102,169,226,0.40)
-        RQC->>PS: the link and the provider's reference,<br/>guarded on PENDING
+        VER->>PS: state → DECLINED,<br/>guarded on PENDING
       end
-    else no link: the provider is down or too slow
-      rect rgba(102,169,226,0.40)
-        RQC->>PS: state → DECLINED,<br/>guarded on PENDING
+    else they pass: still PENDING, nothing committed
+      WF->>RQC: run
+      RQC->>BP: ask for the customer's<br/>redirect link, one try
+      alt the link comes back
+        rect rgba(102,169,226,0.40)
+          RQC->>PS: the link and the provider's reference,<br/>guarded on PENDING
+        end
+      else no link: the provider is down or too slow
+        rect rgba(102,169,226,0.40)
+          RQC->>PS: state → DECLINED,<br/>guarded on PENDING
+        end
       end
     end
   end
@@ -925,8 +935,8 @@ sequenceDiagram
     R->>WF: update confirm,<br/>ID {paymentId}-confirm
     rect rgba(0,111,207,0.12)
       Note over WF,PS: Online cluster, the same workflow
-      WF->>VER: run
-      Note over VER: asks Payment Instruments whether<br/>the instrument's token is valid
+      WF->>VER: bank-side checks
+      Note over VER: asks Payment Instruments whether<br/>the instrument's token is valid,<br/>and in GB the provider for the funds
       rect rgba(102,169,226,0.40)
         VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
       end
@@ -1014,7 +1024,7 @@ sequenceDiagram
 
 ## 16. Pay by Debit card: create, 3D Secure and authorization
 
-A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-core directly, not through One-Data, and the callback is an update to the same workflow. Verify runs its usual checks, then authorizes the payment last: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS (Proposed). Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
+A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-core directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS (Proposed). Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
 
 ```mermaid
 ---
@@ -1049,15 +1059,23 @@ sequenceDiagram
   rect rgba(0,111,207,0.12)
     Note over WF,PS: Online cluster, the first workflow task
     Note over WF: Capture first: PENDING
-    WF->>RQC: run
-    RQC->>CP: start 3D Secure with the callback URL,<br/>one try
-    alt the provider answers
+    WF->>VER: own checks, before 3D Secure
+    Note over VER: Instruments, Options by option ID,<br/>and Plans for a mandate, in parallel
+    alt a check's rule fails
       rect rgba(102,169,226,0.40)
-        RQC->>PS: the challenge link, or none,<br/>and the provider's reference, guarded on PENDING
+        VER->>PS: state → DECLINED,<br/>guarded on PENDING
       end
-    else no answer: the provider is down or too slow
-      rect rgba(102,169,226,0.40)
-        RQC->>PS: state → DECLINED,<br/>guarded on PENDING
+    else they pass: still PENDING, nothing committed
+      WF->>RQC: run
+      RQC->>CP: start 3D Secure with the callback URL,<br/>one try
+      alt the provider answers
+        rect rgba(102,169,226,0.40)
+          RQC->>PS: the challenge link, or none,<br/>and the provider's reference, guarded on PENDING
+        end
+      else no answer: the provider is down or too slow
+        rect rgba(102,169,226,0.40)
+          RQC->>PS: state → DECLINED,<br/>guarded on PENDING
+        end
       end
     end
   end
@@ -1076,8 +1094,8 @@ sequenceDiagram
     rect rgba(0,111,207,0.12)
       Note over WF,PS: Online cluster, the same workflow
       WF->>VER: run, with the 3D Secure result
-      Note over VER: a failed result: DECLINED, no authorization.<br/>Otherwise the usual checks first
-      opt the checks' rules pass
+      Note over VER: a failed result: DECLINED, no authorization.<br/>Amex's own checks already passed at the create
+      opt the 3D Secure result passed
         VER->>CP: authorize, with the payment ID<br/>as the idempotency key (Proposed)
         CP-->>VER: approved and the account debited,<br/>or declined: not enough money
       end

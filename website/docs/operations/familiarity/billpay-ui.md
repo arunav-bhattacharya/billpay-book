@@ -21,6 +21,9 @@ The Operations step holds the settings that drive a market at runtime:
 - its representment rules
 - which status changes send a Raven message
 - its bank-confirmation provider and window
+- its card provider and authentication window, for debit cards
+- its verification rule settings, such as the largest payment and the instrument types it takes
+- its scheduling horizon and whether it offers Pay with MR Points (both Proposed)
 - its expected volumes
 - its BOTH rules
 

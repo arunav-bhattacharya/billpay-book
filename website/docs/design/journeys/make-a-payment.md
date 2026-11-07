@@ -18,24 +18,24 @@ A page that listed every instrument on file would let the customer pick one this
 
 ## Three calls, in this order
 
-1. **`ReadPaymentOptions`**, from Payment Options. It returns what the customer owes and the options to pay it: Statement Balance, Total Balance, Minimum Due and Other Amount. Each option carries a token ID, which Billpay verifies during execution. It also says whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take. If nothing is owed, the payment journey never starts and the channel calls nothing else.
+1. **`ReadPaymentOptions.v1`**, from Payment Options. It returns what the customer owes and the options to pay it: Statement Balance, Total Balance, Minimum Due and Other Amount. Each option carries a payment option ID, unique to that option and the balance it pays. It also says whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take. If nothing is owed, the payment journey never starts and the channel calls nothing else.
 2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from. It is a One-Data function in front of a billpay-core endpoint, and billpay-core makes the one read that source needs:
    - Enrolled Instruments: Payment Instruments' `ReadInstruments`, for the instruments the customer has enrolled;
    - Pay with Bank Transfer or a debit card: `ReadBanksForRealtimePayments.v1`, for the list of banks the customer can pay from in real time;
    - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with.
 
    It replaces the channel's own call to Payment Instruments.
-3. **`CreatePayment.v3`**, when the customer reviews and pays. It carries the chosen option's token ID (Proposed), and it is the only call that starts anything.
+3. **`CreatePayment.v3`**, when the customer reviews and pays. It carries the ID of the option the customer chose, and it is the only call that starts anything.
 
 A debit card adds one more call, in the other direction. Billpay gives the market's card provider a callback URL when it starts 3D Secure, and the provider calls billpay-core back directly once the card is authenticated, not through One-Data and not from the channel.
 
-The reads only guide the page. Verify calls Payment Options and Payment Instruments again once the payment is created, and those calls decide: Verify's Options check verifies the option's token (Proposed). The Router and Verify also check the payment against the market's release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it would refuse.
+The reads only guide the page. Verify calls Payment Options and Payment Instruments again once the payment is created, and those calls decide. Verify's Options check validates the chosen option through Payment Options' `ReadPaymentOptionById.v1`. A scheduled payment is checked again on its due date: Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the option still holds, and declines the payment if not. A Statement Balance or Total Balance payment pays what the option gives that day, which can differ from the amount at the create. Payments from Accounts Receivable, corporate payments and Pay with MR Points carry no option ID, and their Verify skips the Options check. The Router and Verify also check the payment against the market's release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it would refuse.
 
 ## What decides what the page offers
 
 The amounts, the payment options and the dates come from Payment Options, for this customer. The instruments come through Billpay, filtered by the market's rules, so an Autopay instrument still pending verification never shows up for a payment made now. Pay with Bank Transfer, a debit card and a US payment confirmed through Plaid pay today only, so once the customer picks a later date the page doesn't offer them, and a future-dated create with one gets 422 before any workflow starts. Who will own the bank and wallet reads isn't decided yet; it will probably be the Instruments domain.
 
-Where the page gets the rest is still open: the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show. `ReadPaymentOptions` is one option. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps the profile's settings that the Router and Verify check.
+Where the page gets the rest is still open: the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show. `ReadPaymentOptions.v1` is one option. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps the profile's settings that the Router and Verify check.
 
 ## How the Router picks the journey
 
@@ -67,13 +67,13 @@ A payment stays on the account's pending list only until it is decided. Once it 
 
 A debit card is its own way to pay, apart from a bank account. Every debit card payment goes through 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money:
 
-1. The Router starts `CreatePaymentIntentWorkflow`. RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure, and gives it Billpay's callback URL.
+1. The Router starts `CreatePaymentIntentWorkflow`. Amex's own checks run first: the Instrument, Options and Mandate checks. A payment that fails them is `DECLINED` at once, and 3D Secure never starts. Otherwise RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure, and gives it Billpay's callback URL.
 2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link (Proposed).
 3. The card provider calls `POST /payments/{payment-id}/authentication` (Proposed) once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
-4. Verify runs its usual checks, then authorizes the payment, last (the check is Proposed). The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
+4. Amex's own checks already passed, so Verify now only authorizes the payment (the check is Proposed). The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
 5. Execute makes no clearing call, because the money has moved. Billpay creates the settlement event itself and hands it to One-Data, dated when the money moved (Proposed), and the payment is `PAID` once that event and Accounts Receivable's posting are both in.
 
-If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. Any account type can pay by debit card: consumer, corporate and business travel. A debit card pays today only, with one instruction, and never with MR Points: a create that breaks this gets 422 before any workflow starts.
+If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. Consumer and business travel payments can pay by debit card; corporate payments can't. A debit card pays today only, with one instruction, never with MR Points and never through Pay & Plan: a create that breaks this, or a corporate one, gets 422 before any workflow starts.
 
 Pay with Bank Transfer works the same way at the end: its money moves at the bank, during the customer's bank connection, so it has no clearing step either, and Billpay creates its settlement event too.
 
@@ -89,10 +89,10 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 
 ## Still to be defined
 
-- Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions` is one option.
+- Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions.v1` is one option.
 - The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-core endpoint behind it.
 - Who owns `ReadBanksForRealtimePayments.v1` and `ReadEligibleWallets.v1`, and their contracts.
-- The payment option token's contract, and whether Reverify checks it again for a scheduled payment.
-- Whether the market's Proposed scheduling horizon setting stays, now that `ReadPaymentOptions` gives each customer's date range.
+- The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionById.v1`, and the decline code for an option that no longer holds.
+- Whether the market's Proposed scheduling horizon setting stays, now that `ReadPaymentOptions.v1` gives each customer's date range.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
 - Wallet: which instrument it is, and whether it needs a bank step. The page can read eligible wallets, but no journey takes one yet, and wallets appear on this page only.

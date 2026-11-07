@@ -23,7 +23,7 @@ Pay & Plan combines a payment today with a plan of future installments, across B
 2. The Installments API, to set up the plan.
 3. An optional update to the customer's Autopay.
 
-Pay & Plan never takes bank confirmation. A request that would need it gets 422 before any workflow starts.
+Pay & Plan never takes bank confirmation or a debit card. A request that would need either gets 422 before any workflow starts.
 
 ## Create Payment with Multiple Instructions
 

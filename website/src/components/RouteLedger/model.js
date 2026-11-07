@@ -78,7 +78,7 @@ export const IFACES = [
     fails: 'decline',
     queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify'],
-    note: 'it has no rate limit',
+    note: 'ReadPaymentOptionById.v1 in Verify, ReadPaymentOptions.v1 in Reverify; it has no rate limit',
   },
   {
     name: 'PlansActivities',
@@ -252,17 +252,20 @@ export const BANDS = [
             wf: 'CreatePaymentIntent',
             tag: 'bank confirmation',
             lead: 'Pay today, once the customer confirms their bank details.',
-            stages: ['Capture'],
+            stages: ['Capture', 'Verify'],
             own: ['RequestConfirmation'],
+            move: {Verify: 'PENDING, unchanged; DECLINED with no link'},
             journey: 'Create payment, today, one instruction, with bank confirmation: a payment that waits for the customer',
             wfId: '{paymentId}-init',
             answer: 'with PENDING and the redirect link, or DECLINED with none',
             chips: five('CONSUMER', 'Y', 'Y'),
             behave:
-              'Example values. A BOTH turns bank confirmation to Y when the payment method needs the customer to confirm at their bank. Only consumer payments made today take it.',
+              'Example values. A BOTH turns bank confirmation to Y when the payment method needs the customer to confirm at their bank. It is on for consumer payments made today; business travel can be turned on later.',
             notes: {
+              Verify:
+                "Amex's own checks, before the bank step: the Instrument, Options and Mandate checks that apply, as local activities. A payment that fails them is DECLINED, with no link. One that passes stays PENDING, and nothing is committed.",
               RequestConfirmation:
-                "It runs after Capture, in place of Verify. It gets the provider's redirect link, with one try, and stores it on the payment, guarded on PENDING. The caller gets PENDING with the link, and the PENDING event goes out. With no link, the payment is DECLINED instead.",
+                "It runs once Verify's own checks have passed. It gets the provider's redirect link, with one try, and stores it on the payment, guarded on PENDING. The caller gets PENDING with the link, and the PENDING event goes out. With no link, the payment is DECLINED instead.",
             },
             stop: {
               title: 'The workflow waits here.',
@@ -279,8 +282,10 @@ export const BANDS = [
             tag: 'debit card',
             card: true,
             lead: 'Pay today by debit card, once 3D Secure has authenticated it.',
-            stages: ['Capture'],
+            stages: ['Capture', 'Verify'],
             own: ['RequestConfirmation'],
+            move: {Verify: 'PENDING, unchanged; DECLINED before 3D Secure'},
+            exc: {'Verify|CardActivities': {kind: 'skip', note: 'the authorization waits for the callback'}},
             journey: 'Create payment, today, one instruction, by debit card: a payment that waits for 3D Secure',
             wfId: '{paymentId}-init',
             answer: 'with PENDING and the challenge link, or none; DECLINED when the provider gives no answer',
@@ -288,8 +293,10 @@ export const BANDS = [
             behave:
               'Example values. Card authentication is Y: the Router sets it for every debit card, and no market chooses it. A debit card pays today only, with one instruction and no MR Points.',
             notes: {
+              Verify:
+                "Amex's own checks, before 3D Secure: the Instrument, Options and Mandate checks that apply, as local activities. A payment that fails them is DECLINED, and 3D Secure never starts. One that passes stays PENDING, and nothing is committed.",
               RequestConfirmation:
-                "It asks the market's card provider to start 3D Secure, with Billpay's callback URL, one try, and stores the challenge link, or none when the card's bank needs no challenge (Proposed), guarded on PENDING. The caller gets PENDING. With no answer from the provider, the payment is DECLINED instead (Proposed).",
+                "Once Verify's own checks have passed, it asks the market's card provider to start 3D Secure, with Billpay's callback URL, one try, and stores the challenge link, or none when the card's bank needs no challenge (Proposed), guarded on PENDING. The caller gets PENDING. With no answer from the provider, the payment is DECLINED instead (Proposed).",
             },
             stop: {
               title: 'The workflow waits here.',
@@ -398,10 +405,12 @@ export const BANDS = [
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "One commit, guarded on PENDING, and the confirm's reply returns here: the same early return as the create's. Once the workflow no longer waits, such as after its timer cancelled the payment, the confirm gets 409.",
+                "Only the bank-side checks run: the token, and in GB the funds. One commit, guarded on PENDING, and the confirm's reply returns here: the same early return as the create's. Once the workflow no longer waits, such as after its timer cancelled the payment, the confirm gets 409.",
             },
             exc: {
-              'Verify|InstrumentActivities': {kind: 'call', note: "also asks whether the instrument's verification token is valid"},
+              'Verify|InstrumentActivities': {kind: 'call', note: "only whether the instrument's verification token is valid: Amex's own checks ran at the create"},
+              'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
               'Execute|ClearingActivities': {kind: 'cond', note: 'not for Pay with Bank Transfer: its money moved at the bank, and Billpay creates its settlement event'},
             },
             then: [PAID],
@@ -433,10 +442,13 @@ export const BANDS = [
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "A failed 3D Secure result is DECLINED with no authorization. Otherwise the usual checks run, then last the card provider authorizes the payment (the check is Proposed): approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
+                "A failed 3D Secure result is DECLINED with no authorization. Otherwise, since Amex's own checks ran at the create, the card provider authorizes the payment (the check is Proposed): approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
               Execute: "No clearing call: the authorization moved the money. The AR balance and open-to-buy calls go out, and One-Data gets the settlement event Billpay creates, dated when the money moved.",
             },
             exc: {
+              'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
+              'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
               'Execute|ClearingActivities': {kind: 'skip', note: 'the authorization moved the money'},
             },
             then: [{to: 'paid', text: 'PAID, once One-Data has the settlement Billpay created and the GAR posting'}],
@@ -1217,7 +1229,7 @@ export function router(j) {
         note: `Nothing to pick: the answer goes as an update to the payment's running ${j.full}, on the ${j.cluster} cluster. The Router only admits it.`,
       },
       {name: 'Resolve behaviors', chips: j.chips || [], note: 'Nothing new to resolve: the workflow kept the behaviors it was started with.'},
-      {name: 'Pin the resolved profile', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that plan, and its build, to the end.'},
+      {name: 'Pin the resolved profile', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that profile, and its build, to the end.'},
       {name: 'Choose the run site', main: `Online cluster, the running ${j.wfId}.`, note: 'Nothing new is placed: the update goes to the workflow that is already waiting.'},
       {
         name: 'Start',
@@ -1236,7 +1248,7 @@ export function router(j) {
       main: 'The journey, the five resolved behaviors and the config version (v12, an example).',
       note: j.today
         ? "On the due date the dispatcher calls the Router again, so the payment runs with today's config. The version used at scheduling stays in its timeline for audit."
-        : 'The running workflow keeps this plan, and its build, to the end.',
+        : 'The running workflow keeps this profile, and its build, to the end.',
     },
     {name: 'Choose the run site', ...place},
     {name: 'Start', ...start},

@@ -53,11 +53,11 @@ One-Data functions are the versioned contracts that channels and partner systems
 
 ### Core
 
-1. [CreatePayment.v3](https://explorer.aexp.com/functions/CreatePayment.v3?method=post): create a payment for today or schedule one for a future date. A payment that needs the customer to confirm their bank details (`requiresBankConfirmation`) comes back `PENDING` with the provider's redirect link, and `CreateConfirmPendingPayment.v1` carries it on once the customer has confirmed. A debit card payment comes back `PENDING` too, while 3D Secure runs. A create on a card account that already has a payment in `PENDING` never reaches Billpay: One-Data declines it ([Held creates and the pending check](#held-creates-and-the-pending-check), agreed 2026-10-21).
+1. [CreatePayment.v3](https://explorer.aexp.com/functions/CreatePayment.v3?method=post): create a payment for today or schedule one for a future date. A create from a channel carries the payment option ID the customer chose ([Making a payment](#making-a-payment-the-channels-calls), agreed 2026-11-06). A payment that needs the customer to confirm their bank details (`requiresBankConfirmation`) comes back `PENDING` with the provider's redirect link, and `CreateConfirmPendingPayment.v1` carries it on once the customer has confirmed. A debit card payment comes back `PENDING` too, while 3D Secure runs. A create on a card account that already has a payment in `PENDING` never reaches Billpay: One-Data declines it ([Held creates and the pending check](#held-creates-and-the-pending-check), agreed 2026-10-21).
 2. [UpdatePayment.v1](https://explorer.aexp.com/functions/UpdatePayment.v1?method=post): update a `SCHEDULED` payment. Works only inside the market's cancellation window; after that the answer is 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.
 3. [DeletePayment.v1](https://explorer.aexp.com/functions/DeletePayment.v1?method=post): cancel a `SCHEDULED` payment. Works only inside the cancellation window; after that the answer is 409. A corporate payment leaves `SCHEDULED` when its allocations are requested. It also cancels a `PENDING` payment that waits for a confirmation, when the customer says no (agreed 2026-10-18).
-4. [ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1): list the payments on a card account.
-5. [ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1): list the lifecycle states one payment has been through.
+4. [ReadPayments.v1](https://explorer.aexp.com/functions/ReadPayments.v1): list the payments on a card account, through `GET /payments/account/{account-id}`.
+5. [ReadPaymentEventsById.v1](https://explorer.aexp.com/functions/ReadPaymentEventsById.v1): list the lifecycle events of one payment, the states it has been through, through `GET /payments/{payment-id}` (agreed 2026-11-06).
 6. [CreateCreditBalanceRefund.v1](https://explorer.aexp.com/functions/CreateCreditBalanceRefund.v1?method=post): refund a credit balance on a card account.
 7. `CreateInboundPayment.v1`: take a payment pushed by a third party. One-Data stores it in its inbox and replies 202; the inbound dispatcher starts its workflow.
 8. `CreateConfirmPendingPayment.v1`: confirm a payment that waited for the customer. Channels call it with the same payment ID once the customer has confirmed their bank details on the provider's site, and it starts processing the payment.
@@ -68,9 +68,9 @@ One-Data functions are the versioned contracts that channels and partner systems
 
 A channel's make-a-payment page calls three APIs, in this order (agreed 2026-11-05; it replaces the four calls agreed 2026-10-20):
 
-1. **Payment Options' `ReadPaymentOptions`**, called by the channel directly, separately from the calls Verify makes to Payment Options later. It returns:
+1. **Payment Options' `ReadPaymentOptions.v1`**, called by the channel directly, separately from the calls Verify and Reverify make to Payment Options later. It returns:
    - the amounts the customer owes. If nothing is owed, the payment journey never starts and nothing else is called;
-   - the payment options, such as Statement Balance, Total Balance, Minimum Due and Other Amount. Each carries a token ID, which Billpay verifies during execution (agreed 2026-11-05). The create carries the chosen option's token ID, and Verify's Options check verifies it (Proposed, 2026-11-05);
+   - the payment options, such as Statement Balance, Total Balance, Minimum Due and Other Amount. Each carries a payment option ID, unique to that option and the balance it pays (agreed 2026-11-05; named 2026-11-06, it was the token ID). The create carries the ID of the option the customer chose, and Billpay validates it (The payment option ID, below);
    - whether the customer can pay today, on a future date, or both, and the range of dates a future payment can take (agreed 2026-11-05).
 2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from (agreed 2026-11-05). It is a One-Data function in front of a billpay-core endpoint, and billpay-core makes the call the source needs:
    - Enrolled Instruments: Payment Instruments' `ReadInstruments`, for the instruments the customer has enrolled;
@@ -84,11 +84,16 @@ A channel's make-a-payment page calls three APIs, in this order (agreed 2026-11-
 
 What the reads return guides the page; it decides nothing. The Router and Verify check the create against the release active when it arrives, so a release that goes live between a read and the create can't let through a payment it refuses.
 
-Where the page gets the rest of what it shows is open (2026-11-05): the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show (agreed 2026-10-21). `ReadPaymentOptions` is one option ([Open Items](#open-items)).
+**The payment option ID** (agreed 2026-11-06). A create from a channel carries the option ID for every payment that pays a balance: pay today, a scheduled payment, Pay with Bank Transfer and debit card, the payment Pay & Plan makes, and multiple instructions. Creates from AR intake, corporate payments and Pay with MR Points carry none, and their Verify runs no Options check. Billpay validates the ID:
+
+- **At the create**, Verify's Options check calls Payment Options' `ReadPaymentOptionById.v1` with the chosen option ID, and a rule declines the payment if the option isn't valid.
+- **On the due date**, a scheduled payment is checked again. Reverify's Options check calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the chosen option still holds. If not, the payment is `DECLINED`, with a decline code product will send. For an option whose amount follows a balance, such as Statement Balance or Total Balance, the amount is taken again that day, so it can differ from the amount at the create.
+
+Where the page gets the rest of what it shows is open (2026-11-05): the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show (agreed 2026-10-21). `ReadPaymentOptions.v1` is one option ([Open Items](#open-items)).
 
 **MR Points** (agreed 2026-10-20). Next to the way to pay, the customer can tick Pay with MR Points. Points alone run [Pay with MR Points](#composite-workflows). Points with a bank account are two instructions, and run as multiple instructions. Points pay today only: once they are ticked, the page offers no later date, and a future-dated create with points gets 422 before any workflow starts (Proposed). A debit card doesn't combine with MR Points (agreed 2026-10-20).
 
-**Debit card** (agreed 2026-10-20). A debit card is a way to pay of its own, apart from a bank account. The page reads the banks the customer can pay from by debit card through `ReadBanksForRealtimePayments.v1` (agreed 2026-11-06). Every debit card payment needs 3D Secure, the card scheme's check that the customer is the cardholder: Billpay asks the market's card provider to authenticate the card, giving it a callback URL, and the provider calls Billpay back once the card is authenticated. The provider then authorizes the payment, and the authorization debits the customer's account if it holds enough money; the issuing bank declines it if not. Any account type can pay by debit card: consumer, corporate and business travel (agreed 2026-10-21). A debit card pays today only, with one instruction: a future-dated create, or one with several instructions, that pays by debit card gets 422 before any workflow starts ([12. CreatePaymentIntentWorkflow](#12-createpaymentintentworkflow)).
+**Debit card** (agreed 2026-10-20). A debit card is a way to pay of its own, apart from a bank account. The page reads the banks the customer can pay from by debit card through `ReadBanksForRealtimePayments.v1` (agreed 2026-11-06). Every debit card payment needs 3D Secure, the card scheme's check that the customer is the cardholder: Billpay asks the market's card provider to authenticate the card, giving it a callback URL, and the provider calls Billpay back once the card is authenticated. The provider then authorizes the payment, and the authorization debits the customer's account if it holds enough money; the issuing bank declines it if not. Consumer and business travel payments can use a debit card; corporate payments can't (agreed 2026-11-06; it replaces the 2026-10-21 answer that any account type can). A debit card pays today only, with one instruction: a future-dated create, one with several instructions, a Pay & Plan request or a corporate payment that pays by debit card gets 422 before any workflow starts ([12. CreatePaymentIntentWorkflow](#12-createpaymentintentworkflow)).
 
 ### Composite
 
@@ -97,7 +102,7 @@ Where the page gets the rest of what it shows is open (2026-11-05): the ways to 
 
 ### Event Handlers
 
-Event handlers take events from other platforms. None of them starts or waits on a workflow: they store what arrives in One-Data's inbox, and call Billpay only to find a payment an event doesn't name.
+Event handlers take events from other platforms. None of them starts or waits on a workflow: the money movement and AR handlers store what arrives in One-Data's inbox, and call Billpay only to find a payment an event doesn't name.
 
 1. `CreateMoneyMovementEventHandler.v1`: money movement events from MR/M3. A return is stored in One-Data's **inbox** for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment.
 2. `CreateAccountsReceivableTransactionEventHandler.v1`: Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment, or leg, and presentment.
@@ -154,6 +159,7 @@ Three cases need a rule of their own. Two are settled, and the third waits on On
 Every write API admits the request first, through the Router (see [Routing and Start Modes](#routing-and-start-modes)). The Router checks billpay-core's in-memory copy of the onboarding config, so admission adds no call (agreed 2026-10-18):
 
 - **422** when the market, account type or API is not live in this environment. Senders do not retry a 422. A held create that RTF delivers after its market was taken out of service is captured and declined instead, so the customer is told and the delete runs (agreed 2026-10-18).
+- **422** too when the request asks for what its way to pay can't do, before any workflow starts ([The Router's six steps](#the-routers-six-steps)): a future-dated create that pays by Pay with Bank Transfer, debit card, Plaid or MR Points (Proposed for MR Points); a debit card with several instructions, MR Points, Pay & Plan or a corporate payment; bank confirmation with several instructions, Pay & Plan or a corporate payment.
 - **429** with `Retry-After` when an allocation callback arrives over its traffic class's budget. The allocations manager retries on 429.
 - **409** when an update or cancel arrives for a payment that is no longer `SCHEDULED` (a corporate payment leaves it when its allocations are requested), or after the cancellation window has closed; and when a confirm arrives for a payment that has been cancelled, such as one whose confirmation window closed. A cancel of a `PENDING` payment that isn't waiting for a confirmation gets 409 too. A confirm repeated after its workflow has closed gets the payment's current state instead ([CreatePaymentIntentWorkflow](#12-createpaymentintentworkflow)).
 - **503** with `Retry-After` for an allocation callback or a Market Onboarding API request while the Offline cluster is down.
@@ -172,7 +178,7 @@ AR intake, returns and inbound payments never reach these APIs. One-Data stores 
 | `POST /payments/{payment-id}/allocations` | Takes one batch of allocations for a corporate payment | Stores the batch, then async start | 202 |
 | `POST /refunds` | Refunds a credit balance | Update-With-Start | The refund's result |
 | `GET /payments/account/{account-id}` | Lists the payments on an account | Reads Oracle | The payments |
-| `GET /payments/{payment-id}` | Returns one payment | Reads Oracle | The payment; with its redirect link while it waits for bank confirmation (agreed 2026-10-18) |
+| `GET /payments/{payment-id}` | Returns one payment and its lifecycle events; `ReadPaymentEventsById.v1` calls it (agreed 2026-11-06) | Reads Oracle | The payment and its lifecycle events; with its redirect or challenge link while it waits for bank confirmation or 3D Secure (agreed 2026-10-18; the challenge link 2026-10-20) |
 | `GET /instruments/account/{account-id}?source={source}` | Behind `ReadBillpayInstruments.v1`: the instruments the customer can pay from, for one source: Enrolled Instruments, Pay with Bank Transfer, debit card or wallet (agreed 2026-11-05; the path is Proposed) | Calls `ReadInstruments`, `ReadBanksForRealtimePayments.v1` or `ReadEligibleWallets.v1`, then filters by the market's rules. No workflow | The list the page may offer |
 
 AR learns the outcome of a request it sent from the SCHEDULED and DECLINED notifications and lifecycle events, or from `GET /payments/{payment-id}`.
@@ -234,6 +240,21 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 - billpay-core ships and deploys as one app. There is no separate online or offline app: more capacity means more pods of the same app.
 - Load-test runs 4 and 6 run on the app, and online p99 must stay unchanged while offline work runs.
 
+### Sites
+
+Billpay runs from two on-prem Hydra sites, IPC2 in the east and IPC1 in the west, against the two Temporal clusters in AWS. Only the front door is live in both sites: everything behind it processes in one place at a time, with a standby that does nothing until an operator promotes it.
+
+| Part | Where it runs |
+| --- | --- |
+| One-Data | Active in both sites. Both call the core APIs in IPC2's app; IPC1's One-Data routes across |
+| Redis | A store in each site, run as one active-active database (Redis calls this a CRDB), so what one site writes the other can read |
+| One-Data's inbox | One Postgres primary, replicated across IPC1 and IPC2 ([Inbox](#inbox-one-datas-postgres-tables)) |
+| billpay-core | IPC2. IPC1 keeps a standby of the same app, deployed and ready, which an operator promotes if IPC2 goes. It is the only component that talks to Temporal, over gRPC, with a client for each cluster |
+| Oracle | The read/write primary in IPC2, with two read-only replicas beside it for read and reporting traffic. IPC1 holds the Oracle Data Guard standby and one more read-only replica. Promoting the standby is an operator's decision, never automatic |
+| Temporal | Self-hosted on EKS in us-east-1, the frontend, history, matching and worker services of each cluster as pods; a passive standby of each in us-west-1 ([Two clusters](#two-clusters)) |
+
+Temporal is the only part that doesn't run on Hydra. Its services talk to each other pod to pod all the time, so a cluster needs Kubernetes with that path left alone. AWS runs EKS across several Availability Zones in a region. Hydra doesn't form an EKS cluster across zones, so a cluster there would sit in one zone, and on Hydra the istio-proxy sits in the middle of pod traffic.
+
 ### Traffic classes
 
 | Traffic | Volume and rate | Caller waits | Deadline | Cluster |
@@ -266,7 +287,7 @@ One app, billpay-core, runs the core APIs, the Router, the dispatchers, the gove
 | `CreateScheduledPaymentWorkflow` | `{paymentId}-init` | Scheduled from channels |
 | `UpdatePaymentWorkflow` | `{paymentId}-update` | |
 | `CancelPaymentWorkflow` | `{paymentId}-cancel` | |
-| `CreatePaymentIntentWorkflow` | `{paymentId}-init` | A payment that waits for the customer, for bank confirmation or a debit card's 3D Secure, from the create to its end; the confirm and the no reach it as updates (agreed 2026-10-18) |
+| `CreatePaymentIntentWorkflow` | `{paymentId}-init` | A payment that waits for the customer, for bank confirmation or a debit card's 3D Secure, from the create to its end; the confirm, the no and the 3D Secure callback reach it as updates (agreed 2026-10-18; the callback 2026-10-20) |
 | `CreateBalanceRefundWorkflow` | `{paymentId}-init` | Refunds from channels |
 | `CreatePaymentWithMultipleInstructionsWorkflow`, Pay & Plan and Pay with MR Points | `{paymentId}-init` | Composites; children on the Online cluster |
 | `ExecuteSplitPaymentWorkflow` | `{paymentId}_{seq}-execute` | Consumer split legs of an Online parent run as its children |
@@ -303,7 +324,7 @@ Consumer and corporate payments share one set of states. A corporate payment add
 
 | State | Meaning | Terminal? |
 | --- | --- | --- |
-| `PENDING` | Captured in Billpay, idempotency checked, awaiting validation; or waiting for the customer to confirm their bank details, or to authenticate their debit card with 3D Secure. | No |
+| `PENDING` | Captured in Billpay, idempotency checked, awaiting validation; or waiting for the customer to confirm their bank details, or to authenticate their debit card with 3D Secure. While a payment is `PENDING`, One-Data declines any other create from a channel on its card account (agreed 2026-10-21). | No |
 | `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
 | `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. | No |
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager; batches may be arriving. | No |
@@ -311,11 +332,11 @@ Consumer and corporate payments share one set of states. A corporate payment add
 | `PROCESSING` | Being executed: clearing with the bank, the AR balance reduced, open-to-buy raised. A Pay with Bank Transfer or debit card payment has no clearing: its money has already moved, and Execute sends One-Data the settlement event Billpay creates for it (agreed 2026-10-20; the event 2026-10-21). | No |
 | `PROCESSED` | Clearing, AR, OTB, accounting, eBNC, risk, TFNE, GPHDB and B2Notifier have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
 | `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date market rules set. | No |
-| `PAID` | Settled and posted to Accounts Receivable. | Yes, unless a return arrives |
+| `PAID` | Settled and posted to Accounts Receivable. For a Pay with Bank Transfer or debit card payment, the settlement is the event Billpay created in Execute. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank returned the funds. | Yes. A representment is a new row |
 | `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
-| `DECLINED` | Failed validation, or a representment failed its recheck; or the provider gave no redirect link; or a held create arrived after its market was taken out of service. | Yes |
-| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed before the market's confirmation window closed; or the customer said no to a payment waiting for bank confirmation. | Yes |
+| `DECLINED` | Failed validation, or a representment failed its recheck; or the bank-confirmation provider gave no redirect link, or the card provider gave no answer; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed before the market's confirmation window closed; or a debit card payment whose 3D Secure callback didn't come within 2 minutes; or the customer said no to a payment waiting for bank confirmation. | Yes |
 | `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
 ### Transitions
@@ -360,7 +381,7 @@ Every presentment keeps the payment's ID and confirmation code.
 
 ### Guarded updates
 
-Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. A payment that has been represented has a row per presentment, so Return's guard also names the presentment. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`. A corporate payment's allocation request races a cancel the same way: both are guarded on `SCHEDULED`, so only one wins. A confirm races the end of the confirmation window the same way: Verify and the expiry's Cancel are both guarded on `PENDING`, and a confirm that loses gets 409. So do a yes and a no from two tabs: one wins, and the other gets 409.
+Every status change is a conditional update on the current status, such as `UPDATE trans_dtl SET status = 'CANCELLED' WHERE payment_id = :id AND status = 'SCHEDULED'`. A payment that has been represented has a row per presentment, so Return's guard also names the presentment. When two writers race, one wins and the other sees zero rows updated. At the edge of the cancellation window, either Cancel or Reverify wins; a cancel that loses gets 409, or the earlier result again if the payment is already `CANCELLED`. A corporate payment's allocation request races a cancel the same way: both are guarded on `SCHEDULED`, so only one wins. A payment that waits for its customer doesn't race in the database: its own workflow takes one answer, the confirm, the 3D Secure callback, the no or its timer, and its validators turn any other away with 409, writing nothing ([12. CreatePaymentIntentWorkflow](#12-createpaymentintentworkflow)). Verify and Cancel are still both guarded on `PENDING`.
 
 ### Corporate payments
 
@@ -388,7 +409,7 @@ Corporate rules:
 
 ## Payment Domain Model
 
-The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
+The payment model in code is `docs/domainModel/Payment.kt.md`, supplied on 2026-10-16; instruments and payment options are in `Instrument.kt.md` and `PaymentOption.kt.md`. It lives in the package `com.aexp.billpay.core.domain.transaction`. The model turns the lifecycle into types: a payment's class is its state, and a transition is a function from one class to the next.
 
 The model below is the target, agreed on 2026-10-17. It covers the whole lifecycle apart from what [Still open](#still-open) lists. [Changes the code needs](#changes-the-code-needs) lists what the supplied file doesn't have yet, and [Types the model uses but doesn't define](#types-the-model-uses-but-doesnt-define) covers the five types it leans on.
 
@@ -431,7 +452,7 @@ Two shapes cross the states. `FullPayment` settles as one amount. `SplitPayment`
 | `DECLINED` | `DeclinedFullPayment` | `DeclinedSplitPayment` |
 | `DISALLOWED` | `DisallowedFullPayment` | |
 
-Twenty-two data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice`: `sequenceNumber`, `splitAmount`, `splitPaymentId` (the leg's ID) and `account` (the card account the leg pays). So there is no pending, scheduled, allocating or allocated leg. A leg is never cancelled, and is declined only when its representment fails the recheck. Only a corporate payment is ever `ALLOCATING` or `ALLOCATED`, and only a push payment is ever `DISALLOWED`.
+Twenty-two data classes in all. A leg starts at `ACCEPTED`, made from a `SplitSlice`: `sequenceNumber`, `splitAmount`, `splitPaymentId` (the leg's ID) and `account` (the card account the leg pays). So there is no pending, scheduled, allocating or allocated leg. A consumer split's legs are written by Verify's `ACCEPTED` commit, through `AcceptedFullPayment.toAcceptedSplitPayment(splitSlice)`; a corporate payment's legs are written at its release, once its Execute has cleared it, through `ProcessingFullPayment.toAcceptedSplitPayment(splitSlice)`. A leg is never cancelled, and is declined only when its representment fails the recheck. Only a corporate payment is ever `ALLOCATING` or `ALLOCATED`, and only a push payment is ever `DISALLOWED`.
 
 ### Presentments in the model
 
@@ -485,17 +506,20 @@ The supplied file leans on five types it doesn't define. The build takes each on
 
 | Type | What it is |
 | --- | --- |
-| `TransactionId` | A payment's ID, which One-Data makes as a ULID (agreed 2026-10-18). A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`. A small class over the string, checked when it is built and written to JSON as the plain string |
+| `TransactionId` | A payment's ID, which One-Data makes as a ULID (agreed 2026-10-18). A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`. A small class over the string, checked against `[0-9A-HJKMNP-TV-Z]{26}(_[0-9]+)?` when it is built and written to JSON as the plain string |
 | `MonetaryAmount` | `javax.money.MonetaryAmount` from JSR 354, the Java money API, with Moneta's `Money` behind it, so an amount is never a floating-point number. In JSON it is an amount and a currency code |
-| `TokenizedAccount` | The card account, held as its token and never as a card number. The token is the account's `CARD_ACCT.ACCT_ID`. It narrows `Account`, the type `Transaction` holds; if the supplied files don't define `Account` either, it comes from the current app the same way |
-| `PlanInfo` | The Pay & Plan details a payment carries, null on a payment made outside Pay & Plan. Its fields follow the Installments API |
-| `LegacyPayment` | Today's payment class. The model uses only its three enums: `PaymentStatus`, `PaymentSource` and `DeclineCode`. `PaymentStatus` holds the fourteen states, with `ALLOCATING` and `ALLOCATED` added by change 2 |
+| `TokenizedAccount` | The card account, held as its token and never as a card number: `TokenizedAccount(val accountId: String)`, where the token is the account's `CARD_ACCT.ACCT_ID`. It narrows `Account`, the type `Transaction` holds; if the supplied files don't define `Account` either, it comes from the current app the same way |
+| `PlanInfo` | The Pay & Plan details a payment carries, null on a payment made outside Pay & Plan. For now it holds `planId: String?`; its other fields follow the Installments API |
+| `LegacyPayment` | Today's payment class. The model uses only its three enums: `PaymentStatus`, `PaymentSource` and `DeclineCode`. `PaymentStatus` holds the fourteen states, with `ALLOCATING` and `ALLOCATED` added by change 2. `PaymentSource` and `DeclineCode` keep the current app's values, which other systems already read |
 
 ### Still open
 
 | Question | The model for now |
 | --- | --- |
 | Credit balance refunds | Skipped for now. `Refund` has no concrete types, and the refund steps are still to be defined |
+| A debit card's challenge link and the card provider's reference | Not in the model yet. `BankConfirmation` holds only the bank-confirmation provider's reference and redirect link (2026-11-07) |
+| The payment option ID | The create carries it, Verify's Options check validates it at the create, and Reverify checks the option again on the due date (agreed 2026-11-06). Proposed: it travels as the `id` a `PaymentOptionReference` already has, and Verify's answer turns the reference into a `VerifiedPaymentOption` |
+| Reverify's new amount | `ScheduledFullPayment.toAcceptedFullPayment()` takes no amount, but a Statement Balance or Total Balance payment can pay a different amount on its due date (agreed 2026-11-06). Proposed: the move takes the amount Reverify read |
 
 [^ Top](#table-of-contents)
 
@@ -510,14 +534,16 @@ A market profile is one market and one account type. Onboarding picks the Billpa
 | Behavior | Values |
 | --- | --- |
 | `accountType` | `CONSUMER`, `CORPORATE`, `BUSINESS_TRAVEL` |
-| `requiresArPosting` | Y, N or BOTH: the processed payment is posted to AR |
+| `requiresArPosting` | Y, N or BOTH: the processed payment is posted to AR. Product calls it **Good faith credit**: whether the cardmember gets credit for the payment before the money settles, because Billpay tells AR to post the payment while it is still processing |
 | `requiresRealtimeClearing` | Y, N or BOTH: clearing is realtime or batch |
 | `requiresMandateAuthorization` | Y, N or BOTH: Verify, and Reverify on the due date, fetch the payment's mandate details from Plans, and the verification rules check them; a mandate that fails its check declines the payment (agreed 2026-10-18) |
 | `requiresBankConfirmation` | Y, N or BOTH: the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
 
-**BOTH** means required for some journeys and not others. Onboarding stores which journeys get Y, and the Router resolves BOTH to Y or N per journey. For realtime clearing only pay-today payments from channels get Y: every future-dated payment clears in batch, whether it came from a channel or from AR. Future-dated payments never clear in real time. For bank confirmation, BOTH is resolved from the request's payment method: a method that needs the customer to confirm at their bank gets Y. Only consumer payments made today take bank confirmation, and only with one instruction: a request with several instructions that would need bank confirmation gets 422, and so does a Pay & Plan request (agreed 2026-10-18). A future-dated request that would need it gets 422 too: Pay with Bank Transfer and a payment confirmed through Plaid pay today only (agreed 2026-11-06).
+**BOTH** means required for some journeys and not others. Onboarding stores which journeys get Y, and the Router resolves BOTH to Y or N per journey. For realtime clearing only pay-today payments from channels get Y: every future-dated payment clears in batch, whether it came from a channel or from AR. Future-dated payments never clear in real time. For bank confirmation, BOTH is resolved from the request's payment method: a method that needs the customer to confirm at their bank gets Y. Which account types can take bank confirmation is configurable: it is on for consumer payments for now, and business travel can be turned on later without a code change (agreed 2026-11-06). Corporate payments never take it. Until business travel is turned on, its profiles don't offer bank confirmation, so a business travel request whose method needs it is a combination that isn't onboarded and gets 422 (Proposed). Bank confirmation takes only payments made today, and only with one instruction: a request with several instructions that would need bank confirmation gets 422, and so does a Pay & Plan request (agreed 2026-10-18). A future-dated request that would need it gets 422 too: Pay with Bank Transfer and a payment confirmed through Plaid pay today only (agreed 2026-11-06). So does a corporate payment whose payment method needs bank confirmation, such as Pay with Bank Transfer (agreed 2026-11-06).
 
 A debit card's 3D Secure is not one of the five behaviors. Every debit card needs it, so onboarding asks nothing: the Router sets **card authentication** to Y in the resolved profile when the payment method is a debit card, and N otherwise, and stages pick their strategies from it as from a behavior (agreed 2026-10-20 that every debit card needs it; the flag is Proposed). The card provider varies by market ([Operations settings](#operations-settings)).
+
+What a market does choose is which ways to pay it takes, debit cards included, through the instrument types in its verification rule settings, and whether it offers Pay & Plan, through whether the profile takes `CreatePaymentInstallment.v1` (Proposed). Consumer and business travel profiles can take debit cards; a corporate profile can't (agreed 2026-11-06).
 
 A combination that is not onboarded for a market is rejected with 422 before any workflow starts.
 
@@ -550,8 +576,8 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 | Stage | Moves | Varies by |
 | --- | --- | --- |
 | Capture | Input → `PENDING`, with the idempotency check | Nothing |
-| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the provider gives no link. It runs only for bank confirmation or a debit card. `CreatePaymentIntentWorkflow` then waits for the customer (agreed 2026-10-18). For a debit card it starts 3D Secure with the card provider and gets the challenge link, or no link when the issuer needs no challenge; either way the result arrives only through the provider's callback (Proposed, 2026-10-20) | Bank confirmation or card authentication, which pick the request; the provider is a market setting (agreed 2026-10-18) |
-| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED` | Mandate authorization, bank confirmation and card authentication, which decide its checks. What a payment waited for picks nothing, and its commit writes a corporate payment's `ALLOC_REQUEST` row from the account type, as it writes a future-dated payment's `SCHED_EXEC` row from the date (agreed 2026-10-18) |
+| RequestConfirmation | `PENDING`, unchanged: gets the provider's redirect link for the caller, and stores the link and the provider's reference on the payment. `PENDING` → `DECLINED` when the provider gives no link. It runs only for bank confirmation or a debit card, and only once Verify's own checks have passed (agreed 2026-11-06). `CreatePaymentIntentWorkflow` then waits for the customer (agreed 2026-10-18). For a debit card it starts 3D Secure with the card provider and gets the challenge link, or no link when the issuer needs no challenge; either way the result arrives only through the provider's callback (Proposed, 2026-10-20) | Bank confirmation or card authentication, which pick the request; the provider is a market setting (agreed 2026-10-18) |
+| Verify | `PENDING` → `ACCEPTED`, `SCHEDULED` or `DECLINED`; a push payment (inbound) → `ACCEPTED` or `DISALLOWED`. For a payment that waits for its customer it runs in two parts: its own checks at the create, which can only decline, and the bank-side checks after the answer (agreed 2026-11-06) | Mandate authorization, bank confirmation and card authentication, which decide its checks: the Mandate check, the Token check and the Card authorization check (card authentication Proposed, 2026-10-20). Its commit writes a corporate payment's `ALLOC_REQUEST` row from the account type, as it writes a future-dated payment's `SCHED_EXEC` row from the date (agreed 2026-10-18) |
 | Reverify | `SCHEDULED` → `ACCEPTED` or `DECLINED`; a corporate payment from `ALLOCATED` | All four |
 | Execute | `ACCEPTED` → `PROCESSING`; a corporate payment paid today from `ALLOCATED`. A corporate parent only clears, once, and releases its legs, which make the AR and open-to-buy calls. The open-to-buy call first waits for the instrument's clear-text data from Payment Instruments (agreed 2026-10-18). A Pay with Bank Transfer or debit card payment makes no clearing call: its money moved at the bank connection, or at the card authorization (agreed 2026-10-20). It hands One-Data the settlement event Billpay creates instead (Proposed, 2026-10-21) | Account type, AR posting, realtime clearing, bank confirmation, card authentication |
 | Fulfil | `PROCESSING` → `PROCESSED` | Account type |
@@ -569,7 +595,7 @@ After the commit, the workflow calls the stage's announcement: an RTF lifecycle 
 
 Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 
-1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Token check (Payment Instruments again: whether the verification token it holds for the payment's instrument is valid), the Options check (Payment Options) and the Mandate check (Plans, which holds the mandate details). Each check says where it applies, and Verify runs every check that applies to the payment: the Instrument and Options checks everywhere, the Token check with bank confirmation, and the Mandate check where the profile requires mandate authorization ([Resolved profiles and stage lookup](#resolved-profiles-and-stage-lookup), agreed 2026-10-19). A debit card payment runs the Card authorization check (Proposed, 2026-10-20): it reads the 3D Secure result the callback brought, and only once the other checks' rules pass, asks the card provider to authorize the payment. The authorization debits the customer's account if it holds enough money, and the issuing bank declines it if not, so the check runs last: no other rule can decline a payment whose money has moved (agreed 2026-10-20 that the authorization debits the money). A failed 3D Secure result declines the payment without an authorization. In GB, a Pay with Bank Transfer payment also runs GB's Funds check: whether the customer's bank account holds enough money for the payment, and a rule declines a payment the account can't cover (agreed 2026-10-18). The bank-confirmation provider answers it (agreed 2026-10-18). The Funds check stays GB's own until a second market needs it (agreed 2026-10-19). Represent runs checks of its own, still to be defined: see the placeholder below.
+1. **Checks.** A check is one data source plus the rules about its answer: the Instrument check (Payment Instruments), the Token check (Payment Instruments again: whether the verification token it holds for the payment's instrument is valid), the Options check (Payment Options: `ReadPaymentOptionById.v1` in Verify, `ReadPaymentOptions.v1` in Reverify) and the Mandate check (Plans, which holds the mandate details). Each check says where it applies, and Verify runs every check that applies to the payment: the Instrument check everywhere, the Options check wherever the create carries a payment option ID (agreed 2026-11-06), the Token check with bank confirmation, and the Mandate check where the profile requires mandate authorization ([Resolved profiles and stage lookup](#resolved-profiles-and-stage-lookup), agreed 2026-10-19). A debit card payment runs the Card authorization check (Proposed, 2026-10-20): it reads the 3D Secure result the callback brought, and only once the other checks' rules pass, asks the card provider to authorize the payment. The authorization debits the customer's account if it holds enough money, and the issuing bank declines it if not, so the check runs last: no other rule can decline a payment whose money has moved (agreed 2026-10-20 that the authorization debits the money). A failed 3D Secure result declines the payment without an authorization. In GB, a Pay with Bank Transfer payment also runs GB's Funds check: whether the customer's bank account holds enough money for the payment, and a rule declines a payment the account can't cover (agreed 2026-10-18). The bank-confirmation provider answers it (agreed 2026-10-18). The Funds check stays GB's own until a second market needs it (agreed 2026-10-19). Represent runs checks of its own, still to be defined: see the placeholder below.
 2. **Facts.** The checks' calls run in parallel, and their answers go into one read-only `VerificationFacts`, with the payment, the market's rule settings and the time, read once from `Workflow.currentTimeMillis()`. A check that didn't run leaves its part empty. These are the facts Verify passes on to Execute and Fulfil, encrypted in history.
 3. **Rules.** A rule is a pure condition over the facts, built with the Specification pattern: a specification is a named yes/no question about the facts, `Spec<VerificationFacts>`, and specifications combine with `and`, `or` and `not`. A rule has an ID, a decline code, a priority, the steps it runs in, an `appliesTo` like a check's, and two specifications: `runsWhen`, whether the rule makes sense for these facts, such as "the instrument was found", and `passes`, whether the payment passes it. It makes no calls and never reads the clock. Small specifications such as `instrumentFound` and `mandateActive` are written once and shared, and a rule may read more than one check's answer. A rule keeps one decline code, so specifications are combined inside a rule only when one code fits the whole condition (agreed 2026-10-19).
 4. **Evaluation.** A rule registry picks the payment's rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins, so a market can add a rule, or replace a shared one by reusing its ID, without touching shared code. A picked rule is skipped when its `runsWhen` is false, and otherwise passes or fails on `passes`. "Instrument open" runs only when "instrument found" holds, so after "instrument not found" it is skipped, not failed, and there is no list of rule dependencies to keep. The highest-priority failure decides, and the report keeps every rule's result (agreed 2026-10-19).
@@ -582,7 +608,9 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 - An example of rule settings, with illustrative names and values (Proposed, 2026-10-20): GB's consumer release v7 sets `maxPaymentAmount` to 25,000 GBP and `acceptedInstrumentTypes` to `BANK_ACCOUNT` only. They are authored in the Market Onboarding UI's Operations step and frozen with the release. When v7 is active, the Router copies them into the resolved profile as `ruleSettings`, Verify puts them into `VerificationFacts`, and the largest-payment rule fails a 30,000 GBP payment. A payment started on v7 keeps 25,000 even after v8 raises it.
 - A rule's logic changes with a deploy. Worker Versioning keeps a running payment on the rules it started with, and Reverify uses the build and config of the due date, which is what a recheck should use.
 - Nothing inside a check or a rule asks which market or behaviors apply: their `appliesTo` picks them. A rule's `runsWhen` starts with the check it reads, such as `ran(MANDATE)`, so the Mandate check's rules are skipped for a payment that didn't run it. GB's funds rule names GB and bank confirmation in its own `appliesTo`, as `GBFundsCheck` does (agreed 2026-10-19).
-- Verify has one flow, and only its checks vary: the Instrument and Options checks, the Token check for bank confirmation, the Mandate check, and GB's Funds check. Nothing else changes Verify: not what the payment waited for, and not its account type (agreed 2026-10-18).
+- Verify has one flow, and only its checks vary: the Instrument check, the Options check where the create carries an option ID, the Token check for bank confirmation, the Card authorization check for a debit card (Proposed, 2026-10-20), the Mandate check, and GB's Funds check. Its account type changes nothing in Verify (agreed 2026-10-18).
+- A check that moves money, such as the card authorization, runs in a second phase: Verify fetches the other checks and runs their rules first, and only if they pass does it make the money-moving call and run the rules again. The registry still returns strategies sorted by key; Verify splits them into the two phases (Proposed, 2026-10-20).
+- For a payment that waits for its customer, Amex's own checks come before the bank step (agreed 2026-11-06). Verify runs the Instrument, Options and Mandate checks at the create, before RequestConfirmation, and a payment that fails them is `DECLINED` with no redirect or challenge link. After the confirm or the 3D Secure callback, only the checks that need the customer's bank step run: the Token check, GB's Funds check, or the Card authorization check. Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow to the second, which runs the rules again over all of them.
 - The shared checks sit in `core/lib/verification/checks/`, and the shared rules, grouped in `RuleSet` beans with the specifications they use, in `core/lib/verification/rules/`. A market's own checks and rules sit in its module, such as `GBFundsCheck` and GB's funds rule in `market/gb/`. Like stage code, they depend only on activity interfaces (agreed 2026-10-19).
 - Conditions don't change without a deploy for now. If business teams need that later, simple conditions could move into the release as expressions, such as CEL, pinned with the config version. A CEL expression would be one more kind of specification.
 - Every rule takes its decline code from one table, keyed by rule ID. Until product sends the codes, each rule uses the closest code the current app has; when they arrive, only the table changes. A test fails if any rule has no code (agreed 2026-10-19).
@@ -598,7 +626,7 @@ Verify, Reverify and Represent decide the same way (agreed 2026-10-18):
 - Every strategy is a `@Singleton` bean, so Quarkus finds them all at build time and hands each kind over as `@All List<T>`. A **registry** for each kind, written once, works out the winners for every combination of market and behaviors when the app starts, so a lookup at runtime is a map read. Two strategies level for one key stop the app at start, and the error names them and the combination. A registry returns its strategies sorted by key, so a replay makes the same calls in the same order (agreed 2026-10-19).
 - Strategies hold no state. The workflow calls the **stage resolver**, `stageResolver.resolve(profile)`, on its own thread, where Temporal requires activity stubs to be made. The resolver makes the stubs there, picks each step's stage, and binds it to a `StageContext` that holds the resolved profile and the stubs, so workflow code calls `stages.verify.run(paymentId)` and never touches a stub. The worker passes the resolver to each workflow through the factory it registers the workflow with (agreed 2026-10-19).
 - The lookup runs inside the workflow, never in the Router: during a rolling deploy the Router and the workers can run different builds, so only the workflow's own build picks its classes (agreed 2026-10-18).
-- Each step names the behaviors it must act on, such as mandate authorization and bank confirmation for Verify, and the keys it must fill, such as clearing for Execute. A combination can't run where one of those behaviors is Y but no strategy that applies names it, or where one of those keys is empty. From this the registries work out the build's **capability manifest** when the app starts: every combination that every step of its journey can run (agreed 2026-10-19). The onboarding workflow checks each market profile against it. A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
+- Each step names the behaviors it must act on, such as mandate authorization, bank confirmation and card authentication for Verify, and the keys it must fill, such as clearing for Execute. A combination can't run where one of those behaviors is Y but no strategy that applies names it, or where one of those keys is empty. From this the registries work out the build's **capability manifest** when the app starts: every combination that every step of its journey can run (agreed 2026-10-19). The onboarding workflow checks each market profile against it. A combination the build can't run cannot be onboarded, and a request for a combination a market has not onboarded gets 422.
 - A test writes a report: for each step, market and combination, the stage and the strategies it gets. The report is checked in, and the test fails when the build's differs, so a change to what a combination runs is reviewed as a diff (agreed 2026-10-18).
 - Quarkus only sees beans in modules that carry an index, so each module that holds strategies has an empty `META-INF/beans.xml`. A test compares the strategy classes on the classpath with what the registries hold, so a class Quarkus can't see fails the build (agreed 2026-10-19).
 - Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes code under a running payment.
@@ -653,12 +681,12 @@ What the design costs:
 - There is one implementation of each workflow. A workflow gets its stages from the stage resolver and is never copied per market.
 - Activities are shared across markets. Pass IDs, not payment objects; activities load what they need. The one exception is data from Payment Options and Payment Instruments: what a stage gets there, clear text included, travels in the workflow to the later calls of the same run that need it, such as Execute's and Fulfil's. Workflow history holds it encrypted by the payload codec (agreed 2026-10-18).
 - A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle. Nothing is written before the workflow starts, so the caller's path has no extra database call. From Capture on, stages pass the ID. A workflow that a Work Tracker row starts takes the payment ID, since the payment is already in Oracle (agreed 2026-10-18).
-- Set search attributes once, at start. No signals or queries on the hot path: what a caller sends a running workflow, the confirm and the no, goes in as an update, which answers the caller (agreed 2026-10-18).
+- Set search attributes once, at start. No signals or queries on the hot path: what a caller sends a running workflow, the confirm, the no and the 3D Secure callback, goes in as an update, which answers the caller (agreed 2026-10-18).
 - Every HTTP call carries an idempotency key such as `{paymentId}-{step}`. Every Oracle write is insert-if-absent or a conditional update on the current state, because local activities run again if a worker dies mid-task and any activity can be retried after a timeout even when its call went through.
 
 ### Retries and timeouts
 
-- **Business failures** found by Verify or Reverify (closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, a mandate that fails its check) are non-retryable. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
+- **Business failures** found by Verify or Reverify (closed account, insufficient funds, an amount above the customer's AR balance, which Payment Options refuses, a payment option that no longer holds, a mandate that fails its check) are non-retryable. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops.
 - **429 with Retry-After:** throw `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus a little jitter. Temporal uses it in place of the retry policy's interval for that attempt.
 - **Other errors:** retry from 1 s, doubling, capped at 60 s, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED` and the payment goes onto the exception list in its last state. Operations resolve each one by hand: someone reprocesses the payment's workflow, or terminates it (agreed 2026-10-18).
 - **RTF and Raven** get a long schedule-to-close, like `PaymentStore`. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
@@ -699,7 +727,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 - **A repeated create.** While `{paymentId}-init` runs, a repeat joins it (conflict policy `USE_EXISTING`). Once the run has closed, a repeat starts a new run under the default reuse policy, `ALLOW_DUPLICATE`, and Capture's idempotency check finds the payment. If it is still `PENDING` with nothing waiting on it, because the last run died before deciding, the new run carries on with the next stage, so the payment isn't stuck. Otherwise the run returns the payment as it stands and ends, so no stage runs twice; a payment that waits for a confirmation comes back with its link. Either way the run calls the delete once the payment is decided. Workflows and activities are idempotent, so this needs no special reuse policy (agreed 2026-10-18).
 - **A late create.** Nothing is declined for arriving late. One-Data stamps each create with the customer's submit date, which is the payment date. A scheduled payment that lands on its date runs that day as pay today; one that lands after its date runs when it lands and keeps its scheduled date (agreed 2026-10-19). A payment whose amount Verify works out uses the balance as of the submit date, if Payment Options can give a balance as of a past date (agreed 2026-10-19).
-- **A market taken out of service.** A held create that arrives after its market was taken out of service is captured and declined, so the customer is told and the delete runs (agreed 2026-10-18). The Router starts its workflow with a plan that only captures and declines, and Verify declines it (agreed 2026-10-19).
+- **A market taken out of service.** A held create that arrives after its market was taken out of service is captured and declined, so the customer is told and the delete runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19).
 
 ### Core workflows
 
@@ -708,10 +736,10 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 > `{paymentId}-init` · Online · Update-With-Start from channels, Temporal's early-return pattern
 
 - **Early return:** the caller's Update-With-Start lands on the workflow's update method, which returns Verify's decision as soon as it is committed. The workflow carries on with Execute and Fulfil, with nobody waiting (agreed 2026-10-18).
-- **The decision in the first workflow task:** on the Online cluster, Capture, Verify's calls to Payment Instruments, Payment Options and Plans, and Verify's commit all run as local activities. The decision is made, and the caller answered, inside the workflow's first task, with no task round trip (agreed 2026-10-18). Execute's and Fulfil's calls stay regular activities. A Verify call that fails 3 times as a local activity is made again as a regular activity on `online-wf`, for up to 24 hours, and the caller gets `PENDING` at 2.5 s (agreed 2026-10-19).
+- **The decision in the first workflow task:** on the Online cluster, Capture, Verify's calls to Payment Instruments, Payment Options (`ReadPaymentOptionById.v1`) and Plans, and Verify's commit all run as local activities. The decision is made, and the caller answered, inside the workflow's first task, with no task round trip (agreed 2026-10-18). Execute's and Fulfil's calls stay regular activities. A Verify call that fails 3 times as a local activity is made again as a regular activity on `online-wf`, for up to 24 hours, and the caller gets `PENDING` at 2.5 s (agreed 2026-10-19).
 - **Input:** the request, in the start operation. Nothing is written to Oracle before the workflow starts (agreed 2026-10-18).
 - **Capture:** `PENDING`: writes the request with insert-if-absent, which is the idempotency check. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`).
-- **Verify:** `ACCEPTED` or `DECLINED`, in one guarded commit. The caller's update returns here. It calls Payment Instruments and Payment Options in parallel, and Plans too where the profile requires mandate authorization, then runs the [verification rules](#verification-rules) over the answers; a failed rule means `DECLINED` with its decline code (agreed 2026-10-18).
+- **Verify:** `ACCEPTED` or `DECLINED`, in one guarded commit. The caller's update returns here. It calls Payment Instruments, and Payment Options' `ReadPaymentOptionById.v1` with the create's option ID, in parallel, and Plans too where the profile requires mandate authorization, then runs the [verification rules](#verification-rules) over the answers; a failed rule means `DECLINED` with its decline code (agreed 2026-10-18).
 - If `DECLINED`, the workflow sends the `DECLINED` event and message, then ends.
 - **Execute:** `PROCESSING`. Clearing, AR and OTB run in parallel, varied by account type, AR posting and realtime clearing. OTB first waits for an `InstrumentActivities` call that fetches the instrument's clear-text data; clearing and AR don't wait for it (agreed 2026-10-18).
 - **Fulfil:** `PROCESSED`. Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier run in parallel; then the RTF event and the Raven message; then the commit. TFNE, the Transaction Notification Engine, and GPHDB, the legacy Payments History Database, are legacy downstreams told when a payment moves from `PROCESSING` to `PROCESSED`, and B2Notifier is a downstream notification system that tells other downstream systems; `PROCESSED` waits for all three, and all three take the clear-text data Execute fetched (agreed 2026-10-18). Comms go last, so the customer hears only once everything else has succeeded.
@@ -723,7 +751,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 > `{paymentId}-init` · Online from channels (Update-With-Start), Offline from AR (started by the AR intake dispatcher)
 
-- **Capture**, then **Verify**: `SCHEDULED` or `DECLINED`.
+- **Capture**, then **Verify**: `SCHEDULED` or `DECLINED`. A create from a channel has its option ID validated through `ReadPaymentOptionById.v1`, as for pay today (agreed 2026-11-06).
 - The `SCHEDULED` commit writes the `SCHED_EXEC` row; for a corporate payment, an `ALLOC_REQUEST` row instead, due at its fetch time.
 - Reply, send the `SCHEDULED` event and message, then close. Nothing waits in Temporal until the due date.
 
@@ -731,7 +759,7 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 > `{paymentId}-execute` · Offline · started through the Router, with today's config, by the scheduled-payments dispatcher; for a corporate payment, scheduled or paid today, by the allocated-payments dispatcher
 
-- **Reverify:** `ACCEPTED` or `DECLINED`. Its guard (`SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`, or `'ALLOCATED'` for a corporate payment) means a cancel and the execution can never both win. A corporate payment paid today skips Reverify: Verify passed it minutes earlier. Where the profile requires mandate authorization, Reverify fetches the mandate details from Plans again, and the same rules check them; a failed rule means `DECLINED` (agreed 2026-10-18).
+- **Reverify:** `ACCEPTED` or `DECLINED`. Its guard (`SET status = 'ACCEPTED' WHERE status = 'SCHEDULED'`, or `'ALLOCATED'` for a corporate payment) means a cancel and the execution can never both win. A corporate payment paid today skips Reverify: Verify passed it minutes earlier. Where the profile requires mandate authorization, Reverify fetches the mandate details from Plans again, and the same rules check them; a failed rule means `DECLINED` (agreed 2026-10-18). Where the payment carries an option ID, Reverify's Options check calls `ReadPaymentOptions.v1`: if the customer no longer owes money, or the chosen option no longer holds, the payment is `DECLINED`. A Statement Balance or Total Balance payment takes the amount the option gives that day (agreed 2026-11-06).
 - **Execute**, then **Fulfil**, as for pay today.
 - **Corporate:** Execute clears once, at payment level, and makes no AR or open-to-buy call; its commit marks the legs released, and the leg dispatcher then writes and starts them. There is no Fulfil.
 - The last commit marks its Work Tracker row, `SCHED_EXEC` or `ALLOC_EXEC`, `DONE`, or `FAILED` when retries run out.
@@ -803,12 +831,13 @@ A create can reach billpay-core more than once, or late: One-Data holds it while
 
 A create that needs the customer to confirm their bank details, or that pays by debit card, runs as this one workflow from the create to its end, so the whole wait shows in one history in the Temporal UI. It replaces the confirm workflow, the `CONFIRM_EXPIRY` Work Tracker row and the confirmation-expiry dispatcher (agreed 2026-10-18).
 
-- **Capture**. Then, for bank confirmation, **RequestConfirmation** asks the market's provider for the customer's redirect link, with one try that fits inside the API's wait, and stores the link and the provider's reference on the payment (agreed 2026-10-18). The caller's update returns `PENDING` with the link, and the `PENDING` event goes out. If the provider gives no link, because it is down or too slow, the payment is `DECLINED` instead, and the workflow ends after its announcement. The money moves at the bank, during the customer's bank connection, so Execute makes no clearing call for Pay with Bank Transfer (agreed 2026-10-20; it replaces the 2026-10-18 note that the provider never moves money).
+- **Capture**. Then **Verify's own checks**, before the bank step: the Instrument, Options and Mandate checks that apply, as local activities in the same first task. A payment that fails them is `DECLINED` in one commit guarded on `PENDING`: the caller's update returns `DECLINED`, with no link, and the workflow ends after its announcement and the delete. A payment that passes stays `PENDING`, and nothing is committed (agreed 2026-11-06).
+- Then, for bank confirmation, **RequestConfirmation** asks the market's provider for the customer's redirect link, with one try that fits inside the API's wait, and stores the link and the provider's reference on the payment (agreed 2026-10-18). The caller's update returns `PENDING` with the link, and the `PENDING` event goes out. If the provider gives no link, because it is down or too slow, the payment is `DECLINED` instead, and the workflow ends after its announcement. The money moves at the bank, during the customer's bank connection, so Execute makes no clearing call for Pay with Bank Transfer (agreed 2026-10-20; it replaces the 2026-10-18 note that the provider never moves money).
 - **The wait:** a durable timer for the market's confirmation window plus a grace of 10 s, so a confirm sent at the last moment still lands (agreed 2026-10-19). Nothing else runs while the workflow waits.
-- **The confirm:** `POST /payments/{payment-id}/confirm` sends the `confirm` update with the update ID `{paymentId}-confirm`, so a repeated confirm attaches to the same update and gets the same answer. The update's validator turns a confirm away once the workflow has an answer or no longer waits, which writes nothing to history, and the API answers 409. Verify runs the checks the payment's behaviors pick, as for any payment: with bank confirmation, the Token check below (agreed 2026-10-18).
+- **The confirm:** `POST /payments/{payment-id}/confirm` sends the `confirm` update with the update ID `{paymentId}-confirm`, so a repeated confirm attaches to the same update and gets the same answer. The update's validator turns a confirm away once the workflow has an answer or no longer waits, which writes nothing to history, and the API answers 409. Verify then runs only the checks that need the bank step, since the others ran at the create: with bank confirmation, the Token check below (agreed 2026-10-18; only those, 2026-11-06).
 - **Verify:** `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING`. The confirm's update returns here: the same early return as the create's. The provider has already verified the customer's bank details, so Verify doesn't ask it about them. Before it accepts the payment, Verify's Token check asks Payment Instruments whether the verification token it holds for the payment's instrument is valid, to guard against fraud (agreed 2026-10-17). Payment Instruments decides what makes a token valid (agreed 2026-10-18). A payment without a valid token is `DECLINED` (agreed 2026-10-18). In GB, GB's Funds check also asks the provider whether the customer's bank account holds enough money for the payment, and a rule declines the payment if not (agreed 2026-10-18).
-- Then **Execute** and **Fulfil**, as for pay today, in the same workflow. A corporate one stops at `ACCEPTED` with its `ALLOC_REQUEST` row, as in its usual journey. Every payment this workflow runs is paid today: bank confirmation and debit cards take no later date, and the go-ahead that once brought scheduled payments here is gone (agreed 2026-10-21).
-- **A debit card** (agreed 2026-10-20 unless marked): RequestConfirmation's 3D Secure request asks the market's card provider (Checkout.com in the UK) to authenticate the card, and gives it Billpay's callback URL, `POST /payments/{payment-id}/authentication` (Proposed). When the issuer wants a challenge, such as a one-time code or a banking-app approval, the provider returns the challenge link, and the caller's update returns `PENDING` with it. When it needs none, the reply is `PENDING` with no link, and the callback follows on its own (Proposed). Either way the workflow waits for the callback on a timer of 2 minutes plus the 10 s grace. The callback is the `authenticated` update, with the update ID `{paymentId}-authentication`, so a repeated callback attaches to the same update (Proposed). The provider calls billpay-core directly, not through One-Data. Verify then runs the usual checks, and last the Card authorization check: the card provider authorizes the payment with the 3D Secure result, and the authorization debits the customer's account if it holds enough money; the issuing bank declines it if not, and a failed authentication declines the payment with no authorization. `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING`, and the callback's update returns here. Execute makes no clearing call, since the money has moved; it hands One-Data the settlement event instead, and Fulfil follows. With no callback in time, the timer runs Cancel, as for a bank confirmation. A debit card pays today only, with one instruction, and never with MR Points; a request that breaks this gets 422 before any workflow starts.
+- Then **Execute** and **Fulfil**, as for pay today, in the same workflow. No corporate payment runs here: corporate payments take neither bank confirmation nor a debit card (agreed 2026-11-06). Every payment this workflow runs is paid today: bank confirmation and debit cards take no later date, and the go-ahead that once brought scheduled payments here is gone (agreed 2026-10-21).
+- **A debit card** (agreed 2026-10-20 unless marked): RequestConfirmation's 3D Secure request asks the market's card provider (Checkout.com in the UK) to authenticate the card, and gives it Billpay's callback URL, `POST /payments/{payment-id}/authentication` (Proposed). When the issuer wants a challenge, such as a one-time code or a banking-app approval, the provider returns the challenge link, and the caller's update returns `PENDING` with it. When it needs none, the reply is `PENDING` with no link, and the callback follows on its own (Proposed). Either way the workflow waits for the callback on a timer of 2 minutes plus the 10 s grace. The callback is the `authenticated` update, with the update ID `{paymentId}-authentication`, so a repeated callback attaches to the same update (Proposed). The provider calls billpay-core directly, not through One-Data. Verify's own checks ran at the create, before 3D Secure (agreed 2026-11-06), so Verify now runs only the Card authorization check: the card provider authorizes the payment with the 3D Secure result, and the authorization debits the customer's account if it holds enough money; the issuing bank declines it if not, and a failed authentication declines the payment with no authorization. `ACCEPTED` or `DECLINED`, in one commit guarded on `PENDING`, and the callback's update returns here. Execute makes no clearing call, since the money has moved; it hands One-Data the settlement event instead, and Fulfil follows. With no callback in time, the timer runs Cancel, as for a bank confirmation. A debit card pays today only, with one instruction, and never with MR Points; a request that breaks this gets 422 before any workflow starts.
 - **The no:** `DeletePayment.v1` sends the `decline` update with the update ID `{paymentId}-no`. Cancel moves the payment from `PENDING` to `CANCELLED`, guarded on `PENDING`, with no window check. A no and a yes from two tabs are two updates to one workflow: the first one it accepts wins, and the validator turns the other away with 409. A repeated no gets `CANCELLED` again (agreed 2026-10-18).
 - **The timer:** when it fires with no answer, Cancel moves the payment to `CANCELLED`, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven, as for any cancel. The workflow never relies on a terminate or an execution timeout: either would leave the payment `PENDING`, with nobody told.
 - **A timer handled late:** the server fires a timer on time, and a worker normally handles it within about a second. One handled more than a minute late means the Online cluster or its workers were down. A customer who confirmed during the outage was answered `PENDING`, because One-Data held the confirm. The workflow then gives the customer one more confirmation window before it cancels, and the held confirm lands in it (agreed 2026-10-19). It reads the workflow clock, so a replay decides the same way.
@@ -826,7 +855,7 @@ A create that needs the customer to confirm their bank details, or that pays by 
 
 > `{paymentId}-init` · Online · Update-With-Start; their children run on the same cluster
 
-1. **Pay & Plan (Create Payment & Installments):** `CreateImmediatePaymentWorkflow` as a child, then the Installments API, then an optional Autopay update. It never takes bank confirmation: a request that would need it gets 422 before any workflow starts (agreed 2026-10-18).
+1. **Pay & Plan (Create Payment & Installments):** `CreateImmediatePaymentWorkflow` as a child, then the Installments API, then an optional Autopay update. It never takes bank confirmation or a debit card: a request that would need either gets 422 before any workflow starts (agreed 2026-10-18; the debit card 2026-11-06).
 2. **Multiple instructions** (`CreatePaymentWithMultipleInstructionsWorkflow`): validates the composite payment, then runs one `CreateImmediatePaymentWorkflow` per instruction. It never takes bank confirmation or a debit card: a request that would need either gets 422 before any workflow starts (agreed 2026-10-18; the debit card 2026-10-20). To the customer, several instructions are a bank account plus MR Points, paid today (agreed 2026-10-20).
 3. **Pay with MR Points:** a create whose one instruction is MR Points, across Billpay and Loyalty, paid today only (agreed 2026-10-20). Its children and its calls to Loyalty are still to be defined ([Open Items](#open-items)).
 
@@ -926,13 +955,17 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
         stages.capture.run(request)                                    // PENDING: the request
-        decided = stages.requestConfirmation.run(paymentId)            // PENDING with the bank's link, the card's
+        val own = stages.verify.ownChecks(paymentId)                   // Amex's checks first: Instrument, Options,
+                                                                       // Mandate; DECLINED in one commit on a failure
+        decided = if (own.decision == PaymentDecision.DECLINED) own.decision
+                  else stages.requestConfirmation.run(paymentId)       // PENDING with the bank's link, the card's
                                                                        // challenge link or none; or DECLINED
         waiting = decided == PaymentDecision.PENDING
         stages.capture.announce(paymentId)                             // the reply goes out with this task
         if (!waiting) {
             inbox.deletePending(paymentId)                             // decided: the account's entry goes
-            return stages.requestConfirmation.announce(paymentId)
+            return if (own.decision == PaymentDecision.DECLINED) stages.verify.announce(paymentId)
+                   else stages.requestConfirmation.announce(paymentId)
         }
         Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // One-Data keeps the entry;
                                                                        // the wait doesn't wait for this call
@@ -945,8 +978,8 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         waiting = false                                                // the validators turn answers away now
 
         if (answer == Answer.YES) {
-            val verified = stages.verify.run(paymentId, authentication) // ACCEPTED or DECLINED; for a debit card,
-            result = verified.decision                                 // its authorization debits the money last
+            val verified = stages.verify.bankChecks(paymentId, own, authentication) // only the bank side: the Token
+            result = verified.decision                                 // check, GB's Funds, or the card authorization
             inbox.deletePending(paymentId)                             // decided: the account's entry goes
             stages.verify.announce(paymentId)
             if (result == PaymentDecision.ACCEPTED && profile.accountType != AccountType.CORPORATE) {
@@ -1026,7 +1059,7 @@ One activity interface per system, each on that system's task queue, with one ex
 | --- | --- | --- | --- |
 | `PaymentStore` | Oracle | Local activity | Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update |
 | `InstrumentActivities` | Payment Instruments | Verify's calls on the Online cluster: a local activity (agreed 2026-10-18). Otherwise the workflow's queue: Payment Instruments has no rate limit | Verify, Reverify; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call (agreed 2026-10-18) |
-| `OptionsActivities` | Payment Options | Verify's calls on the Online cluster: a local activity (agreed 2026-10-18). Otherwise the workflow's queue: Payment Options has no rate limit | Verify, Reverify |
+| `OptionsActivities` | Payment Options: `ReadPaymentOptionById.v1` and `ReadPaymentOptions.v1` | Verify's calls on the Online cluster: a local activity (agreed 2026-10-18). Otherwise the workflow's queue: Payment Options has no rate limit | Verify, to validate the create's option ID through `ReadPaymentOptionById.v1`; Reverify, through `ReadPaymentOptions.v1`, to confirm the customer still owes and the option still holds (agreed 2026-11-06) |
 | `PlansActivities` | Plans, which holds the payment's mandate details; the verification rules check them where the profile requires mandate authorization (agreed 2026-10-18) | Like Payment Instruments and Payment Options: a local activity in Verify on the Online cluster, otherwise the workflow's queue (agreed 2026-10-18) | Verify and Reverify (agreed 2026-10-18) |
 | `ClearingActivities` | MR/M3 | `ds-clearing` | Execute (payment level, and consumer legs), except for Pay with Bank Transfer and a debit card, which have no clearing (agreed 2026-10-20); Represent; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
 | `ReceivablesActivities` | Accounts Receivable (GAR) | `ds-receivables` | Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state |
@@ -1046,12 +1079,13 @@ One activity interface per system, each on that system's task queue, with one ex
 
 `PaymentStore` is the only code that reads or writes Oracle. Each operation is one transaction:
 
-- **Capture:** insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, from the request the workflow was started with. A duplicate means the request was seen before.
+- **Capture:** insert-if-absent into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, `idempotency_checker`, from the request the workflow was started with. A duplicate means the request was seen before.
 - **A stage commit:** the guarded status update, the timeline entry with the cluster, and any Work Tracker rows the step creates or closes.
 - **Writing legs:** a batch's split rows in 1,000-row array inserts, each with its `ALLOC_LEG` row, in the transaction that records on the batch when its legs were written, so each batch is written once.
 - **Bank confirmation or 3D Secure:** the redirect or challenge link and the provider's reference, guarded on `PENDING`.
 - **Cancel:** the guarded update to `CANCELLED` and the cancellation of the payment's Work Tracker rows.
 - **Mapping a replacement:** the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
+- **Giving up:** the Work Tracker row to `FAILED`, and the payment or leg whose retries ran out onto `exception_list` in the status it stopped in.
 - **Settle:** a batch of inbox rows, sent as JDBC batches in one transaction. Each row is a guarded update, `PROCESSED` → `PAID` with `stlmt_ts` and `ar_pstd_ts`: on `trans_dtl` for a payment, or on `split_trans_dtl` for a leg (an ID with `_{seq}`). Wherever the update count is 1, a `PAID` row tagged with the batch ID goes into that table's timeline. Then it reads back the payments and legs whose timeline row carries the batch ID. A row is `UNMATCHED` if its payment or leg isn't `PAID` afterwards.
 - **Reads:** loading the fields an activity or stage needs, by ID.
 
@@ -1076,12 +1110,12 @@ On the Online cluster, the decision's calls run as local activities, and the oth
 
 > One-Data function → Billpay core API → Billpay Router → workflow → stages → activities → clients
 
-Between the core APIs and the workflows sits the Billpay Router. For every row below except settlement and AR posting, which are not routed, it does the same six steps: **admit, pick the journey, resolve behaviors, pin the resolved profile, choose the run site, start.** The confirm, and the no to a payment that waits, are only admitted: they are updates to a workflow that is already running, so there is nothing to pick, pin or choose (agreed 2026-10-18).
+Between the core APIs and the workflows sits the Billpay Router. For every row below except settlement, AR posting and the reads, which are not routed, it does the same six steps: **admit, pick the journey, resolve behaviors, pin the resolved profile, choose the run site, start.** The confirm, the no to a payment that waits, and the card provider's 3D Secure callback are only admitted: they are updates to a workflow that is already running, so there is nothing to pick, pin or choose (agreed 2026-10-18; the callback 2026-10-20).
 
 | One-Data function | Core API | Router: journey and start | Workflows | Children and follow-ups |
 | --- | --- | --- | --- | --- |
 | `CreatePayment.v3` | `POST /payments` | Today, one instruction; Update-With-Start | `CreateImmediatePaymentWorkflow` (Online) | Consumer: `ExecuteSplitPaymentWorkflow` children (Online). Corporate: `RequestAllocationsWorkflow`, `ReceiveAllocationsWorkflow`, `ExecuteScheduledPaymentWorkflow` and one `ExecuteSplitPaymentWorkflow` per leg, each started by a dispatcher (Offline) |
-| | | Needs bank confirmation, or pays by debit card; Update-With-Start | `CreatePaymentIntentWorkflow` (Online) | None: the confirm and the no arrive as updates, and Execute and Fulfil run in the same workflow (agreed 2026-10-18) |
+| | | Needs bank confirmation, or pays by debit card; Update-With-Start | `CreatePaymentIntentWorkflow` (Online) | None: the confirm, the no and the 3D Secure callback arrive as updates, and Execute and Fulfil run in the same workflow (agreed 2026-10-18; the callback 2026-10-20) |
 | | | Today, several instructions; Update-With-Start | `CreatePaymentWithMultipleInstructionsWorkflow` (Online) | One `CreateImmediatePaymentWorkflow` per instruction |
 | | | Today, MR Points as the one instruction; Update-With-Start (agreed 2026-10-20) | Pay with MR Points composite (Online) | Still to be defined |
 | | | Future-dated; Update-With-Start | `CreateScheduledPaymentWorkflow` (Online), then `ExecuteScheduledPaymentWorkflow` on the due date (Offline) | Consumer: as for pay today, on the Offline cluster. Corporate: `RequestAllocationsWorkflow` and `ReceiveAllocationsWorkflow` first, then the execution and one `ExecuteSplitPaymentWorkflow` per leg, each started by a dispatcher |
@@ -1091,6 +1125,9 @@ Between the core APIs and the workflows sits the Billpay Router. For every row b
 | None: the card provider calls billpay-core directly | `POST /payments/{payment-id}/authentication` | `PENDING`, waiting for a debit card's 3D Secure; an update (agreed 2026-10-20) | The payment's `CreatePaymentIntentWorkflow` (Online) | |
 | `CreatePaymentInstallment.v1` | `POST /payment-installments` | Pay & Plan; Update-With-Start | Pay & Plan composite (Online) | `CreateImmediatePaymentWorkflow` |
 | `CreateCreditBalanceRefund.v1` | `POST /refunds` | From a channel; Update-With-Start | `CreateBalanceRefundWorkflow` (Online) | |
+| `ReadPayments.v1` | `GET /payments/account/{account-id}` | Not routed: a read. One-Data reads Redis too and removes duplicates | None | |
+| `ReadPaymentEventsById.v1` | `GET /payments/{payment-id}` | Not routed: a read (agreed 2026-11-06) | None | |
+| `ReadBillpayInstruments.v1` | `GET /instruments/account/{account-id}?source={source}` (path Proposed) | Not routed: a read (agreed 2026-11-05) | None | |
 | `CreateBillpayTransactionFromAccountsReceivable.v1` (payment) | None: stored in One-Data's inbox | Future-dated from AR; the AR intake dispatcher calls the Router | `CreateScheduledPaymentWorkflow` (Offline), then `ExecuteScheduledPaymentWorkflow` on the due date | As for any scheduled payment |
 | `CreateBillpayTransactionFromAccountsReceivable.v1` (refund) | None: stored in One-Data's inbox | A refund AR raises; the AR intake dispatcher calls the Router | `CreateBalanceRefundWorkflow` (Offline) | |
 | `CreateMoneyMovementEventHandler.v1` (return) | None: stored in One-Data's inbox | A return; the returns dispatcher calls the Router | `ProcessReturnedPaymentWorkflow` (Offline) | A `REPRESENT` row; `ProcessRepresentmentWorkflow` on its date (Offline) |
@@ -1129,10 +1166,10 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 ### The Router's six steps
 
 1. **Admit.** The market, account type and API must be live in this environment, checked against billpay-core's in-memory copy of the onboarding config, so admission adds no call; if not, 422, which senders don't retry, and a dispatcher marks a pulled request `REJECTED`. A held create that arrives after its market was taken out of service is captured and declined instead ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)). A Work Tracker row is refused only if its market was taken out of service after the row was written: its dispatcher marks it `FAILED`, which raises the retries-exhausted alert. An async start must be inside its traffic class's budget; if not, 429 with `Retry-After`. Dispatchers are already paced by the governor, so their starts never get 429.
-2. **Pick the journey** from the routing table. Proposed (2026-10-20): each request type names its own journey, so no central `when` maps requests to journeys. `RouteRequest` is a sealed interface with `journey(version)`, and a new request type doesn't compile until it names one. A Work Tracker item type and an inbox request type each carry their journey as an enum property. A create is the one request with conditions: an ordered list of `JourneyRule`s decides it, and the first that matches wins: waits for the customer, then future-dated, then several instructions, then MR Points alone (placed here 2026-10-20, Proposed), then pay today. A future-dated create with MR Points, or one with MR Points where the market doesn't offer them, gets 422 at admission (Proposed, 2026-10-20). A test writes the routing table from the code, trigger, condition and journey, and compares it with a checked-in copy, so the code and this table can't drift. A create that waits for the customer, for bank confirmation or a debit card's 3D Secure, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18; the debit card 2026-10-20). A debit card create that is future-dated, has several instructions or carries MR Points gets 422 at admission (agreed 2026-10-20). A create on an account with a payment already `PENDING` never reaches the Router: One-Data declines it ([Held creates and the pending check](#held-creates-and-the-pending-check), agreed 2026-10-21).
-3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule.
-4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes can apply, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window (agreed 2026-10-18).
-5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID, held in a `RunSite` (named 2026-10-20; it was `Placement`). While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue.
+2. **Pick the journey** from the routing table. Proposed (2026-10-20): each request type names its own journey, so no central `when` maps requests to journeys. `RouteRequest` is a sealed interface with `journey(version)`, and a new request type doesn't compile until it names one. A Work Tracker item type and an inbox request type each carry their journey as an enum property. A create is the one request with conditions: an ordered list of `JourneyRule`s decides it, and the first that matches wins: waits for the customer, then future-dated, then several instructions, then MR Points alone (placed here 2026-10-20, Proposed), then pay today. A future-dated create with MR Points, or one with MR Points where the market doesn't offer them, gets 422 at admission (Proposed, 2026-10-20). A test writes the routing table from the code, trigger, condition and journey, and compares it with a checked-in copy, so the code and this table can't drift. A create that waits for the customer, for bank confirmation or a debit card's 3D Secure, takes `CreatePaymentIntentWorkflow` (agreed 2026-10-18; the debit card 2026-10-20). A debit card create that is future-dated, has several instructions or carries MR Points gets 422 at admission (agreed 2026-10-20), and so does a corporate one (agreed 2026-11-06). A corporate create whose payment method needs bank confirmation gets 422 too, and so does a Pay & Plan request that would need bank confirmation or pays by debit card (agreed 2026-11-06; bank confirmation 2026-10-18). A create on an account with a payment already `PENDING` never reaches the Router: One-Data declines it ([Held creates and the pending check](#held-creates-and-the-pending-check), agreed 2026-10-21).
+3. **Resolve behaviors** from the market's active config. A behavior set to BOTH becomes Y or N by the market's journey rule. For a debit card the Router also sets card authentication to Y (Proposed, 2026-10-20).
+4. **Pin the resolved profile:** the market, the journey, the resolved behaviors and the config version (the market is there so a market's own classes can apply, agreed 2026-10-18), plus the market's rule settings from that version, as values, for the verification rules, and for a payment that waits for the customer, its confirmation window, or for a debit card its 2-minute authentication window and card authentication (agreed 2026-10-18; the card Proposed, 2026-10-20).
+5. **Choose the run site:** cluster, task queue, priority, fairness key and workflow ID, held in a `RunSite` (named 2026-10-20; it was `Placement`). While a cutoff run caps Online on a downstream, an Online journey's calls to it are placed on the capped queue. Proposed: the capped queues travel into the workflow in the run site, as `cappedQueues`, and the stages build their activity options from them.
 6. **Start** with the journey's start mode.
 
 ### Start modes
@@ -1140,12 +1177,12 @@ The Billpay Router is a library inside the core APIs and the dispatchers. It dec
 | When | Start | Reply | Used by |
 | --- | --- | --- | --- |
 | A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | The update's result: PENDING, ACCEPTED, SCHEDULED, DECLINED or CANCELLED. The API waits at most 2.5 s; a payment not decided by then is answered PENDING and finishes on its own | Pay today, schedule, a payment that waits for the customer, composites, update, cancel, refunds from channels |
-| A caller answers a waiting payment | An update to its running `CreatePaymentIntentWorkflow` | The update's result: ACCEPTED, SCHEDULED, DECLINED or CANCELLED; 409 once the workflow no longer waits. The same 2.5 s wait, then PENDING | The confirm, and the customer's no (agreed 2026-10-18) |
+| A caller answers a waiting payment | An update to its running `CreatePaymentIntentWorkflow` | The update's result: ACCEPTED, DECLINED or CANCELLED; 409 once the workflow no longer waits. The same 2.5 s wait, then PENDING | The confirm, the customer's no, and the card provider's 3D Secure callback (agreed 2026-10-18; the callback 2026-10-20) |
 | Nobody waits | One-Data stores the request; a dispatcher pulls it from the inbox and starts it through the Router | AR intake and inbound: 202 from One-Data, once stored. A return arrives as an event | AR intake (payments and refunds), returns, inbound |
 | An allocation callback | Async start; the workflow exists before we reply | 202; 429 with `Retry-After` over budget | Allocation callbacks |
 | Due on a date, or a big fan-out | A Work Tracker row in the producer's commit; a dispatcher starts it through the Router | None | Scheduled execution, allocation requests, corporate execution, corporate legs, representments |
 
-- PENDING in a reply means the payment is captured but not yet decided; the caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, PENDING comes with the provider's redirect link, and the confirm's reply carries the decision. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits (agreed 2026-10-18).
+- PENDING in a reply means the payment is captured but not yet decided; the caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, PENDING comes with the provider's redirect link, and the confirm's reply carries the decision. For a debit card, PENDING comes with the challenge link, or none, and the card provider's callback brings the decision; the channel learns it from the payment's state. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits (agreed 2026-10-18).
 - A create from a channel repeated after its `{paymentId}-init` run has closed starts a new run under the default reuse policy, and Capture's idempotency check decides whether it carries on ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice), agreed 2026-10-18).
 - Update-With-Start is Temporal's early-return pattern: the update returns the decision, and the workflow carries on with the rest of the journey, with nobody waiting (agreed 2026-10-18).
 - The request is the start input: the Router puts it in the start operation, and Capture writes it inside the first workflow task. Nothing writes to Oracle before a workflow starts, so the caller's path has no extra database call (agreed 2026-10-18).
@@ -1502,7 +1539,7 @@ A corporate payment fetches its allocations before it moves money, and no workfl
 
 - **Intake.** Verify's commit writes an `ALLOC_REQUEST` row: due at once for pay today (`ACCEPTED`), or at the market's fetch time for a scheduled payment (`SCHEDULED`). Fetch timing is a market setting: on the due date, or a set number of hours or days before it. The intake workflow ends there and starts nothing.
 - **Request.** The allocation-request dispatcher starts `RequestAllocationsWorkflow`. It moves the payment to `ALLOCATING` with a guarded update, asks the allocations manager, and ends; no workflow waits for the answer. The guard races a cancel the way Reverify does: one wins, and a payment cancelled first is never asked about. From here a cancel or an update gets 409.
-- **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`), once or several times, with batches numbered per payment. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch and writes no legs. Once the batches add up to the payment amount, one guarded commit moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row: due at once for pay today, or at the execution time on the due date for a scheduled payment (at once, if that time has passed).
+- **Receive.** The allocations manager calls `POST /payments/{payment-id}/allocations` through One-Data (`CreatePaymentAllocations.v1`), once or several times, with batches numbered per payment. The callback is agreed as designed, and allocations never change once they have arrived (agreed 2026-10-17); its full contract, idempotency rules included, is still to be agreed with the allocations manager. The API stores each batch in `allocation_batch`, starts `ReceiveAllocationsWorkflow` with only the payment ID and batch number, and replies 202. The workflow checks the batch and writes no legs. Once the batches add up to the payment amount, one guarded commit moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row: due at once for pay today, or at the execution time on the due date for a scheduled payment (at once, if that time has passed).
 - **Execute.** The allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow` for both kinds. A scheduled payment is reverified first (`ALLOCATED` → `ACCEPTED`, or `DECLINED`); pay today skips Reverify. Execute clears the parent once, at payment level (→ `PROCESSING`), and makes no AR or open-to-buy call: the legs do. Its commit marks the legs released. There is no Fulfil.
 - **Release.** The leg dispatcher writes the legs of every stored batch as `{paymentId}_{seq}` in `ACCEPTED`, each with its allocation's card account, in 1,000-row array inserts, each with a `SCHEDULED` `ALLOC_LEG` row. A declined parent is never released, so its batches are never written.
 - **Legs.** Each runs `ExecuteSplitPaymentWorkflow`, apart from the parent's clearing: AR balance and OTB in parallel (OTB after the Instruments call), then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then RTF and Raven. Clearing never runs per allocation.
@@ -1583,7 +1620,7 @@ A step in the Market Onboarding UI. Each setting drives something at runtime.
 | Bank confirmation: provider and confirmation window. A provider's link lasts about 10 minutes for now, so the window is at most 10 minutes (2026-10-18). | Which provider RequestConfirmation asks for the redirect link, and when `CreatePaymentIntentWorkflow` cancels a payment still waiting: once the window and its grace have passed |
 | Card authentication: the card provider for a debit card's 3D Secure and authorization (Checkout.com in the UK), and the authentication window, 2 minutes (agreed 2026-10-20) | Which provider RequestConfirmation and Verify's Card authorization check call, and when `CreatePaymentIntentWorkflow` cancels a debit card payment still waiting for the callback: once the window and its grace have passed |
 | Verification rule settings, such as the largest payment and the instrument types the market takes | The verification rules in Verify, Reverify and Represent. The Router passes them to the workflow in the resolved profile (agreed 2026-10-18). `ReadBillpayInstruments.v1` filters the instruments it returns by the market's rules (agreed 2026-11-05) |
-| Scheduling horizon: how many days ahead a payment can be scheduled, 30 by default (Proposed, 2026-10-20) | The verification rules, which decline a create dated beyond it. Like the other rule settings, it reaches the workflow in the resolved profile. `ReadPaymentOptions` now gives each customer's date range (agreed 2026-11-05), so whether this setting stays is open |
+| Scheduling horizon: how many days ahead a payment can be scheduled, 30 by default (Proposed, 2026-10-20) | The verification rules, which decline a create dated beyond it. Like the other rule settings, it reaches the workflow in the resolved profile. `ReadPaymentOptions.v1` now gives each customer's date range (agreed 2026-11-05), so whether this setting stays is open |
 | Pay with MR Points: offered or not, off by default (Proposed, 2026-10-20) | The Router, which answers 422 to a create with MR Points where it is off. How the page learns whether to offer it is open (2026-11-05) |
 | Expected volumes | The governor's floors and budgets |
 | BOTH rules, per behavior | The Router: which journeys get Y; for bank confirmation, which payment methods |
@@ -1604,7 +1641,7 @@ Every build ships a manifest of the behavior combinations it can run, returned b
 - The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
 - The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`; onboarding maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring checks each new combination against the manifest.
-- The Operations step gains the scheduling horizon and the Pay with MR Points setting (Proposed, 2026-10-20). Whether the horizon stays is open, now that `ReadPaymentOptions` gives each customer's date range (2026-11-05).
+- The Operations step gains the scheduling horizon and the Pay with MR Points setting (Proposed, 2026-10-20). Whether the horizon stays is open, now that `ReadPaymentOptions.v1` gives each customer's date range (2026-11-05).
 
 [^ Top](#table-of-contents)
 
@@ -1655,7 +1692,7 @@ Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other 
 
 ### Java SDK settings
 
-- Caller waits: Update-With-Start, conflict policy `USE_EXISTING`, and the default reuse policy: the early-return pattern. The request is the start operation's input (agreed 2026-10-18). The confirm and the no are updates to the waiting `CreatePaymentIntentWorkflow`, with the update IDs `{paymentId}-confirm` and `{paymentId}-no` (agreed 2026-10-18). The API's 2.5 s bound covers the whole call, not just its result: with the decision made by local activities, the worker reports the update accepted only when the first workflow task completes, so acceptance and the answer arrive together (checked in the Java SDK's code, 2026-10-18).
+- Caller waits: Update-With-Start, conflict policy `USE_EXISTING`, and the default reuse policy: the early-return pattern. The request is the start operation's input (agreed 2026-10-18). The confirm, the no and the 3D Secure callback are updates to the waiting `CreatePaymentIntentWorkflow`, with the update IDs `{paymentId}-confirm`, `{paymentId}-no` and `{paymentId}-authentication` (agreed 2026-10-18; the callback 2026-10-20, Proposed). The API's 2.5 s bound covers the whole call, not just its result: with the decision made by local activities, the worker reports the update accepted only when the first workflow task completes, so acceptance and the answer arrive together (checked in the Java SDK's code, 2026-10-18).
 - On the Online cluster, the decision's calls are local activities: Payment Instruments, Payment Options and Plans in Verify, start-to-close about 2 to 3× the system's p99 and retried in the worker; the provider in RequestConfirmation, with one try (agreed 2026-10-18); and for a debit card, the card provider's authorization in Verify, with the payment ID as its idempotency key (Proposed, 2026-10-20). Verify's get 3 tries, `maximumAttempts` 3, since a Java local activity with neither a schedule-to-close nor a maximum attempts is not retried at all. If all 3 fail, Verify makes the same call as a regular activity on `online-wf` with a schedule-to-close of 24 hours; after that the payment goes on the exception list, as for any activity whose retries run out. The caller still gets `PENDING` at 2.5 s (agreed 2026-10-19).
 - Allocation callbacks: async start, conflict policy `USE_EXISTING`, reuse policy `REJECT_DUPLICATE`; reply only after the start returns.
 - Dispatcher starts: reuse policy `REJECT_DUPLICATE`, priority and fairness keys, search attributes.
@@ -1691,8 +1728,10 @@ Proposed (2026-10-20), for the team to confirm:
 - Branch names: `feature/{ticket}-{short-name}` and `fix/{ticket}-{short-name}` from `develop`, `release/{version}` from `develop`, `hotfix/{version}` from `main`.
 - The build that moves through E1, E2 and E3 is built from the `release/*` or `hotfix/*` branch. A merge to `develop` runs every check and publishes an image, but deploys nowhere.
 - A fix found while a release is being tested goes onto its `release/*` branch through a pull request, and the release branch merges back to `develop` when it closes, so the fix isn't lost.
-- Merge methods: a feature or fix branch is squashed into `develop`, one commit per pull request, its title in Conventional Commits form, such as `feat(verify): add MandateCheck`. A `release/*` or `hotfix/*` branch merges to `main` and to `develop` with a merge commit, never squashed, so `main` keeps the exact commits that were tested. The merge to `main` is tagged with the release version, `v{version}`.
-- Branch protection on `develop`, `release/*` and `main`: changes arrive only through a pull request; every required check passes on the branch's latest commit; the branch is up to date with its base; no force push; nobody, administrators included, merges past a failing check or a missing approval.
+- Merge methods: a feature or fix branch is squashed into `develop`, one commit per pull request, its title in Conventional Commits form, such as `feat(verify): add MandateCheck`. A `release/*` or `hotfix/*` branch merges to `main` and to `develop` with a merge commit, never squashed, so `main` keeps the exact commits that were tested. The merge to `main` is tagged with the release version, `v{version}`, and the release branch is deleted once it has merged back to `develop`. A hotfix also merges to an open release branch. Commit titles follow Conventional Commits so the release notes can be built from the log.
+- Branch protection on `develop`, `release/*` and `main`: changes arrive only through a pull request that isn't a draft and has no conflicts; no reviewer has asked for changes; every required check passes on the branch's latest commit; the branch is up to date with its base; no force push; nobody, administrators included, merges past a failing check or a missing approval.
+- Pull requests: each does one thing, small enough to review in one sitting. The description says what changed and why and links the ticket, and it stays a draft until it is ready. A change to what a combination runs updates the checked-in stage report in the same pull request.
+- Code owners: `core/lib/` needs a platform owner, since every market runs it, and `market/{m}/` needs that market's team. Reviewers rotate, so knowledge of an area doesn't sit with one person.
 - Approvals: one approval, and the code owner's where `CODEOWNERS` names one. A change to workflow or stage code, or to anything under `core/lib/verification/`, needs two, because a determinism mistake there only shows up when a payment replays. A pull request to `main` needs the release manager's approval too.
 - Required checks on every pull request: the Gradle build, which makes a breach of the layer rules a compile error; ktlint and detekt; the unit tests, including the registry tests, the checked-in stage report and the bean-index test; the integration tests against Oracle in TestContainers; the replay tests over the recorded histories; and the organization's dependency, static-analysis and secret scans. Auto-merge is allowed once a pull request is approved, so it merges as soon as the checks pass.
 - Replay histories: one or more per journey are checked in, and each release adds histories recorded in E2 for the journeys it changed.
@@ -1701,6 +1740,46 @@ Proposed (2026-10-20), for the team to confirm:
 ### Coding agents
 
 The billpay-core codebase ships skills for coding agents, so an agent works inside the same guardrails as a person: the layer rules the module graph enforces, deterministic workflow and stage code, Oracle only through `PaymentStore`, the naming rules, and the tests and checked-in reports a change must update (agreed 2026-10-20). Temporal code, from workflows and activities to workers and Schedules, is written and reviewed with the `temporal-developer` skill from the Temporal plugin (agreed 2026-10-20).
+
+### Tech stack
+
+Kotlin throughout, Quarkus (ArC/CDI) for wiring, used lightly, and one Gradle multi-module monorepo. Each library below was picked for predictable failure modes and explicit control over timeouts and transactions.
+
+| Concern | Choice | How billpay-core uses it |
+| --- | --- | --- |
+| Database | Oracle | One schema, `BPYSCH`, with a read-write and a read-only user. Schema migrations are version-controlled and run through the standard Amex DB pipeline, never by hand and never by the ORM. Complex payloads, such as a corporate payment's allocation batches, can sit in JSON-typed columns. The DBO team runs the replicas and Data Guard |
+| Connection pool | Agroal | Two pools, one for online work and one for offline. An Online worker runs no more `PaymentStore` local activities at once than the online pool has connections, and the Offline workers are capped the same way against theirs, so `PaymentStore` never queues for a connection. The pool fails fast when Oracle is down and doesn't retry: Temporal's retry is the only retry layer |
+| ORM | Exposed | The only path to Oracle, on its DSL. One `Table` object per table, the only types that name columns. Only `PaymentStore` opens a `transaction { }`, one per operation, and it returns immutable data classes. No Hibernate |
+| HTTP client | OkHttp | One shared client per category of downstream: clearing, posting, validation and notification. A call's timeouts are about half its activity's timeout, so the HTTP layer gives up first, and `retryOnConnectionFailure(false)` keeps one task to one call |
+| Serialization | Jackson | One `ObjectMapper`, with the Kotlin and Java time modules, for REST, the clients and Temporal: both Temporal clients take it through `JacksonJsonPayloadConverter`. Dates are not written as timestamps, and unknown fields are ignored, so code one release behind reads a new payload. A new field gets a default value, so an old payload still reads. kotlinx.serialization was turned down: Temporal ships no converter for it |
+
+Konsist, for architecture tests, and Arrow's `Either`, for validation errors, are under evaluation. Until either is adopted, the code doesn't use them.
+
+### Deployables
+
+Five things ship. The Temporal clusters are self-hosted infrastructure, not deployables.
+
+| Deployable | What it is |
+| --- | --- |
+| billpay-core | The one app: one deployable, one JVM, running the core APIs, the Router, the dispatchers, the governor and the workers for both clusters ([One app](#one-app)) |
+| One-Data's functions and inbox | The functions, the event handlers, the inbox functions, the hourly sweep, the Redis stores and the inbox database |
+| Market Onboarding UI | The control plane, one for all environments ([Market Onboarding](#market-onboarding)) |
+| Codec server | Decrypts payloads for the Temporal Web UI, so a workflow's payloads read as plain data there. Each cluster has its own Web UI |
+| Mocks app | A stand-in for downstream integrations until an end-to-end test environment is ready |
+
+### Operating tools
+
+| Tool | What operators use it for |
+| --- | --- |
+| Kibana | Billpay's alerts ([Alerts](#alerts)) |
+| Grafana | The health of both Temporal clusters: the governor's inputs, and each `ds-*` and `ctl-*` queue's backlog and current rate limit |
+| Hydra console | billpay-core's pods, in IPC2 and IPC1 |
+| OpenSearch | The app-health dashboard, and the logs |
+| Temporal Web UI | One per cluster: a payment's workflows by ID or search attribute, with payloads decrypted by the codec server |
+| Tracing UI | One payment's traces, followed through their span links ([Workflow IDs and tracing](#workflow-ids-and-tracing)) |
+| Market Onboarding UI | A market's operations settings, a release's readiness, and pausing a live market |
+
+Oracle issues are escalated to the DBO team on `#oracle-dbo-support`.
 
 ### Sizing
 
@@ -1721,7 +1800,7 @@ Every number here is an estimate from the write model; load-test run 1 measures 
 
 - A regular activity costs about 4 writes: scheduled, started, completed, and the next workflow task.
 - A group of local activities inside one workflow task costs about 2 writes in total. On the Online cluster that is how a decision runs: Capture, Verify's two or three calls and Verify's commit cost about 2 writes together, where Verify's calls as regular activities would cost about 2k + 3 (agreed 2026-10-18).
-- A payment that waits for the customer runs as one workflow: a timer and an update take the place of a second workflow's start and close, the `CONFIRM_EXPIRY` row and the dispatcher's claim. An expiry's cancel now writes on the Online cluster, not the Offline one.
+- A payment that waits for the customer runs as one workflow: a timer and an update, with no second workflow, no Work Tracker row and no dispatcher's claim. A cancel when its window closes writes on the Online cluster.
 - A stage of k parallel regular activities costs about 2k + 3.
 - Start and close cost about 4. Visibility writes go to OpenSearch, not Aurora.
 
@@ -1767,12 +1846,58 @@ Any payment can be traced from its ID alone. Workflow IDs are the payment ID plu
 | Governor | `governor`, plus its Schedule's trigger time |
 | Market onboarding | `onboard-{market}-{accountType}-v{N}` |
 
-The confirm and the no are not workflows. They are updates to the waiting payment's `{paymentId}-init`, with the update IDs `{paymentId}-confirm` and `{paymentId}-no`, so they show in that one history (agreed 2026-10-18).
+The confirm, the no and the 3D Secure callback are not workflows. They are updates to the waiting payment's `{paymentId}-init`, with the update IDs `{paymentId}-confirm`, `{paymentId}-no` and `{paymentId}-authentication`, so they show in that one history (agreed 2026-10-18; the callback 2026-10-20, Proposed).
 
 - **Search attributes,** set once at start: `PaymentId`, `Market`, `Journey`, `DueDate`, `ConfigVersion`, and `ParentPaymentId` for legs.
 - **Traces.** One trace per workflow, through the SDK's OpenTelemetry interceptors. Execution and leg spans carry a span link to the producer's trace, read from `trace_parent`; a single 30-day trace isn't practical.
 - **Finding payment X:** read `trans_lfcyc_event` by payment ID for every step and its cluster; open `{paymentId}-{suffix}` in that cluster's Temporal UI (within 30 days); open the trace for call-level detail.
 - **A payment or leg stuck in `PROCESSED`:** its row in One-Data's inbox says which event is missing, or that it is `UNMATCHED`.
+
+### Service levels
+
+Each API and function has an availability, the SLA, which is the commitment to its callers, and latency targets, the SLOs engineering steers to, at P50, P90, P99, P99.9 and P99.99. The SLI is what is measured. Every figure here is assumed for now (2026-11-07) and still to be agreed; a row whose SLI ends in "targets Proposed" had its targets proposed with its API (2026-10-20). One target is fixed by the design: p99 for `POST /payments` is 500 ms, which the governor watches ([The governor](#the-governor)).
+
+Billpay core APIs, measured at billpay-core's ingress:
+
+| API | SLA | P50 | P90 | P99 | P99.9 | P99.99 | SLI |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `POST /payments` | 99.95% | 120 ms | 250 ms | 500 ms | 900 ms | 1.5 s | Request to response. The API waits at most 2.5 s for a decision |
+| `PUT /payments/{payment-id}` | 99.95% | 160 ms | 320 ms | 650 ms | 1.1 s | 1.8 s | The round trip through `UpdatePaymentWorkflow` |
+| `DELETE /payments/{payment-id}` | 99.95% | 100 ms | 200 ms | 420 ms | 800 ms | 1.3 s | The round trip through `CancelPaymentWorkflow` |
+| `POST /refunds` | 99.95% | 140 ms | 280 ms | 550 ms | 950 ms | 1.6 s | A refund from a channel, until its result |
+| `GET /payments/account/{account-id}` | 99.99% | 45 ms | 95 ms | 200 ms | 400 ms | 700 ms | Read latency from Oracle |
+| `GET /payments/{payment-id}` | 99.99% | 35 ms | 80 ms | 170 ms | 350 ms | 600 ms | Read latency for one payment from Oracle |
+| `POST /payment-installments` | 99.9% | 220 ms | 450 ms | 900 ms | 1.6 s | 2.4 s | End to end, through the child create, the plan and the optional Autopay update |
+| `POST /payments/{payment-id}/confirm` | 99.95% | 120 ms | 250 ms | 500 ms | 900 ms | 1.5 s | Request to response, through the update; the same 2.5 s wait. Targets Proposed |
+| `POST /payments/{payment-id}/authentication` | 99.95% | 150 ms | 300 ms | 600 ms | 1 s | 1.5 s | Request to response, through the update; its Verify makes one more call, the authorization. Targets Proposed |
+| `POST /payments/{payment-id}/allocations` | 99.95% | 50 ms | 110 ms | 230 ms | 450 ms | 800 ms | Time to the 202. A 429 over budget is pacing, not an error. Targets Proposed |
+| Market Onboarding API writes | 99.9% | 80 ms | 150 ms | 300 ms | 600 ms | 1 s | Time to the 202; a 503 while the Offline cluster is down counts against availability. Targets Proposed |
+| Market Onboarding API reads | 99.9% | 30 ms | 60 ms | 150 ms | 300 ms | 500 ms | Read latency for a release's status and the capability manifest. Targets Proposed |
+| `GET /instruments/account/{account-id}?source={source}` | Not set | | | | | | Targets still to come |
+
+One-Data functions, measured at the One-Data edge, so their latencies include the contract validation and, for a create, the pending check:
+
+| Function | SLA | P50 | P90 | P99 | P99.9 | P99.99 | SLI |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `CreatePayment.v3` | 99.95% | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s | Caller-observed latency. A create billpay-core doesn't answer within 3 s is held for RTF and answered `PENDING` |
+| `UpdatePayment.v1` | 99.95% | 170 ms | 340 ms | 700 ms | 1.2 s | 1.9 s | End to end, through the cancel and re-create |
+| `DeletePayment.v1` | 99.95% | 110 ms | 220 ms | 450 ms | 850 ms | 1.4 s | The round trip to `CANCELLED`, or 409 |
+| `ReadPayments.v1` | 99.99% | 50 ms | 100 ms | 210 ms | 420 ms | 750 ms | Account-scoped read, from Redis and billpay-core together |
+| `ReadPaymentEventsById.v1` | 99.99% | 40 ms | 85 ms | 180 ms | 360 ms | 650 ms | One payment and its lifecycle events |
+| `CreateCreditBalanceRefund.v1` | 99.95% | 150 ms | 300 ms | 580 ms | 1 s | 1.7 s | Until the refund's result |
+| `CreatePaymentInstallment.v1` | 99.9% | 240 ms | 480 ms | 950 ms | 1.7 s | 2.5 s | End to end at the function edge |
+| `CreateConfirmPendingPayment.v1` | 99.95% | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s | Until the confirm's answer, with the same 3 s hold as a create. Targets Proposed |
+| `CreatePaymentAllocations.v1` | 99.95% | 60 ms | 120 ms | 250 ms | 500 ms | 900 ms | Time to the 202. Targets Proposed |
+| `CreateInboundPayment.v1`, `CreateBillpayTransactionFromAccountsReceivable.v1` | 99.95% | 80 ms | 200 ms | 500 ms | 900 ms | 1.5 s | Time to the 202, once stored. Load-test run 6 holds AR intake's p99 under 500 ms; the other cells are Proposed |
+| `CreateMoneyMovementEventHandler.v1`, `CreateAccountsReceivableTransactionEventHandler.v1`, `CreateOpentoBuyUpdatePaymentEventHandler.v1` | 99.99% | 30 ms | 70 ms | 150 ms | 300 ms | 600 ms | Time to the acknowledgement: for money movement and AR, after the raw event and the inbox row commit together; the authorization handler acknowledges and stores nothing. Targets Proposed |
+| `DeletePendingPayment.v1` | 99.9% | 20 ms | 40 ms | 100 ms | 200 ms | 400 ms | The call billpay-core makes once a create's payment is decided. Targets Proposed |
+| `ReadPaidReadyPayments.v1`, `ReadStartRequests.v1` | 99.9% | 50 ms | 120 ms | 300 ms | 600 ms | 1 s | One batch of `READY` rows. Targets Proposed |
+| `UpdatePaidReadyPayments.v1`, `UpdateStartRequests.v1` | 99.9% | 40 ms | 100 ms | 250 ms | 500 ms | 900 ms | One batch of rows set in one transaction. Targets Proposed |
+| `ReadBillpayInstruments.v1` | Not set | | | | | | Targets still to come |
+
+- The error budget follows from the SLA: 0.05% of a 30-day window at 99.95%, about 21.6 minutes; 0.01% at 99.99%, about 4.3 minutes; 0.1% at 99.9%, about 43.2 minutes.
+- Work nobody waits for is measured to One-Data's 202, then by its backlog age: how long it waits for its dispatcher, which the backlog-age alerts watch.
+- `UpdateUnmatchedPayments.v1` and the hourly sweep have no SLA: nobody calls them, and their alerts are the measure.
 
 ### Alerts
 
@@ -1807,7 +1932,8 @@ Most failures need no one: the system slows down, waits, or resumes on its own.
 | Downstream sends 429 | Calls wait out `Retry-After`; the queue limit drops ×0.7, or the offline share halves after an Online 429, never below a SEPA run's need; admissions follow | Nothing |
 | Downstream outage | The queue trickles at 1 RPS; dependent admissions pause; in-flight stays capped | Contact the owner if it lasts |
 | Raven or RTF outage | Payments wait in Fulfil, short of `PROCESSED`, and other announcements wait in their workflows, the PAID drain's included. Once the in-flight cap fills, the Work Tracker dispatchers stop, and the governor stops the inbox dispatchers, so a SEPA cutoff can be missed | Contact the owner; the cutoff alert fires if the run falls behind |
-| Oracle outage or patching | `PaymentStore` retries, then waits on durable timers; dispatchers stop claiming; work resumes when Oracle is back | Nothing, unless it outlasts the schedule-to-close |
+| Oracle outage or patching | `PaymentStore` retries, then waits on durable timers; dispatchers stop claiming; work resumes when Oracle is back. Reads still work off the read-only replicas | Nothing, unless it outlasts the schedule-to-close; a longer outage means promoting the Data Guard standby in IPC1 |
+| A whole site | Losing IPC1 costs its front door and the standbys there, and nothing stops, since IPC1 already sends its traffic to IPC2. Losing IPC2 leaves IPC1's One-Data answering and holding new creates and confirms for RTF | For IPC2, promote the app and the Data Guard standby in IPC1 |
 | Offline DB runs hot | The governor cuts; a hard breach halves the budget | Look if it lasts over 15 minutes |
 | Online p99 near its SLO | Every offline class is cut, execution included, but a SEPA run keeps its cutoff floor | Nothing, unless a cutoff alert follows |
 | Online would leave a SEPA run short | Online is capped on that downstream at agreed TPS less the run's need, until the cutoff | Nothing; raise the agreed TPS if it happens often |
@@ -1871,8 +1997,8 @@ Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin 
 
 | # | Flow | Must show |
 | --- | --- | --- |
-| 1 | Pay today, one instruction | Update-With-Start on Online; the reply at Verify, then the announcements; Execute and Fulfil; RTF and Raven last in Fulfil, before `PROCESSED` |
-| 2 | Scheduled payment, created today and executed later | Intake on Online writes `SCHEDULED` and a `SCHED_EXEC` row; on the due date the dispatcher re-routes and starts `ExecuteScheduledPaymentWorkflow` on Offline |
+| 1 | Pay today, one instruction | Update-With-Start on Online; Verify's calls, `ReadPaymentOptionById.v1` for the option ID among them; the reply at Verify, then the announcements; Execute and Fulfil; RTF and Raven last in Fulfil, before `PROCESSED` |
+| 2 | Scheduled payment, created today and executed later | Intake on Online writes `SCHEDULED` and a `SCHED_EXEC` row; on the due date the dispatcher re-routes and starts `ExecuteScheduledPaymentWorkflow` on Offline, whose Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes and the option still holds |
 | 3 | Corporate payment, pay today | Update-With-Start on Online to `ACCEPTED`, with an `ALLOC_REQUEST` row due at once; `RequestAllocationsWorkflow` (`ALLOCATING`); the callbacks; `ALLOCATED` with an `ALLOC_EXEC` row; `ExecuteScheduledPaymentWorkflow` from the allocated-payments dispatcher, clearing once; the release and the legs; the completion check |
 | 4 | Corporate payment, scheduled | `SCHEDULED` with an `ALLOC_REQUEST` row at the fetch time; `ALLOCATING`, after which a cancel gets 409; the callbacks and `ALLOCATED`, with an `ALLOC_EXEC` row due at the execution time; on the due date, Reverify and Execute in `ExecuteScheduledPaymentWorkflow`; then the release and the legs, as for pay today |
 | 5 | Update a scheduled payment | The guarded cancel, then child `CreateScheduledPaymentWorkflow` `{newId}-init`; 409 when late |
@@ -1884,16 +2010,16 @@ Pages draw these in Mermaid. Every sequence shows the Router's hops (admit, pin 
 | 11 | Missing paid events | `ProcessMissingPaidEventsWorkflow` finds payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and sends any event it finds through One-Data's handler |
 | 12 | Pay & Plan | The composite on Online with its children on the same cluster |
 | 13 | Allocations callback | One-Data, `POST /payments/{payment-id}/allocations`, the batch stored in `allocation_batch`, async start, 202; `ReceiveAllocationsWorkflow` checks the batch, and the one that completes the amount moves the payment to `ALLOCATED` with its `ALLOC_EXEC` row |
-| 14 | Pay by bank: create and confirm | `POST /payments` on Online starts `CreatePaymentIntentWorkflow`; Capture, then RequestConfirmation, and the reply `PENDING` with the redirect link, or `DECLINED` when no link comes back; the workflow waits on its timer; the caller's `POST /payments/{payment-id}/confirm` is an update to it: Verify guarded on `PENDING`, the reply, then Execute, with no clearing call since the money moved at the bank, and Fulfil in the same workflow; with no confirm, the timer fires and Cancel runs |
+| 14 | Pay by bank: create and confirm | `POST /payments` on Online starts `CreatePaymentIntentWorkflow`; Capture, then Verify's own checks, which can decline it with no link; then RequestConfirmation, and the reply `PENDING` with the redirect link, or `DECLINED` when no link comes back; the workflow waits on its timer; the caller's `POST /payments/{payment-id}/confirm` is an update to it: Verify's bank-side checks, guarded on `PENDING`, the reply, then Execute, with no clearing call since the money moved at the bank, and Fulfil in the same workflow; with no confirm, the timer fires and Cancel runs |
 | 15 | A new payment while another is pending | One-Data's pending check, one atomic Redis call, finds a pending payment on the account and answers 200 `DECLINED` with its reason; billpay-core is never called. With no pending payment, it adds the new one and stores the create, then calls billpay-core. With Redis down, the check goes through `ReadPayments.v1`. Once the earlier payment is decided, billpay-core's delete removes its entry and the account can pay again (2026-10-21) |
-| 16 | Pay by Debit card: create, 3D Secure and authorization | `POST /payments` on Online starts `CreatePaymentIntentWorkflow`; Capture, then RequestConfirmation asks the card provider to start 3D Secure with Billpay's callback URL; the reply `PENDING` with the challenge link; the customer completes the challenge; the provider's `POST /payments/{payment-id}/authentication` is an update to the workflow: Verify's checks, then the authorization, which debits the account or is declined, `ACCEPTED` or `DECLINED` guarded on `PENDING`, the reply to the callback, then Execute with no clearing and Fulfil; with no callback, the timer fires and Cancel runs (2026-10-20) |
+| 16 | Pay by Debit card: create, 3D Secure and authorization | `POST /payments` on Online starts `CreatePaymentIntentWorkflow`; Capture, then Verify's own checks, which can decline it before 3D Secure; then RequestConfirmation asks the card provider to start 3D Secure with Billpay's callback URL; the reply `PENDING` with the challenge link; the customer completes the challenge; the provider's `POST /payments/{payment-id}/authentication` is an update to the workflow: the authorization, which debits the account or is declined, `ACCEPTED` or `DECLINED` guarded on `PENDING`, the reply to the callback, then Execute with no clearing and Fulfil; with no callback, the timer fires and Cancel runs (2026-10-20) |
 
 ### Payment states
 
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING: Capture
-    PENDING --> ACCEPTED: Verify, pay today, inbound or at confirm
+    PENDING --> ACCEPTED: Verify, pay today, inbound, at confirm or at the 3D Secure callback
     PENDING --> SCHEDULED: Verify, future date
     PENDING --> DECLINED: Verify fails, or no link from the provider
     PENDING --> DISALLOWED: Verify, push payment not accepted
@@ -1912,6 +2038,8 @@ stateDiagram-v2
     REPRESENTING --> DECLINED: Recheck fails
     REPRESENTED --> RETURNED: Returned again
     PAID --> [*]
+    RETURNED --> [*]
+    REPRESENTED --> [*]
     DECLINED --> [*]
     CANCELLED --> [*]
     DISALLOWED --> [*]
@@ -1972,10 +2100,16 @@ These inputs are still assumed. The first changes the numbers most. The other in
 | Decline codes for verification rules | One table maps each rule ID to a `DeclineCode`. Until product sends the codes, each rule uses the closest one the current app has, and a test fails if any rule has no code (agreed 2026-10-19) | Product will send the codes; only the table changes. They decide what code a declined payment carries, and what the channel tells the customer |
 | `ReadBillpayInstruments.v1` | A One-Data function in front of a billpay-core endpoint, which calls `ReadInstruments`, `ReadBanksForRealtimePayments.v1` or `ReadEligibleWallets.v1` and filters by the market's rules (agreed 2026-11-05) | Its contract, and the billpay-core endpoint's path, are still to come |
 | The bank and wallet reads | `ReadBanksForRealtimePayments.v1`, for Pay with Bank Transfer and debit card (agreed 2026-11-06), and `ReadEligibleWallets.v1` (agreed 2026-11-05) | Who owns them, probably the Instruments domain, and their contracts. Nothing is decided yet |
-| What else the payment page reads | Not covered (2026-11-05): the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account | Where each comes from. `ReadPaymentOptions` is one option |
-| The payment option's token | Each option `ReadPaymentOptions` returns carries a token ID that Billpay verifies during execution (agreed 2026-11-05). The create carries it, and Verify's Options check verifies it (Proposed) | The token's contract, and whether Reverify checks it again for a scheduled payment |
-| The scheduling horizon setting | Kept as a Proposed setting (2026-10-20) | `ReadPaymentOptions` now gives each customer's date range (agreed 2026-11-05). Whether the market setting stays |
+| What else the payment page reads | Not covered (2026-11-05): the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account | Where each comes from. `ReadPaymentOptions.v1` is one option |
+| The payment option ID | Each option `ReadPaymentOptions.v1` returns carries an option ID. The create carries the chosen one; Verify validates it through `ReadPaymentOptionById.v1`, and Reverify checks the option again through `ReadPaymentOptions.v1` (agreed 2026-11-06) | The contracts of both Payment Options APIs, and the decline code for an option that no longer holds |
+| The scheduling horizon setting | Kept as a Proposed setting (2026-10-20) | `ReadPaymentOptions.v1` now gives each customer's date range (agreed 2026-11-05). Whether the market setting stays |
 | Pay with MR Points | Points alone run their own composite across Billpay and Loyalty; with a bank account they run as multiple instructions; today only (agreed 2026-10-20) | Its children, its calls to Loyalty, and how a points instruction runs inside multiple instructions are still to be defined |
+| Wallet | `ReadEligibleWallets.v1` lists the wallets a customer can pay with, but no journey takes one yet (2026-11-07) | Which instrument a wallet is, and whether it needs a bank step |
+| The allocations callback's contract | Agreed as designed, and allocations never change once they have arrived (agreed 2026-10-17) | Its full contract, idempotency rules included, is still to be agreed with the allocations manager |
+| Service level targets | The figures in [Service levels](#service-levels), assumed for now (2026-11-07); none yet for the instruments read | To be agreed before they are quoted outside the team |
+| The delete for composites | Every create's workflow calls `DeletePendingPayment.v1` once its payment is decided | Which workflow calls it for Pay & Plan and for multiple instructions: the composite or its children |
+| Write-ups still to come | The deployment pipeline stage by stage; alert escalation and the steps to acknowledge and resolve an alert in Kibana; the codec server, the mocks app, app health and OpenSearch logs (2026-11-07) | Operators need them before go-live |
+| End-to-end environment | Not ready: the mocks app stands in for the downstreams, and integration tests fall back to mocks where an integration isn't containerised | Where end-to-end tests against the real integrations run |
 | Does US bank confirmation clear | No clearing for Pay with Bank Transfer (agreed 2026-10-20). `BankTransferSettlement` names bank confirmation with no market, so it would also catch a US payment confirmed through Plaid | Whether a Plaid payment's money moves at the bank too, or it still clears through MR/M3; if it clears, the class becomes GB's own |
 
 [^ Top](#table-of-contents)

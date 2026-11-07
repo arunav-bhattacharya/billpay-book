@@ -31,6 +31,12 @@ sealed interface VerifiedPaymentOption : PaymentOption {         // post-lookup
 
 A `PaymentOptionReference` may hold nothing but the option type, while a `VerifiedPaymentOption` can't exist without a confirmed ID and amount. The nullable fields are the state, which is why [every state that can move money](./payment.md#what-each-state-must-hold) can demand a `VerifiedPaymentOption` and know at compile time that an amount exists.
 
+## The option ID
+
+The channel's payment page reads the customer's options from Payment Options' `ReadPaymentOptions.v1`, and each comes with a payment option ID, unique to that option and the balance it pays. The create carries the ID of the option the customer chose, so the reference holds it from the start (Proposed: in the `id` the reference already has). Verify's Options check validates it through `ReadPaymentOptionById.v1`, and the answer turns the reference into a verified option.
+
+A scheduled payment is checked again on its due date. Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the chosen option still holds, and declines the payment if not. For an option whose amount follows a balance, such as the statement balance or the total balance, the amount is taken again that day, so the payment can pay a different amount from the one it showed at the create. Payments from Accounts Receivable, corporate payments and Pay with MR Points carry no option ID.
+
 ## The eight option types
 
 | Option type | Meaning |

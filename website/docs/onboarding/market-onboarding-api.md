@@ -30,7 +30,7 @@ Sending a release is idempotent: there is one onboarding workflow per market, ac
 
 One run takes one release through five steps in its environment.
 
-1. Check vN against the deployed build's capability manifest. A behavior combination the build can't run stops the release here, marked as needing a build.
+1. Check vN against the deployed build's capability manifest. A behavior combination the build can't run stops the release here, marked as needing a build. So does a profile whose cancellation window doesn't close before its execution time.
 2. Save vN as an inactive version, together with the Schedules, dispatcher settings, rate rows and fairness settings it needs, all inactive too.
 3. Test with payments against vN. The Router accepts a pinned config version for test accounts only, so test payments can use vN before anyone else can.
 4. Wait for sign-off, and in E3 for the change request (RFC) as well.

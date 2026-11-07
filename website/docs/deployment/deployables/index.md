@@ -32,7 +32,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
     {
       term: 'Market Onboarding UI',
       to: '/docs/deployment/deployables/ui-app',
-      desc: `The market onboarding control plane: one for every environment, reaching each one only through its Market Onboarding API.`,
+      desc: `The market onboarding control plane: one for all environments, reaching each one only through its Market Onboarding API.`,
     },
     {
       term: 'Mocks App',
