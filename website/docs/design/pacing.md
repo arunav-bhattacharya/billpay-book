@@ -24,7 +24,7 @@ One narrow table in Oracle, `work_tracker`, holds every piece of dated work. A r
 
 | Type | One row per | Due at | Started by |
 | --- | --- | --- | --- |
-| `SCHED_EXEC` | Scheduled payment, other than corporate | The market's execution time on the due date | Scheduled-payments dispatcher |
+| `SCHED_EXEC` | Scheduled payment, other than corporate | The execution time of its market and account type on the due date | Scheduled-payments dispatcher |
 | `ALLOC_REQUEST` | Corporate payment | Its fetch time; at once for pay today | Allocation-request dispatcher |
 | `ALLOC_EXEC` | Corporate payment, written once it is `ALLOCATED` | At once for pay today; the execution time on the due date for a scheduled payment, or at once if that has passed | Allocated-payments dispatcher |
 | `ALLOC_LEG` | Allocation leg | When the leg is written, at its parent's release | Leg dispatcher |
@@ -50,11 +50,11 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 
 | Dispatcher | Claims | Runs | Starts |
 | --- | --- | --- | --- |
-| Scheduled payments, one per market per day | `SCHED_EXEC` rows due in that market | A Schedule at the market's execution time; drains, sweeps stragglers, then ends | `ExecuteScheduledPaymentWorkflow` |
+| Scheduled payments, one per market and account type per day | `SCHED_EXEC` rows due in that market and account type | A Schedule at the execution time its release sets, local midnight by default; drains, sweeps stragglers, then ends | `ExecuteScheduledPaymentWorkflow` |
 | Allocation requests | `ALLOC_REQUEST` rows at their fetch time | A Schedule every minute | `RequestAllocationsWorkflow` |
 | Allocated payments | `ALLOC_EXEC` rows due | A Schedule every minute | `ExecuteScheduledPaymentWorkflow` |
 | Allocation legs | `ALLOC_LEG` rows, fair across parents | A Schedule every minute | `ExecuteSplitPaymentWorkflow` |
-| Representments, one per market | `REPRESENT` rows due | A Schedule every few minutes | `ProcessRepresentmentWorkflow` |
+| Representments, one per market | `REPRESENT` rows due | A Schedule every 5 minutes (Proposed) | `ProcessRepresentmentWorkflow` |
 | AR intake | `READY` AR requests in One-Data's inbox, payments and refunds | A Schedule every minute | `CreateScheduledPaymentWorkflow`, `CreateBalanceRefundWorkflow` |
 | Returns | `READY` returns in One-Data's inbox | A Schedule every minute | `ProcessReturnedPaymentWorkflow` |
 | Inbound | `READY` inbound payments in One-Data's inbox | A Schedule every minute | `ProcessInboundPaymentWorkflow` |
@@ -64,7 +64,7 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 A dispatcher run is a loop of ticks, each about 20 seconds of work at the current rate.
 
 1. The tick size is the allowed rate times 20 seconds. At 50 TPS that is 1,000 items.
-2. One activity, `claimAndStart`, runs on the dispatcher's control queue. It claims up to that many rows as `DISPATCHING`, stamped with the run ID. It starts one workflow per row through the Router and a token bucket (50 TPS is one start every 20 ms). Every 50 or so starts it re-reads the allowed rate and checks the in-flight count. It heartbeats its position every 2 to 3 seconds, including while it waits on the cap or the bucket. At the end it marks the rows `DISPATCHED` and returns the counts.
+2. One activity, `claimAndStart`, runs on the dispatcher's control queue. It claims up to that many rows as `DISPATCHING`, stamped with the run ID. It starts one workflow per row through the Router and a token bucket (50 TPS is one start every 20 ms). Every 5 seconds, on a timer, it re-reads the allowed rate. It checks in-flight and waits while the cap is full, checking again every 250 ms. It heartbeats its position every 2 seconds, including while it waits on the cap or the bucket (the 5 s, 250 ms and 2 s are Proposed, 2026-11-07). At the end it marks the rows `DISPATCHED` and returns the counts.
 3. The workflow adds up the counts and loops. An empty claim triggers a sweep of this run's `DISPATCHING` rows, and then the run ends.
 4. The run continues-as-new whenever the SDK suggests it.
 
@@ -84,7 +84,7 @@ With a cap, the activity waits instead, and the real rate settles at the cap div
 
 ### Changing the rate
 
-The activity reads its row in `rate_allocation` every few seconds, so a new rate takes effect within seconds, with no signals and no extra workflow history. Operators can override the governor (pause, resume, or cap the rate) by writing a row in `rate_allocation` through an ops API, and an override always wins. Pausing a Schedule stops new runs too.
+The activity reads its row in `rate_allocation` every 5 seconds (Proposed), so a new rate takes effect within seconds, with no signals and no extra workflow history. Each dispatcher reads its own class (Proposed, 2026-11-07): `EXECUTION`, scoped by market, with the class's `'*'` row when the market has none; `INTAKE`, `RETURN` and `INBOUND`, scoped `'*'`; `REPRESENTMENT`, scoped by market; and `PAID`, scoped `'*'`, for the PAID drain in payments a second. A class with no row at all gets zero, so its run waits. Operators can override the governor (pause, resume, or cap the rate) by writing a row in `rate_allocation` through an ops API, and an override always wins. Pausing a Schedule stops new runs too.
 
 ### Crash safety
 

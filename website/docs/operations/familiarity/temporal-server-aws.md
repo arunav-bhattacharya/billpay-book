@@ -43,7 +43,7 @@ On a shared queue, a level waits until every level above it drains, so returns c
 
 ## Schedules
 
-Every Temporal Schedule lives on the Offline cluster: one per dispatcher (the scheduled-payment and representment dispatchers have one per market), the governor's, and the periodic jobs'. Each skips a trigger while its last run is still going. Pausing a Schedule stops new runs; to pause a whole market, use the Market Onboarding UI instead ([Dispatch Controls](./dispatch-controls.md)).
+Every Temporal Schedule lives on the Offline cluster: one per dispatcher (the scheduled-payments dispatcher has one per market and account type, and the representment dispatcher one per market), the governor's, and the periodic jobs'. Each skips a trigger while its last run is still going. Pausing a Schedule stops new runs; to pause a whole market, use the Market Onboarding UI instead ([Dispatch Controls](./dispatch-controls.md)).
 
 ## Scaling
 

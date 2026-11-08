@@ -139,7 +139,7 @@ Verify has one flow, and only its checks vary. Where the profile requires mandat
 
 ## Reverify
 
-Checks a scheduled payment again on its due date, with the same checks as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Where the payment carries an option ID, its Options check calls `ReadPaymentOptions.v1` instead of `ReadPaymentOptionByIdentifier.v1`: a customer who no longer owes money, or an option that no longer holds, means `DECLINED`, and a Statement Balance or Total Balance payment takes that day's amount. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
+Checks a scheduled payment again on its due date, with the same checks as Verify, the mandate check included where the profile requires one, and commits `ACCEPTED` or `DECLINED`. Where the payment carries an option ID, its Options check calls `ReadPaymentOptions.v1` instead of `ReadPaymentOptionByIdentifier.v1`: a customer who no longer owes money fails `BALANCE_OWED` and is `DECLINED` with `NO_BALANCE_OWED`, and an option that no longer holds fails `OPTION_VALID` and is `DECLINED` with `PAYMENT_OPTION_INVALID` (agreed 2026-11-07; the codes are placeholders). A Statement Balance or Total Balance payment takes that day's amount. Its guard, `WHERE status = 'SCHEDULED'`, means a cancel and the execution can never both win. A scheduled corporate payment is reverified from `ALLOCATED`, once its allocations are in. One paid today skips Reverify, because Verify passed it minutes earlier.
 
 ## Execute
 
@@ -181,11 +181,11 @@ Moves the [presentment](../payment-state-model.md#presentments) the bank sent ba
 
 ## QueueRepresentment
 
-Writes the next presentment as a new row, with the same payment ID and a `presentmentSequence` one higher, in `REPRESENTING`. Its clearing date is the representment date, which the market's rules set. The same commit writes its `REPRESENT` Work Tracker row, due on that date. The return never starts the representment itself; the representment dispatcher does, when the date comes.
+Writes the next presentment as a new row, with the same payment ID and a `presentmentSequence` one higher, in `REPRESENTING`. Its clearing date is the representment date: the day the return arrived, in the market's time zone, plus the release's `delayDays` (agreed 2026-11-07). The same commit writes its `REPRESENT` Work Tracker row, due at the start of that date, so a same-day representment is due at once (Proposed). Only a whole payment is represented, never a leg (agreed 2026-11-07). The return never starts the representment itself; the representment dispatcher does, when the date comes.
 
 ## Represent
 
-Rechecks eligibility before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. The recheck is its own, not Verify's: Represent calls neither Payment Instruments, Payment Options nor Plans, and which checks it runs is still to be defined. A failed recheck commits `DECLINED`, and nothing is sent.
+Rechecks eligibility before anything goes to clearing, then sends the new presentment for clearing and commits `REPRESENTED`. The recheck is its own, not Verify's: Represent calls neither Payment Instruments, Payment Options nor Plans, and which checks it runs is still to be defined. A failed recheck commits `DECLINED`, and nothing is sent. Until its checks exist, the recheck passes (Proposed, 2026-11-07), and every combination of account type and behavior runs the default QueueRepresentment and Represent (agreed 2026-11-07).
 
 :::info[Placeholder: Represent's checks]
 Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules will be strategies like Verify's, listing Represent among their steps, so they are picked the same way.

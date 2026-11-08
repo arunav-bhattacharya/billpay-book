@@ -22,7 +22,7 @@ A page that listed every instrument on file would let the customer pick one this
 2. **`ReadBillpayInstruments.v1`**, once the customer picks where to pay from. It is a One-Data function in front of a billpay-online endpoint, and billpay-online makes the one read that source needs:
    - Enrolled Instruments: Payment Instruments' `ReadInstruments`, for the instruments the customer has enrolled;
    - Pay with Bank Transfer or a debit card: `ReadBanksForRealtimePayments.v1`, for the list of banks the customer can pay from in real time;
-   - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with.
+   - a wallet: `ReadEligibleWallets.v1`, for the wallets the customer can pay with. No journey takes a wallet yet, so the page doesn't offer one until a journey does (agreed 2026-11-07).
 
    It replaces the channel's own call to Payment Instruments.
 3. **`CreatePayment.v3`**, when the customer reviews and pays. It carries the ID of the option the customer chose, and it is the only call that starts anything.
@@ -33,7 +33,7 @@ The reads only guide the page. Verify calls Payment Options and Payment Instrume
 
 ## What decides what the page offers
 
-The amounts, the payment options and the dates come from Payment Options, for this customer. The instruments come through Billpay, filtered by the market's rules, so an Autopay instrument still pending verification never shows up for a payment made now. Pay with Bank Transfer, a debit card and a US payment confirmed through Plaid pay today only, so once the customer picks a later date the page doesn't offer them, and a future-dated create with one gets 422 before any workflow starts. Who will own the bank and wallet reads isn't decided yet; it will probably be the Instruments domain.
+The amounts, the payment options and the dates come from Payment Options, for this customer. The instruments come through Billpay, filtered by the market's rules, so an Autopay instrument still pending verification never shows up for a payment made now. Proposed (2026-11-07): the filter takes the Router's way-to-pay rules (no bank confirmation or debit card for a corporate payment; bank confirmation and a debit card only where the market has their provider), the market's accepted instrument types and Verify's `ACTIVE` status, and leaves out a type no create takes. Pay with Bank Transfer, a debit card and a US payment confirmed through Plaid pay today only, so once the customer picks a later date the page doesn't offer them, and a future-dated create with one gets 422 before any workflow starts. Who will own the bank and wallet reads isn't decided yet; it will probably be the Instruments domain.
 
 Where the page gets the rest is still open: the ways to pay the market offers, its limits such as the largest payment, the cancellation window, whether it offers Pay & Plan and Pay with MR Points, and a payment already pending on the account, which the page can show. `ReadPaymentOptions.v1` is one option. [Market Profile](../../onboarding/market-profile.md#what-the-customer-is-offered) maps the profile's settings that the Router and Verify check.
 
@@ -95,4 +95,4 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 - The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionByIdentifier.v1`, and the decline code for an option that no longer holds.
 - Whether the market's Proposed scheduling horizon setting stays, now that `ReadPaymentOptions.v1` gives each customer's date range.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.
-- Wallet: which instrument it is, and whether it needs a bank step. The page can read eligible wallets, but no journey takes one yet, and wallets appear on this page only.
+- Wallet: which instrument it is, and whether it needs a bank step. The page can read eligible wallets, but no journey takes one yet, so the page doesn't offer them until one does (agreed 2026-11-07).

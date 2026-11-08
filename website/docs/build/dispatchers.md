@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 
 ## One workflow, one activity
 
-A dispatcher is two pieces. The workflow runs on the Offline cluster and loops over ticks. Each tick is one activity, `claimAndStart`, on the dispatcher's own control queue, such as `ctl-sched` or `ctl-leg`, so one kind of work can't hold up another.
+A dispatcher is two pieces. The workflow runs on the Offline cluster and loops over ticks. Each tick is one activity, `claimAndStart`, on the dispatcher's own control queue, such as `ctl-sched` or `ctl-leg`, so one kind of work can't hold up another. Proposed (2026-11-07): AR intake runs on `ctl-intake`, returns on `ctl-return`, inbound on `ctl-inbound` and representments on `ctl-repr`. The run ID stamped on a claimed row is the dispatcher's workflow ID.
 
 The workflow holds no rows and starts nothing itself. Starting a workflow is I/O, and [workflow code has to stay deterministic](./core-build/workflows.md#why-workflow-code-must-be-deterministic), so every claim and every start happens inside the activity. The workflow only adds up counts and decides whether to go round again. A sketch, with illustrative names:
 
@@ -54,29 +54,38 @@ override fun claimAndStart(kind: DispatchKind): Counts {
     val resume = ctx.getHeartbeatDetails(Position::class.java).orElse(null)
     val rows = resume?.rows ?: store.claim(kind, limit = rates.allowed(kind) * 20, runId(ctx))
     val bucket = TokenBucket(rates.allowed(kind))
-    val started = mutableListOf<WorkRow>()
+    val unmarked = mutableListOf<WorkRow>()                  // started, not yet DISPATCHED
+    var started = 0
+    var rateReadAt = clock.millis()
+
+    fun beat(next: Int) {                                    // mark first, then heartbeat
+        store.markDispatched(unmarked); unmarked.clear()     // guarded on DISPATCHING
+        ctx.heartbeat(Position(rows, next))
+    }
 
     for (i in (resume?.next ?: 0) until rows.size) {
-        if (i % 50 == 0) {                                   // every 50 or so starts
+        if (clock.millis() - rateReadAt >= 5_000) {          // the rate, every 5 s on a timer
             bucket.rate = rates.allowed(kind)                // a new rate lands within seconds
-            while (store.inFlight(kind) >= cap(kind)) {      // backpressure
-                beat(ctx, Position(rows, i))
-                Thread.sleep(500)
-            }
+            rateReadAt = clock.millis()
         }
-        bucket.acquire { beat(ctx, Position(rows, i)) }      // heartbeat while it waits, too
+        while (store.inFlight(kind) >= cap(kind)) {          // backpressure: 1,000 to start
+            beat(i)
+            Thread.sleep(250)                                // re-checked every 250 ms while full
+        }
+        bucket.acquire { beat(i) }                           // heartbeat while it waits, too
         when (router.route(DueRow(rows[i]))) {               // admit, pin, choose the run site, start
-            Started, AlreadyStarted -> started += rows[i]    // already started counts as done
+            Started, AlreadyStarted -> { unmarked += rows[i]; started++ }
             Refused -> store.markFailed(rows[i])             // its market was taken out of service
         }
-        beat(ctx, Position(rows, i + 1))                     // the SDK throttles what it sends
+        if (unmarked.size == 100) { store.markDispatched(unmarked); unmarked.clear() }
+        if (heartbeatDue(every = 2.seconds)) beat(i + 1)
     }
-    store.markDispatched(started)                            // guarded on DISPATCHING
-    return Counts(claimed = rows.size, started = started.size)
+    beat(rows.size)
+    return Counts(claimed = rows.size, started = started)
 }
 ```
 
-The heartbeat carries the tick's position, and that position is what a retry resumes from. The SDK throttles how often heartbeats actually reach the server, so the last recorded position can be a few seconds behind. That costs nothing: the retry repeats a few starts, and a start that is already running counts as done. The rest of the sketch is the part that's easy to get wrong:
+The heartbeat carries the tick's position, and that position is what a retry resumes from. Rows are marked `DISPATCHED` in batches of 100 and before each heartbeat, so every row behind a heartbeat's position is already marked, and a retried tick leaves none behind (Proposed, 2026-11-07). The SDK throttles how often heartbeats actually reach the server, so the last recorded position can be a few seconds behind. That costs nothing: the retry repeats a few starts, and a start that is already running counts as done. The rest of the sketch is the part that's easy to get wrong:
 
 - Every status change on a Work Tracker row is a guarded update, like every other status change in Oracle. Marking a row `DISPATCHED` applies only while it is still `DISPATCHING`, so it never overwrites a row that a fast workflow has already closed as `DONE`.
 - The Router sets the workflow ID from the row: the payment ID plus its suffix, such as `{paymentId}-execute`. With reuse policy `REJECT_DUPLICATE`, a row released twice can't execute its payment twice, and a start that fails as already started is a success, not an error.
@@ -85,19 +94,20 @@ The heartbeat carries the tick's position, and that position is what a retry res
 
 ### When a worker dies mid-tick
 
-The heartbeat timeout is 10 seconds. A worker that dies mid-tick misses it, Temporal retries the activity on another worker, and the retry reads the last heartbeat's position and carries on from there. It doesn't claim again, and the rows it already started fail as already started, which counts as done.
+The heartbeat timeout is 10 seconds. Proposed numbers (2026-11-07): a 20-second tick, a 60-second hold, a sweep after 120 seconds, and an activity start-to-close of 10 minutes plus the hold. A worker that dies mid-tick misses the heartbeat timeout, Temporal retries the activity on another worker, and the retry reads the last heartbeat's position and carries on from there. It doesn't claim again, and the rows it already started fail as already started, which counts as done.
 
 Rows that were claimed but never started stay `DISPATCHING`. The sweep at the end of the run starts them again, and the next run catches anything the sweep missed. Again, a start that finds its workflow already running counts as done, so nothing runs twice.
 
 ## The inbox dispatchers
 
-The AR intake, returns and inbound dispatchers run the same loop against One-Data's inbox instead of the Work Tracker, through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions):
+The AR intake, returns and inbound dispatchers run the same loop against One-Data's inbox instead of the Work Tracker, through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions). A request's body is the workflow's start input. Proposed (2026-11-07): an AR payment's and an inbound payment's body is `CreatePayment.v3`'s body with one instruction, plus the fields One-Data passes in headers on a create, under placeholder names, and until the key's format is known, the payment ID is the request's whole idempotency key. An AR request dated today is scheduled and executes the same day (agreed 2026-11-07); which dispatcher picks it up once that day's run has passed is still to be proposed.
 
 | Work Tracker dispatcher | Inbox dispatcher |
 | --- | --- |
 | Claims rows with `FOR UPDATE SKIP LOCKED`, stamped with its run | Reads `READY` requests with `ReadStartRequests.v1`. Nothing is claimed: its Schedule allows one run at a time, and a repeated start counts as done |
 | Marks rows `DISPATCHED` | Marks requests `DONE` with `UpdateStartRequests.v1` once started, or `REJECTED` when the Router can't admit them, which raises an alert for operations |
 | Caps its in-flight work | Has no in-flight cap, because no Work Tracker row counts its work. The governor's rate paces it, and drops to zero while RTF calls fail or a downstream it calls is out |
+| A retried tick resumes from its heartbeat | A retried tick reads the inbox again, since the inbox is its position. A request it started but hadn't marked comes back already started and is marked `DONE` (Proposed, 2026-11-07) |
 
 The workflow ID comes from the request: the payment ID in its idempotency key, or for a return, the returned payment and its presentment sequence. A request that arrives twice finds the same workflow. The request's body is the workflow's start input, so the workflow never reads the inbox itself.
 

@@ -212,7 +212,7 @@ export const BANDS = [
             lead: 'Pay today, with several instructions.',
             stages: CVEF,
             child: ['Execute', 'Fulfil'],
-            childWf: 'for Execute and Fulfil',
+            childWf: 'CreateImmediatePayment',
             journey: 'Create payment, today, several instructions',
             wfId: '{groupId}-init (Proposed); each child is {groupId}_{paymentId}-init',
             answer: 'once Verify has decided every instruction',
@@ -475,14 +475,14 @@ export const BANDS = [
             lead: 'Pay today, and create a plan of future installments.',
             stages: CVEF,
             child: ['Execute', 'Fulfil'],
-            childWf: 'for Execute and Fulfil',
+            childWf: 'CreateImmediatePayment',
             journey: 'Pay & Plan',
             wfId: '{paymentId}-plan',
-            answer: 'once Verify decides',
+            answer: 'once the decision, the plan and the Autopay update are in',
             chips: five('CONSUMER', 'Y', 'N'),
             behave: 'Example values.',
-            first: 'It captures and verifies its one payment itself and replies with the decision (one instruction, Proposed).',
-            after: 'For an ACCEPTED payment it calls the Installments API and makes an optional Autopay update, on online-wf until their owners set a limit, and a child runs Execute and Fulfil as {paymentId}-init. A declined payment gets no plan (Proposed).',
+            first: 'It captures and verifies its one payment itself (one instruction, Proposed).',
+            after: 'For an ACCEPTED payment it calls the Installments API and makes an optional Autopay update, on online-wf until their owners set a limit, then replies. A child, CreateImmediatePayment started with the decision, runs Execute and Fulfil as {paymentId}-init. A declined payment gets no plan (Proposed).',
             then: [{to: 'immediate', text: 'Execute and Fulfil run as for pay today, in a child'}],
           },
         ],
@@ -528,16 +528,16 @@ export const BANDS = [
             id: 'arScheduled',
             wf: 'CreateScheduledPayment',
             tag: 'from AR',
-            lead: 'A payment AR raises, for a future date.',
+            lead: 'A payment AR raises, for a future date or for today.',
             stages: CV,
-            journey: 'From Accounts Receivable, future-dated',
+            journey: 'From Accounts Receivable, future-dated or today',
             wfId: '{paymentId}-init',
             prio: [1, '"intake"'],
             chips: five('CONSUMER', 'N', 'N'),
             behave:
               'Example values. AR never raises a corporate payment, and a future-dated payment never clears in real time.',
             notes: {Verify: 'Its SCHEDULED commit writes the SCHED_EXEC row.'},
-            then: [{to: 'execute', text: 'on the due date, its SCHED_EXEC row'}],
+            then: [{to: 'execute', text: 'on the due date, its SCHED_EXEC row; the same day for one dated today'}],
           },
           {
             id: 'arRefund',
@@ -653,12 +653,12 @@ export const BANDS = [
         row: 'SCHED_EXEC',
         by: 'scheduled-payments dispatcher',
         ctl: 'ctl-sched',
-        runs: "One Schedule per market, at the market's execution time in its time zone",
+        runs: "One Schedule per market and account type, at the execution time its release sets, in its time zone",
         writer: 'CreateScheduledPayment',
         wrote: ['scheduled', 'arScheduled'],
         written: 'in its SCHEDULED commit, for a payment that is not corporate',
         origin: ['CreatePayment.v3', 'CreateBillpayTransaction|FromAccountsReceivable.v1'],
-        due: "the market's execution time on the due date",
+        due: "the execution time of its market and account type on the due date",
         roads: [
           {
             id: 'execute',
@@ -780,7 +780,7 @@ export const BANDS = [
         row: 'REPRESENT',
         by: 'representment dispatcher',
         ctl: 'ctl-repr',
-        runs: 'One Schedule per market, every few minutes',
+        runs: 'One Schedule per market, every 5 minutes (Proposed)',
         writer: 'ProcessReturnedPayment',
         wrote: ['returned'],
         written: 'at QueueRepresentment',
@@ -1076,7 +1076,7 @@ export function calls(j, f) {
    caller's reply: every create workflow once Verify decides, whatever
    started it; a payment that waits, once after its reply and again once the
    confirm, the callback or the no decides it */
-const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no', 'refund', 'arScheduled', 'arRefund']);
+const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no', 'refund', 'arScheduled', 'arRefund', 'multiple', 'payplan']);
 /* creates One-Data never stored, so the delete finds nothing to remove */
 const UNSTORED = new Set(['arScheduled', 'arRefund']);
 
@@ -1097,6 +1097,7 @@ export function inboxUse(j) {
     return "calls the delete API once Verify decides, so the account's pending entry goes. Execute hands One-Data the settlement event Billpay creates, dated when the money moved";
   }
   if (j.id === 'no') return "calls the delete API once Cancel decides, so the account's pending entry goes";
+  if (j.id === 'multiple') return "calls the delete API for every instruction it decides, a declined one included, after the reply, so each stored create and its pending entry leave One-Data's Redis";
   if (UNSTORED.has(j.id)) return 'calls the delete API once Verify decides, after the reply, as every create workflow does; it finds nothing to remove';
   if (j.id === 'refund') return 'calls the delete API once Verify decides, after the reply, as every create workflow does; for now a placeholder, until One-Data says whether it stores refunds';
   if (DELETES.has(j.id)) return "calls the delete API once Verify decides, after the reply, so the stored create and the account's pending entry leave One-Data's Redis";

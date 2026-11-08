@@ -29,7 +29,7 @@ Escalation paths, and the steps to acknowledge and resolve an alert in Kibana, a
 | --- | --- | --- |
 | Late allocations | A corporate payment is still `ALLOCATING` at the market's alert point | Chase the allocation source. [Runbook](../../operations/sops.md#late-allocations) |
 | Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list, then reprocess or terminate each payment's workflow by hand. [Runbook](../../operations/sops.md#retries-exhausted) |
-| Payment not PAID | A payment (other than a split parent) or a leg is still `PROCESSED` after 48 hours, or an inbox row has stayed `UNMATCHED` for 48 hours, which One-Data's `UpdateUnmatchedPayments.v1` raises | Read the inbox row for the missing event, or check the event's IDs against Oracle. [Runbook](../../operations/sops.md#a-payment-not-paid-after-48-hours) |
+| Payment not PAID | A payment (other than a split parent) or a leg is still `PROCESSED` after 48 hours and the missing-events check (hourly, Proposed) couldn't find and hand over its events, counted by `billpay_paid_overdue_total` (agreed 2026-11-07); or an inbox row has stayed `UNMATCHED` for 48 hours, which One-Data's `UpdateUnmatchedPayments.v1` raises | Read the inbox row for the missing event, or check the event's IDs against Oracle. [Runbook](../../operations/sops.md#a-payment-not-paid-after-48-hours) |
 | Event without a payment | An event with no payment ID matches no payment through `ReadPayments.v1`, or more than one | Find the payment and replay the event through its handler. [Runbook](../../operations/sops.md#an-event-that-matches-no-payment) |
 | Rejected request | A dispatcher marks a pulled request `REJECTED`, because nothing live matches its market, account type or API | Find out why traffic reached something that isn't live, since a market's traffic is enabled only after its release is live in production. The sender is not told. [Runbook](../../operations/sops.md#a-rejected-request) |
 | Release failed onboarding | `MarketOnboardingWorkflow` stops before activation | Fix the profile, or ship the build it needs. [Runbook](../../operations/sops.md#a-release-failed-onboarding) |
@@ -39,7 +39,7 @@ Escalation paths, and the steps to acknowledge and resolve an alert in Kibana, a
 | Alert | Fires when | People do |
 | --- | --- | --- |
 | Returns backlog age | The oldest return waiting in One-Data's inbox passes its age threshold (Proposed: checked by `UpdateUnmatchedPayments.v1`) | Check whether higher priorities are holding the queue |
-| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold (Proposed: checked by `UpdateUnmatchedPayments.v1`) | Check whether the governor is holding the drain, or RTF is down. [Runbook](../../operations/sops.md#paid-backlog-age) |
+| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold, counted from when the row last became `READY`, so a row back from `UNMATCHED` doesn't trip it (agreed 2026-11-07; Proposed: checked by `UpdateUnmatchedPayments.v1`) | Check whether the governor is holding the drain, or RTF is down. [Runbook](../../operations/sops.md#paid-backlog-age) |
 
 Returns sit at the lowest priority, so during an execution window they can wait behind everything else. That is fine for work nobody is waiting on, and the age alert keeps a long wait from going unnoticed.
 

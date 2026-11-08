@@ -17,7 +17,9 @@ A composite exists because the customer asked for one thing. Paying now and sett
 
 The caller waits for an answer, and the answer is Verify's decision. If each child made its own decision, the composite would hear it only when the child ended, after Execute and Fulfil. A workflow can't send an update to another workflow, and payment workflows take no signals, so there is no earlier way for a child to report back. The caller would mostly hear `PENDING` at 2.5 s and learn the outcome later.
 
-So the composite runs Capture and Verify for each of its payments itself, replies with the decisions, and hands only Execute and Fulfil to its children (agreed 2026-11-07). Which workflow the children run is still to be named.
+So the composite runs Capture and Verify for each of its payments itself, replies with the decisions, and hands only Execute and Fulfil to its children (agreed 2026-11-07). Each child is `CreateImmediatePaymentWorkflow`, started with the composite's decision, so it skips Capture and Verify and goes straight to Execute and Fulfil (agreed 2026-11-07).
+
+The composite also calls One-Data's delete for every payment it decides, a declined one included (agreed 2026-11-07). A declined instruction gets no child, so if the children called it, a declined instruction's pending entry would stay until One-Data's hourly sweep cleared it, which takes an entry only once it is 2 hours old, and the account couldn't pay again until then.
 
 ## Create Payment & Installments
 
@@ -25,9 +27,10 @@ So the composite runs Capture and Verify for each of its payments itself, replie
 
 Pay & Plan combines a payment today with a plan of future installments, across Billpay and GAR. Its workflow type is `PayAndPlanWorkflow` (Proposed, 2026-11-07), and it takes one instruction (Proposed, 2026-11-07).
 
-1. Capture and Verify the payment, then reply with the decision.
+1. Capture and Verify the payment.
 2. For an `ACCEPTED` payment, call the Installments API to set up the plan, and make the optional update to the customer's Autopay. A declined payment gets no plan (Proposed).
-3. A child runs the payment's Execute and Fulfil, as `{paymentId}-init`.
+3. Reply. The reply waits for the decision, the plan and the Autopay update, so the customer hears about all three at once (agreed 2026-11-07).
+4. A child runs the payment's Execute and Fulfil, as `{paymentId}-init`.
 
 The composite's ID ends in `-plan` so that the payment's own workflow keeps `{paymentId}-init`, the ID every payment's workflow has (agreed 2026-11-07). The Installments and Autopay calls are neither Execute's nor Fulfil's, so they run on the workflow's own queue, `online-wf`. They move to a `ds-*` queue once their owners set a rate limit (Proposed, 2026-11-07).
 
@@ -41,7 +44,7 @@ Pay & Plan never takes bank confirmation or a debit card. A request that would n
 
 1. Capture each instruction with its own idempotency key, so each is its own payment with its own lifecycle and outcome.
 2. Verify each instruction, then reply with every decision.
-3. Start a child for each accepted instruction, to run its Execute and Fulfil.
+3. Start a child for each accepted instruction, to run its Execute and Fulfil, and call One-Data's delete for every instruction.
 
 The request carries one payment option ID for the whole payment (agreed 2026-11-07). The composite checks it once, for all its instructions. If the option no longer holds, every instruction is declined with `PAYMENT_OPTION_INVALID`, after each has been captured, so the customer is told and One-Data's delete runs (Proposed, 2026-11-07).
 

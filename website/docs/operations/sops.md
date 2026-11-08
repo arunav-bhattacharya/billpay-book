@@ -96,7 +96,7 @@ The `PAID` drain comes last in the governor's order, and the Oracle signals cut 
 
 ## A payment not PAID after 48 hours
 
-The payment not PAID alert fires when a payment or a leg is still `PROCESSED` after 48 hours, or when an inbox row has stayed `UNMATCHED` for 48 hours. Split parents are left out, since only their legs turn `PAID`.
+The payment not PAID alert fires when a payment or a leg is still `PROCESSED` after 48 hours and the missing-events check couldn't find and hand over its events (agreed 2026-11-07), or when an inbox row has stayed `UNMATCHED` for 48 hours. Split parents are left out, since only their legs turn `PAID`.
 
 Billpay has already looked. `ProcessMissingPaidEventsWorkflow` asks MR/M3, the clearing system, and GAR, the Accounts Receivable system, for the payment's current state, and hands any event it finds to One-Data's handler.
 

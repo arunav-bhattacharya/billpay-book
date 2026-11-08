@@ -206,13 +206,15 @@ object DeclineCodes {
         "INSTRUMENT_FOUND" to DeclineCode.INSTRUMENT_NOT_FOUND,
         "INSTRUMENT_OPEN" to DeclineCode.INSTRUMENT_CLOSED,
         "MANDATE_ACTIVE" to DeclineCode.MANDATE_NOT_ACTIVE,
-        "GB_FUNDS" to DeclineCode.INSUFFICIENT_FUNDS,
+        "OPTION_VALID" to DeclineCode.PAYMENT_OPTION_INVALID,
+        "BALANCE_OWED" to DeclineCode.NO_BALANCE_OWED,
+        "FUNDS_AVAILABLE" to DeclineCode.INSUFFICIENT_FUNDS,
     )
     fun of(ruleId: String): DeclineCode? = byRule[ruleId]
 }
 ```
 
-*(A sketch: GB's funds rule is illustrative; the other codes are the agreed placeholders.)*
+*(A sketch: the table below has every rule and its placeholder code.)*
 
 The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INSTRUMENT_OPEN` and `MANDATE_ACTIVE`; a rule that the payment option is still valid, for the Options check; and rules on the market's rule settings: the largest payment, the instrument types the market takes and the scheduling horizon. Each rule's decline code is a placeholder until product sends the codes, an UPPERCASE enum with its words joined by underscores (agreed 2026-11-07):
 
@@ -225,6 +227,15 @@ The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INS
 | The largest payment | `AMOUNT_ABOVE_MAXIMUM` |
 | The instrument types the market takes | `INSTRUMENT_TYPE_NOT_ACCEPTED` |
 | The scheduling horizon | `DATE_BEYOND_SCHEDULING_HORIZON` |
+| `OPTION_VALID`, at Reverify (agreed 2026-11-07) | `PAYMENT_OPTION_INVALID` |
+| `BALANCE_OWED`, at Reverify (agreed 2026-11-07) | `NO_BALANCE_OWED` |
+| `TOKEN_VALID` (Proposed) | `TOKEN_INVALID` |
+| `FUNDS_AVAILABLE`, GB's funds rule (Proposed) | `INSUFFICIENT_FUNDS` |
+| `CARD_AUTHENTICATED` (Proposed) | `CARD_AUTHENTICATION_FAILED` |
+| `CARD_AUTHORIZED` (Proposed) | `CARD_AUTHORIZATION_DECLINED` |
+| `CONFIRMATION_AVAILABLE` (Proposed) | `CONFIRMATION_UNAVAILABLE` |
+
+On the due date, Reverify runs two rules against `ReadPaymentOptions.v1` (agreed 2026-11-07): `BALANCE_OWED`, for a customer who no longer owes money, and `OPTION_VALID`, for an option that no longer holds. Proposed: `BALANCE_OWED` comes first, at priority 360 against 350, and a customer owes money when some option today has an amount above 0. The names of the balance options are placeholders.
 
 A held create that arrives after its market went out of service is declined with `MARKET_OUT_OF_SERVICE`, by the same placeholder rule (Proposed, 2026-11-07).
 
@@ -238,6 +249,6 @@ A test asks the rule registry for every rule it holds and fails if `DeclineCodes
 - A rule keeps one decline code. Specifications combine inside a rule only when one code fits the whole condition; otherwise they are two rules.
 - The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. GB's funds rule sits beside `GBFundsCheck` in `market/gb/` and names GB and bank confirmation, as the check does. MX's split also lives in `market/mx/`, with its numbers as rule settings in MX's release (Proposed, 2026-11-07), but it shapes the legs Verify's `ACCEPTED` commit writes rather than passing or declining the payment; [When a consumer payment splits](../../design/component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.
 - `fetchAll` waits for every check. An activity returns what its system said, such as a closed account or an expired mandate, as data, and throws only on an error, which Temporal retries. So an outage never declines a payment, and a "no" is never retried.
-- The shared rules sit in `core/lib/verification/rules/`, each with the steps it runs in. Reverify runs the same `MandateCheck` and `MANDATE_ACTIVE` on the due date. Represent calls none of Payment Instruments, Payment Options and Plans: it will add checks and rules of its own once they are defined.
+- The shared rules sit in `core/lib/verification/rules/`, each with the steps it runs in. Reverify runs the same `MandateCheck` and `MANDATE_ACTIVE` on the due date. Represent calls none of Payment Instruments, Payment Options and Plans: it will add checks and rules of its own once they are defined, and until then its recheck passes (Proposed, 2026-11-07).
 - A rule reads only the facts, never `Instant.now()` or a service. That is what makes it safe inside the workflow, where a replay must reach the same decision.
 - The report keeps every rule's result. The commit's timeline row keeps the IDs of the rules that failed in its event JSON, and `billpay_verification_declines_total` counts declines by step and rule.

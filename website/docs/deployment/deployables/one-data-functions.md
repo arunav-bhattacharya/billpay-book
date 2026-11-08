@@ -39,7 +39,7 @@ A start request is `READY` as soon as it is stored, and its dispatcher marks it 
 
 ### Rows for PAID
 
-A payment turns `PAID` once both the bank's settlement and AR's posting are in. Every payment gets both, even where `requiresArPosting` is N. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead: Execute hands it to the money movement handler, dated when the money moved, so its row pairs the same way and needs no rule of its own (Proposed). A split payment settles once, as a whole, while each leg posts on its own, so a leg takes its payment's settlement: the split payment's own row holds only the settlement, and each leg's row pairs its posting with it.
+A payment turns `PAID` once both the bank's settlement and AR's posting are in. Every payment gets both, even where `requiresArPosting` is N. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead: Execute hands it to the money movement handler, dated when the money moved, so its row pairs the same way and needs no rule of its own (Proposed). A corporate payment settles once, as a whole, while each leg posts on its own, so a corporate leg takes its payment's settlement: the payment's own row holds only the settlement, and each leg's row pairs its posting with it. A consumer split's legs clear on their own, so each settles on its own too (agreed 2026-11-07).
 
 | `sta_cd` | Meaning |
 | --- | --- |
@@ -77,7 +77,8 @@ where (p.stlmt_ts is null and excluded.stlmt_ts is not null)
 <summary>The pairing statements that follow the upsert</summary>
 
 ```sql
--- a leg's posting: take its payment's settlement, if it is in
+-- a corporate leg's posting: take its payment's settlement, if it is in
+-- (a consumer split's leg gets its own settlement, under its own ID, through the upsert above)
 update bpyevnts.billpay_paid_ready l
    set stlmt_ts = p.stlmt_ts, sta_cd = 'READY', lst_updt_ts = now()
   from bpyevnts.billpay_paid_ready p
@@ -105,7 +106,7 @@ update bpyevnts.billpay_paid_ready
 Why it is safe when events arrive together, or twice:
 
 - When both events for one row arrive at once, Postgres makes the second upsert wait for the first one's row, so it sees both and sets `READY`.
-- The payment's lock does the same across rows. A settlement waits for postings already in flight, and a posting that arrives during a settlement waits for it, so a leg and its payment's settlement always meet.
+- The payment's lock does the same across rows. A settlement waits for postings already in flight, and a posting that arrives during a settlement waits for it, so a corporate leg and its payment's settlement always meet.
 - One settlement can hand off to up to 100K legs in one statement. The `PAID` drain then takes them at the governor's pace.
 - Only `WAITING` moves to `READY`, and the `where` clause skips an event the row already has. A repeat changes nothing, not even `lst_updt_ts`, so a `READY` row keeps its place in the fetch order and an `UNMATCHED` row keeps its retry time.
 - `billpay_extnl_event` needs no unique index on the idempotency ID: a repeated event leaves the inbox row as it was, and Settle skips a payment that is already `PAID`.

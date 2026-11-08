@@ -16,8 +16,18 @@ Schedules start three kinds of work: the dispatchers, which release payments at 
 
 - Overlap policy SKIP. A trigger that fires while the last run is still going does nothing, so a slow run never stacks up behind itself. That is how `ProcessPaidEventsWorkflow` can fire every 30 seconds and still only ever have one run.
 - For the dispatchers, a catch-up window of 6 hours, so a trigger missed during an outage still fires when the cluster is back.
-- A run's workflow ID is the workflow ID set in the Schedule's start action, which we make the same as the Schedule's ID, plus the trigger time Temporal appends, such as `dispatch-sched-DE` and the time, so every run can be found from its Schedule.
-- Each dispatcher runs its activities on its own control queue, such as `ctl-sched` or `ctl-repr`, and has its own budget from the governor. One kind of work can't hold up another.
+- A run's workflow ID is the workflow ID set in the Schedule's start action, plus the trigger time Temporal appends, so every run can be found from its Schedule. Proposed names (2026-11-07):
+
+| Schedule | Starts |
+| --- | --- |
+| `scheduled-payments-{market}-{accountType}` | `dispatch-scheduled-payments-{market}-{accountType}` |
+| `representments-{market}` | `dispatch-representments-{market}` |
+| `ar-intake`, `returns`, `inbound` | `dispatch-ar-intake`, `dispatch-returns`, `dispatch-inbound` |
+| `paid-drain` | `process-paid-events` |
+| `missing-paid-events`, hourly | `process-missing-paid-events` |
+| `purge-transaction-data`, daily at 02:00 UTC | `purge-transaction-data` |
+
+- Each dispatcher runs its activities on its own control queue, such as `ctl-sched`, `ctl-intake`, `ctl-return`, `ctl-inbound` or `ctl-repr`, and has its own budget from the governor. One kind of work can't hold up another.
 
 A minute Schedule starts a short run: it drains what is due, continues-as-new while work remains, and ends when a claim comes back empty. The governor's Schedule works differently, because the governor is meant to run all the time. Its Schedule only starts it again if it isn't running.
 
@@ -25,12 +35,14 @@ There is no batching to tune here. The pace comes from the governor, which sets 
 
 ## Market Schedules
 
-The scheduled-payments and representment dispatchers run per market, at the market's own times. Their Schedules aren't written by hand, and they don't ship with a deploy. They arrive in a market release from the Market Onboarding UI:
+The scheduled-payments dispatcher runs per market and account type, at the time each release sets, and the representment dispatcher per market (agreed 2026-11-07). Their Schedules aren't written by hand, and they don't ship with a deploy. They arrive in a market release from the Market Onboarding UI:
 
 1. [The onboarding workflow](../onboarding/market-onboarding-api.md) saves the release with its Schedules, inactive.
 2. When the release is activated, the Schedules go live with it.
 3. A rollback switches back to the previous version's Schedules and settings.
 
-A market's Schedule takes its time zone, so the execution time holds across daylight saving. Test the daylight-saving weekends. The US market runs on Phoenix time, which has no daylight saving, so its run starts at 00:01 MST all year. Execution runs every day: no market keeps a holiday calendar.
+Each release sets `timeZone`, an IANA zone such as `America/Phoenix`, and `executionTime`, `HH:mm`, local midnight when unset (agreed 2026-11-07). A Schedule takes its time zone, so the execution time holds across daylight saving. Test the daylight-saving weekends: on the Temporal dev server (1.32.2), a Schedule at local midnight in `Europe/London` fires one extra run at 00:00Z on 2027-10-31, which is 01:00 BST, just before the clocks go back. That run finds nothing due and ends after its sweep, so it does no harm, but check the production server's version before a market with daylight saving relies on Schedules. The US market runs on Phoenix time, which has no daylight saving, so its run starts at 00:01 MST all year. Execution runs every day: no market keeps a holiday calendar.
+
+Until market activation creates the Schedules, billpay-offline creates any that are missing from the active config every 15 seconds, and tests create them paused (Proposed, 2026-11-07).
 
 Pausing a live market stops its dispatchers, through the Market Onboarding API's pause and resume, and pausing a Schedule stops new runs too.

@@ -78,7 +78,7 @@ The 36 functions, grouped by the class they start from. Leg classes mirror the f
 | `ReturnedFullPayment` | `toRepresentingFullPayment(representmentDate)`, which builds the next presentment with the representment date as its clearing date |
 | `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toDeclinedFullPayment(declineCode)` when the recheck fails |
 | `RepresentedFullPayment` | `toReturnedFullPayment(returnedInfo)` |
-| `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same ten moves at leg level: accepted to processing; processing to processed or returned; processed to paid or returned; paid to returned; returned to the next presentment; representing to represented, or declined when the recheck fails; represented to returned |
+| `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same ten moves at leg level: accepted to processing; processing to processed or returned; processed to paid or returned; paid to returned; returned to the next presentment; representing to represented, or declined when the recheck fails; represented to returned. No journey represents a leg (agreed 2026-11-07), so the leg's representment moves have no caller for now, and whether they stay is open |
 
 The arguments say what each move needs. The move out of `PENDING` takes exactly what Verify resolves, so Verify's results are the arguments. Every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile, and the move to the next presentment takes the date it clears on.
 

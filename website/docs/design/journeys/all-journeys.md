@@ -487,7 +487,7 @@ One request, more than one instruction. To the customer, that is a bank account 
   core={[{kind: 'api', label: 'POST /payments'}]}
   workflow={[
     {label: 'CreatePaymentWithMultipleInstructionsWorkflow'},
-    {label: 'Execute and Fulfil', via: 'runs', child: true, note: 'one per accepted instruction'},
+    {label: 'CreateImmediatePaymentWorkflow', via: 'runs', child: true, note: 'one per accepted instruction; Execute and Fulfil only'},
   ]}
   persist={false}
   band={false}
@@ -535,22 +535,22 @@ The customer pays today and sets up a plan of future installments in the same re
   core={[{kind: 'api', label: 'POST /payment-installments'}]}
   workflow={[
     {label: 'Create Payment & Installments'},
-    {label: 'Execute and Fulfil', via: 'runs', child: true},
+    {label: 'CreateImmediatePaymentWorkflow', via: 'runs', child: true, note: 'Execute and Fulfil only'},
   ]}
   persist={false}
   band={false}
   steps={[
-    {icon: 'shieldCheck', name: 'Decide', caption: 'Capture and Verify, then the reply'},
+    {icon: 'shieldCheck', name: 'Decide', caption: 'Capture and Verify'},
     {icon: 'calendar', name: 'Plan', caption: 'future installments', systems: ['Installments']},
-    {icon: 'recheck', name: 'Autopay', caption: 'an optional update'},
+    {icon: 'recheck', name: 'Autopay', caption: 'an optional update, then the reply'},
     {icon: 'orchestrate', name: 'Pay', caption: 'Execute and Fulfil in a child'},
   ]}
   detail={[
     {text: 'One-Data runs the same pending check as on a payment: if the card account already has a payment in `PENDING`, it declines the request there and then, and Billpay never sees it.'},
-    {step: 1, text: 'The composite captures and verifies the payment itself, as [Pay my bill today](#pay-my-bill-today) does, and replies with the decision. A child that decided would be heard only when it ended, after Execute and Fulfil.'},
+    {step: 1, text: 'The composite captures and verifies the payment itself, as [Pay my bill today](#pay-my-bill-today) does. A child that decided would be heard only when it ended, after Execute and Fulfil.'},
     {step: 2, text: 'For an `ACCEPTED` payment, the composite calls the Installments API to set up the plan of future installments. Billpay asks for the plan; it doesn\'t own it. A declined payment gets no plan (Proposed).'},
-    {step: 3, text: 'An optional update to the customer\'s Autopay. The Installments and Autopay calls run on the workflow\'s own queue until their owners set a rate limit (Proposed).'},
-    {step: 4, text: 'A child on the same cluster runs the payment\'s Execute and Fulfil, as `{paymentId}-init`. Nothing about the plan changes how the money moves or settles.'},
+    {step: 3, text: 'An optional update to the customer\'s Autopay. The Installments and Autopay calls run on the workflow\'s own queue until their owners set a rate limit (Proposed). Then the composite replies: the reply waits for the decision, the plan and the Autopay update (agreed 2026-11-07).'},
+    {step: 4, text: 'A child on the same cluster, `CreateImmediatePaymentWorkflow` started with the decision, runs the payment\'s Execute and Fulfil, as `{paymentId}-init`. Nothing about the plan changes how the money moves or settles.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#12-pay--plan', label: 'Sequence diagram'}}
 />
@@ -1051,8 +1051,8 @@ This is where a payment turns `PAID`, or for a split payment, each of its legs. 
     {step: 2, text: 'Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a guarded update, and tags each `PAID` timeline row with the batch\'s ID. A retried Settle finds the payments it already moved by that ID.'},
     {step: 3, text: 'The `PAID` events go to RTF.'},
     {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data\'s own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row is `DONE` only once its event has gone out.'},
-    {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its parent has settled. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split.'},
-    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a Pay with Bank Transfer or debit card payment, which MR/M3 never settles: it asks GAR alone, and hands over Billpay\'s own settlement event again if the inbox lacks it (Proposed).'},
+    {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its settlement is in. A corporate leg takes its parent\'s settlement, and a consumer split\'s leg settles on its own. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split.'},
+    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a Pay with Bank Transfer or debit card payment, which MR/M3 never settles: it asks GAR alone, and always hands over Billpay\'s own settlement event again, since Billpay can\'t read the inbox (Proposed).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#10-paid-events', label: 'Sequence diagram'}}
 />
@@ -1111,8 +1111,8 @@ Days after a payment looks finished, the bank can send the money back. Billpay r
     {text: 'Returns come in bursts, up to 100 a second and 100K a day. One-Data keeps each one in its inbox, and the returns dispatcher starts them through the Router at the governor\'s pace, at priority 5, the lowest priority level.'},
     {step: 1, text: 'Only a payment that got far enough can come back. The workflow checks the payment, whole or a leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment returned again.'},
     {step: 2, text: 'The presentment that came back moves to `RETURNED`, and its row stays there.'},
-    {step: 3, text: 'Not every return is worth another try. The market\'s representment rules say which return reasons can be represented and how many times a payment can be, and a return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.'},
-    {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never starts the representment itself; the date does.'},
+    {step: 3, text: 'Not every return is worth another try. The market\'s release holds its representment rules: which return reasons can be represented, how many times a payment can be, and how many days after the return it goes again (agreed 2026-11-07). A return that fails either test stays `RETURNED`, and so does a leg\'s, since only a whole payment is represented. The representment date is the day the return arrived, in the market\'s time zone, plus those days.'},
+    {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due at its start, so a same-day representment is due at once (Proposed). A return never starts the representment itself; the date does.'},
     {text: 'What happens on that date is [A payment is represented](#a-payment-is-represented).'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#7-return', label: 'Sequence diagram'}}
@@ -1132,7 +1132,7 @@ The second attempt queued by a return, run on the day it falls due. Billpay chec
     brandLogo: false,
     channels: [{icon: 'calendar', label: 'REPRESENT rows due today'}],
   }}
-  entry={[{kind: 'schedule', label: 'Every few minutes, per market'}]}
+  entry={[{kind: 'schedule', label: 'Every 5 minutes, per market (Proposed)'}]}
   core={[{kind: 'dispatcher', label: 'Representment dispatcher'}]}
   workflow={{label: 'ProcessRepresentmentWorkflow'}}
   band={false}
@@ -1162,9 +1162,9 @@ The second attempt queued by a return, run on the day it falls due. Billpay chec
   ]}
   detail={[
     {text: 'A representment is the next presentment of the same payment: a new row with the same payment ID, numbered one higher. [A payment is returned](#a-payment-is-returned) queued it, and it has waited as a Work Tracker row since.'},
-    {step: 1, text: 'Each market\'s representment dispatcher runs every few minutes, claims the `REPRESENT` rows that are due and starts `ProcessRepresentmentWorkflow` through the Router.'},
-    {step: 2, text: 'Eligibility is checked again before anything goes to clearing. Days may have passed since the return, and the account may have changed.'},
-    {step: 3, text: 'The new presentment goes to clearing and lands at `REPRESENTED`. A failed recheck ends it at `DECLINED`, and nothing is sent.'},
+    {step: 1, text: 'Each market\'s representment dispatcher runs every 5 minutes (Proposed), claims the `REPRESENT` rows that are due and starts `ProcessRepresentmentWorkflow` through the Router.'},
+    {step: 2, text: 'Eligibility is checked again before anything goes to clearing. Days may have passed since the return, and the account may have changed. Represent\'s own checks are still to be defined, so for now the recheck passes (Proposed).'},
+    {step: 3, text: 'The new presentment goes to clearing, in the batch, with the idempotency key `{paymentId}-represent-{seq}`, and lands at `REPRESENTED`. A failed recheck ends it at `DECLINED`, and nothing is sent.'},
     {text: 'If this presentment comes back too, that is a new return, with its own workflow ID, and the next presentment is number 3.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#8-representment', label: 'Sequence diagram'}}
@@ -1239,7 +1239,7 @@ Someone other than the cardmember pushes money at the account. Amex didn't ask f
 
 ### Accounts Receivable initiates a payment
 
-Some payments start inside Amex. Accounts Receivable raises them on the customer's behalf, in bulk, and they run as scheduled payments with nobody on the line.
+Some payments start inside Amex. Accounts Receivable raises them on the customer's behalf, in bulk, and they run as scheduled payments with nobody on the line. One dated today is scheduled too, and executes the same day (agreed 2026-11-07).
 
 <JourneyMap
   kind="system"

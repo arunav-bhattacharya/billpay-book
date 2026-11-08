@@ -185,7 +185,7 @@ A corporate payment's allocation request races a cancel the same way. Both are g
 
 A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}` and the card account it pays, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through the same states as any payment, `PROCESSING`, `PROCESSED` and on.
 
-`PAID` is set on legs, never on the parent. The bank settles a split payment once, as a whole, while Accounts Receivable posts each leg on its own. So each leg turns `PAID` once its own posting and its parent's settlement are both in. That holds for consumer and corporate splits alike.
+`PAID` is set on legs, never on the parent. Accounts Receivable posts each leg on its own, and a leg turns `PAID` once its posting and its settlement are both in. Where the settlement comes from differs (agreed 2026-11-07). A corporate payment clears once, as a whole, so the bank settles it once and every leg takes its parent's settlement. A consumer split's legs clear on their own, so each settles on its own too.
 
 Where the parent stops differs (agreed 2026-11-07). A consumer split's parent doesn't clear, because its legs clear on their own, so it stays `ACCEPTED` while its legs move through `PROCESSING`, `PROCESSED` and `PAID`. A corporate parent clears once, as a whole, so it reaches `PROCESSED` and stays there. Consumer splits happen only in a few exceptions, such as a large payment from certain banks in Mexico; [Core Workflows](./component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.
 

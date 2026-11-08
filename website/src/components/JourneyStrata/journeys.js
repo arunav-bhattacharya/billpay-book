@@ -91,7 +91,7 @@ export const GROUPS = [
             ruler: [{t: 'until the due date'}],
           },
           {
-            phase: ['The due date', "the market's execution time"],
+            phase: ['The due date', 'the execution time its release sets'],
             road: 'execute',
             customer: [{t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'}],
             oracle: [
@@ -201,7 +201,7 @@ export const GROUPS = [
               {t: 'Pays from a bank account and MR Points', s: 'two instructions', m: 'on', at: 'Capture'},
               {t: 'Sees the result', st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
-            oneData: [{...CREATE, at: 'Capture'}],
+            oneData: [{...CREATE, at: 'Capture'}, {...DELETE_END, s: 'for every instruction, a declined one included, once Verify decides'}],
           },
           paidAfter(false),
         ],
@@ -240,10 +240,10 @@ export const GROUPS = [
             waiting: true,
             customer: [
               {t: 'Pays today and sets up a plan', s: 'future installments', m: 'on', at: 'Capture'},
-              {t: 'Sees the answer', st: 'ACCEPTED', m: 'on', at: 'Verify'},
+              {t: 'Sees the answer', s: 'once the plan and the Autopay update are in', st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
-            oneData: [{c: 'CreatePaymentInstallment.v1', s: 'Pay & Plan', at: 'Capture'}],
-            after: 'For an ACCEPTED payment, the Installments API sets up the plan and an optional Autopay update follows, while a child runs Execute and Fulfil. A declined payment gets no plan (Proposed).',
+            oneData: [{c: 'CreatePaymentInstallment.v1', s: 'Pay & Plan', at: 'Capture'}, DELETE_END],
+            after: 'For an ACCEPTED payment, the Installments API sets up the plan and an optional Autopay update follows. Then the composite replies, and a child runs Execute and Fulfil. A declined payment gets no plan (Proposed).',
           },
           paidAfter(false),
         ],
@@ -446,7 +446,7 @@ export const GROUPS = [
             ruler: [{t: 'as batches arrive', at: 'ReceiveAllocations'}],
           },
           {
-            phase: ['The due date', "the market's execution time"],
+            phase: ['The due date', 'the execution time its release sets'],
             road: 'corpExecute',
             cond: {},
             customer: [],
@@ -550,7 +550,7 @@ export const GROUPS = [
         term: 'AR initiates a payment',
         kind: 'system',
         days: true,
-        meta: ['Accounts Receivable calls', 'Offline', 'future-dated'],
+        meta: ['Accounts Receivable calls', 'Offline', 'future-dated or today'],
         segments: [
           {
             phase: ['Intake', 'nobody waits'],
@@ -568,7 +568,7 @@ export const GROUPS = [
             ruler: [{t: 'days'}],
           },
           {
-            phase: ['The due date', "the market's execution time"],
+            phase: ['The due date', 'the execution time its release sets'],
             road: 'execute',
             customer: [{t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'}],
             oracle: [

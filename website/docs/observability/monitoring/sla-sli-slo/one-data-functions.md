@@ -20,7 +20,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
 
-**SLI:** caller-observed latency at the One-Data edge, including the contract validation and the pending check in Redis. If billpay-online doesn't answer within 3 seconds, One-Data holds the create for RTF and answers `PENDING`, so a caller's wait has a ceiling even when the core is slow. **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency at the One-Data edge, including the contract validation and the pending check in Redis. If billpay-online doesn't answer within 3 seconds, One-Data holds the create for RTF and answers `PENDING` (a pay-by-bank or debit card create gets 503 instead), so a caller's wait has a ceiling even when the core is slow. **Error budget:** 0.05% / 30-day window.
 
 ## Update Payment
 

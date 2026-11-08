@@ -14,6 +14,7 @@ import Lead from '@site/src/components/Lead';
 - Every workflow gets one trace, through the OpenTelemetry interceptors on the Temporal clients and workers.
 - When one step leaves work for a later one, such as Verify writing a scheduled payment's Work Tracker row, the producer's trace context goes with it, in the row's `trace_parent`.
 - The execution or leg that the row later starts carries a span link back to that trace. Follow the link to step from one workflow's trace to the one that set it up.
+- A dispatcher makes one span for each start, `dispatch {itemType}`, with the payment ID on it. It has no parent, and links to the row's `trace_parent` and to the dispatcher tick's own span (Proposed, 2026-11-07).
 
 A single trace that ran from the create to the payment turning `PAID` could stay open for 30 days, which isn't practical, so the links do that job instead.
 

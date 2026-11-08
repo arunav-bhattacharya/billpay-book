@@ -17,7 +17,7 @@ import Lead from '@site/src/components/Lead';
 | **Strong ACID guarantees** | Money movement cannot tolerate phantom reads, lost writes, or partial commits. Serialisable isolation and well-understood locking behavior are the table stakes everything else builds on. |
 | **Operations we don't have to build** | A dedicated Amex DBO team covers HA, backup, restore, patching, and capacity. Picking a datastore nobody else at Amex runs would mean carrying that whole layer ourselves. |
 | **Fits our load shape** | Billpay is mixed OLTP: short, hot transactions on `trans_dtl` and `idempotency_checker` next to append-only timelines (`trans_lfcyc_event`, `split_trans_lfcyc_event`) and a Work Tracker that grows by millions of rows. Oracle handles that shape predictably with the right indexes and partitioning. |
-| **Partitioning is how we purge** | The Work Tracker is partitioned by day, and dropping a partition 15 days after it falls due retires its rows at once, with no mass `DELETE`. |
+| **Partitioning is how we purge** | The Work Tracker is partitioned by day, and dropping a partition 15 days after it falls due retires its rows at once, with no mass `DELETE`. A partition that still holds unfinished rows waits for a later run. |
 | **Idempotency at the constraint level** | First-write-wins is a unique constraint rather than application code, so there is no race to reason about. |
 | **Replicas and DR are solved** | Read replicas take the reporting load and Data Guard covers disaster recovery. Both are run by the DBO team, not by us. |
 | **JSON where relational is overkill** | Complex payloads, such as the allocation batches a corporate payment receives, can sit in JSON-typed columns instead of exploding into side tables. |

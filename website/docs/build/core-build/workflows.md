@@ -47,7 +47,7 @@ Every one of these starts goes through the Router, and the Router places it: the
 
 A child always runs on its parent's cluster. These journeys use them:
 
-- A composite makes the decision itself, so it can reply with it, and runs each accepted payment's Execute and Fulfil as a child (agreed 2026-11-07). Multiple instructions starts one child per accepted instruction, and Pay & Plan one for its payment. Which workflow those children run is still to be named.
+- A composite makes the decision itself, so it can reply with it, and runs each accepted payment's Execute and Fulfil as a child (agreed 2026-11-07). Multiple instructions starts one child per accepted instruction, and Pay & Plan one for its payment. Each child is `CreateImmediatePaymentWorkflow`, started with the composite's decision, so it skips Capture and Verify; the composite calls One-Data's delete for every payment it decides (agreed 2026-11-07).
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child, and the parent stays `ACCEPTED` while its legs move on.
 

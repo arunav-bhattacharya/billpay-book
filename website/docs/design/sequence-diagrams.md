@@ -157,7 +157,7 @@ sequenceDiagram
   end
 
   rect rgba(0,23,90,0.12)
-    Note over SD,RAV: Offline cluster, at the market's execution time on the due date
+    Note over SD,RAV: Offline cluster, at the execution time of the payment's market and account type on the due date
     SD->>PS: claim due SCHED_EXEC<br/>rows: DISPATCHING
     SD->>R: re-route with today's config
     Note over R: admit, pin profile, run on Offline
@@ -527,8 +527,8 @@ sequenceDiagram
     end
     WF->>RTF: RETURNED event
     WF->>RAV: RETURNED message
-    opt the market's rules allow another presentment
-      Note over WF,RET: date from market rules, today or later
+    opt the release's representment block allows another presentment
+      Note over WF,RET: date: the day the return arrived, in the market's time zone, plus delayDays
       WF->>QR: run
       rect rgba(102,169,226,0.40)
         QR->>PS: insert the next presentment<br/>(seq + 1) in REPRESENTING,<br/>with a REPRESENT row<br/>due on that date
@@ -571,7 +571,7 @@ sequenceDiagram
   end
 
   rect rgba(0,23,90,0.12)
-    Note over RPD,RAV: Offline cluster: the market's representment dispatcher, every few minutes
+    Note over RPD,RAV: Offline cluster: the market's representment dispatcher, every 5 minutes (Proposed)
     RPD->>PS: claim due REPRESENT rows: DISPATCHING
     RPD->>R: start through<br/>the Router
     Note over R: admit, pin profile, run on Offline: priority 4
@@ -694,7 +694,7 @@ sequenceDiagram
     MM->>IN: settlement,<br/>CreateMoneyMovementEventHandler.v1
     Note over MM,IN: Pay with Bank Transfer and debit cards: Billpay's Execute<br/>sends the settlement to this handler instead
     GAR->>IN: AR posting, CreateAccountsReceivable<br/>TransactionEventHandler.v1
-    Note over GAR,IN: whichever arrives second sets the row READY. A leg's posting takes its payment's settlement
+    Note over GAR,IN: whichever arrives second sets the row READY. A corporate leg's posting takes its payment's settlement; a consumer split's leg has its own
   end
 
   rect rgba(0,23,90,0.12)
@@ -716,7 +716,7 @@ sequenceDiagram
 
 ## 11. Missing paid events
 
-Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing, and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. MR/M3 never settles a Pay with Bank Transfer or debit card payment, so for those the check asks GAR alone, and hands over Billpay's own settlement event again if the inbox doesn't have it (Proposed). Whatever it can't find raises an alert.
+Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing, and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. MR/M3 never settles a Pay with Bank Transfer or debit card payment, so for those the check asks GAR alone, and always hands over Billpay's own settlement event again, since Billpay can't read the inbox to see whether it has it (Proposed). Whatever it can't find raises an alert.
 
 ```mermaid
 ---
@@ -741,20 +741,21 @@ sequenceDiagram
 
   rect rgba(0,23,90,0.12)
     Note over IN,WF: Offline cluster
-    SCH->>WF: start, periodically
+    SCH->>WF: start, hourly (Proposed)
     Note over SCH,WF: finds payments and legs still PROCESSED after 48 hours. Split parents are skipped
     loop each one found
       opt not Pay with Bank Transfer or a debit card
-        WF->>MM: asks for the settlement: its own, or for a leg, its payment's
+        WF->>MM: asks for the settlement: its own, or for a corporate leg, its payment's
         MM-->>WF: current state
       end
       WF->>GAR: asks for the AR posting: the payment's, or the leg's own
       GAR-->>WF: current state
+      opt Pay with Bank Transfer or a debit card
+        WF->>IN: hands Billpay's own settlement over again,<br/>CreateMoneyMovementEventHandler.v1 (Proposed)
+      end
       alt an event is found
         WF->>IN: hands it to its One-Data handler
         Note over IN: it reaches the inbox the one way events do
-      else Billpay's own settlement is missing
-        WF->>IN: hands it over again,<br/>CreateMoneyMovementEventHandler.v1 (Proposed)
       else still missing
         Note over SCH,WF: alert. The inbox row shows which event is missing
       end
@@ -765,7 +766,7 @@ sequenceDiagram
 
 ## 12. Pay & Plan
 
-Pay & Plan is a composite. It starts on Online as `{paymentId}-plan`, captures and verifies the payment itself and replies with the decision, because a child that decided would be heard only when it ended (agreed 2026-11-07). For an `ACCEPTED` payment it calls the Installments API and, when asked, updates Autopay, and a child on the same cluster runs Execute and Fulfil as `{paymentId}-init`. A declined payment gets no plan (Proposed). One-Data runs the same pending check first, as in diagram 15, so a request on an account with a payment already `PENDING` never gets here.
+Pay & Plan is a composite. It starts on Online as `{paymentId}-plan` and captures and verifies the payment itself, because a child that decided would be heard only when it ended (agreed 2026-11-07). For an `ACCEPTED` payment it calls the Installments API and, when asked, updates Autopay, and the reply waits for all three: the decision, the plan and the Autopay update (agreed 2026-11-07). A child on the same cluster, `CreateImmediatePaymentWorkflow` started with the decision, runs Execute and Fulfil as `{paymentId}-init`, and the composite calls One-Data's delete. A declined payment gets no plan (Proposed). One-Data runs the same pending check first, as in diagram 15, so a request on an account with a payment already `PENDING` never gets here.
 
 ```mermaid
 ---
@@ -793,10 +794,10 @@ sequenceDiagram
   rect rgba(0,111,207,0.12)
     Note over PP,CH: Online cluster. The child runs on the same cluster
     Note over PP: Capture and Verify, as for pay today
-    PP-->>R: the decision
-    R-->>OD: the decision,<br/>or PENDING at 2.5 s
     Note over PP: for ACCEPTED: the Installments API and an optional Autopay update
-    PP->>CH: child workflow,<br/>{paymentId}-init
+    PP-->>R: the decision, the plan<br/>and the Autopay update
+    R-->>OD: the reply,<br/>or PENDING at 2.5 s
+    PP->>CH: child workflow, from the decision,<br/>{paymentId}-init
     Note over CH: Execute and Fulfil, as for pay today
   end
 ```

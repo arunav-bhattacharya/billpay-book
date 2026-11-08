@@ -21,6 +21,8 @@ The strip under each heading shows the cluster, the workflow ID, what starts the
 
 `CreateImmediatePaymentWorkflow` pays a bill today, with Temporal's early-return pattern: the caller waits only until Verify decides, and the same workflow carries on with Execute and Fulfil after the reply.
 
+A composite's child reuses this workflow, started with the composite's decision, so it skips Capture and Verify and runs only Execute and Fulfil ([Composite Workflows](./composite.md), agreed 2026-11-07).
+
 On the Online cluster, the decision's calls run as local activities, inside the worker. Capture, Verify's calls to Payment Instruments, Payment Options and Plans, and Verify's commit all happen in the workflow's first task, so nothing makes a round trip through the Temporal server before the caller has its answer.
 
 1. Capture writes the request, which arrives as the workflow's start input, as `PENDING`, with the idempotency check. Nothing is written before the workflow starts, so the caller's path has no extra database call. A repeated request joins the existing workflow (conflict policy `USE_EXISTING`). One that comes after the workflow has closed starts a new run, and Capture's check decides what it does ([Creates that arrive late or twice](#creates-that-arrive-late-or-twice)).
@@ -60,8 +62,10 @@ As soon as Verify has decided, every create workflow calls One-Data's delete API
 `CreateScheduledPaymentWorkflow` books a payment for a future date, then closes. Nothing waits in Temporal until the due date.
 
 1. Capture, then Verify: `SCHEDULED` or `DECLINED`.
-2. The `SCHEDULED` commit writes the `SCHED_EXEC` Work Tracker row, due at the market's execution time on the due date. A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time, and its execution row comes once it is `ALLOCATED`.
+2. The `SCHEDULED` commit writes the `SCHED_EXEC` Work Tracker row, due at the execution time of the payment's market and account type on the due date. The same commit stores the cancel cutoff, worked out from the config version the payment was scheduled on (Proposed, 2026-11-07). A corporate payment gets an `ALLOC_REQUEST` row instead, due at the market's fetch time, and its execution row comes once it is `ALLOCATED`.
 3. The caller gets its answer, the `SCHEDULED` event and message go out, and the workflow closes.
+
+A payment Accounts Receivable raises for today takes this path too: it is scheduled, then executes the same day (agreed 2026-11-07). Which dispatcher picks it up once that day's scheduled run has passed is still to be proposed.
 
 It makes the same delete call as [Create Immediate Payment](#create-immediate-payment), once Verify has decided, whether a channel or Accounts Receivable started it. `SCHEDULED` is a decision, so a scheduled payment never keeps the customer from making another payment while it waits.
 
@@ -86,7 +90,7 @@ For a corporate payment, Execute clears the parent once, at payment level, and m
 1. Execute moves the leg to `PROCESSING` and updates the AR balance and open-to-buy in parallel, open-to-buy once Payment Instruments has returned the clear-text details. Consumer legs also clear, while their parent stays `ACCEPTED`. Corporate legs never clear per allocation; the parent clears once, as a whole, at payment level.
 2. Fulfil runs accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then sends the leg's RTF event and Raven message, then commits `PROCESSED`.
 
-Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment can't starve the others. Each leg turns `PAID` on its own later, once it has posted and its parent has settled.
+Corporate legs run at priority 2 with the parent's payment ID as fairness key, so one large payment can't starve the others. Each leg turns `PAID` on its own later, once it has posted and its settlement is in: a corporate leg's parent settles once for all its legs, and a consumer leg settles on its own (agreed 2026-11-07).
 
 ## Request Allocations
 
@@ -109,10 +113,10 @@ Corporate legs run at priority 2 with the parent's payment ID as fairness key, s
 
 `UpdatePaymentWorkflow` changes a scheduled payment. Nothing is edited in place: the original is cancelled and a replacement is created, so every payment record stays as it was written.
 
-1. Check the cancellation window and eligibility with read-only calls.
+1. Check the cancel cutoff stored with the payment, and its eligibility, with read-only calls. The cutoff was worked out from the config version the payment was scheduled on, so a later config change doesn't move it (Proposed, 2026-11-07).
 2. Cancel the old payment with the guarded update. If it is no longer `SCHEDULED`, the answer is 409. A corporate payment leaves `SCHEDULED` when its allocations are requested.
-3. Start the new payment as child `CreateScheduledPaymentWorkflow` `{newId}-init`, with the same confirmation number. Its result is the caller's answer.
-4. Map the old and new payment IDs in `ORIG_TRANS_REFER_MAP`.
+3. Map the old and new payment IDs in `ORIG_TRANS_REFER_MAP`, before the new payment starts, so a retry after a crash finds the replacement (Proposed, 2026-11-07).
+4. Start the new payment as child `CreateScheduledPaymentWorkflow` `{newId}-init`, with the same confirmation number. Its result is the caller's answer. The replacement is future-dated only (Proposed).
 
 Two payments are in play at once, which is easier to see drawn:
 
@@ -141,7 +145,7 @@ stateDiagram-v2
 
 `CancelPaymentWorkflow` withdraws a `SCHEDULED` payment inside the market's cancellation window. A corporate payment can be withdrawn only until its allocations are requested, when it moves to `ALLOCATING`.
 
-1. Check the window and eligibility with read-only calls.
+1. Check the stored cancel cutoff and eligibility with read-only calls.
 2. Cancel: one guarded update to `CANCELLED`. The same commit cancels the payment's Work Tracker rows. The `CANCELLED` event and message go out after the reply.
 3. If the update changes no row and the payment is already `CANCELLED`, the API returns that result again. Otherwise the answer is 409, which is what a corporate payment gets once it is `ALLOCATING`.
 
@@ -154,21 +158,23 @@ A `PENDING` payment that waits for its customer isn't cancelled here. [Create Pa
 `ProcessReturnedPaymentWorkflow` handles a payment the bank sends back, and queues another attempt when one makes sense. Each attempt is a [presentment](../../payment-state-model.md#presentments) with its own row, and `{seq}` here is the one that came back.
 
 1. Check the payment, full or split, the presentment that came back, and its status. The eligible statuses are `PROCESSING`, `PROCESSED`, `PAID`, and `REPRESENTED` for a payment returned again.
-2. Return: that presentment's row turns `RETURNED` and stays there.
-3. Judge whether the return can be represented under the market's representment rules: which return reasons can be represented, and how many times a payment can be. A return that fails either test stays `RETURNED`. The same rules set the representment date: today or later.
-4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due on it. A return never hands off to a representment workflow directly.
+2. Return: that presentment's row turns `RETURNED` and stays there. The commit is guarded on the status the workflow read and on that presentment, so if Settle moves the payment to `PAID` in between, the workflow reads again and tries once more, up to three times. A return Billpay can't apply, such as one for a presentment still `ACCEPTED`, goes on the exception list. The return's reason, source and effective date go in the `RETURNED` timeline row (Proposed, 2026-11-07).
+3. Judge whether the return can be represented. The market's release holds the rules as a `representment` block: the return reasons that can be represented, the most times a payment can be, and `delayDays` (agreed 2026-11-07). A return can be represented when its reason is listed and the payment has been represented fewer times than the limit. A release with no block represents nothing. The representment date is the day the return arrives, in the market's time zone, plus `delayDays`, so 0 is the same day.
+4. QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due at the start of it, so a same-day representment is due at once (Proposed). A return never hands off to a representment workflow directly.
+
+Only a whole payment is represented, never a leg (agreed 2026-11-07). A corporate payment is represented as a whole, at the parent, and a returned consumer split leg stays `RETURNED`.
 
 ## Process Representment
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-represent-{seq}" start="The representment dispatcher, on the representment date" behaviors="all" />
 
-`ProcessRepresentmentWorkflow` sends a returned payment's next presentment to the bank, and `{seq}` is that presentment's number. Represent rechecks eligibility before anything goes to clearing, with checks of its own that are still to be defined, then commits `REPRESENTED`, or `DECLINED` if the recheck fails and nothing is sent.
+`ProcessRepresentmentWorkflow` sends a returned payment's next presentment to the bank, and `{seq}` is that presentment's number. Represent rechecks eligibility before anything goes to clearing, with checks of its own that are still to be defined, then commits `REPRESENTED`, or `DECLINED` if the recheck fails and nothing is sent. Until its checks exist, the recheck passes, and the new presentment clears in the batch with the idempotency key `{paymentId}-represent-{seq}` (Proposed, 2026-11-07). How QueueRepresentment and Represent should vary by account type and behavior isn't decided, so every combination runs the default stage for now (agreed 2026-11-07).
 
 ## Process Inbound Payment
 
 <WorkflowMeta cluster="Offline" id="{paymentId}-init" start="The inbound dispatcher, from One-Data's inbox" behaviors="all" />
 
-`ProcessInboundPaymentWorkflow` takes a push payment: one a third party sends in. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute and Fulfil. A push payment is the only kind that can end `DISALLOWED`.
+`ProcessInboundPaymentWorkflow` takes a push payment: one a third party sends in. It runs Capture, then Verify (`ACCEPTED` or `DISALLOWED`), then Execute, clearing in the batch (Proposed), and Fulfil. A push payment is the only kind that can end `DISALLOWED`. It makes no One-Data delete, since an inbound payment never enters a channel's pending list.
 
 One inbound payment can be split across several card accounts, each leg running `ExecuteSplitPaymentWorkflow` (agreed 2026-11-07). Two things are still open: what decides the legs, meaning which card accounts and how much each, and whether the parent clears or leaves clearing to its legs.
 
@@ -178,10 +184,10 @@ One inbound payment can be split across several card accounts, each leg running 
 
 `CreatePaymentIntentWorkflow` runs a payment that has to wait for its customer: for their bank, when `requiresBankConfirmation` resolves to Y; or for their debit card's 3D Secure, whenever they pay by debit card. One workflow holds the whole wait, from the create to the payment's end, so its history in the Temporal UI tells the payment's whole story.
 
-1. Capture writes `PENDING`. Amex's own checks come next, before the bank step or 3D Secure: Verify's Instrument, Options and Mandate checks that apply, in the same first task. A payment that fails them is `DECLINED` there and then, with no link, and the caller gets `DECLINED`. One that passes stays `PENDING`, and nothing is committed. For bank confirmation, RequestConfirmation then gets the provider's redirect link, with one try, and stores it on the payment. The caller's update returns `PENDING` with the link, and the `PENDING` event goes out. If the provider gives no link, the payment is `DECLINED` there and then, and the caller gets `DECLINED`. For a debit card, RequestConfirmation starts 3D Secure with the market's card provider and gives it Billpay's callback URL; the reply carries the challenge link, or no link when the card's bank needs no challenge (Proposed).
+1. Capture writes `PENDING`. Amex's own checks come next, before the bank step or 3D Secure: Verify's Instrument, Options and Mandate checks that apply, in the same first task. A payment that fails them is `DECLINED` there and then, with no link, and the caller gets `DECLINED`. One that passes stays `PENDING`, and nothing is committed. For bank confirmation, RequestConfirmation then gets the provider's redirect link, with one try that has Verify's 1.2 seconds (Proposed), and stores it on the payment. The caller's update returns `PENDING` with the link, and the `PENDING` event goes out. If the provider gives no link, or an answer without one, the payment is `DECLINED` there and then with `CONFIRMATION_UNAVAILABLE` (Proposed), and the caller gets `DECLINED`. The reply carries the link as `confirmationUrl` (Proposed). For a debit card, RequestConfirmation starts 3D Secure with the market's card provider and gives it Billpay's callback URL, the setting `billpay.card.callback-base-url` plus `/payments/{payment-id}/authentication` (Proposed); the reply carries the challenge link, or no link when the card's bank needs no challenge (Proposed).
 2. The workflow waits on a timer for the market's confirmation window plus a grace of 10 seconds, so a confirm sent at the last moment still lands. For a debit card the window is 2 minutes.
 3. The confirm arrives as an update. Verify decides in one commit guarded on `PENDING`, and the confirm's reply carries the decision: the same early return as the create's. Amex's own checks passed at the create, so Verify runs only the checks that need the bank step. The provider has already verified the customer's bank details, so Verify doesn't ask it about them. Before it accepts the payment, it asks Payment Instruments whether the verification token it holds for the instrument is valid, to guard against fraud, and a payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer's bank account holds enough money for the payment, and declines it if not. For a debit card, the card provider's callback brings the 3D Secure result instead of a confirm. A failed result is `DECLINED`. Otherwise Verify only authorizes the payment with the card provider (Proposed): the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not.
-4. Execute, then Fulfil, as for pay today, in the same workflow. Execute makes no clearing call for Pay with Bank Transfer or a debit card, because their money has already moved. It creates the payment's settlement event instead and hands it to One-Data, dated when the money moved (Proposed), so the payment turns `PAID` the same way as any other. No corporate payment runs here: corporate payments take neither bank confirmation nor a debit card. Every payment this workflow runs is paid today.
+4. Execute, then Fulfil, as for pay today, in the same workflow. Execute makes no clearing call for Pay with Bank Transfer or a debit card, because their money has already moved. It creates the payment's settlement event instead, keyed `{paymentId}-settlement`, and hands it to One-Data, dated when the money moved (Proposed), so the payment turns `PAID` the same way as any other. No corporate payment runs here: corporate payments take neither bank confirmation nor a debit card. Every payment this workflow runs is paid today.
 
 The customer's no is an update too. Cancel moves the payment from `PENDING` to `CANCELLED`, with no window check. A yes and a no from two browser tabs are two updates to one workflow, so the first one it accepts wins and the other gets 409. If the timer fires with no answer, Cancel runs the same way, and as for any cancel, the `CANCELLED` event goes to RTF and the `CANCELLED` message goes to the customer through Raven. The workflow never ends by a terminate or a timeout, because either would leave the payment `PENDING` with nobody told.
 

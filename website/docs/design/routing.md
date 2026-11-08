@@ -123,7 +123,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
           desc: 'Today, several instructions',
           flow: [
             {via: 'uws', name: 'CreatePaymentWithMultipleInstructions', cluster: 'Online', caption: ['Capture and Verify for every instruction, then the reply']},
-            {via: 'child', detail: 'one per accepted instruction', name: 'Execute and Fulfil', cluster: 'Online'},
+            {via: 'child', detail: 'one per accepted instruction, from the decision', name: 'CreateImmediatePayment', cluster: 'Online'},
           ],
         },
         {
@@ -168,8 +168,8 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         {
           desc: 'Pay today, plan future installments',
           flow: [
-            {via: 'uws', name: 'Create Payment & Installments', cluster: 'Online', caption: ['Capture and Verify, then the reply', 'For ACCEPTED: the plan and the optional Autopay update']},
-            {via: 'child', name: 'Execute and Fulfil', cluster: 'Online'},
+            {via: 'uws', name: 'Create Payment & Installments', cluster: 'Online', caption: ['Capture and Verify', 'For ACCEPTED: the plan and the optional Autopay update, then the reply']},
+            {via: 'child', detail: 'from the decision', name: 'CreateImmediatePayment', cluster: 'Online'},
           ],
         },
       ],
@@ -178,12 +178,13 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
       term: 'From Accounts Receivable',
       routes: [
         {
-          desc: 'Future-dated',
+          desc: 'Future-dated, or today',
           across: true,
           flow: [
             {via: 'inbox', detail: 'AR intake dispatcher', name: 'CreateScheduledPayment', cluster: 'Offline'},
             {via: 'row', detail: 'on the due date', name: 'ExecuteScheduledPayment', cluster: 'Offline'},
           ],
+          note: 'One dated today executes the same day',
         },
       ],
     },
@@ -269,7 +270,7 @@ Settlement and Accounts Receivable posting are the one input the Router never se
 
 ## Child workflows
 
-The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and a debit card for 3D Secure. A consumer payment of one amount starts no child: its workflow runs every stage itself. A composite makes the decision itself and replies, so the child in the several-instructions route runs once per accepted instruction, for Execute and Fulfil only, and so does Pay & Plan's.
+The behaviors pick the branch at each fork: `accountType` for consumer and corporate. Whether a create waits for the customer is decided before the fork, when the Router picks the journey: `requiresBankConfirmation` for a payment the customer confirms at their bank, and a debit card for 3D Secure. A consumer payment of one amount starts no child: its workflow runs every stage itself. A composite makes the decision itself and replies, so the child in the several-instructions route runs once per accepted instruction, and so does Pay & Plan's: each is `CreateImmediatePaymentWorkflow`, started with the composite's decision, so it skips Capture and Verify and runs Execute and Fulfil (agreed 2026-11-07).
 
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs. The parent stays `ACCEPTED`, and each leg moves through `PROCESSING` and `PROCESSED` on its own. Splits are rare: [When a consumer payment splits](./component-model/workflows/core.md#when-a-consumer-payment-splits) lists the cases.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
@@ -298,7 +299,7 @@ The payment ID is a ULID, and every workflow ID is the payment ID plus a suffix,
 | Allocation request and received batch | `{paymentId}-allocations`, `{paymentId}-allocations-{batch}` |
 | Leg | `{paymentId}_{seq}-execute` |
 | Return and representment | `{paymentId}-return-{seq}`, `{paymentId}-represent-{seq}` |
-| Dispatcher run | Its Schedule's ID, such as `dispatch-sched-DE`, plus the trigger time |
+| Dispatcher run | `dispatch-` and its Schedule's ID, such as `dispatch-scheduled-payments-DE-CONSUMER`, plus the trigger time (Proposed) |
 | Governor | `governor`, plus its Schedule's trigger time |
 | Market onboarding | `onboard-{market}-{accountType}-v{N}` |
 

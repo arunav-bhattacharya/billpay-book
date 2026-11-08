@@ -18,11 +18,11 @@ The `BPYSCH` DDL shared on 2026-10-16 is current: it is what runs in production.
 
 | Table | One row per | Holds |
 | --- | --- | --- |
-| `trans_dtl` | Payment, per presentment | Its type in `trans_type_cd`, `PAYMENT` or `REFUND` for now, with `ADJUSTMENT` and `REVERSAL` to follow; adjustments and reversals across accounts move no money. Its total in `tot_trans_am`: the create's total, which for one instruction equals `trans_am`, while a create with several instructions writes one row per instruction, each carrying the same total (agreed 2026-11-07). Its source in `trans_srce_nm`, which mostly matches `PaymentSource`, and its money movement, when it has one, in `money_move_da`. The instrument's enrollment ID, and in `instrmt_dtl_da` only the instrument type, its token, its fingerprint, the bank's routing number and name, and the account number's last 4 digits: Billpay fetches the rest of the instrument from Payment Instruments when a step needs it. Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
+| `trans_dtl` | Payment, per presentment | Its type in `trans_type_cd`, `PAYMENT` or `REFUND` for now, with `ADJUSTMENT` and `REVERSAL` to follow; adjustments and reversals across accounts move no money. Its total in `tot_trans_am`: the create's total, which for one instruction equals `trans_am`, while a create with several instructions writes one row per instruction, each carrying the same total (agreed 2026-11-07). Its source in `trans_srce_nm`, which mostly matches `PaymentSource`, and its money movement, when it has one, in `money_move_da`. The instrument's enrollment ID, and in `instrmt_dtl_da` only the instrument type, its token, its fingerprint, the bank's routing number and name, and the account number's last 4 digits: Billpay fetches the rest of the instrument from Payment Instruments when a step needs it. Capture writes `acct_dtl_da` as `{productType, accountType}` and the instrument type into `instrmt_dtl_da`, since a dispatcher re-routes each row it claims with that day's config and the account type is stored nowhere else (Proposed, 2026-11-07). Its current status, which every stage moves with a guarded update. A corporate payment passes through `ALLOCATING` and `ALLOCATED`, and its parent row carries `legs_released_at`, set by its Execute. Every payment but a split parent carries `stlmt_ts` and `ar_pstd_ts`, set by Settle when it turns `PAID`. A payment waiting for bank confirmation carries the provider's reference and the redirect link, and a debit card payment the card provider's reference and the challenge link. |
 | `trans_lfcyc_event` | Status a payment reached, per presentment | The timeline. Each row names the cluster that ran the step, and the `PAID` rows Settle writes carry its `batch_id`. |
 | `split_trans_dtl` | Leg of a split payment, consumer or corporate, per presentment | The leg's current status, with `stlmt_ts` and `ar_pstd_ts` once it turns `PAID`. |
 | `split_trans_lfcyc_event` | Status a leg reached, per presentment | The leg's timeline, with the same cluster column and `batch_id` on Settle's `PAID` rows. |
-| `idempotency_checker` | Request | Capture's insert-if-absent check. A duplicate means the request was seen before. |
+| `idempotency_checker` | Request | Capture's insert-if-absent check. A duplicate means the request was seen before. Its `api_id` holds an internal value for the API, at most 30 characters. `CreateBillpayTransactionFromAccountsReceivable.v1` is 49, so for now billpay-offline writes the placeholder `CreateBillpayTxnFromAR.v1`; replace it with the value the company's environment uses once Billpay is integrated. |
 | `ORIG_TRANS_REFER_MAP` | Replacement payment | The old and new payment IDs, when Update Payment cancels a payment and creates its replacement. |
 | `allocation_batch` (new) | Allocations callback | A corporate payment's allocations, stored before `ReceiveAllocationsWorkflow` starts, and when that batch's legs were written. It keeps big batches out of workflow inputs, holds every batch until the parent's Execute releases its legs, and makes sure each batch's legs are written once. |
 
@@ -45,12 +45,12 @@ Both timelines are append-only. A step adds a row and never updates one, so the 
 
 | Column | Holds |
 | --- | --- |
-| `item_id` | Primary key: a deterministic business key such as `exec:{paymentId}`, so a retried insert can't create duplicate work |
+| `item_id` | Primary key: a deterministic business key such as `exec:{paymentId}`, `allocreq:{paymentId}` or `repr:{paymentId}:{seq}` (Proposed, 2026-11-07), so a retried insert can't create duplicate work |
 | `item_type` | `SCHED_EXEC`, `ALLOC_REQUEST`, `ALLOC_EXEC`, `ALLOC_LEG` or `REPRESENT` |
 | `ref_id` | The payment or leg ID in the payment tables |
 | `group_key` | The market, or the parent payment ID for a leg |
 | `due_at` | The earliest start: the execution time, the fetch time, the time a leg is written, or the representment date |
-| `priority` | Claim order inside a type |
+| `priority` | Claim order inside a type: 1 for an execution or a representment, 2 for an allocation request (Proposed, 2026-11-07) |
 | `status` | `SCHEDULED`, `DISPATCHING`, `DISPATCHED`, `DONE`, `FAILED` or `CANCELLED` |
 | `run_id`, `claimed_at` | Which dispatcher run claimed it, and when |
 | `attempts`, `last_error` | Dispatch retries, and the last failure |
@@ -62,7 +62,7 @@ The table grows by millions of rows, so three choices keep it fast:
 
 - The claim index is function-based, on `CASE WHEN status = 'SCHEDULED' THEN … END` for `item_type`, `group_key`, `priority` and `due_at`. Oracle stores no entry when every key is NULL, so the index holds only rows that can be claimed and stays small beside the finished ones.
 - An in-flight index uses the same trick for `DISPATCHING` and `DISPATCHED` rows, so counting work in flight is a small index scan.
-- Daily interval partitions on `due_at`, with row movement on. The purge drops a partition 15 days after it falls due, so there are no mass `DELETE`s.
+- Daily interval partitions on `due_at`, with row movement on. The purge drops a partition 15 days after it falls due, so there are no mass `DELETE`s. A partition that still holds an unfinished row (`SCHEDULED`, `DISPATCHING` or `DISPATCHED`) is kept and dropped on a later run, once those rows finish (agreed 2026-11-07).
 
 A dispatcher claims rows with a cursor opened `FOR UPDATE SKIP LOCKED`: it fetches up to N rows with `BULK COLLECT … LIMIT N`, marks those IDs `DISPATCHING` and commits. `ROWNUM <= N` doesn't work with SKIP LOCKED, because ROWNUM counts the locked rows too and can return fewer rows than asked, or none. `FETCH FIRST` doesn't work either: Oracle refuses it together with `FOR UPDATE`.
 
@@ -91,4 +91,5 @@ The production DDL stays as it is. What the design adds goes to the DBAs as one 
 - New indexes: the batch-ID index on each timeline, and the indexes for the corporate completion check, the late-allocations check and the 48-hour check (Proposed).
 - New tables: `work_tracker`, `allocation_batch`, `exception_list`, `market_config_version`, `market_config_active` (with `in_service_in`, Proposed), `dispatch_run`, `rate_allocation`, `downstream_limit` and `governor_decision`.
 - New values: `ALLOCATING` and `ALLOCATED` in `trans_sta_cd`.
+- New rights: billpay-offline's database user can drop `work_tracker`'s partitions, for the purge (2026-11-07).
 

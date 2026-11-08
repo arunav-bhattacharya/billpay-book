@@ -21,8 +21,8 @@ import styles from "./styles.module.css";
  * a debit card), then a later date, then several instructions, then MR Points
  * alone, then pay today. The list shows the journeys in the order customers
  * meet them, which is not the order the Router checks them in, and the
- * footnote says so. Where the spec has no answer yet (Wallet, a later date
- * with a bank step), the model says that instead of picking a journey.
+ * footnote says so. Where the spec has no answer yet, the model says that
+ * instead of picking a journey. No wallet is offered until a journey takes one.
  */
 
 const ALL_JOURNEYS = "/docs/design/journeys/all-journeys";
@@ -82,7 +82,6 @@ const METHODS = [
     note: "checked with 3D Secure",
     todayOnly: true,
   },
-  { id: "wallet", label: "Wallet" },
   {
     id: "transfer",
     label: "Pay with Bank Transfer",
@@ -175,13 +174,6 @@ function decide(a) {
       kind: "declined",
       met,
       text: "One-Data's pending check finds the payment already PENDING on the account, and declines this one there and then: 200 with DECLINED and its reason. billpay-online is never called, so no payment exists in Billpay. The customer can pay again once the pending one is decided.",
-    };
-  }
-  if (instructions.includes("wallet")) {
-    return {
-      kind: "open",
-      met,
-      text: "Wallet is still to be defined: which instrument it is, and whether it needs a bank step. The Router has no rule for it yet.",
     };
   }
   if (card && (several || later)) {
@@ -285,7 +277,6 @@ function ReadTag({ name }) {
 const SOURCE_CHOICES = {
   debit: [["listed", "A bank from the list"]],
   transfer: [["listed", "A bank from the list"]],
-  wallet: [["eligible", "An eligible wallet"]],
 };
 
 function Segmented({ label, options, value, onChange, disabled }) {
@@ -641,7 +632,9 @@ function TheCalls({ a }) {
                 <span>
                   {id === "transfer"
                     ? "Pay with Bank Transfer or debit card"
-                    : METHODS.find((m) => m.id === id).label}
+                    : id === "wallet"
+                      ? "Wallet, not offered until a journey takes one"
+                      : METHODS.find((m) => m.id === id).label}
                   <span className={styles.source}>{r.read}</span>
                 </span>
               </li>
@@ -792,7 +785,8 @@ function TheRouter({ a, set, result }) {
         <li>
           <span className={styles.hollow} aria-hidden="true" />
           <span>
-            <strong>Wallet</strong> is still to be defined.
+            <strong>Wallet</strong> isn&apos;t offered: no journey takes one
+            yet, so the page shows none until one does.
           </span>
         </li>
       </ul>
