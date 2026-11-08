@@ -17,7 +17,7 @@ import StateLegend from '@site/src/components/StateLegend';
 
 Each arrow is a move one stage makes, and the label names the stage. Consumer and corporate payments share one set of states. A corporate payment adds two, `ALLOCATING` and `ALLOCATED`, while its allocations are fetched, and the toggle shows the path each kind takes. A payment that waits for a date spends that time as `SCHEDULED`, a row in Oracle with nothing running in Temporal. A payment that waits for the customer, to confirm at their bank or to authenticate their debit card, stays `PENDING`, with its own workflow waiting on a timer, until the caller confirms it, the card provider calls back, the customer says no, or the window closes.
 
-`PENDING` also blocks the card account. While one payment on it is `PENDING`, One-Data declines any new create from a channel before Billpay sees it. The block lifts as soon as the payment is decided, whichever of `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED` it reaches, because its workflow then calls One-Data's delete API, after the reply.
+`PENDING` also blocks the card account. While one payment on it is `PENDING`, One-Data declines any new create from a channel before Billpay sees it. The block lifts as soon as the payment is decided, whichever of `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED` it reaches, because its workflow then calls One-Data's delete API, after the reply. A payment that waits for bank confirmation or 3D Secure is on the list too, so it blocks the account while it waits (agreed 2026-11-08).
 
 <Tabs groupId="payment-type" className="toggle-tabs">
 <TabItem value="consumer" label="Consumer" default>
@@ -183,7 +183,7 @@ A corporate payment's allocation request races a cancel the same way. Both are g
 
 ## Split payments
 
-A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}` and the card account it pays, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through the same states as any payment, `PROCESSING`, `PROCESSED` and on.
+A split payment divides one amount into legs. Each leg is its own record, with the ID `{paymentId}_{seq}` and the card account it pays, and it starts at `ACCEPTED`: a leg is only ever made from a parent that Verify has already passed. From there a leg moves through `PROCESSING` and `PROCESSED` to `PAID`, and can be `RETURNED`. A returned leg stays `RETURNED`: only a whole payment is represented, so a leg is never `REPRESENTING`, `REPRESENTED` or `DECLINED` (agreed 2026-11-07; the leg's representment classes dropped 2026-11-08).
 
 `PAID` is set on legs, never on the parent. Accounts Receivable posts each leg on its own, and a leg turns `PAID` once its posting and its settlement are both in. Where the settlement comes from differs (agreed 2026-11-07). A corporate payment clears once, as a whole, so the bank settles it once and every leg takes its parent's settlement. A consumer split's legs clear on their own, so each settles on its own too.
 

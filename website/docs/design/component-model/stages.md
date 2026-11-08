@@ -77,7 +77,7 @@ A stage interface is named for its step, with `Payment` in front: `PaymentVerify
 
 - The stage every market runs is `DefaultPayment{Step}Stage`.
 - A market whose flow for a step really differs gets a stage of its own, with the market's code first: `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. GB doesn't need one today.
-- A shared stage whose whole flow for a step differs by a behavior is named for that behavior: `Payment{Step}StageWith{Behavior}`. No step needs one today, because a behavior that only adds or swaps a call is a check or a method.
+- A shared stage whose whole flow for a step differs by a behavior is named for that behavior: `Payment{Step}StageWith{Behavior}`. Execute and Reverify have one each for a corporate payment, `PaymentExecuteStageWithCorporateAccount` and `PaymentReverifyStageWithCorporateAccount` (Proposed, 2026-11-08). A behavior that only adds or swaps a call is a check or a method.
 - A check or a method is named for its job, such as `MandateCheck` or `RealtimeClearing`. A market's own starts with its code, such as `GBFundsCheck`.
 
 A name never lists the activities a class calls. The mandate check, for example, is a call to Plans that Verify makes, so a market that needs one gets `MandateCheck` in its Verify:
@@ -98,7 +98,7 @@ Three rules keep the names straight:
 
 - Names are for people: the lookup reads where a class applies, never its name. A test fails for a class tied to a market whose name doesn't start with that market's code.
 - Calls that every stage of a step makes the same way live in a plain helper function, never in a base class.
-- Shared stages sit in `core/lib/stages/impl/{step}/` and shared checks in `core/lib/verification/checks/`. A market's own classes sit in its module under `market/{m}/`.
+- Shared stages sit in `core/lib/stages/impl/{step}/` and shared checks in `core/lib/stages`, package `checks` (agreed 2026-11-08). A check belongs to its stage: its one call goes through the stage's own stubs, in the stage's workflow code. A market's own classes sit in its module under `market/{m}/`.
 
 ## How verification decides
 

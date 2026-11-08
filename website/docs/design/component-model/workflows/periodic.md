@@ -19,6 +19,7 @@ A Schedule is a timer the cluster owns, not a workflow. It fires on its cadence 
 <ScheduleTable
   rows={[
     {schedule: 'Scheduled payments, one per market and account type', workflow: 'The scheduled-payments dispatcher', runs: 'At the execution time its release sets, in its time zone, local midnight by default; drains, sweeps stragglers, then ends'},
+    {schedule: 'Scheduled payments, late, one per market and account type (Proposed)', workflow: 'The scheduled-payments dispatcher, for rows due after the day\'s run, such as an AR payment dated today', runs: 'Every 15 minutes, never at the same time as the day\'s run'},
     {schedule: 'Allocation requests', workflow: 'The allocation-request dispatcher', runs: 'Every minute'},
     {schedule: 'Allocated payments', workflow: 'The allocated-payments dispatcher', runs: 'Every minute'},
     {schedule: 'Allocation legs', workflow: 'The leg dispatcher', runs: 'Every minute'},
@@ -49,7 +50,7 @@ A run's workflow ID is `dispatch-` and its Schedule's ID, such as `dispatch-sche
 
 ## Process Paid Events
 
-<WorkflowMeta cluster="Offline" id="`process-paid-events`, plus the trigger time (Proposed)" start="The `paid-drain` Schedule (Proposed), every 30 seconds, overlap SKIP" behaviors="generic" />
+<WorkflowMeta cluster="Offline" id="`paid-drain`, its Schedule's ID, plus the trigger time" start="The `paid-drain` Schedule (Proposed), every 30 seconds, overlap SKIP" behaviors="generic" />
 
 `ProcessPaidEventsWorkflow` marks payments `PAID`. The two confirmations it needs, settlement from the bank and posting from Accounts Receivable, don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own, and mark a payment's row `READY` once both are in. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead, in Execute, and hands it to the same handler MR/M3 uses, dated when the money moved, so its row pairs the same way (Proposed). This workflow pulls those rows at Billpay's own pace.
 
@@ -79,7 +80,7 @@ One run settles an estimated 1,000 payments a second, at about half a second a b
 
 ## Process Missing Paid Events
 
-<WorkflowMeta cluster="Offline" id="`process-missing-paid-events`, plus the trigger time" start="The `missing-paid-events` Schedule, hourly (Proposed)" behaviors="generic" />
+<WorkflowMeta cluster="Offline" id="`missing-paid-events`, its Schedule's ID, plus the trigger time" start="The `missing-paid-events` Schedule, hourly (Proposed)" behaviors="generic" />
 
 `ProcessMissingPaidEventsWorkflow` chases confirmations that never came.
 

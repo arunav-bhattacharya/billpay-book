@@ -45,7 +45,7 @@ A payment scheduled for its due date resolves differently. The two side by side:
 | --- | --- | --- |
 | Account type | Consumer | Consumer |
 | AR posting | Y | Y |
-| Realtime clearing | Y | N: every future-dated payment clears in batch |
+| Realtime clearing | Y | N: every future-dated payment clears in batch, even where the release sets Y (agreed 2026-11-08) |
 | Mandate authorization | Y | Y |
 | Bank confirmation | N | N |
 | Verify, or Reverify on the due date | `DefaultPaymentVerifyStage`, with the Instrument, Options and Mandate checks | `DefaultPaymentReverifyStage`, with the same three checks |
@@ -283,7 +283,7 @@ No child workflow ever crosses clusters. A scheduled payment created on the Onli
 
 A scheduled payment waits in Oracle until its date, and a market's config can change in that time. So on the due date the dispatcher calls the Router again, and the payment runs with today's config. The version it was scheduled under stays in its timeline for audit.
 
-Two guardrails keep that safe. The resolved profile carries the resolved behaviors and the config version, so the running workflow never reads config that changed after it started. And the workflow is pinned to its build with Worker Versioning, so a deploy never changes its code mid-run.
+Two guardrails keep that safe. The resolved profile carries the resolved behaviors and the config version, so the running workflow never reads config that changed after it started. And a change to workflow code that would alter a running payment's steps is patched with `Workflow.getVersion`, since deploys are rolling (2026-11-08).
 
 ## Workflow IDs
 

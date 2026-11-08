@@ -157,7 +157,7 @@ export const IFACES = [
     system: 'One-Data',
     queue: "the workflow's queue",
     at: [],
-    note: 'no stage: the PAID drain, the inbox dispatchers and the delete call every create workflow makes',
+    note: 'no stage: the PAID drain, the missing-events check, and the delete every create workflow makes',
   },
 ];
 
@@ -1074,8 +1074,8 @@ export function calls(j, f) {
 
 /* roads whose workflow calls the delete API at One-Data, always after the
    caller's reply: every create workflow once Verify decides, whatever
-   started it; a payment that waits, once after its reply and again once the
-   confirm, the callback or the no decides it */
+   started it; a payment that waits, once the confirm, the callback, the no
+   or the timer decides it (agreed 2026-11-08) */
 const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no', 'refund', 'arScheduled', 'arRefund', 'multiple', 'payplan']);
 /* creates One-Data never stored, so the delete finds nothing to remove */
 const UNSTORED = new Set(['arScheduled', 'arRefund']);
@@ -1083,12 +1083,15 @@ const UNSTORED = new Set(['arScheduled', 'arRefund']);
 /* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
   if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
+  /* an inbox dispatcher's tick calls the One-Data client itself, not this
+     interface (agreed 2026-11-08), so a pulled road lights it only for the delete */
   if (j.band.key === 'pulled') {
-    const read = 'its dispatcher reads the request, and marks it once started';
-    return UNSTORED.has(j.id) ? `${read}; once Verify decides, the workflow calls the delete API after its reply, which finds nothing to remove, since One-Data never stored this create` : read;
+    return UNSTORED.has(j.id) ? 'once Verify decides, the workflow calls the delete API after its reply, which finds nothing to remove, since One-Data never stored this create' : null;
   }
+  /* a payment that waits for its customer stays in One-Data's Redis until it
+     is decided, and makes one delete call then (agreed 2026-11-08) */
   if (j.id === 'bank' || j.id === 'card') {
-    return "calls the delete API after its reply, saying the payment still waits, so only the stored create leaves One-Data's Redis";
+    return "calls the delete API here only for a payment declined at the create. A payment that waits keeps its pending entry, which blocks the account, and makes its one delete call once the confirm, the callback, the no or the timer decides it";
   }
   if (j.id === 'confirm') {
     return "calls the delete API once Verify decides, so the account's pending entry goes and the customer can pay again. For Pay with Bank Transfer, Execute hands One-Data the settlement event Billpay creates";
@@ -1119,7 +1122,7 @@ export function list(items) {
 }
 
 const FAILS = {
-  must: 'It must succeed: a 429 waits out Retry-After, and other errors retry from 1 second, doubling up to 60.',
+  must: 'It must succeed: a 429 waits out Retry-After, and other errors retry from 6 seconds, doubling up to 45 minutes apart.',
   hold: 'It must succeed, so it gets a long timeout: an outage holds the payment where it is instead of failing it.',
   decline: 'A business failure found here, such as a closed account, declines the payment and is never retried.',
   mandate: 'A mandate that fails its check declines the payment and is never retried.',
@@ -1135,7 +1138,7 @@ function localOnOnline(j, f, s) {
 /* where a call runs, on road j's cluster, at stage s */
 function runsOn(j, f, s) {
   if (f.name === 'PaymentStore') {
-    return 'Oracle, through a local activity on the first attempt, so a healthy write has no task round trip. A failed attempt runs again as a regular activity with the full retry policy, so if Oracle is down the payment pauses and carries on when it is back.';
+    return 'Oracle, through a local activity on the first 2 attempts, so a healthy write has no task round trip. If both fail, it runs again as a regular activity with the full retry policy, so if Oracle is down the payment pauses and carries on when it is back.';
   }
   if (f.name === 'LifecycleEventActivities') {
     return "RTF, on the workflow's own queue, since RTF has no rate limit. The workflow sends one state change at a time, so the payment's events reach RTF in order.";
@@ -1271,7 +1274,7 @@ export function router(j) {
         note: `Nothing to pick: the answer goes as an update to the payment's running ${j.full}, on the ${j.cluster} cluster. The Router only admits it.`,
       },
       {name: 'Resolve behaviors', chips: j.chips || [], note: 'Nothing new to resolve: the workflow kept the behaviors it was started with.'},
-      {name: 'Pin the resolved profile', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that profile, and its build, to the end.'},
+      {name: 'Pin the resolved profile', main: 'Already pinned, when the create started the workflow.', note: 'The running workflow keeps that profile to the end.'},
       {name: 'Choose the run site', main: `Online cluster, the running ${j.wfId}.`, note: 'Nothing new is placed: the update goes to the workflow that is already waiting.'},
       {
         name: 'Start',
@@ -1290,7 +1293,7 @@ export function router(j) {
       main: 'The journey, the five resolved behaviors and the config version (v12, an example).',
       note: j.today
         ? "On the due date the dispatcher calls the Router again, so the payment runs with today's config. The version used at scheduling stays in its timeline for audit."
-        : 'The running workflow keeps this profile, and its build, to the end.',
+        : 'The running workflow keeps this profile to the end.',
     },
     {name: 'Choose the run site', ...place},
     {name: 'Start', ...start},

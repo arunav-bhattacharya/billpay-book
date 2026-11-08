@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 
 ## One workflow, one activity
 
-A dispatcher is two pieces. The workflow runs on the Offline cluster and loops over ticks. Each tick is one activity, `claimAndStart`, on the dispatcher's own control queue, such as `ctl-sched` or `ctl-leg`, so one kind of work can't hold up another. Proposed (2026-11-07): AR intake runs on `ctl-intake`, returns on `ctl-return`, inbound on `ctl-inbound` and representments on `ctl-repr`. The run ID stamped on a claimed row is the dispatcher's workflow ID.
+A dispatcher is two pieces. The workflow runs on the Offline cluster and loops over ticks. Each tick is one activity, `claimAndStart`, on the dispatcher's own control queue, such as `ctl-sched` or `ctl-leg`, so one kind of work can't hold up another. Proposed (2026-11-07): AR intake runs on `ctl-intake`, returns on `ctl-return`, inbound on `ctl-inbound` and representments on `ctl-repr`. The corporate dispatchers run across markets, allocation requests on `ctl-alloc`, allocated payments on `ctl-allocated` and allocation legs on `ctl-leg`, each every minute (Proposed, 2026-11-08). The dispatcher workflows' own tasks run on `offline-wf`. The run ID stamped on a claimed row is the dispatcher's workflow ID.
 
 The workflow holds no rows and starts nothing itself. Starting a workflow is I/O, and [workflow code has to stay deterministic](./core-build/workflows.md#why-workflow-code-must-be-deterministic), so every claim and every start happens inside the activity. The workflow only adds up counts and decides whether to go round again. A sketch, with illustrative names:
 
@@ -31,7 +31,7 @@ class DispatcherWorkflowImpl : DispatcherWorkflow {
             val tick = dispatch.claimAndStart(kind)
             total += tick
             if (tick.claimed == 0) {
-                dispatch.sweep(kind)                // this run's rows still DISPATCHING
+                dispatch.sweep(kind)                // rows still DISPATCHING after 120 s
                 return                              // nothing due: the run ends
             }
             if (Workflow.getInfo().isContinueAsNewSuggested) {
@@ -94,13 +94,13 @@ The heartbeat carries the tick's position, and that position is what a retry res
 
 ### When a worker dies mid-tick
 
-The heartbeat timeout is 10 seconds. Proposed numbers (2026-11-07): a 20-second tick, a 60-second hold, a sweep after 120 seconds, and an activity start-to-close of 10 minutes plus the hold. A worker that dies mid-tick misses the heartbeat timeout, Temporal retries the activity on another worker, and the retry reads the last heartbeat's position and carries on from there. It doesn't claim again, and the rows it already started fail as already started, which counts as done.
+The heartbeat timeout is 10 seconds. Proposed numbers (2026-11-07): a 20-second tick, a 60-second hold, a sweep after 120 seconds, and an activity start-to-close of 10 minutes, which already covers the hold many times over (2026-11-08). A worker that dies mid-tick misses the heartbeat timeout, Temporal retries the activity on another worker, and the retry reads the last heartbeat's position and carries on from there. It doesn't claim again, and the rows it already started fail as already started, which counts as done.
 
 Rows that were claimed but never started stay `DISPATCHING`. The sweep at the end of the run starts them again, and the next run catches anything the sweep missed. Again, a start that finds its workflow already running counts as done, so nothing runs twice.
 
 ## The inbox dispatchers
 
-The AR intake, returns and inbound dispatchers run the same loop against One-Data's inbox instead of the Work Tracker, through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions). A request's body is the workflow's start input. Proposed (2026-11-07): an AR payment's and an inbound payment's body is `CreatePayment.v3`'s body with one instruction, plus the fields One-Data passes in headers on a create, under placeholder names, and until the key's format is known, the payment ID is the request's whole idempotency key. An AR request dated today is scheduled and executes the same day (agreed 2026-11-07); which dispatcher picks it up once that day's run has passed is still to be proposed.
+The AR intake, returns and inbound dispatchers run the same loop against One-Data's inbox instead of the Work Tracker, through [One-Data's inbox functions](./api-spec/one-data.md#inbox-functions). A request's body is the workflow's start input. Proposed (2026-11-07): an AR payment's and an inbound payment's body is `CreatePayment.v3`'s body with one instruction, plus the fields One-Data passes in headers on a create, under placeholder names, and until the key's format is known, the payment ID is the request's whole idempotency key. An AR request dated today is scheduled and executes the same day (agreed 2026-11-07); once that day's run has passed, the late companion Schedule picks it up within 15 minutes (Proposed, 2026-11-08). Each tick is one activity, so it calls the One-Data client itself rather than `InboxActivities` (agreed 2026-11-08).
 
 | Work Tracker dispatcher | Inbox dispatcher |
 | --- | --- |

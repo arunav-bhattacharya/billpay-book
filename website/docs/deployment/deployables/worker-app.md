@@ -33,11 +33,11 @@ Each worker polls one task queue on its app's cluster.
 - Slots are fixed when a worker starts, but billpay-online reads its limits every 15 seconds and lowers one when a SEPA run's cap starts, so an Online `ds-*` worker is sized for the agreed TPS, the most Online gets (OK for now, 2026-11-07).
 - Each app's slot caps are sized to its own pods and its own Oracle pool ([DataSource](../../build/tech-stack/datasource.md)).
 
-Workflow workers keep a sticky cache at least as big as the number of workflows in flight, which is 2,000 or more on the Offline cluster. A workflow that falls out of the cache has to be replayed from its history before its next step, so a cache that is too small turns into extra load on the cluster.
+Workflow workers keep a sticky cache at least as big as the number of workflows in flight, which is 2,000 or more on the Offline cluster. Proposed (2026-11-08), per pod, to tune in the load test: a sticky cache of 2,000 workflows on Online and 4,000 on Offline; 200 workflow-task slots on each; and local-activity slots at about 80% of the pod's Oracle pool, 40 on Online (pool 50) and 24 on Offline (pool 30), so database local activities never queue for a connection. A workflow that falls out of the cache has to be replayed from its history before its next step, so a cache that is too small turns into extra load on the cluster.
 
 ## Versions and deploys
 
-One pipeline run builds both apps from the same commit, and each registers that build ID with its own cluster under Worker Versioning. Payment workflows are pinned to the build they started on, so a deploy starts new payments on the new build and never changes the code under one already running. The dispatchers and the governor are pinned too, but each continues-as-new onto the newest build, and the governor does so as soon as a new build is the target (Proposed). [Deployment Pipeline](../pipeline.md) covers what that means for a release.
+One pipeline run builds both apps from the same commit, and deploys are rolling. A payment running during a deploy carries on in the new build, so a change to workflow code that would alter its steps is patched with `Workflow.getVersion` and checked by the replay tests. Worker Versioning is parked for later (2026-11-08). [Deployment Pipeline](../pipeline.md) covers what that means for a release.
 
 ## Where they run
 

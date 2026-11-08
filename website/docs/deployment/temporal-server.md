@@ -27,6 +27,7 @@ Both clusters run the latest Temporal server, at least 1.30.1, so visibility can
 | Standby | Passive, in us-west-1 | Passive, in us-west-1 | Active-passive; an operator promotes each standby on its own |
 | `system.enableActivityEagerExecution` | true | true | Eager activities save writes |
 | Eager workflow start | Not used | Not used | The server refuses it with Update-With-Start |
+| `matching.useNewMatcher` | Not needed | true | The matcher fairness needs on a self-hosted server (2026-11-08) |
 | `matching.enableFairness` | Not needed | true | Fairness keys and per-key limits |
 | Namespace retention | 30 days | 30 days | The retention requirement |
 | Namespace RPS limits | Well above peak | About 2× the API requests per second at the governor's ceiling | A hard backstop if the governor misbehaves |

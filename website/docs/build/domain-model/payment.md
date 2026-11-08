@@ -10,7 +10,7 @@ import Lead from '@site/src/components/Lead';
 
 <Lead>One sealed class per lifecycle state, two shapes, and moves between states as functions the compiler checks. This page is the payment model as Kotlin, top down, from the sources under <code>docs/domainModel</code>.</Lead>
 
-[Design → Domain Model](../../design/domain-model.md) has the map: all fourteen states, what each one guarantees, and the 36 moves between them. This page shows the code a builder works with.
+[Design → Domain Model](../../design/domain-model.md) has the map: all fourteen states, what each one guarantees, and the 32 moves between them. This page shows the code a builder works with.
 
 ## The root types
 

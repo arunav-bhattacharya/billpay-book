@@ -120,10 +120,7 @@ export const GROUPS = [
               {t: 'Pays with a bank step', s: 'Pay with Bank Transfer, say', st: 'PENDING', m: 'on', at: 'Capture'},
               {t: "Gets the provider's link", s: "or DECLINED, when Amex's own checks fail or no link comes", st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
-            oneData: [
-              {...CREATE, at: 'Capture'},
-              {c: 'DeletePendingPayment.v1', s: 'after the reply: only the stored create goes', at: 'RequestConfirmation'},
-            ],
+            oneData: [{...CREATE, at: 'Capture'}],
           },
           {
             phase: ['At the bank', 'the confirmation window, 10 minutes at most'],
@@ -164,10 +161,7 @@ export const GROUPS = [
               {t: 'Pays by debit card', s: 'a bank from the list, through ReadBillpayInstruments.v1', st: 'PENDING', m: 'on', at: 'Capture'},
               {t: 'Gets the challenge link', s: "or none, when the bank needs no challenge; DECLINED if Amex's own checks fail", st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
-            oneData: [
-              {...CREATE, at: 'Capture'},
-              {c: 'DeletePendingPayment.v1', s: 'after the reply: only the stored create goes', at: 'RequestConfirmation'},
-            ],
+            oneData: [{...CREATE, at: 'Capture'}],
           },
           {
             phase: ['3D Secure', '2 minutes at most'],

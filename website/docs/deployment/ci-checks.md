@@ -41,7 +41,7 @@ Adding `MandateCheck`, for example, shows up as new rows for every combination w
 
 The replay tests are only as good as the histories they replay. One or more per journey are checked in, and each release adds histories recorded in E2 for the journeys it changed.
 
-Worker Versioning pins a payment to the build it started on, so a new build never replays an old build's payments. The replay tests guard something else: a worker that restarts mid-payment, and another worker of the same build that replays the history. Code that reads the clock or iterates in an unstable order takes a different path the second time, and these tests find it before production does.
+Deploys are rolling, so a new build does replay payments an old build started. The replay tests catch a change that would derail them, one that should have been patched with `Workflow.getVersion` (2026-11-08). They also guard a worker that restarts mid-payment, and another worker that replays the history. Code that reads the clock or iterates in an unstable order takes a different path the second time, and these tests find it before production does.
 
 ## When a check fails
 

@@ -15,11 +15,11 @@ import Lead from '@site/src/components/Lead';
 | Layer | Shared by every market | A market's own |
 | --- | --- | --- |
 | Workflow | `core/lib/workflows/impl/` | None |
-| Stage, with its checks and methods | `core/lib/stages/impl/{step}/`, one folder per step; the shared checks in `core/lib/verification/checks/` | `market/{m}/`: usually a check or a method, and a stage only when the market's flow differs |
+| Stage, with its checks and methods | `core/lib/stages/impl/{step}/`, one folder per step; the shared checks in `core/lib/stages`, package `checks` | `market/{m}/`: usually a check or a method, and a stage only when the market's flow differs |
 | Activity | `core/lib/activities/` and `impl/` | None |
 | Client | `core/lib/clients/` | None |
 
-What each type is called is in the [naming conventions](../../design/principles.md#naming). The Router, the dispatchers and the governor sit beside these four in modules of their own, and the [stage resolver](./stage-resolver.md) and its registries live in the app modules. The shared checks and rules that Verify, Reverify and Represent use sit in `core/lib/verification/`, with the checks in `checks/` and the rules, with the specifications they use, in `rules/`. Like stage code, they depend only on activity interfaces. Every module that holds stages, checks or methods carries an empty `META-INF/beans.xml`, so Quarkus finds its classes, and a test fails for any class it misses.
+What each type is called is in the [naming conventions](../../design/principles.md#naming). The Router, the dispatchers and the governor sit beside these four in modules of their own, and the [stage resolver](./stage-resolver.md) and its registries live in the app modules. The shared checks sit in `core/lib/stages`, package `checks`, and depend on activity interfaces like the rest of stage code. The rules Verify, Reverify and Represent run sit in `core/lib/rules` (renamed from `core/lib/verification`, 2026-11-08), with `CheckKey`, `VerificationFacts`, the specifications, the `RuleSet` beans, the rule registry, the decline codes and the split policies. That module depends on the domain alone, with no activity interfaces and no Temporal SDK. The systems' answers are domain types in `domain.answers` (agreed 2026-11-08). Every module that holds stages, checks or methods carries an empty `META-INF/beans.xml`, so Quarkus finds its classes, and a test fails for any class it misses.
 
 Only stages have a market column, because stages, with their checks and methods, are the only layer that varies. There is one implementation of each workflow, and it gets its stages from the stage resolver, never copied per market. Activities and clients are shared by every market by design.
 
@@ -32,6 +32,7 @@ Each layer may depend only on the interfaces of the layer below it:
 - Workflow code depends on stage interfaces, activity interfaces and the stage resolver. It never sees an activity's implementation, a store, a client or another cluster.
 - Stage code depends on activity interfaces, and gets their stubs through its `StageContext`. It never sees an activity's implementation, a store or a client.
 - Activity implementations depend on stores and clients. A store reaches Oracle and a client its one system, and neither depends on anything above it.
+- Rule code, in `core/lib/rules`, depends on the domain alone, with no activity interfaces and no Temporal SDK, so the build itself stops a rule from calling an activity, a store or a client. A rule decides over the facts its stage fetched and never reads the clock (agreed 2026-11-08).
 
 A workflow may call stages or activities, a stage calls activities, an activity calls stores or clients, and a client calls only its own system. There are no exceptions, for control and periodic workflows too (agreed 2026-11-07).
 

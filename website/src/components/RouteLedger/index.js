@@ -974,7 +974,7 @@ function ActCard({f, go, onClear}) {
 
       {f.rail && f.name === 'PaymentStore' && (
         <p className={clsx(styles.stepText, styles.gapTop)}>
-          It is the store for payment state: only the stores reach Oracle. Its first attempt runs as a local activity and any retry as a regular one. Each stage commits its new state,
+          It is the store for payment state: only the stores reach Oracle. Its first 2 attempts run as a local activity and any retry after them as a regular one. Each stage commits its new state,
           a timeline entry and its Work Tracker rows in one guarded transaction.
         </p>
       )}

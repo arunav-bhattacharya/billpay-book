@@ -449,7 +449,7 @@ export default function HADiagram() {
           <text x={PREM.x + 60} y={805}>request path, and gRPC to Temporal</text>
           <path d={`M${PREM.x + 356},800 H${PREM.x + 392}`} className={styles.buf} markerEnd="url(#had-buf)" />
           <text x={PREM.x + 402} y={805}>
-            hold: One-Data stores each new payment in Redis, and RTF retries it when the core APIs are slow or down
+            hold: One-Data stores a new payment in Redis, and RTF retries it when the core APIs are slow or down
           </text>
           <path d={`M${PREM.x + 14},830 H${PREM.x + 50}`} className={styles.rep} markerEnd="url(#had-rep)" />
           <text x={PREM.x + 60} y={835}>replication</text>

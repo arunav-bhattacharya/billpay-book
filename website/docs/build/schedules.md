@@ -21,13 +21,15 @@ Schedules start three kinds of work: the dispatchers, which release payments at 
 | Schedule | Starts |
 | --- | --- |
 | `scheduled-payments-{market}-{accountType}` | `dispatch-scheduled-payments-{market}-{accountType}` |
+| `scheduled-payments-{market}-{accountType}-late`, every 15 minutes (Proposed, 2026-11-08) | `dispatch-scheduled-payments-{market}-{accountType}-late` |
 | `representments-{market}` | `dispatch-representments-{market}` |
+| `allocation-requests`, `allocated-payments`, `allocation-legs` (Proposed, 2026-11-08) | `dispatch-allocation-requests`, `dispatch-allocated-payments`, `dispatch-allocation-legs` |
 | `ar-intake`, `returns`, `inbound` | `dispatch-ar-intake`, `dispatch-returns`, `dispatch-inbound` |
-| `paid-drain` | `process-paid-events` |
-| `missing-paid-events`, hourly | `process-missing-paid-events` |
+| `paid-drain` | `paid-drain` (2026-11-08) |
+| `missing-paid-events`, hourly | `missing-paid-events` (2026-11-08) |
 | `purge-transaction-data`, daily at 02:00 UTC | `purge-transaction-data` |
 
-- Each dispatcher runs its activities on its own control queue, such as `ctl-sched`, `ctl-intake`, `ctl-return`, `ctl-inbound` or `ctl-repr`, and has its own budget from the governor. One kind of work can't hold up another.
+- Each dispatcher runs its activities on its own control queue, such as `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-intake`, `ctl-return`, `ctl-inbound` or `ctl-repr`, and has its own budget from the governor. One kind of work can't hold up another.
 
 A minute Schedule starts a short run: it drains what is due, continues-as-new while work remains, and ends when a claim comes back empty. The governor's Schedule works differently, because the governor is meant to run all the time. Its Schedule only starts it again if it isn't running.
 
@@ -44,5 +46,7 @@ The scheduled-payments dispatcher runs per market and account type, at the time 
 Each release sets `timeZone`, an IANA zone such as `America/Phoenix`, and `executionTime`, `HH:mm`, local midnight when unset (agreed 2026-11-07). A Schedule takes its time zone, so the execution time holds across daylight saving. Test the daylight-saving weekends: on the Temporal dev server (1.32.2), a Schedule at local midnight in `Europe/London` fires one extra run at 00:00Z on 2027-10-31, which is 01:00 BST, just before the clocks go back. That run finds nothing due and ends after its sweep, so it does no harm, but check the production server's version before a market with daylight saving relies on Schedules. The US market runs on Phoenix time, which has no daylight saving, so its run starts at 00:01 MST all year. Execution runs every day: no market keeps a holiday calendar.
 
 Until market activation creates the Schedules, billpay-offline creates any that are missing from the active config every 15 seconds, and tests create them paused (Proposed, 2026-11-07).
+
+Each scheduled-payments Schedule has a late companion, `scheduled-payments-{market}-{accountType}-late`, every 15 minutes, for rows that fall due after the day's run, such as an AR payment dated today; a late run that finds nothing due sweeps and ends (Proposed, 2026-11-08). The two never run at once (agreed 2026-11-08): a late run that fires while the day's run is going ends at once, and a late run still going at the execution time finishes first, then the day's run starts.
 
 Pausing a live market stops its dispatchers, through the Market Onboarding API's pause and resume, and pausing a Schedule stops new runs too.

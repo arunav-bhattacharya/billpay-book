@@ -1,6 +1,6 @@
 ---
 title: Domain Model
-description: "In Billpay's code, a payment's class is its state, and the only way from one state to the next is one of 36 functions."
+description: "In Billpay's code, a payment's class is its state, and the only way from one state to the next is one of 32 functions."
 sidebar_label: Domain Model
 ---
 
@@ -9,7 +9,7 @@ import DomainModelMap from '@site/src/components/DomainModelMap';
 
 # Domain Model
 
-<Lead>In Billpay's code, a payment's class is its state, and the only way from one state to the next is one of 36 functions. A `PaidFullPayment` can't be built without a tokenized account, a verified instrument and a clearing date, so no paid payment is ever missing one.</Lead>
+<Lead>In Billpay's code, a payment's class is its state, and the only way from one state to the next is one of 32 functions. A `PaidFullPayment` can't be built without a tokenized account, a verified instrument and a clearing date, so no paid payment is ever missing one.</Lead>
 
 A common way to model a payment is a status column beside fields that may or may not be filled in. That leaves room for a `PAID` payment with no clearing date, or a `RETURNED` one that can't say why it came back. Billpay's model leaves no room for either, because the compiler refuses to build them.
 
@@ -31,9 +31,9 @@ The [stages](./component-model/stages.md) are where these moves run. Verify move
 
 ## Full payments and legs
 
-Two shapes cross the states. A `FullPayment` settles as one amount. A `SplitPayment` is a leg: it carries its parent's ID as `originalPaymentId`, a `sequenceNumber` and its own amount. A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`, which is also how One-Data pairs a leg's Accounts Receivable (AR) posting with the settlement of its parent: it reads the part before the `_`.
+Two shapes cross the states. A `FullPayment` settles as one amount. A `SplitPayment` is a leg: it carries its parent's ID as `originalPaymentId`, a `sequenceNumber` and its own amount. A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`, which is also how One-Data pairs a corporate leg's Accounts Receivable (AR) posting with the settlement of its parent: it reads the part before the `_`. A consumer split's leg settles on its own.
 
-That makes twenty-two classes in all. A full payment has a class for each of the fourteen states. A leg has eight. It starts at `ACCEPTED`: it is made from a parent Verify has already passed, by `toAcceptedSplitPayment(splitSlice)`, so there's no pending, scheduled, allocating or allocated leg. From there it has the same seven states as any payment that moves money, plus `DeclinedSplitPayment`, because a leg's representment can fail its recheck. A leg is never cancelled.
+That makes nineteen classes in all. A full payment has a class for each of the fourteen states. A leg has five. It starts at `ACCEPTED`: it is made from a parent Verify has already passed, by `toAcceptedSplitPayment(splitSlice)`, so there's no pending, scheduled, allocating or allocated leg. From there it moves through `PROCESSING` and `PROCESSED` to `PAID`, and can be `RETURNED`. Only a whole payment is represented (agreed 2026-11-07), so a returned leg stays `RETURNED`, and the leg has no representment classes (dropped 2026-11-08). A leg is never cancelled or declined.
 
 The `SplitSlice` carries what the leg needs: its sequence number, its amount, its ID (`splitPaymentId`) and the card account it pays, so each leg can pay its own card account instead of its parent's. The parent can be `ACCEPTED` or already `PROCESSING` when its legs are made. A corporate parent is always `PROCESSING` by then, because its legs are written only once its Execute has cleared it. [Corporate Allocations](./corporate-allocations.md) covers that path.
 
@@ -50,7 +50,7 @@ Every class from `SCHEDULED` to `REPRESENTED`, `ALLOCATING` and `ALLOCATED` incl
 - A pending payment may not know its amount yet, so `PendingFullPayment` checks the amount when it's built. If the customer named the amount (an other amount, or an initial payment amount) or the option is already verified, the amount must be there. For any other option it must be empty, because Verify works the amount out.
 - A pending payment that waits for the customer's bank also holds `bankConfirmation`, with the provider's reference, `providerReference`, and the redirect link, `redirectLink`.
 - A cancelled payment, like a declined one, may have no amount and only a plain `Timeline`, because a payment cancelled while `PENDING` was never verified.
-- A declined payment carries a `declineCode` and has no confirmation code. A leg is declined only when its representment fails the recheck.
+- A declined payment carries a `declineCode` and has no confirmation code. A leg is never declined.
 - Only a push payment, one a third party sends in, can end `DISALLOWED`.
 
 ## Presentments
@@ -63,7 +63,7 @@ That is also why a second return takes its own `ReturnedInfo`. A payment returne
 
 ## Moving between states
 
-The 36 functions, grouped by the class they start from. Leg classes mirror the full ones from `ACCEPTED` down.
+The 32 functions, grouped by the class they start from. Leg classes mirror the full ones from `ACCEPTED` to `RETURNED`, since a leg is never represented or declined.
 
 | From | Functions |
 | --- | --- |
@@ -78,7 +78,7 @@ The 36 functions, grouped by the class they start from. Leg classes mirror the f
 | `ReturnedFullPayment` | `toRepresentingFullPayment(representmentDate)`, which builds the next presentment with the representment date as its clearing date |
 | `RepresentingFullPayment` | `toRepresentedFullPayment()`, `toDeclinedFullPayment(declineCode)` when the recheck fails |
 | `RepresentedFullPayment` | `toReturnedFullPayment(returnedInfo)` |
-| `AcceptedSplitPayment` to `RepresentedSplitPayment` | The same ten moves at leg level: accepted to processing; processing to processed or returned; processed to paid or returned; paid to returned; returned to the next presentment; representing to represented, or declined when the recheck fails; represented to returned. No journey represents a leg (agreed 2026-11-07), so the leg's representment moves have no caller for now, and whether they stay is open |
+| `AcceptedSplitPayment` to `ReturnedSplitPayment` | Six moves at leg level: accepted to processing; processing to processed or returned; processed to paid or returned; paid to returned. A returned leg stays `RETURNED`, since only a whole payment is represented (agreed 2026-11-07; the leg's representment moves dropped 2026-11-08) |
 
 The arguments say what each move needs. The move out of `PENDING` takes exactly what Verify resolves, so Verify's results are the arguments. Every move that records a return takes a `ReturnedInfo`, so a return without its details doesn't compile, and the move to the next presentment takes the date it clears on.
 
@@ -101,10 +101,11 @@ These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The build
 3. `PENDING` → `CANCELLED`, for a payment never confirmed or one the customer said no to, with `CancelledFullPayment` accepting a missing amount and a plain `Timeline`.
 4. `bankConfirmation` on `PendingFullPayment`, holding `providerReference` and `redirectLink`.
 5. `DisallowedFullPayment`, for push payments only.
-6. A second return's details: `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)`, and the same for a leg. Today that move keeps the first return's.
-7. The next presentment: `toRepresentingFullPayment(representmentDate)` and the leg's version number it one higher and give it the representment date as its clearing date. Today they copy the returned presentment's number and timeline.
-8. A representment that fails its recheck turns the new presentment's row `DECLINED`: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`, plus `DeclinedSplitPayment` and its move for a leg. The supplied code's moves from `REPRESENTING` back to `RETURNED` go.
+6. A second return's details: `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)`. Today that move keeps the first return's.
+7. The next presentment: `toRepresentingFullPayment(representmentDate)` numbers it one higher and gives it the representment date as its clearing date. Today it copies the returned presentment's number and timeline.
+8. A representment that fails its recheck turns the new presentment's row `DECLINED`: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`. The supplied code's moves from `REPRESENTING` back to `RETURNED` go.
 9. `SplitSlice` gains `splitPaymentId` and `account`, and a leg takes its ID and card account from the slice. Today the code builds the ID with `paymentId.withSplit(seq)` and copies the parent's account.
+10. The leg's representment classes go, since only a whole payment is represented: `RepresentingSplitPayment` and `RepresentedSplitPayment`, with `toRepresentingSplitPayment()`, `toRepresentedSplitPayment()` and both moves back to `ReturnedSplitPayment` (agreed 2026-11-08).
 
 ## Still open
 

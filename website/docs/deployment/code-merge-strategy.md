@@ -71,7 +71,7 @@ A pull request does one thing, small enough to review in one sitting.
 
 - `core/lib/` needs a platform owner, since every market runs it.
 - `market/{m}/` needs that market's team.
-- Workflow code, stage code and anything under `core/lib/verification/` need two approvals. A determinism mistake there only shows up when a payment replays, so it gets a second pair of eyes.
+- Workflow code, stage code and anything under `core/lib/rules/` need two approvals. A determinism mistake there only shows up when a payment replays, so it gets a second pair of eyes.
 - A pull request to `main` also needs the release manager.
 
 Reviewers rotate, so knowledge of each area doesn't sit with one person.

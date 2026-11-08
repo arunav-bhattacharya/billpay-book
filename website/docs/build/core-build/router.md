@@ -167,7 +167,7 @@ No rule here looks at the account's other payments. A create on an account that 
 
 Each behavior in the market's version is Y, N or BOTH, and a workflow must only ever see Y or N. BOTH becomes one or the other here, by the rule onboarding stored with it:
 
-- For most behaviors the rule lists the journeys that get Y. Realtime clearing is the usual example: only a pay-today payment from a channel gets it.
+- For most behaviors the rule lists the journeys that get Y. Realtime clearing is the usual example: only a pay-today payment from a channel gets it. A scheduled execution always resolves it to N, even where the release sets `requiresRealtimeClearing` to Y, because a future-dated payment never clears in real time (agreed 2026-11-08).
 - For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Bank confirmation takes only payments made today. Which account types can take it is configurable: consumer for now, and business travel can be turned on later. Until then, a business travel request whose method needs it is refused with 422 (Proposed). A corporate payment whose method would need it is refused with 422. A future-dated request, or one with several instructions, that would need it is refused with 422: Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
 - Card authentication is never BOTH, because no market chooses it: the Router sets it to Y whenever the payment method is a debit card (Proposed).
 
@@ -180,7 +180,7 @@ fun resolveFlag(rule: BehaviorRule, journey: Journey, method: PaymentMethod?): B
     }
 ```
 
-The version is the active one, with one exception. A new version is tested with real payments before it goes live, from mock accounts set up for that version (agreed 2026-11-07). Proposed: the release's JSON lists them, `testAccounts` by account token, frozen with the release, and the Router pins that version for any payment from one of them, even before it is active. Every other account runs on the active version.
+The version is the active one, with one exception. A new version is tested with real payments before it goes live, from mock accounts set up for that version (agreed 2026-11-07). Proposed: the release's JSON lists them, `testAccounts` by account token, frozen with the release, and the Router pins that version for any payment from one of them, even before it is active, and keeps it for that payment's updates, cancels and due-date execution (agreed 2026-11-08). Every other account runs on the active version.
 
 ### 4. Pin the resolved profile
 
@@ -335,4 +335,4 @@ Neither cluster uses eager workflow start: the server refuses it with Update-Wit
 
 A scheduled payment is routed twice. Its create goes through the Router when the customer schedules it. On the due date, the dispatcher hands its `SCHED_EXEC` row, or a corporate payment's `ALLOC_EXEC` row, to the Router like any other start. The Router resolves the behaviors from that day's active version and pins a new resolved profile, so the payment executes with today's config. The version it was scheduled under stays in its timeline for audit.
 
-In code, a due row is one more kind of request, which is the point of having one Router. The two guardrails that make this safe are already in place: the resolved profile carries the behaviors and the version, and Worker Versioning pins the workflow to its build.
+In code, a due row is one more kind of request, which is the point of having one Router. The two guardrails that make this safe are already in place: the resolved profile carries the behaviors and the version, and a workflow code change that would alter a running payment's steps is patched and replay-tested.

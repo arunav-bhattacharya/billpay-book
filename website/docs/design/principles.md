@@ -64,9 +64,11 @@ Work flows one way: a workflow calls stages or activities, a stage calls activit
 | Layer | May call | Must not call |
 | --- | --- | --- |
 | Workflow | Stages; activities; child workflows on its own cluster | Stores, clients, external systems, anything on the other cluster |
-| Stage | Activities; the checks and methods the stage resolver gives it; plain helper functions | Workflows, other stages, clients, external systems |
+| Stage | Activities, its checks' calls included; the checks and methods the stage resolver gives it; rules; plain helper functions | Workflows, other stages, clients, external systems |
 | Activity | Stores and clients | Workflows, stages, other activities, external systems |
 | Client | Its one system | Other clients, workflows, stages, activities |
+
+Rules aren't a layer. Like the domain, they are pure code a stage uses: inside a stage, the rules decide over the facts the stage's activities fetched. A rule never calls an activity, a store or a client, and never reads the clock (agreed 2026-11-08).
 
 ## Naming
 
@@ -83,7 +85,7 @@ Naming a class for its job rather than its market means a check that several mar
 
 - There is one implementation of each workflow. A workflow gets its stages from the stage resolver and is never copied per market.
 - Workflows and stages are never `abstract`.
-- Activities are shared across markets. Callers pass IDs, not payment objects, and an activity loads what it needs. A whole request travels only once, into a workflow that creates a payment: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. Data from Payment Options and Payment Instruments is the other exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec.
+- Activities are shared across markets. Keep what a workflow carries as light as possible, without dropping a detail a later step must have, and without adding database reads that slow the run (agreed 2026-11-08). A workflow that creates a payment carries its request: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. An activity may take the small value it needs, such as the money movement, instead of loading it again by ID. Data from Payment Options and Payment Instruments travels too: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec, whose key source is a placeholder for now, set in the company's environment (2026-11-08).
 
 ## How a workflow finds its stages
 
@@ -93,7 +95,7 @@ Nothing maps a resolved profile to classes by hand. Each stage, and each check o
 
 - Each step names the behaviors it must act on, such as mandate authorization for Verify. A combination where one of them is Y and no class that applies handles it can't run, so it can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
 - The same registries produce the build's **capability manifest**, the list of every combination the build can run. The onboarding workflow checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
-- Payment workflows are pinned to their build with Worker Versioning, and the resolved profile carries the config version. A deploy never changes the code under a running payment, and a new market release never changes its config.
+- The resolved profile carries the config version, so a new market release never changes a running payment's config. Deploys are rolling, so a change to workflow code that would alter a running payment's steps is patched, and the replay tests prove old histories still replay (2026-11-08).
 
 ## Writing a step that is safe to repeat
 

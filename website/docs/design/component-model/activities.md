@@ -11,7 +11,7 @@ export const ACTIVITIES = [
   {
     name: 'PaymentStore',
     system: 'Oracle',
-    queue: 'A local activity on the first attempt, then a regular activity for every retry',
+    queue: 'A local activity on the first 2 attempts, then a regular activity for every retry after',
     calledBy: "Every stage's commit; Capture's insert-if-absent; the leg writes at release; the guarded cancel; the ID map in Update",
   },
   {
@@ -96,7 +96,7 @@ export const ACTIVITIES = [
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; the AR intake, returns and inbound dispatchers, to fetch and mark their requests; every create workflow once its payment is decided, and `CreatePaymentIntentWorkflow` once after its reply and again once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a Pay with Bank Transfer or debit card payment (Proposed)',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; every create workflow once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a Pay with Bank Transfer or debit card payment (Proposed)',
   },
   {
     name: 'LifecycleEventActivities',
@@ -118,7 +118,7 @@ export const ACTIVITIES = [
 
 The task queue is how Billpay throttles. A downstream system with an agreed rate gets its own `ds-*` queue, and the queue's server-side rate limit holds across every pod, so the system never sees more than it agreed to. Calls that nobody throttles run on the workflow's own queue, and Oracle is reached only through `PaymentStore`, which runs inside the workflow task itself. [Throttling](../throttling.md) covers how the limits are set and changed.
 
-Activities take IDs, not payment objects, and load what they need. Capture's write is where a payment starts: `PaymentStore` takes the request the workflow was started with and writes it with insert-if-absent, so nothing reaches Oracle before the workflow starts. Data from Payment Options and Payment Instruments is the one other exception: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, such as Execute's open-to-buy call and Fulfil's notifications. Workflow history keeps it encrypted by the payload codec. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
+An activity takes what it needs as lightly as it can: usually the payment ID, or a small value such as the money movement when that saves loading it again (agreed 2026-11-08). Capture's write is where a payment starts: `PaymentStore` takes the request the workflow was started with and writes it with insert-if-absent, so nothing reaches Oracle before the workflow starts. Data from Payment Options and Payment Instruments travels in the workflow too: what a stage gets there, clear text included, goes on to the later calls that need it, such as Execute's open-to-buy call and Fulfil's notifications. Workflow history keeps it encrypted by the payload codec. RTF lifecycle events and Raven messages are activities like the rest: there is no outbox.
 
 ## The catalogue
 
@@ -134,7 +134,7 @@ A corporate payment is never declined because its allocations are slow. It waits
 
 ## The stores, the way into Oracle
 
-Every store reads and writes Oracle directly, called from an activity: `PaymentStore` for payment state, and `WorkTrackerStore`, `AllocationBatchStore`, `ConfigStore` and `ControlStore` for the Work Tracker, allocation batches, the published market config and the control tables. Each operation is one transaction. `PaymentStore`'s are:
+Every store reads and writes Oracle directly, called from an activity: `PaymentStore` for payment state, and `WorkTrackerStore`, `AllocationBatchStore`, `ConfigStore` and `ControlStore` for the Work Tracker, allocation batches, the published market config and the control tables. `PaymentStore` also holds the corporate completion counts, since they read the legs' table (2026-11-08). Each operation is one transaction. `PaymentStore`'s are:
 
 | Operation | What it writes |
 | --- | --- |
@@ -149,26 +149,26 @@ Every store reads and writes Oracle directly, called from an activity: `PaymentS
 
 Every database activity runs local first, which is what lets a payment ride out an Oracle outage or a patching window without anyone stepping in:
 
-- The first attempt runs as a local activity, inside the workflow task, so a healthy read or write costs no task round trip.
-- If it fails, the retry runs as a regular activity with the full retry policy: a schedule-to-close of a few hours and a maximum retry interval of about a minute. The payment pauses and resumes when Oracle is back, even across a worker restart, and no workflow task waits while it does.
+- The first 2 attempts run as a local activity, inside the workflow task, so a healthy read or write costs no task round trip (agreed 2026-11-08).
+- If both fail, the next try runs as a regular activity with the full retry policy: the first retry after 6 seconds, doubling, at most 45 minutes between tries, within a schedule-to-close of a few hours (agreed 2026-11-08). The payment pauses and resumes when Oracle is back, even across a worker restart, and no workflow task waits while it does.
 - During an outage the governor sees the Oracle errors and stops dispatching, so only the payments already in flight wait.
 
 ## Where each call runs
 
 | Call | Runs as | Why |
 | --- | --- | --- |
-| Oracle reads and writes, through the stores | A local activity on the first attempt; a regular activity for every retry | The first try needs no task round trip; a retry runs on a worker like any activity, with the full retry policy |
-| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and the provider in RequestConfirmation | A local activity. A Verify call that fails 3 times runs again as a regular activity on `online-wf`, for up to 24 hours | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
+| Oracle reads and writes, through the stores | A local activity on the first 2 attempts; a regular activity for every retry after | A healthy call needs no task round trip; a retry runs on a worker like any activity, with the full retry policy |
+| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and the provider in RequestConfirmation | A local activity. A Verify call that fails its 2 attempts runs again as a regular activity on `online-wf`, for up to 24 hours (agreed 2026-11-08). The provider in RequestConfirmation gets one try, since its link must come back inside the caller's wait | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
 | Calls a downstream may throttle, Execute's and Fulfil's on both clusters | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there. The governor sets the limits on both clusters (agreed 2026-11-07) |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 
-Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the last row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans everywhere except Verify on the Online cluster. Raven has an agreed rate, so its calls run on `ds-comms`, on both clusters, including the announcements made at Verify's decision (Proposed, 2026-11-07).
+Throttled calls stay off eager dispatch, because it hands the task straight back to the worker and skips the queue's limit. RTF calls fall in the last row, since nobody throttles them, and so do calls to Payment Instruments, Payment Options and Plans everywhere except Verify on the Online cluster. On the Offline cluster, Verify's calls in Reverify and AR intake's Verify retry for up to 24 hours, as on Online (agreed 2026-11-08). Raven has an agreed rate, so its calls run on `ds-comms`, on both clusters, including the announcements made at Verify's decision (Proposed, 2026-11-07).
 
 ## Retries and timeouts
 
 - Business failures that Verify or Reverify find, such as a closed account, insufficient funds or a mandate that fails its check, are not retried. The payment goes to `DECLINED`, its Work Tracker row to `DONE`, and the workflow stops. Which HTTP answers count as business failures is set per contract. Until the contracts arrive, a 422 is the only one, and every other error retries (Proposed, 2026-11-07).
 - A 429 with `Retry-After` throws `ApplicationFailure.newFailureWithCauseAndDelay(...)` with that delay plus up to 250 ms of jitter (Proposed, 2026-11-07). Temporal uses it in place of the retry policy's interval for that attempt.
-- Other errors retry from 1 second, doubling, capped at 60 seconds, within a schedule-to-close limit per activity. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
+- Other errors retry with exponential backoff: the first retry after 6 seconds, doubling, at most 45 minutes between tries, within a schedule-to-close limit per activity (agreed 2026-11-08). A local attempt that fails retries at once instead, since its caller is waiting. After that the Work Tracker row goes to `FAILED`, and the payment goes on the exception list in its last state.
 - RTF and Raven get a long schedule-to-close, like the database activities. Both must succeed, so an outage pauses payments where they are instead of sending them to the exception list.
 - Every downstream HTTP call in Execute and Fulfil times out at 5 seconds, and its activity's start-to-close sits just above that (Proposed: 6 seconds), so the HTTP timeout fires first and a hung call frees its slot (agreed 2026-11-07). Verify's calls stay shorter, at about two to three times the call's p99. For Payment Instruments, Payment Options and Plans that p99 is at most 300 to 400 ms (agreed 2026-11-07), so their start-to-close is at most about 1.2 seconds, behind a setting of its own.
 - HTTP clients inside activities don't retry on their own (no MicroProfile `@Retry`, for example). One task is one call, so a queue's limit stays the real call rate.

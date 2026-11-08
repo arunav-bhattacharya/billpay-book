@@ -34,7 +34,7 @@ Market releases don't travel this way. A new market, or a change to one, is conf
     {
       term: 'Deployment Pipeline',
       to: '/docs/deployment/pipeline',
-      desc: `How one build reaches production, why old builds keep running for a while, and what each environment sets for itself.`,
+      desc: `How one build reaches production, what happens to running payments during a rolling deploy, and what each environment sets for itself.`,
     },
     {
       term: 'Temporal Server',

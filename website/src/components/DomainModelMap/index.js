@@ -11,19 +11,21 @@ import styles from './styles.module.css';
  * payment in the middle and a split leg on the right. Where a full payment
  * stops (disallowed, cancelled, declined) sits in its own column at the far
  * left, still under the FullPayment header because both are full payments.
- * A leg stops in one way only, a representment that fails its recheck, so its
- * DECLINED class sits under its own column. Every arrow is one of the 36
- * transition functions; the blue ones make a leg. The two traits are tinted
- * bands behind the rows they cover, so "verified" reads as a region of the
- * lifecycle rather than a label on twenty-two boxes.
+ * A leg never stops early and is never represented: only a whole payment is
+ * (agreed 2026-11-07), so a leg's classes end at RETURNED (dropped
+ * 2026-11-08). Every arrow is one of the 32 transition functions; the blue
+ * ones make a leg. The two traits are tinted bands behind the rows they
+ * cover, so "verified" reads as a region of the lifecycle rather than a label
+ * on nineteen boxes.
  *
  * What the supplied code does not have yet is dashed: the two corporate
  * classes and their six moves, PENDING to CANCELLED, PROCESSING to RETURNED,
- * the disallowed class, and the representment that fails its recheck, for a
- * payment and a leg. A move that stays but changes (a second return takes its
- * own returnedInfo, a representment builds the next presentment) keeps a
- * solid line and says so in its note. The supplied code's moves from
- * REPRESENTING back to RETURNED are gone from the model, so they aren't drawn.
+ * the disallowed class, and the representment that fails its recheck. A move
+ * that stays but changes (a second return takes its own returnedInfo, a
+ * representment builds the next presentment) keeps a solid line and says so
+ * in its note. The supplied code's moves from REPRESENTING back to RETURNED,
+ * and its leg representment classes, are gone from the model, so they aren't
+ * drawn.
  *
  * Coordinates are hand-placed on a 1056 x 952 canvas. Lines run in lanes
  * beside the boxes, so no two cross. PENDING and SCHEDULED both reach
@@ -41,7 +43,7 @@ import styles from './styles.module.css';
  */
 
 const W = 1056;
-const H = 952;
+const H = 900;
 
 /* ------------------------------------------------------------ geometry -- */
 
@@ -85,10 +87,6 @@ const BOXES = [
   {id: 'prodS', col: 'split', row: 6, state: 'PROCESSED', cls: 'ProcessedSplitPayment', tone: 'mid'},
   {id: 'paidS', col: 'split', row: 7, state: 'PAID', cls: 'PaidSplitPayment', tone: 'ok'},
   {id: 'retS', col: 'split', row: 8, state: 'RETURNED', cls: 'ReturnedSplitPayment', tone: 'ok'},
-  {id: 'repingS', col: 'split', row: 9, state: 'REPRESENTING', cls: 'RepresentingSplitPayment', tone: 'mid'},
-  {id: 'repedS', col: 'split', row: 10, state: 'REPRESENTED', cls: 'RepresentedSplitPayment', tone: 'ok'},
-  {id: 'decS', col: 'split', row: 11, state: 'DECLINED', cls: 'DeclinedSplitPayment', tone: 'stop', todo: true,
-    extra: 'A leg ends here only when its representment fails the recheck. It carries a declineCode and no confirmation code.'},
 ];
 
 const AT = {};
@@ -178,12 +176,6 @@ const EDGES = [
   {a: 'prodS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)',
     d: `M${L('prodS')},${r(6)} H${L('prodS') - 16} V${r(8) - 8} H${L('retS')}`},
   {a: 'paidS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)', d: vert('paidS', 'retS', SX)},
-  {a: 'retS', b: 'repingS', fn: 'toRepresentingSplitPayment(representmentDate)', note: NEXT, d: vert('retS', 'repingS', SX - 40)},
-  {a: 'repingS', b: 'repedS', fn: 'toRepresentedSplitPayment()', d: vert('repingS', 'repedS', SX)},
-  {a: 'repingS', b: 'decS', fn: 'toDeclinedSplitPayment(declineCode)', note: 'the recheck fails', todo: true,
-    d: `M${L('repingS')},${r(9)} H606 V${r(11)} H${L('decS')}`},
-  {a: 'repedS', b: 'retS', fn: 'toReturnedSplitPayment(returnedInfo)', note: SECOND,
-    d: `M${R('repedS')},${r(10)} H${R('repedS') + 16} V${r(8) + 8} H${R('retS')}`},
 ];
 
 /* the transition functions, by source class, for the reader line */
@@ -353,7 +345,7 @@ function ToolIcon({name}) {
 }
 
 const LABEL =
-  "The payment domain model as agreed on 2026-10-17. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have all eleven states on the path, from PendingFullPayment through AllocatingFullPayment and AllocatedFullPayment, which only a corporate payment reaches, to RepresentedFullPayment, plus DisallowedFullPayment, CancelledFullPayment and DeclinedFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have seven states on the path, plus DeclinedSplitPayment under their column for a representment that fails its recheck; a leg is never pending, scheduled, allocating, allocated or cancelled. The transition functions join them: a pending payment is accepted, scheduled or declined, cancelled when its confirmation window closes or the customer says no, or, for a push payment, disallowed; a scheduled one is accepted, declined or cancelled, or for a corporate payment moves to allocating at the fetch time; an accepted one moves to processing, or for a corporate payment paid today to allocating; allocating moves to allocated, which moves to processing when it was paid today, or back to accepted or on to declined at Reverify when it was scheduled; a processing, processed or paid payment can be returned; a returned one builds its next presentment, numbered one higher, which is representing; a representing one is represented, or declined when its recheck fails, for a payment and a leg alike; and a represented one can be returned again, with that return's own details. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. Dashed lines and outlines mark what the supplied code does not have yet: the two corporate classes and their moves, PENDING to CANCELLED, PROCESSING to RETURNED for a payment and a leg, DisallowedFullPayment, DeclinedSplitPayment, and REPRESENTING to DECLINED for a payment and a leg.";
+  "The payment domain model as agreed on 2026-10-17. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have all eleven states on the path, from PendingFullPayment through AllocatingFullPayment and AllocatedFullPayment, which only a corporate payment reaches, to RepresentedFullPayment, plus DisallowedFullPayment, CancelledFullPayment and DeclinedFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have five states, ending at ReturnedSplitPayment, since only a whole payment is represented; a leg is never pending, scheduled, allocating, allocated, cancelled or declined. The transition functions join them: a pending payment is accepted, scheduled or declined, cancelled when its confirmation window closes or the customer says no, or, for a push payment, disallowed; a scheduled one is accepted, declined or cancelled, or for a corporate payment moves to allocating at the fetch time; an accepted one moves to processing, or for a corporate payment paid today to allocating; allocating moves to allocated, which moves to processing when it was paid today, or back to accepted or on to declined at Reverify when it was scheduled; a processing, processed or paid payment can be returned; a returned full payment builds its next presentment, numbered one higher, which is representing; a representing one is represented, or declined when its recheck fails; and a represented one can be returned again, with that return's own details. A returned leg stays returned. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. Dashed lines and outlines mark what the supplied code does not have yet: the two corporate classes and their moves, PENDING to CANCELLED, PROCESSING to RETURNED for a payment and a leg, DisallowedFullPayment, and REPRESENTING to DECLINED.";
 
 /* ------------------------------------------------------------- the map --- */
 

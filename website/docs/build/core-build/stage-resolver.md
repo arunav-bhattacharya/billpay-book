@@ -401,7 +401,7 @@ The stubs are the reason for the context. Temporal only lets a workflow make act
 | A market replaces a shared check | One class in `market/{m}/`, with the shared check's key and `market = M` | It beats the shared check in that market, and nowhere else |
 | A market's own rule | A rule in a `RuleSet` in `market/{m}/`, with `market = M` | Only that market runs it. With a shared rule's ID, it replaces that rule there |
 | A market's Verify flow really differs | `{M}PaymentVerifyStage`, with `market = M` | It beats `DefaultPaymentVerifyStage` in that market. Its checks still come from the registry |
-| A step's whole flow differs by a behavior | `Payment{Step}StageWith{Behavior}`, with the behavior in `on` | It beats the default stage wherever that behavior is Y. No step needs one today |
+| A step's whole flow differs by a behavior | `Payment{Step}StageWith{Behavior}`, with the behavior in `on` | It beats the default stage wherever that behavior is Y. Execute and Reverify have one each for the corporate account type (Proposed, 2026-11-08) |
 | Two classes claim the same job equally, by mistake | Nothing | The app refuses to start: `Verify check tie for FUNDS at GB [BANK_CONFIRMATION]: [GBFundsCheck, GBBalanceCheck]` |
 
 None of these changes touches shared code, the resolver or a list.
@@ -427,7 +427,7 @@ The registries also work out the build's capability manifest when the app starts
 
 ## Why the lookup stays in the workflow
 
-The Router builds the resolved profile, so it could pick the stages as well and hand each workflow its class names. It doesn't, because during a rolling deploy the Router and the workers can run different builds. A Router on the new build could name a class that the worker's build doesn't have yet. When the workflow looks up its own stages, the build that runs them is the build that chose them, and Worker Versioning, Temporal's way of keeping a workflow on the build it started on, keeps that pairing for the life of the workflow.
+The Router builds the resolved profile, so it could pick the stages as well and hand each workflow its class names. It doesn't, because during a rolling deploy the Router and the workers can run different builds. A Router on the new build could name a class that the worker's build doesn't have yet. When the workflow looks up its own stages, the build that runs them is the build that chose them. Deploys are rolling, so a change that would make a running payment pick a different class is a workflow change like any other: it is patched with `Workflow.getVersion` and checked by the replay tests (2026-11-08).
 
 ## Why not KSP, SPI or a `when`
 

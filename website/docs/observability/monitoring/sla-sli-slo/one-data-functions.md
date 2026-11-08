@@ -20,7 +20,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
 
-**SLI:** caller-observed latency at the One-Data edge, including the contract validation and the pending check in Redis. If billpay-online doesn't answer within 3 seconds, One-Data holds the create for RTF and answers `PENDING` (a pay-by-bank or debit card create gets 503 instead), so a caller's wait has a ceiling even when the core is slow. **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency at the One-Data edge, including the contract validation and the pending check in Redis. If billpay-online doesn't answer within 3 seconds, One-Data holds the create for RTF and answers `PENDING` (a Pay with Bank Transfer, Plaid or debit card create gets 503 instead), so a caller's wait has a ceiling even when the core is slow. **Error budget:** 0.05% / 30-day window.
 
 ## Update Payment
 
@@ -96,7 +96,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 | --- | --- | --- | --- | --- |
 | 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
 
-**SLI:** caller-observed latency for a bank confirmation's confirm, until its answer. If billpay-online doesn't answer within 3 seconds, One-Data holds the confirm for RTF and answers `PENDING`, the same ceiling a create has. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency for a bank confirmation's confirm, until its answer. One-Data holds no confirm for RTF: if billpay-online doesn't answer within 3 seconds, or answers with a 5xx, the channel gets 503 and the customer confirms again (agreed 2026-11-08). Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
 
 ## Create Payment Allocations
 

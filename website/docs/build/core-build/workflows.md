@@ -20,8 +20,8 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 
 - One workflow per journey, with one implementation. Create Immediate Payment, Execute Scheduled Payment and Process Returned Payment exist once each, and no market has a workflow of its own.
 - Never `abstract`. Variation comes from the stages, checks and methods the stage resolver picks, per the [composition rules](../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
-- Call stages and, on the workflow's own cluster, child workflows. Nothing else: no activity, no client, no outside system and nothing on the other cluster. The [four layers](../../design/principles.md#the-four-layers) have the full call rules.
-- Pass the payment ID, not the payment. Stages and activities load what they need. There are two exceptions. A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle, so nothing is written before the workflow starts and the caller's path has no extra database call. And data from Payment Options and Payment Instruments, clear text included, travels on in the workflow to the later stages that need it, with the payload codec keeping it encrypted in history.
+- Call stages, activities and, on the workflow's own cluster, child workflows. Nothing else: no client, no outside system and nothing on the other cluster. The [four layers](../../design/principles.md#the-four-layers) have the full call rules.
+- Keep what the workflow carries light, but don't drop a detail a later step must have, and don't add a database read that slows the run (agreed 2026-11-08). A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle, so nothing is written before the workflow starts and the caller's path has no extra database call. A workflow that a Work Tracker row starts takes the payment ID. An activity may take the small value it needs, such as the money movement, instead of loading it again by ID. And data from Payment Options and Payment Instruments, clear text included, travels on in the workflow to the later stages that need it, with the payload codec keeping it encrypted in history.
 - Set search attributes once, at start. Use no signals or queries on the hot path. What a caller sends a running workflow, the confirm and the no, goes in as an update.
 - Never wait for a date. Work due later is a Work Tracker row in Oracle, written in the same commit as the state change, and a dispatcher starts the next workflow when it falls due. Nothing waits on a Temporal timer until then. The one exception is a payment waiting minutes for its customer: `CreatePaymentIntentWorkflow` waits on its own timer for the confirmation window.
 
@@ -55,7 +55,9 @@ A corporate payment starts no child at all. It can have 100K legs, so its alloca
 
 ## Versioning
 
-Payment workflows are pinned to their build with Worker Versioning, so a deploy never changes the code under a running payment. A payment finishes on the build it started on, which is why payment workflow code carries no version branches. Dispatchers and the governor are pinned too, but they move to a new build when they continue-as-new (Proposed). They pass `ContinueAsNewOptions` with `InitialVersioningBehavior.AUTO_UPGRADE`, so each new run starts on the newest build, and the governor, which runs all the time, continues-as-new early once `Workflow.getInfo().isTargetWorkerDeploymentVersionChanged()` turns true. Upgrading on continue-as-new is in Public Preview in Temporal.
+Deploys are rolling, so a payment that is running when a new build goes out carries on in the new build. A change that would make the workflow take a different step for a history already recorded is patched with `Workflow.getVersion`: a payment that passed that point keeps its old path, and new ones take the new one. The replay tests in CI prove that the histories recorded on the old build still replay. A patch can come out once no running workflow can still need the old path. Dispatchers and the governor continue-as-new often, so they pick up a new build quickly anyway.
+
+Worker Versioning, which pins each payment to the build it started on, is parked for later (2026-11-08). It needs each app's old and new builds running side by side during a deploy, which rolling deploys don't do.
 
 Config is pinned the same way. The resolved profile carries the resolved behaviors, the config version and the market's rule settings, and for a payment that waits, its confirmation window, so a replay finds the same stages, thresholds and window. A scheduled payment gets a new resolved profile on its due date, because the dispatcher calls the Router again. It runs with today's config, and the version it was scheduled under stays in its timeline for audit.
 
@@ -145,20 +147,14 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         waiting = decided == PaymentDecision.PENDING              // open for answers before anything else runs
         stages.capture.announce(paymentId)                        // the reply goes out with this task
         if (!waiting) { /* the delete, the announcement, and end */ return }
-        Async.procedure { inbox.deletePending(paymentId, stillWaits = true) }  // the wait doesn't wait for it
 
         val window = checkNotNull(profile.confirmationWindow)    // 2 minutes for a debit card's 3D Secure
-        val due = Workflow.currentTimeMillis() + (window + GRACE).toMillis()
-        if (!Workflow.await(window + GRACE) { answer != null } &&
-            Workflow.currentTimeMillis() - due > LATE.toMillis()) {  // handled late: Online or its workers were down
-            Workflow.await(window) { answer != null }                // one more window
-        }
+        Workflow.await(window + GRACE) { answer != null }        // a late timer cancels like any other
         waiting = false                                          // the validators turn answers away now
 
         result = if (answer == Answer.YES) stages.verify.bankChecks(paymentId, own, authentication).decision  // the bank side only
                  else stages.cancel.run(paymentId)                                  // the no, or the timer
-        inbox.deletePending(paymentId)                           // decided: the account's entry goes
-        // ... the announcements, then Execute and Fulfil for ACCEPTED
+        // ... the delete, the announcements, then Execute and Fulfil for ACCEPTED
         Workflow.await { Workflow.isEveryHandlerFinished() }   // no update left without its reply
     }
 
@@ -174,15 +170,15 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 }
 ```
 
-*(GRACE is 10 seconds and LATE a minute.)*
+*(GRACE is 10 seconds.)*
 
 - The confirm, the no and the 3D Secure callback are updates with fixed IDs, `{paymentId}-confirm`, `{paymentId}-no` and `{paymentId}-authentication`, so a repeat whose reply was lost attaches to the same update and gets the same answer.
 - The validator runs before anything is written. A confirm that comes after the workflow has its answer, or once it no longer waits, is turned away with no history event, and the API answers 409.
 - When the timer fires with no answer, the workflow runs Cancel itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
-- A timer handled well after its time means the Online cluster or its workers were down, so the customer gets one more window. `Workflow.currentTimeMillis()` is the workflow's own clock, so a replay decides the same way.
+- A timer handled late, because the Online cluster or its workers were down, cancels the payment like any other. There is no extra window: One-Data holds no confirm, so none can be waiting to land (agreed 2026-11-08).
 - Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. After the answer, Verify runs only the checks that need the bank step (agreed 2026-11-06). How it splits them is Proposed: each check says whether it needs the bank step, and the first part's facts are carried in the workflow.
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a confirm away.
-- The workflow calls One-Data's delete twice: after its reply, saying the payment still waits, and again as soon as Verify or Cancel has decided, so the customer can pay again without waiting for Execute and Fulfil. The first call runs alongside the wait, so a slow delete never keeps the workflow from taking an answer.
+- The workflow calls One-Data's delete once, when the payment is decided: by the confirm, the callback, the no or the timer, or at the create when it is declined there. Until then its entry stays in One-Data's Redis and blocks the account's next payment (agreed 2026-11-08).
 - For Pay with Bank Transfer and a debit card, Execute makes no clearing call. Its clearing method creates the payment's settlement event and hands it to One-Data's money movement handler instead, dated when the money moved (Proposed).
 
 ## Which cluster runs it

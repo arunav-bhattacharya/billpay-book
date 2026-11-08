@@ -91,7 +91,7 @@ A queue's limit says how much gets through. Priority says who goes first on a sh
 
 - Priority keys run from 1, first, to 5.
 - Returns sit at the lowest level, so on a shared queue they wait until every higher level drains, even through a whole execution window. That is fine for work nobody is waiting on, and an alert on their backlog age keeps a long wait visible.
-- Fairness is switched on in the server's dynamic config (`matching.enableFairness`). The default per-key limit applies to every key on a queue, scaled by the key's weight. Every key except a corporate parent's carries weight 100 and never meets it, so in practice the limit only reins in corporate parents. Weights only compare keys within one priority level.
+- Fairness is switched on in the server's dynamic config: a self-hosted server needs both `matching.useNewMatcher` and `matching.enableFairness` (2026-11-08). The default per-key limit applies to every key on a queue, scaled by the key's weight. Every key except a corporate parent's carries weight 100 and never meets it, so in practice the limit only reins in corporate parents. Weights only compare keys within one priority level.
 - `ProcessPaidEventsWorkflow` uses no shared queue, so it has no priority key. Its calls to One-Data and RTF run on its own queue, Oracle goes through `PaymentStore`, and the governor paces it directly.
 
 The fairness key is what keeps a corporate payment with 100K allocations from starving everyone else. At 100 legs a second it takes about 17 minutes, and the other payments on the queue keep moving the whole time.

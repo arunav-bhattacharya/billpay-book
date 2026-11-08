@@ -27,7 +27,7 @@ Escalation paths, and the steps to acknowledge and resolve an alert in Kibana, a
 
 | Alert | Fires when | People do |
 | --- | --- | --- |
-| Late allocations | A corporate payment is still `ALLOCATING` at the market's alert point | Chase the allocation source. [Runbook](../../operations/sops.md#late-allocations) |
+| Late allocations | A corporate payment is still `ALLOCATING` past its release's `allocationAlertAfter`, counted by `billpay_allocations_late_total`, which the allocation-request dispatcher bumps on each run and logs the payments' IDs (agreed 2026-11-08) | Chase the allocation source. [Runbook](../../operations/sops.md#late-allocations) |
 | Retries exhausted | A Work Tracker row goes `FAILED`, or a payment lands on the exception list | Review the exception list, then reprocess or terminate each payment's workflow by hand. [Runbook](../../operations/sops.md#retries-exhausted) |
 | Payment not PAID | A payment (other than a split parent) or a leg is still `PROCESSED` after 48 hours and the missing-events check (hourly, Proposed) couldn't find and hand over its events, counted by `billpay_paid_overdue_total` (agreed 2026-11-07); or an inbox row has stayed `UNMATCHED` for 48 hours, which One-Data's `UpdateUnmatchedPayments.v1` raises | Read the inbox row for the missing event, or check the event's IDs against Oracle. [Runbook](../../operations/sops.md#a-payment-not-paid-after-48-hours) |
 | Event without a payment | An event with no payment ID matches no payment through `ReadPayments.v1`, or more than one | Find the payment and replay the event through its handler. [Runbook](../../operations/sops.md#an-event-that-matches-no-payment) |
@@ -48,6 +48,6 @@ Returns sit at the lowest priority, so during an execution window they can wait 
 | Alert | Fires when | People do |
 | --- | --- | --- |
 | Stale pending entries | A run of One-Data's hourly sweep found entries more than 2 hours old. One alert per run, with two lists, each with its count and payment IDs: the entries it removed, because billpay-online had decided the payment or never got it, and the payments still `PENDING` whose entries it kept | Removed: find why each delete never landed, whether the delete API, a create billpay-online never got, or the two Redis sites. Kept: find why the payment is still undecided, such as a workflow that stopped before deciding or Verify's calls still failing. Its account can't pay until it is decided |
-| Creates and confirms held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-online and the Online cluster. A jump here is usually the first sign of trouble there |
+| Creates held for RTF | One-Data's hand-offs to RTF jump from near zero | Check billpay-online and the Online cluster. A jump here is usually the first sign of trouble there |
 | Delete calls failing | Billpay's delete calls to One-Data keep failing | Fix One-Data's delete API. Until then, the accounts with stale entries can't make a payment until the sweep clears them |
 | Redis memory or write errors | Redis memory is near its limit, or a write fails | Fix it before One-Data has to make the pending check through `ReadPayments.v1`, which can miss a create billpay-online hasn't captured yet |

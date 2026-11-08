@@ -51,6 +51,7 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 | Dispatcher | Claims | Runs | Starts |
 | --- | --- | --- | --- |
 | Scheduled payments, one per market and account type per day | `SCHED_EXEC` rows due in that market and account type | A Schedule at the execution time its release sets, local midnight by default; drains, sweeps stragglers, then ends | `ExecuteScheduledPaymentWorkflow` |
+| Scheduled payments, late, one per market and account type (Proposed, 2026-11-08) | `SCHED_EXEC` rows due after the day's run, such as an AR payment dated today | A Schedule every 15 minutes, never at the same time as the day's run | `ExecuteScheduledPaymentWorkflow` |
 | Allocation requests | `ALLOC_REQUEST` rows at their fetch time | A Schedule every minute | `RequestAllocationsWorkflow` |
 | Allocated payments | `ALLOC_EXEC` rows due | A Schedule every minute | `ExecuteScheduledPaymentWorkflow` |
 | Allocation legs | `ALLOC_LEG` rows, fair across parents | A Schedule every minute | `ExecuteSplitPaymentWorkflow` |
@@ -64,8 +65,8 @@ There is one dispatcher per kind of work. Each releases its work into Temporal a
 A dispatcher run is a loop of ticks, each about 20 seconds of work at the current rate.
 
 1. The tick size is the allowed rate times 20 seconds. At 50 TPS that is 1,000 items.
-2. One activity, `claimAndStart`, runs on the dispatcher's control queue. It claims up to that many rows as `DISPATCHING`, stamped with the run ID. It starts one workflow per row through the Router and a token bucket (50 TPS is one start every 20 ms). Every 5 seconds, on a timer, it re-reads the allowed rate. It checks in-flight and waits while the cap is full, checking again every 250 ms. It heartbeats its position every 2 seconds, including while it waits on the cap or the bucket (the 5 s, 250 ms and 2 s are Proposed, 2026-11-07). At the end it marks the rows `DISPATCHED` and returns the counts.
-3. The workflow adds up the counts and loops. An empty claim triggers a sweep of this run's `DISPATCHING` rows, and then the run ends.
+2. One activity, `claimAndStart`, runs on the dispatcher's control queue. It claims up to that many rows as `DISPATCHING`, stamped with the run ID. Which rows are its own comes from each row's group key (agreed 2026-11-08): a scheduled-payments run claims its market and account type's, a representments run its market's, the leg dispatcher takes rows from each parent in turn, and the other corporate dispatchers claim across markets. It starts one workflow per row through the Router and a token bucket (50 TPS is one start every 20 ms). Every 5 seconds, on a timer, it re-reads the allowed rate. It checks in-flight and waits while the cap is full, checking again every 250 ms. It heartbeats its position every 2 seconds, including while it waits on the cap or the bucket (the 5 s, 250 ms and 2 s are Proposed, 2026-11-07). At the end it marks the rows `DISPATCHED` and returns the counts.
+3. The workflow adds up the counts and loops. An empty claim triggers a sweep of the `DISPATCHING` rows claimed more than 120 s ago, by this run or an earlier one (Proposed, 2026-11-07), and then the run ends.
 4. The run continues-as-new whenever the SDK suggests it.
 
 Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, the task queue, the priority and fairness keys, and the search attributes.
@@ -84,7 +85,7 @@ With a cap, the activity waits instead, and the real rate settles at the cap div
 
 ### Changing the rate
 
-The activity reads its row in `rate_allocation` every 5 seconds (Proposed), so a new rate takes effect within seconds, with no signals and no extra workflow history. Each dispatcher reads its own class (Proposed, 2026-11-07): `EXECUTION`, scoped by market, with the class's `'*'` row when the market has none; `INTAKE`, `RETURN` and `INBOUND`, scoped `'*'`; `REPRESENTMENT`, scoped by market; and `PAID`, scoped `'*'`, for the PAID drain in payments a second. A class with no row at all gets zero, so its run waits. Operators can override the governor (pause, resume, or cap the rate) by writing a row in `rate_allocation` through an ops API, and an override always wins. Pausing a Schedule stops new runs too.
+The activity reads its row in `rate_allocation` every 5 seconds (Proposed), so a new rate takes effect within seconds, with no signals and no extra workflow history. Each dispatcher reads its own class (Proposed, 2026-11-07): `EXECUTION`, scoped by market, with the class's `'*'` row when the market has none; `INTAKE`, `RETURN` and `INBOUND`, scoped `'*'`; `REPRESENTMENT`, scoped by market; `PAID`, scoped `'*'`, for the PAID drain in payments a second; and `ALLOCATION_REQUEST`, `ALLOCATED_EXECUTION` and `ALLOCATION_LEG`, scoped `'*'`, for the corporate dispatchers, which run across markets (Proposed, 2026-11-08). A class with no row at all gets zero, so its run waits. Operators can override the governor (pause, resume, or cap the rate) by writing a row in `rate_allocation` through an ops API, and an override always wins. Pausing a Schedule stops new runs too.
 
 ### Crash safety
 

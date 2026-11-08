@@ -22,8 +22,8 @@ Only Billpay's stores read or write these tables (`PaymentStore` for payment sta
 
 A short outage or a patching window doesn't fail payments:
 
-- A database call runs as a local activity on its first attempt, inside the workflow task.
-- If that attempt fails, the call runs again as a regular activity with the full retry policy, for a few hours if need be. The payment pauses and resumes when Oracle is back, even across a worker restart.
+- A database call runs as a local activity on its first 2 attempts, inside the workflow task.
+- If both fail, the call runs again as a regular activity, the first retry after 6 seconds, doubling to at most 45 minutes apart, for a few hours if need be. The payment pauses and resumes when Oracle is back, even across a worker restart.
 - The governor sees the Oracle errors and stops dispatching, so only payments already in flight wait.
 - On the Online cluster, Capture has a short deadline, so a caller gets a quick error rather than a long wait.
 

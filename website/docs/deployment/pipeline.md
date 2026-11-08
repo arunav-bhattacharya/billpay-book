@@ -13,17 +13,17 @@ What the pipeline ships is catalogued under [Deployables](./deployables/index.md
 
 ## One build, two apps
 
-billpay-core has two app modules, `apps/online` and `apps/offline`, and each builds its own Quarkus artifact: billpay-online, which connects to the Online cluster, and billpay-offline, which connects to the Offline cluster. One pipeline run builds both from the same commit, so the two never drift apart, and each app registers that build ID with its own cluster under Worker Versioning. More capacity means more pods of the app that needs it.
+billpay-core has two app modules, `apps/online` and `apps/offline`, and each builds its own Quarkus artifact: billpay-online, which connects to the Online cluster, and billpay-offline, which connects to the Offline cluster. One pipeline run builds both from the same commit, so the two never drift apart. More capacity means more pods of the app that needs it.
 
-## Old builds keep running for a while
+## Running payments during a deploy
 
-Payment workflows are pinned to the build they started on, through Temporal's Worker Versioning. When a new build goes out:
+Deploys are rolling: the new build's pods replace the old ones a few at a time. When a new build goes out:
 
 - New payments start on the new build.
-- Payments already running finish on the build they started on, so the old build's workers keep running until its pinned workflows are done.
-- The dispatchers and the governor move to the new build the next time they continue-as-new.
+- Payments already running carry on in the new build, replaying their history first.
+- A change that would make a running payment take a different step is patched with `Workflow.getVersion`, so a payment past that point keeps its old path. The replay tests in CI prove the old histories still replay.
 
-That is why a deploy can't change the rules under a payment halfway through it. No payment workflow sleeps until a due date, because dated work waits in Oracle as a Work Tracker row, so pinned workflows don't hold an old build for days.
+No payment workflow sleeps until a due date, because dated work waits in Oracle as a Work Tracker row, so most running payments are seconds or minutes old when a deploy lands. Worker Versioning, which would pin each payment to the build it started on, is parked for later (2026-11-08): it needs the old and new builds running side by side.
 
 ## The capability manifest
 

@@ -862,7 +862,7 @@ sequenceDiagram
 
 ## 14. Pay by bank: create and confirm
 
-Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. Amex's own checks run first, before the bank step, and a payment that fails them is `DECLINED` with no link. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify runs only the bank-side checks and decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call and hands One-Data the settlement event Billpay creates instead. Once Verify or Cancel has decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15). A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
+Some payments wait for the customer to confirm their bank details on a provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. Amex's own checks run first, before the bank step, and a payment that fails them is `DECLINED` with no link. The create's update ends at `PENDING` with the provider's redirect link, or at `DECLINED` when the provider gives no link, so no payment waits without one. The workflow then waits on its timer. The caller's confirm is an update to that same workflow: Verify runs only the bank-side checks and decides, the confirm's reply carries the decision, and Execute and Fulfil follow in the same workflow. For Pay with Bank Transfer the money moves at the bank, during the customer's bank connection, so Execute makes no clearing call and hands One-Data the settlement event Billpay creates instead. Once Verify or Cancel has decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15). Until then the payment's entry blocks the account, and a Plaid payment works the same way (agreed 2026-11-08). A repeated confirm carries the same update ID and gets the same answer, or the payment's current state once the workflow has closed. If no confirm comes before the window and its grace have passed, the timer fires and the workflow cancels the payment itself.
 
 ```mermaid
 ---
@@ -933,7 +933,7 @@ sequenceDiagram
 
   alt the caller confirms in time
     OC->>R: POST /payments/<br/>{payment-id}/confirm
-    Note over OC,R: no answer in 3 s, or a 5xx: One-Data holds the confirm<br/>and answers PENDING, and RTF retries it with the same update ID
+    Note over OC,R: no answer in 3 s, or a 5xx: One-Data doesn't hold the confirm.<br/>It answers 503, and the customer confirms again with the same update ID
     Note over R: admit, then an update<br/>to the running workflow
     R->>WF: update confirm,<br/>ID {paymentId}-confirm
     rect rgba(0,111,207,0.12)
@@ -953,7 +953,7 @@ sequenceDiagram
     end
   else no confirm before the timer fires
     rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow. A timer handled late gives one more window first, for a confirm One-Data held
+      Note over WF,PS: Online cluster, the same workflow. A timer handled late cancels the same way, with no extra window
       WF->>CAN: run
       rect rgba(102,169,226,0.40)
         CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
@@ -966,7 +966,7 @@ sequenceDiagram
 
 ## 15. A new payment while another is pending
 
-One-Data checks every create from a channel before billpay-online sees it. In one atomic call to Redis, a Lua script (Proposed), it reads the card account's pending payments and, if there are none, adds the new payment and stores the create. If the account already has a payment in `PENDING`, One-Data answers 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed), and never calls billpay-online, so no payment exists in Billpay for the attempt. When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-online alone, so a create billpay-online hasn't captured yet can be missed. A payment keeps its entry only until it is decided: then its workflow calls One-Data's delete API, after the reply, and the account can take its next payment. Payments AR raises, push payments from third parties and refunds skip the check.
+One-Data checks every create from a channel before billpay-online sees it. In one atomic call to Redis, a Lua script (Proposed), it reads the card account's pending payments and, if there are none, adds the new payment and stores the create. A Pay with Bank Transfer, Plaid or debit card create is checked, added and stored the same way (agreed 2026-11-08). If the account already has a payment in `PENDING`, One-Data answers 200 with `DECLINED` and a reason, such as `ANOTHER_PAYMENT_PENDING` (the name is Proposed), and never calls billpay-online, so no payment exists in Billpay for the attempt. When Redis is down, One-Data asks `ReadPayments.v1` instead, which then reads billpay-online alone, so a create billpay-online hasn't captured yet can be missed. A payment keeps its entry only until it is decided: then its workflow calls One-Data's delete API, after the reply, and the account can take its next payment. Payments AR raises, push payments from third parties and refunds skip the check.
 
 ```mermaid
 ---

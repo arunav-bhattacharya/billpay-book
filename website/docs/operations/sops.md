@@ -16,7 +16,7 @@ Most failures need nobody: payments wait out a slow downstream, a patch or a los
 
 During a patch, Oracle returns errors, the dispatchers stop claiming work, and payments in flight pause where they are.
 
-Billpay is already handling it. A database call that fails its first, local attempt runs again as a regular activity that keeps retrying, so a payment resumes when Oracle is back, even across a worker restart. The governor sees the errors and stops dispatching, so only payments already in flight wait. A caller creating a payment gets a quick error rather than a long wait.
+Billpay is already handling it. A database call that fails its first 2 attempts, which run locally, runs again as a regular activity that keeps retrying, so a payment resumes when Oracle is back, even across a worker restart. The governor sees the errors and stops dispatching, so only payments already in flight wait. A caller creating a payment gets a quick error rather than a long wait.
 
 1. For a planned window shorter than `PaymentStore`'s schedule-to-close, a few hours, do nothing.
 2. If the window will run longer, raise it on `#oracle-dbo-support` before it does. Past the schedule-to-close, the waiting payments run out of retries and land on the exception list.
@@ -24,7 +24,7 @@ Billpay is already handling it. A database call that fails its first, local atte
 
 ## Late allocations
 
-The late allocations alert fires when a corporate payment is still `ALLOCATING` at its market's alert point.
+The late allocations alert fires when a corporate payment is still `ALLOCATING` past its release's `allocationAlertAfter`, counted from when it turned `ALLOCATING`. The allocation-request dispatcher counts these on each run and logs their payment IDs (2026-11-08).
 
 The payment waits. Nothing clears and no leg runs until the last batch arrives, and a corporate payment can't be cancelled or updated once its allocations have been requested.
 
@@ -55,7 +55,7 @@ The governor is already holding the run at or above its floor, and Online's resp
 
 The retries exhausted alert fires when a Work Tracker row goes `FAILED` or a payment lands on the exception list.
 
-Billpay has already tried: every call retries from 1 second, doubling to at most 60, until its schedule-to-close runs out. Then `PaymentStore` marks the row `FAILED` and puts the payment on the exception list in the state it stopped in. Business failures never get here, because they end in `DECLINED`. Nor do RTF or Raven outages, because payments wait for those.
+Billpay has already tried: every call retries from 6 seconds, doubling to at most 45 minutes apart, until its schedule-to-close runs out. Then `PaymentStore` marks the row `FAILED` and puts the payment on the exception list in the state it stopped in. Business failures never get here, because they end in `DECLINED`. Nor do RTF or Raven outages, because payments wait for those.
 
 1. Read the payment's row in `exception_list`: the stage and status it stopped in, and the last error.
 2. Fix the cause, which is often a downstream that kept failing. A row the Router refused is different: its market was taken out of service after the row was written.

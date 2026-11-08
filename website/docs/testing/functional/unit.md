@@ -58,8 +58,8 @@ A workflow test runs the real workflow code in the SDK's test environment (`Test
 - A corporate payment stops after Verify. Its next step is a Work Tracker row for a dispatcher, not a call the workflow makes.
 - A payment that Verify declines ends `DECLINED`, and no later stage runs.
 - Each announcement finishes before the next stage starts. Capture and Verify on the Online cluster are the exception: they commit back to back, and both announcements follow the reply.
-- A Verify call on the Online cluster that fails its 3 tries as a local activity goes out again as a regular activity, and the payment carries on instead of failing.
-- In Create Payment Intent, a timer handled more than a minute late gives the customer one more window. The test holds the worker back past the timer, so the timer is handled late, and a confirm sent in the extra window still goes through.
+- A Verify call on the Online cluster that fails its 2 attempts as a local activity goes out again as a regular activity, and the payment carries on instead of failing.
+- In Create Payment Intent, a timer handled late cancels the payment as an on-time timer does, with no extra window (2026-11-08). The test holds the worker back past the timer, so the timer is handled late.
 
 No workflow sleeps until a due date. Dated work waits in Oracle as a Work Tracker row until a dispatcher starts it, so most workflow tests need no timers at all.
 

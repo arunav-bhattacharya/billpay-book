@@ -151,7 +151,7 @@ We looked at several durable execution engines and picked Temporal as the best f
 - Money movement must not lose state across restarts, deploys or downstream outages. A workflow replays from its event history back to a deterministic state, so we never hand-rolled a checkpoint table.
 - A caller who is waiting gets the answer at the decision point. Update-With-Start starts the workflow and waits on one update in a single call, so a channel hears `ACCEPTED` or `DECLINED` while the workflow carries on with clearing. On the Online cluster, the calls behind that decision run as local activities, which the worker makes directly instead of queueing them through the cluster, so the answer comes out of the workflow's first step.
 - Downstream systems flap and push back with 429s. Retries with backoff, a retry delay taken from `Retry-After`, rate-limited task queues, priority and fairness all come with Temporal, so none of that is ours to build.
-- Schedules start the dispatchers and the periodic jobs, and Worker Versioning pins a running payment to the build it started on.
+- Schedules start the dispatchers and the periodic jobs.
 - Temporal requires deterministic workflow code. That constraint is why the work is factored the way it is: workflows orchestrate, activities do the I/O.
 
 Waiting for a date is the one thing we keep out of Temporal. Sleeping on a timer for days costs its database real work, so a payment due next month waits in Oracle as a row, and a dispatcher starts its workflow on the day. A wait of minutes is different: a payment waiting for its customer to confirm stays in its own workflow, on a timer, so the whole wait shows in one place.
