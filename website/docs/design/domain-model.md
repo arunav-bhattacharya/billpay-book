@@ -105,7 +105,7 @@ These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The build
 7. The next presentment: `toRepresentingFullPayment(representmentDate)` numbers it one higher and gives it the representment date as its clearing date. Today it copies the returned presentment's number and timeline.
 8. A representment that fails its recheck turns the new presentment's row `DECLINED`: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`. The supplied code's moves from `REPRESENTING` back to `RETURNED` go.
 9. `SplitSlice` gains `splitPaymentId` and `account`, and a leg takes its ID and card account from the slice. Today the code builds the ID with `paymentId.withSplit(seq)` and copies the parent's account.
-10. The leg's representment classes go, since only a whole payment is represented: `RepresentingSplitPayment` and `RepresentedSplitPayment`, with `toRepresentingSplitPayment()`, `toRepresentedSplitPayment()` and both moves back to `ReturnedSplitPayment` (agreed 2026-11-08).
+10. The leg's representment classes go, since only a whole payment is represented: `RepresentingSplitPayment` and `RepresentedSplitPayment`, with `ReturnedSplitPayment.toRepresentingSplitPayment()`, `RepresentingSplitPayment.toRepresentedSplitPayment()` and `RepresentedSplitPayment.toReturnedSplitPayment()` (agreed 2026-11-08). `RepresentingSplitPayment.toReturnedSplitPayment()` goes under change 8. A leg gets no declined class: the supplied code has none, and none is added.
 
 ## Still open
 

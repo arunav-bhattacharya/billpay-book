@@ -85,7 +85,7 @@ Naming a class for its job rather than its market means a check that several mar
 
 - There is one implementation of each workflow. A workflow gets its stages from the stage resolver and is never copied per market.
 - Workflows and stages are never `abstract`.
-- Activities are shared across markets. Keep what a workflow carries as light as possible, without dropping a detail a later step must have, and without adding database reads that slow the run (agreed 2026-11-08). A workflow that creates a payment carries its request: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. An activity may take the small value it needs, such as the money movement, instead of loading it again by ID. Data from Payment Options and Payment Instruments travels too: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec, whose key source is a placeholder for now, set in the company's environment (2026-11-08).
+- Activities are shared across markets. Keep what a workflow carries as light as possible, without dropping a detail a later step must have, and without adding database reads that slow the run (agreed 2026-11-08). A workflow that creates a payment carries its request: it is the start input, and Capture writes it to Oracle, so nothing is written before the workflow starts. An activity may take the small value it needs, such as the money movement, instead of loading it again by ID. Data from Payment Options and Payment Instruments travels too: what a stage gets there, clear text included, travels in the workflow to the later calls that need it, and workflow history keeps it encrypted by the payload codec, whose key source is a placeholder for now, set in the company's environment (2026-11-08). The codec is AES-256-GCM with a fresh 12-byte nonce, and an app with no key refuses to start rather than write clear text into history (Proposed, 2026-11-08).
 
 ## How a workflow finds its stages
 
@@ -95,7 +95,7 @@ Nothing maps a resolved profile to classes by hand. Each stage, and each check o
 
 - Each step names the behaviors it must act on, such as mandate authorization for Verify. A combination where one of them is Y and no class that applies handles it can't run, so it can't be onboarded, and a request for a combination a market hasn't onboarded gets 422 before any workflow starts.
 - The same registries produce the build's **capability manifest**, the list of every combination the build can run. The onboarding workflow checks each market release against it (see [Market Profile](../onboarding/market-profile.md)).
-- The resolved profile carries the config version, so a new market release never changes a running payment's config. Deploys are rolling, so a change to workflow code that would alter a running payment's steps is patched, and the replay tests prove old histories still replay (2026-11-08).
+- The resolved profile carries the config version, so a new market release never changes a running payment's config. Deploys are rolling, so a change to workflow code that would alter a running payment's steps is patched, and the replay tests prove old histories still replay, from the first production deploy; before it, a change re-records its histories (2026-11-08).
 
 ## Writing a step that is safe to repeat
 

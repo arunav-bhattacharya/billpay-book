@@ -45,7 +45,7 @@ A payment scheduled for its due date resolves differently. The two side by side:
 | --- | --- | --- |
 | Account type | Consumer | Consumer |
 | AR posting | Y | Y |
-| Realtime clearing | Y | N: every future-dated payment clears in batch, even where the release sets Y (agreed 2026-11-08) |
+| Realtime clearing | Y, except a corporate payment, which clears in batch for now (agreed 2026-11-08) | N: every future-dated payment clears in batch, even where the release sets Y (agreed 2026-11-08) |
 | Mandate authorization | Y | Y |
 | Bank confirmation | N | N |
 | Verify, or Reverify on the due date | `DefaultPaymentVerifyStage`, with the Instrument, Options and Mandate checks | `DefaultPaymentReverifyStage`, with the same three checks |

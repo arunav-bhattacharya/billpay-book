@@ -114,7 +114,7 @@ Verify, Reverify and Represent each decide whether a payment can go ahead, and t
 
 ## Capture
 
-Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent. A duplicate means the request was seen before, and the caller gets the existing payment. On the Online cluster Capture gets a short deadline, so a caller facing an Oracle problem gets a quick error instead of a long wait.
+Turns the request into a `PENDING` payment. `PaymentStore` inserts into `trans_dtl`, `trans_lfcyc_event` and the idempotency table, all insert-if-absent. A duplicate means the request was seen before, and the caller gets the existing payment. On the Online cluster Capture gets a short deadline, so a caller facing an Oracle problem gets a quick error instead of a long wait: 2 s, 1 s per local attempt, so the 503 comes before billpay-online's 2.5 s wait ends (Proposed, 2026-11-08).
 
 ## RequestConfirmation
 

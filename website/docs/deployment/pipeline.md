@@ -21,7 +21,7 @@ Deploys are rolling: the new build's pods replace the old ones a few at a time. 
 
 - New payments start on the new build.
 - Payments already running carry on in the new build, replaying their history first.
-- A change that would make a running payment take a different step is patched with `Workflow.getVersion`, so a payment past that point keeps its old path. The replay tests in CI prove the old histories still replay.
+- A change that would make a running payment take a different step is patched with `Workflow.getVersion`, so a payment past that point keeps its old path. The replay tests in CI prove the old histories still replay. Patching starts with the first production deploy: until then nothing runs in production, so a workflow change re-records its histories and the replay tests replay those (agreed 2026-11-08).
 
 No payment workflow sleeps until a due date, because dated work waits in Oracle as a Work Tracker row, so most running payments are seconds or minutes old when a deploy lands. Worker Versioning, which would pin each payment to the build it started on, is parked for later (2026-11-08): it needs the old and new builds running side by side.
 

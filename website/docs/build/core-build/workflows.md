@@ -55,7 +55,7 @@ A corporate payment starts no child at all. It can have 100K legs, so its alloca
 
 ## Versioning
 
-Deploys are rolling, so a payment that is running when a new build goes out carries on in the new build. A change that would make the workflow take a different step for a history already recorded is patched with `Workflow.getVersion`: a payment that passed that point keeps its old path, and new ones take the new one. The replay tests in CI prove that the histories recorded on the old build still replay. A patch can come out once no running workflow can still need the old path. Dispatchers and the governor continue-as-new often, so they pick up a new build quickly anyway.
+Deploys are rolling, so a payment that is running when a new build goes out carries on in the new build. A change that would make the workflow take a different step for a history already recorded is patched with `Workflow.getVersion`: a payment that passed that point keeps its old path, and new ones take the new one. The replay tests in CI prove that the histories recorded on the old build still replay. A patch can come out once no running workflow can still need the old path. Dispatchers and the governor continue-as-new often, so they pick up a new build quickly anyway. Patching starts with the first production deploy: until then nothing runs in production, so a workflow change re-records its histories and the replay tests replay those (agreed 2026-11-08).
 
 Worker Versioning, which pins each payment to the build it started on, is parked for later (2026-11-08). It needs each app's old and new builds running side by side during a deploy, which rolling deploys don't do.
 

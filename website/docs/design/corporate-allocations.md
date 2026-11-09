@@ -54,7 +54,7 @@ Every batch gets one of five outcomes (Proposed, 2026-11-08):
 | `ALREADY_ALLOCATED` | A repeat, or a retry after its own commit | `ALLOCATED` is announced again under the same key |
 | `NOT_ALLOCATING` | The payment left `ALLOCATING` without this batch | Nothing changes; logged as an error |
 
-An `OVER_ALLOCATED` or `NOT_ALLOCATING` batch also bumps `billpay_allocation_batch_rejected_total`, labelled with the reason (agreed 2026-11-08; the name is Proposed).
+An `OVER_ALLOCATED` or `NOT_ALLOCATING` batch also bumps `billpay_allocation_batch_rejected_total`, labelled `reason` with the outcome's name. The workflow bumps it once the outcome is known, so an activity retry never counts a batch twice (agreed 2026-11-08; the name is Proposed).
 
 Two rules sit under this, and both are agreed: the callback contract (batches numbered per payment, complete when they add up to the amount), and that allocations never change once they have arrived. So a batch never needs replacing before its legs are written.
 
@@ -63,7 +63,7 @@ Two rules sit under this, and both are agreed: the callback contract (batches nu
 The allocated-payments dispatcher runs every minute. When an `ALLOC_EXEC` row falls due, it starts `ExecuteScheduledPaymentWorkflow` through the Router, for a payment made today as much as for a scheduled one.
 
 - A scheduled payment is checked again first: Reverify moves it from `ALLOCATED` to `ACCEPTED`, or to `DECLINED`. A payment made today skips Reverify, because Verify passed it minutes earlier.
-- Execute clears the parent once, at payment level, and commits `PROCESSING`. That is its only call: the legs update the AR balance and open-to-buy, and clearing never runs per allocation.
+- Execute clears the parent once, at payment level, in the batch for now, pay today included (agreed 2026-11-08), and commits `PROCESSING`. That is its only call: the legs update the AR balance and open-to-buy, and clearing never runs per allocation.
 - The same commit sets the parent's `LEGS_RELEASED_AT`, closes its `ALLOC_EXEC` row and marks it a split payment. A corporate parent has no Fulfil.
 - A corporate payment counts as scheduled when its payment date is after its submit date. That decides whether Reverify runs and which status Execute moves it from (Proposed, 2026-11-08).
 - The parent and its legs share one Execute stage, `PaymentExecuteStageWithCorporateAccount`: the parent only clears, and a leg makes the AR call where AR posting is Y and the open-to-buy call, and never clears. Reverify's corporate stage is `PaymentReverifyStageWithCorporateAccount` (Proposed, 2026-11-08).
@@ -79,7 +79,7 @@ The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg on the 
 3. Sends its RTF event and Raven message.
 4. Commits `PROCESSED`.
 
-Legs run at priority 2 with the parent's payment ID as their fairness key, and a per-key limit caps how fast any one parent's legs can go. At 100 legs a second, a 100K payment takes about 17 minutes without starving any other payment on the same queues. The fairness key only shares the queue between legs that have started, so the claim is fair as well: each leg's Work Tracker row carries its parent's ID as its group key, and the leg dispatcher takes rows from each parent in turn. A small payment's legs never wait behind all of a large one's (agreed 2026-11-08).
+Legs run at priority 2 with the parent's payment ID as their fairness key, and a per-key limit caps how fast any one parent's legs can go. At 100 legs a second, a 100K payment takes about 17 minutes without starving any other payment on the same queues. The fairness key only shares the queue between legs that have started, so the claim is fair as well: each leg's Work Tracker row carries its parent's ID as its group key, and the leg dispatcher takes rows from each parent in turn. A small payment's legs never wait behind all of a large one's (agreed 2026-11-08). The claim reads up to 100 parents at a time and takes an even share of the tick's rows from each (Proposed, 2026-11-08).
 
 Every 60 seconds the leg dispatcher counts each parent's legs. Once every batch has its legs and every leg is `PROCESSED` or `PAID`, it sends the parent's RTF event and Raven message and moves the parent to `PROCESSED`. Proposed (2026-11-08): the dispatcher's workflow sends them through their own activities, as `{paymentId}-PROCESSED-rtf` and `-raven`, then commits; it releases before each claim, and runs this check when its run starts, every 60 seconds and before it ends, up to 1,000 parents a pass. The parent stays there: each leg turns `PAID` on its own, through Settle, once the parent has settled and that leg's AR posting is in.
 
