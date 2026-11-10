@@ -36,6 +36,16 @@
      The same system tone the journey index uses, so a system trigger reads
      the same on both. */
   --jm-async: var(--amex-journey-system);
+  /* A wait between two steps: muted ink, so it reads as a pause, not a move. */
+  --jm-wait: color-mix(in srgb, var(--amex-mut) 75%, transparent);
+  /* The reply flag takes the channel tone from the Make a Payment page: the
+     navy that marks the channel's side of the line. The trigger flag takes the
+     accent, so the two never read as the same thing. */
+  --jm-reply: var(--amex-call-channel);
+  --jm-reply-ink: var(--amex-call-channel-ink);
+  --jm-reply-key: var(--amex-call-key);
+  --jm-trigger: var(--jm-accent);
+  --jm-trigger-ink: var(--amex-white);
   --jm-gap: 30px;
   --jm-vgap: 26px;
 }
@@ -50,6 +60,8 @@
   --jm-wf: var(--amex-deep-200);
   --jm-wf-ink: var(--amex-navy);
   --jm-outer: var(--amex-blue-bright);
+  /* The lifted accent needs dark ink rather than white. */
+  --jm-trigger-ink: var(--amex-navy);
 }
 
 /* ==================================================================== *
@@ -621,6 +633,17 @@
   font-size: 0.62rem;
   max-width: 13ch;
 }
+.dense .flag {
+  gap: 0.15rem;
+  margin: 0.3rem -0.1rem 0.05rem;
+  padding: 2px 3px;
+  font-size: 0.5rem;
+  letter-spacing: 0.03em;
+}
+.dense .flag .icon {
+  width: 9px;
+  height: 9px;
+}
 
 .exitCell,
 .nodeCell,
@@ -745,6 +768,76 @@
   background: var(--jm-edge);
   clip-path: polygon(0 0, 100% 50%, 0 100%);
   z-index: 1;
+}
+
+/* The connector into a step something outside starts: dashed and muted, with
+   no arrowhead, because nothing moves until the trigger lands. */
+.waitsNext .node::after {
+  height: 0;
+  margin-top: -1px;
+  background: none;
+  border-top: 2px dashed var(--jm-wait);
+}
+.waitsNext .node::before {
+  display: none;
+}
+
+/* ---- reply and trigger flags, inside the node ---- */
+.flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  align-self: stretch;
+  /* Clear of the step number and the timer, which sit on the node's corners. */
+  margin: 0.2rem -0.15rem 0.05rem;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 0.58rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: help;
+}
+.flag .icon {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.2;
+}
+.flagReply {
+  color: var(--jm-reply-ink);
+  background: var(--jm-reply);
+  box-shadow: inset 0 -2px 0 var(--jm-reply-key);
+}
+.flagTrigger {
+  color: var(--jm-trigger-ink);
+  background: var(--jm-trigger);
+}
+/* In the key the flag sits on a line of text, not in a node. */
+.flagKey {
+  align-self: auto;
+  margin: 0;
+  cursor: default;
+}
+
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  --legend-gap: 0.45rem 1.3rem;
+  list-style: none;
+  margin: 1.2rem 0 0;
+  padding: 0;
+}
+.legendItem {
+  composes: legendItem from '../../css/recipes.module.css';
+  --legend-fs: 0.74rem;
+}
+.waitSwatch {
+  flex: none;
+  width: 30px;
+  border-top: 2px dashed var(--jm-wait);
 }
 
 /* ---- a fork: two things running at once ---- */
@@ -1253,6 +1346,15 @@
     border-top: 0;
     border-right: 1.5px solid var(--jm-edge);
     border-bottom: 1.5px solid var(--jm-edge);
+  }
+  .waitsNext .node::after {
+    border-left: 2px dashed var(--jm-wait);
+  }
+  /* Down the left edge here, the flag sits beside the name rather than on top. */
+  .flag {
+    align-self: center;
+    margin: 0;
+    order: 3;
   }
   .node {
     flex-direction: row;

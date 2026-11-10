@@ -98,6 +98,17 @@ const MODE_NOTE = {
   awaiting: 'awaiting events',
 };
 
+/* What wakes a step from outside the workflow. The word is the mechanism, so
+   an engineer can tell an update (which gets an answer back) from a signal
+   (which doesn't), and both from a new run a dispatcher or a callback starts. */
+const TRIGGER_KIND = {
+  update: {word: 'Update', note: 'a Temporal update to the running workflow, which answers its sender'},
+  signal: {word: 'Signal', note: 'a Temporal signal to the running workflow, with no answer back'},
+  callback: {word: 'Callback', note: 'a partner system calls Billpay back, which starts this step'},
+  dispatcher: {word: 'Dispatcher', note: 'a dispatcher picks up a due row and starts this step'},
+  events: {word: 'Events', note: "events from other systems, paired in One-Data's inbox, start this step"},
+};
+
 /* ------------------------------------------------------------------ *
  * Icons: monoline, 24-unit grid, stroke inherits the surrounding ink
  * ------------------------------------------------------------------ */
@@ -124,6 +135,10 @@ const PATHS = {
   calendar: ['M5.4 6.4h13.2a1.4 1.4 0 0 1 1.4 1.4v11a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 18.8v-11a1.4 1.4 0 0 1 1.4-1.4z', 'M4 10.6h16', 'M8.4 3.6v3.4', 'M15.6 3.6v3.4'],
   // money coming back the way it went out
   undo: ['M4.2 9.6h9.8a5.2 5.2 0 1 1 0 10.4H7.8', 'M8.2 5.4L4 9.6l4.2 4.2'],
+  // an answer going back up to whoever asked
+  replyUp: ['M12 19.4V6', 'M6.6 11.2L12 5.8l5.4 5.4'],
+  // something arriving from outside and landing here
+  triggerIn: ['M12 3.6v10.6', 'M7 9.4l5 5 5-5', 'M5 19.6h14'],
   // a payment card
   card: ['M3.4 6.2h17.2a1 1 0 0 1 1 1v9.6a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V7.2a1 1 0 0 1 1-1z', 'M2.4 10h19.2', 'M5.8 14.6h4'],
   // sent somewhere else, to come back later
@@ -323,6 +338,32 @@ function ForkNode({step, index}) {
   );
 }
 
+/* The two moments a reader most needs to see: where the workflow answers the
+   party that called it, and where something outside wakes it. Both sit inside
+   the node, so they never fight an exception branch for the space above it. */
+function Flag({step}) {
+  if (step.trigger) {
+    const kind = TRIGGER_KIND[step.trigger.kind] || TRIGGER_KIND.events;
+    return (
+      <span
+        className={clsx(styles.flag, styles.flagTrigger)}
+        title={`Started from outside: ${step.trigger.label || kind.word}. ${kind.note}.`}>
+        <Icon name="triggerIn" />
+        {kind.word}
+      </span>
+    );
+  }
+  if (step.reply) {
+    return (
+      <span className={clsx(styles.flag, styles.flagReply)} title={`Replies ${step.reply}`}>
+        <Icon name="replyUp" />
+        Reply
+      </span>
+    );
+  }
+  return null;
+}
+
 function StepNode({step, index}) {
   if (step.branches) return <ForkNode step={step} index={index} />;
   /* A step that waits on events rather than doing work gets a timer, so a
@@ -336,6 +377,7 @@ function StepNode({step, index}) {
           <Icon name="clock" />
         </span>
       )}
+      <Flag step={step} />
       <span className={styles.nodeIcon}>
         <Icon name={step.icon} />
       </span>
@@ -392,6 +434,8 @@ export default function JourneyMap({
         ? steps.findIndex((s) => s.mode && s.mode !== 'live')
         : -1;
   const banded = band && bandFrom > 0 && bandFrom < (steps || []).length;
+  const flagged = hasSteps && steps.some((s) => s.trigger || s.reply);
+  const waits = hasSteps && steps.some((s, i) => i > 0 && s.trigger);
 
   return (
     <figure className={styles.wrap}>
@@ -513,7 +557,11 @@ export default function JourneyMap({
               aria-label={`${title}: ${steps
                 .map(
                   (s, i) =>
-                    `step ${i + 1}, ${s.name}${s.state ? `, reaches ${s.state}` : ''}${
+                    `step ${i + 1}, ${s.name}${
+                      s.trigger
+                        ? `, started from outside by ${(TRIGGER_KIND[s.trigger.kind] || TRIGGER_KIND.events).word.toLowerCase()}: ${s.trigger.label}`
+                        : ''
+                    }${s.state ? `, reaches ${s.state}` : ''}${s.reply ? `, replies ${s.reply}` : ''}${
                       s.table ? `, working in the ${s.table}` : ''
                     }${
                       s.systems && s.systems.length ? `, calling ${s.systems.join(', ')}` : ''
@@ -531,8 +579,14 @@ export default function JourneyMap({
                   <div className={styles.exitCell} style={{'--col': i + 1}}>
                     <ExitBranch exit={step.exit} />
                   </div>
+                  {/* The connector into a step something outside starts is a wait,
+                      not a move: drawn dashed, with no arrowhead. */}
                   <div
-                    className={clsx(styles.nodeCell, i < steps.length - 1 && styles.linked)}
+                    className={clsx(
+                      styles.nodeCell,
+                      i < steps.length - 1 && styles.linked,
+                      i < steps.length - 1 && steps[i + 1].trigger && styles.waitsNext,
+                    )}
                     style={{'--col': i + 1}}>
                     <StepNode step={step} index={i} />
                     {/* A fork says what it is on its own label, so it needs no
@@ -563,6 +617,35 @@ export default function JourneyMap({
                 </p>
               )}
             </div>
+          )}
+
+          {flagged && (
+            <ul className={styles.legend} aria-label="Key">
+              {steps.some((s) => s.reply) && (
+                <li className={styles.legendItem}>
+                  <span className={clsx(styles.flag, styles.flagReply, styles.flagKey)} aria-hidden="true">
+                    <Icon name="replyUp" />
+                    Reply
+                  </span>
+                  the workflow answers whoever called it
+                </li>
+              )}
+              {steps.some((s) => s.trigger) && (
+                <li className={styles.legendItem}>
+                  <span className={clsx(styles.flag, styles.flagTrigger, styles.flagKey)} aria-hidden="true">
+                    <Icon name="triggerIn" />
+                    {[...new Set(steps.filter((s) => s.trigger).map((s) => (TRIGGER_KIND[s.trigger.kind] || TRIGGER_KIND.events).word))].join(' · ')}
+                  </span>
+                  something outside starts or resumes the step
+                </li>
+              )}
+              {waits && (
+                <li className={styles.legendItem}>
+                  <span className={styles.waitSwatch} aria-hidden="true" />
+                  a wait: the next step doesn't follow on its own
+                </li>
+              )}
+            </ul>
           )}
         </section>
       </div>

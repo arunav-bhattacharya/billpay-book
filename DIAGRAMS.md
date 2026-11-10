@@ -192,7 +192,7 @@ Pass the array, get the component.
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
-| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more | One payment journey as a banded process flow. |
+| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller) and `trigger` (`{kind, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`) | One payment journey as a banded process flow. A triggered step's incoming connector is drawn as a dashed wait, and a key appears under the rail. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
 | `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row` or `child`) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
