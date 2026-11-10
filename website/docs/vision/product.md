@@ -58,7 +58,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
     },
     {
       term: 'Pay by bank',
-      desc: `Pay from a bank account the customer confirms on their bank's side, such as Plaid in the US or Pay with Bank Transfer in the UK. The payment waits until they come back and confirm it. With Pay with Bank Transfer, the money moves at the bank.`,
+      desc: `Pay straight from a bank account, confirming the payment at the bank: Pay with Bank Transfer in the UK, Plaid in the US, all through Amex Pay with Bank Transfer. The payment waits for the bank's answer, then for word that the money has settled, and the money moves at the bank.`,
     },
     {
       term: 'Pay by Debit card',
@@ -93,7 +93,7 @@ The first kind sets the **behaviors**, the choices that change how a payment is 
 | **Good faith credit** | Whether the cardmember gets credit for the payment before the money settles. Billpay tells Accounts Receivable, the system that tracks what they owe, to post the payment while it is still processing (`requiresArPosting`). | Y, N or BOTH |
 | **Realtime clearing** | Whether the payment goes to the customer's bank straight away or waits for a periodic batch (`requiresRealtimeClearing`). | Y, N or BOTH |
 | **Mandate authorization** | Whether Billpay has to verify a mandate, the standing authorization to collect the money, before the payment is processed. Billpay checks it against the mandate details Plans holds, and a payment whose mandate fails the check is declined (`requiresMandateAuthorization`). | Y, N or BOTH |
-| **Bank confirmation** | Whether the customer confirms their bank details on a provider's site, such as Plaid or Pay with Bank Transfer, before the payment is processed (`requiresBankConfirmation`). | Y, N or BOTH |
+| **Bank confirmation** | Whether the customer confirms the payment at their bank, through Amex Pay with Bank Transfer, before it is processed (`requiresBankConfirmation`). | Y, N or BOTH |
 
 ### Operations settings
 

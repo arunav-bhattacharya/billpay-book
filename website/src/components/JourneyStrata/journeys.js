@@ -27,9 +27,10 @@ const PAID_SEGMENT = {
   oneData: [{c: 'inbox', s: 'settlement from MR/M3, AR posting from GAR. READY when both are in', at: 'Settle'}],
 };
 
-/* Pay with Bank Transfer and a debit card have no clearing, so MR/M3 sends
-   no settlement. Execute hands One-Data the one Billpay creates, and the row
-   pairs it with the GAR posting like any other. */
+/* A debit card has no clearing, so MR/M3 sends no settlement. Execute hands
+   One-Data the one Billpay creates, and the row pairs it with the GAR posting
+   like any other. Pay with Bank Transfer has no clearing either, but M3
+   reports its settlement (2026-11-10). */
 const PAID_BILLPAY_SETTLEMENT = {
   ...PAID_SEGMENT,
   oneData: [{c: 'inbox', s: 'the settlement Billpay created in Execute, and the AR posting from GAR. READY when both are in', at: 'Settle'}],
@@ -110,40 +111,47 @@ export const GROUPS = [
         id: 'bank',
         term: 'Pay by Bank today',
         kind: 'customer',
-        meta: ['customer initiated', 'Online, one workflow throughout', 'minutes at the bank'],
+        meta: ['customer initiated', 'Online, one workflow throughout', 'up to the market\'s 24 to 48 hours'],
         segments: [
           {
             phase: ['The create', 'the customer waits for the link'],
             road: 'bank',
             waiting: true,
             customer: [
-              {t: 'Pays with a bank step', s: 'Pay with Bank Transfer, say', st: 'PENDING', m: 'on', at: 'Capture'},
-              {t: "Gets the provider's link", s: "or DECLINED, when Amex's own checks fail or no link comes", st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
+              {t: 'Pays with a bank step', s: 'Pay with Bank Transfer, or Plaid in the US', st: 'PENDING', m: 'on', at: 'Capture'},
+              {t: 'Gets the link', s: "from Amex Pay with Bank Transfer; or DECLINED, when Amex's own checks fail or no link comes", st: 'PENDING', m: 'on', at: 'RequestConfirmation'},
             ],
             oneData: [{...CREATE, at: 'Capture'}],
           },
           {
-            phase: ['At the bank', 'the confirmation window, 10 minutes at most'],
-            wait: 'The workflow waits on its own timer. No confirm in time, and the timer runs Cancel: CANCELLED.',
-            customer: [{t: 'Confirms at the bank', s: "on the provider's site", m: 'choice'}],
+            phase: ['At the bank', "the market's wait, 24 to 48 hours"],
+            wait: "The workflow waits on its own timer. No confirm and no settled notice in time, and Verify declines the payment with CONFIRMATION_NOT_RECEIVED (Proposed). The customer's no cancels it. Until then its pending entry blocks the account.",
+            customer: [{t: 'Confirms at the bank', s: 'through Amex Pay with Bank Transfer', m: 'choice'}],
           },
           {
-            phase: ['The confirm', 'the customer waits again'],
+            phase: ['The confirm', 'the first one decides'],
             road: 'confirm',
             waiting: true,
             customer: [
-              {t: 'Comes back and confirms', s: 'the same payment ID', m: 'on', at: 'Verify'},
-              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'},
+              {t: 'Comes back', s: "the channel's confirm, or Amex Pay with Bank Transfer's first", st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
             oneData: [
-              {c: 'CreateConfirmPendingPayment.v1', s: 'the confirm', at: 'Verify'},
+              {c: 'CreateConfirmPendingPayment.v1', s: "the channel's confirm, with the bank's answer", at: 'Verify'},
               {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'},
             ],
-            after: "Execute makes no clearing call for Pay with Bank Transfer: the money moved at the bank, during the customer's bank connection. It hands One-Data the settlement event Billpay creates instead. Whether a Plaid payment in the US clears is still open.",
+            after: "Verify calls nothing: it reads the bank's answer, with no token check and no funds check. Amex Pay with Bank Transfer can send the same confirm straight to billpay-online, and whichever lands first decides. An ACCEPTED payment then waits for M3.",
+          },
+          {
+            phase: ['Settled', "M3's notice, straight to billpay-online"],
+            road: 'settled',
+            customer: [
+              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
+            ],
+            after: "The bank tells Amex the payment has settled, and M3 passes it on as a signal. Execute makes no clearing call: M3's notice is the settlement. If the notice comes before any confirm, Billpay accepts the payment on it and logs the missing confirm. If it never comes, the payment goes on the exception list with an alert.",
           },
           {
             ...PAID_SEGMENT,
-            oneData: [{c: 'inbox', s: 'the AR posting from GAR, and the settlement: from MR/M3 if it cleared, from Billpay for Pay with Bank Transfer', at: 'Settle'}],
+            oneData: [{c: 'inbox', s: "the AR posting from GAR, and M3's settlement; how M3's notice reaches the pairing is still open", at: 'Settle'}],
           },
         ],
       },

@@ -60,7 +60,7 @@ const DOWNSTREAM = [
   'Raven (comms)',
   'RTF (events)',
   'Allocations manager',
-  'Bank provider',
+  'Amex Pay with Bank Transfer',
   'Card provider',
 ];
 

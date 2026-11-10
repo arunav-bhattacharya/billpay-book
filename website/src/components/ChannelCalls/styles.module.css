@@ -1,0 +1,374 @@
+/* ChannelCalls. One rule carries the whole figure: a call the channel makes
+   is a solid navy block with a Bright Blue key square, and everything Billpay
+   does for it sits beside it in a pale tint. Nothing is outlined; the square
+   is the one shape. A thread of three small squares crosses from each call to
+   its Billpay side. Every colour is a token, so dark mode keeps the reading. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --cc-call: var(--amex-call-channel);
+  --cc-call-ink: var(--amex-call-channel-ink);
+  --cc-call-sub: var(--amex-call-channel-sub);
+  --cc-key: var(--amex-call-key);
+  --cc-back: var(--amex-call-other);
+  --cc-back-ink: var(--amex-call-other-ink);
+  --cc-back-key: var(--amex-call-other-key);
+  --cc-lit: var(--amex-call-lit);
+  --cc-field: var(--amex-rail);
+  --cc-mut: var(--amex-mut);
+  --cc-shadow: var(--amex-call-shadow);
+  --cc-dim: 0.38;
+
+  margin: 1.4rem 0 2rem;
+  padding: 1.2rem 1.2rem 1rem;
+}
+
+.heads {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) 2.6rem minmax(0, 1fr);
+  margin-bottom: 0.55rem;
+}
+
+.head {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cc-mut);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) 2.6rem minmax(0, 1fr);
+  align-items: stretch;
+  margin: 0;
+}
+
+/* ---- the channel's call ---- */
+.call {
+  background: var(--cc-call);
+  color: var(--cc-call-ink);
+  border-radius: 8px;
+  padding: 0.85rem 0.95rem 0.95rem;
+  box-shadow: var(--cc-shadow);
+  transition: opacity 160ms ease;
+}
+
+.callOff {
+  opacity: var(--cc-dim);
+  box-shadow: none;
+}
+
+.callHead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.key {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+  border-radius: 2px;
+  background: var(--cc-key);
+}
+
+.callName {
+  font-family: var(--ifm-font-family-monospace);
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.callN {
+  margin-left: auto;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--cc-call-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.callLine {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--cc-call-sub);
+}
+
+/* ---- the two filters, working controls inside the call ---- */
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}
+
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+.filterName {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--cc-key);
+}
+
+.filterNote {
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cc-call-sub);
+}
+
+.opts {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.opt {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  padding: 0.32rem 0.5rem;
+  border: 0;
+  border-radius: var(--amex-badge-radius);
+  background: color-mix(in srgb, var(--cc-call-ink) 9%, transparent);
+  color: var(--cc-call-sub);
+  cursor: pointer;
+}
+
+.opt:hover {
+  background: color-mix(in srgb, var(--cc-call-ink) 16%, transparent);
+}
+
+.opt[aria-pressed='true'] {
+  background: var(--cc-key);
+  color: var(--cc-call-ink);
+  font-weight: 600;
+}
+
+.opt:focus-visible {
+  outline: 2px solid var(--cc-key);
+  outline-offset: 2px;
+}
+
+/* A source the picked context refuses: still pickable, so the reader can
+   see the 400, but quieter. */
+.optRefused:not([aria-pressed='true']) {
+  opacity: 0.55;
+}
+
+/* ---- the thread across the threshold ---- */
+.thread {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+}
+
+.thread i {
+  display: block;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 1px;
+  background: var(--cc-key);
+}
+
+.threadOff i {
+  background: var(--cc-back-key);
+}
+
+/* ---- Billpay's side ---- */
+.back {
+  background: var(--cc-back);
+  color: var(--cc-back-ink);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
+.backOff {
+  background: var(--cc-field);
+}
+
+.backOff .backItem {
+  opacity: 0.75;
+}
+
+.backItem {
+  display: grid;
+  grid-template-columns: 0.7rem minmax(0, 1fr);
+  column-gap: 0.55rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+}
+
+.backLit {
+  background: var(--cc-lit);
+  box-shadow: var(--cc-shadow);
+}
+
+.hollow {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 2px;
+  background: var(--cc-back-key);
+  align-self: center;
+}
+
+.backLit .hollow,
+.otherLit .hollow {
+  background: var(--cc-key);
+}
+
+.backName {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.78rem;
+  overflow-wrap: break-word;
+}
+
+.plain {
+  font-family: var(--ifm-font-family-base);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.backWhat {
+  grid-column: 2;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--cc-mut);
+}
+
+.backNote {
+  margin: 0.2rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--cc-mut);
+}
+
+.backRefused .backItem {
+  background: var(--cc-lit);
+}
+
+.backRefused .hollow {
+  background: var(--cc-mut);
+}
+
+/* ---- calls from other systems ---- */
+.others {
+  margin-top: 1.1rem;
+  padding: 0.8rem 0.9rem 0.9rem;
+  border-radius: 8px;
+  background: var(--cc-field);
+}
+
+.otherList {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.45rem;
+}
+
+.other {
+  display: grid;
+  grid-template-columns: 0.7rem minmax(0, 1fr);
+  column-gap: 0.55rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  color: var(--cc-back-ink);
+  opacity: 0.6;
+  transition: opacity 160ms ease;
+}
+
+.otherLit {
+  opacity: 1;
+  background: var(--cc-lit);
+  box-shadow: var(--cc-shadow);
+}
+
+/* ---- legend ---- */
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  margin: 0.9rem 0 0;
+}
+
+.legendItem {
+  composes: legendItem from '../../css/recipes.module.css';
+}
+
+.swatch {
+  width: 1.3rem;
+  height: 0.8rem;
+  border-radius: 3px;
+}
+
+.swatchChannel {
+  background: var(--cc-call);
+}
+
+.swatchOther {
+  background: var(--cc-back);
+}
+
+.swatchChoice {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  background: var(--cc-key);
+}
+
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
+}
+
+/* Narrow: each call stacks over its Billpay side, and the thread turns
+   down the page. */
+@media (max-width: 720px) {
+  .heads {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .thread {
+    flex-direction: column;
+    padding: 0.3rem 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call,
+  .other {
+    transition: none;
+  }
+}

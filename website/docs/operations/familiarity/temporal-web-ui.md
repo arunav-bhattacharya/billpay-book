@@ -13,7 +13,7 @@ import Lead from '@site/src/components/Lead';
 
 Every workflow ID is the payment ID plus a suffix: `{paymentId}-init` for the create, `{paymentId}-execute` for a scheduled execution, `{paymentId}_{seq}-execute` for a leg, `{paymentId}-plan` or `{paymentId}-points` for a Pay & Plan or MR Points composite, and so on. [Workflow IDs](../../design/routing.md#workflow-ids) lists them all. So with a payment ID and the cluster, you can open the workflow directly, without searching.
 
-A payment that waits for its customer, to confirm their bank details or to authenticate their debit card, has one workflow from the create to its end: `{paymentId}-init` on the Online cluster. Its history shows the wait as a timer, and the answer as an update with the ID `{paymentId}-confirm`, `{paymentId}-no` or, for the card provider's 3D Secure callback, `{paymentId}-authentication`. When the timer fires first, the history shows the cancel that followed.
+A payment that waits for its customer, for their bank's answer or to authenticate their debit card, has one workflow from the create to its end: `{paymentId}-init` on the Online cluster. Its history shows the wait as a timer, and the answer as an update with the ID `{paymentId}-confirm`, from the channel or Amex Pay with Bank Transfer, `{paymentId}-no` or, for the card provider's 3D Secure callback, `{paymentId}-authentication`. For a bank, M3's settled notice shows as a `settled` signal, and Execute follows it. When the timer fires first, the history shows the decline or the cancel that followed.
 
 Histories are kept for 30 days. After that the workflow is gone from the UI, but Oracle still has the payment and every step of its timeline.
 

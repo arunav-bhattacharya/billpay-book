@@ -1,0 +1,52 @@
+/* A call named in running text. The fill says who makes it: navy for the
+   channel, a pale tint for Billpay or another system. Colours are the
+   --amex-call-* tokens, so both themes keep the same reading. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+  padding: 0.12em 0.55em 0.14em 0.45em;
+  border-radius: var(--amex-badge-radius);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.84em;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  vertical-align: 0.04em;
+}
+
+.channel {
+  background: var(--amex-call-channel);
+  color: var(--amex-call-channel-ink);
+  box-shadow: var(--amex-call-shadow);
+}
+
+.other {
+  background: var(--amex-call-other);
+  color: var(--amex-call-other-ink);
+  font-weight: 400;
+}
+
+.key {
+  width: 0.62em;
+  height: 0.62em;
+  flex: none;
+  border-radius: 2px;
+}
+
+.channel .key {
+  background: var(--amex-call-key);
+}
+
+.other .key {
+  background: var(--amex-call-other-key);
+}
+
+.name {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
+}

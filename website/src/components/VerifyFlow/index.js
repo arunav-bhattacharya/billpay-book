@@ -31,9 +31,7 @@ const CARDS = [
 const CHECKS = [
   {name: 'InstrumentCheck', when: 'Payment Instruments, always'},
   {name: 'OptionsCheck', when: 'Payment Options, with an option ID'},
-  {name: 'TokenCheck', when: 'with bank confirmation'},
   {name: 'MandateCheck', when: 'Plans, for a mandate'},
-  {name: 'GBFundsCheck', when: 'GB, Pay with Bank Transfer'},
   {name: 'CardAuthorizationCheck', when: 'debit card, last, once rules pass'},
 ];
 
@@ -46,7 +44,7 @@ const RULES = [
 ];
 
 const LABEL =
-  'How Verify, Reverify and Represent decide, in four steps. One, the checks that apply to the payment ask their systems in parallel: InstrumentCheck asks Payment Instruments, always, and OptionsCheck asks Payment Options when the payment carries an option ID; TokenCheck runs with bank confirmation; MandateCheck asks Plans where the profile requires mandate authorization; and GBFundsCheck runs in GB for Pay with Bank Transfer. For a debit card, CardAuthorizationCheck runs last, once the other rules pass, because an approved authorization takes the money from the customer\'s account. Two, their answers become one read-only set of facts, VerificationFacts, together with the rule settings from the resolved profile and the time, read once. Three, the rules that apply run over the facts: a rule whose runsWhen is false is skipped, and the rest pass or fail. Four, the decision: with no failure the payment moves on, ACCEPTED or SCHEDULED; with a failure it is DECLINED with the code of the highest-priority failed rule, or DISALLOWED for a push payment. The stage then makes one guarded commit, which keeps the failed rules’ IDs.';
+  'How Verify, Reverify and Represent decide, in four steps. One, the checks that apply to the payment ask their systems in parallel: InstrumentCheck asks Payment Instruments, always, and OptionsCheck asks Payment Options when the payment carries an option ID; and MandateCheck asks Plans where the profile requires mandate authorization. Bank confirmation adds no check: after the bank\'s confirm, a rule reads its answer. For a debit card, CardAuthorizationCheck runs last, once the other rules pass, because an approved authorization takes the money from the customer\'s account. Two, their answers become one read-only set of facts, VerificationFacts, together with the rule settings from the resolved profile and the time, read once. Three, the rules that apply run over the facts: a rule whose runsWhen is false is skipped, and the rest pass or fail. Four, the decision: with no failure the payment moves on, ACCEPTED or SCHEDULED; with a failure it is DECLINED with the code of the highest-priority failed rule, or DISALLOWED for a push payment. The stage then makes one guarded commit, which keeps the failed rules’ IDs.';
 
 function Chip({x, y, value, tone, w = 40}) {
   return (
@@ -105,6 +103,13 @@ export default function VerifyFlow() {
               </text>
             </g>
           ))}
+
+          <text x={c1.x + 14} y={ROW0 + CHECKS.length * 30 + 8} className={styles.note}>
+            <tspan x={c1.x + 14}>a bank&apos;s confirm adds none:</tspan>
+            <tspan x={c1.x + 14} dy={13}>
+              a rule reads its answer
+            </tspan>
+          </text>
 
           {/* 2: one read-only set of facts */}
           <text x={c2.x + 14} y={ROW0} className={styles.cls}>

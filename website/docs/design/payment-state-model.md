@@ -31,11 +31,11 @@ config:
 stateDiagram-v2
   direction TB
   [*] --> PENDING: Capture
-  PENDING --> ACCEPTED: Verify, pay today, inbound,<br/>at confirm or at the 3D Secure callback
+  PENDING --> ACCEPTED: Verify, pay today, inbound,<br/>at the confirm, M3's notice or the 3D Secure callback
   PENDING --> SCHEDULED: Verify, future date
-  PENDING --> DECLINED: Verify fails, or no link from the provider
+  PENDING --> DECLINED: Verify fails, no link,<br/>the bank says no, or no answer in the wait
   PENDING --> DISALLOWED: Verify, push payment not accepted
-  PENDING --> CANCELLED: Cancel, never confirmed, or the customer's no
+  PENDING --> CANCELLED: Cancel, the customer's no,<br/>or no 3D Secure callback
   SCHEDULED --> ACCEPTED: Reverify, on the due date
   SCHEDULED --> DECLINED: Reverify fails
   SCHEDULED --> CANCELLED: Cancel, inside the window
@@ -107,19 +107,19 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 
 | State | Meaning | Terminal? |
 | --- | --- | --- |
-| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the customer to confirm their bank details or to authenticate their debit card with 3D Secure. While a payment is `PENDING`, One-Data declines any other create from a channel on its card account. | No |
+| `PENDING` | Captured in Billpay, idempotency checked, waiting for validation; or waiting for the bank's answer to a Pay with Bank Transfer payment, or for the customer to authenticate their debit card with 3D Secure. While a payment is `PENDING`, One-Data declines any other create from a channel on its card account. | No |
 | `SCHEDULED` | Validated and waiting in Oracle for its due date, as a Work Tracker row. | No |
-| `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. | No |
+| `ACCEPTED` | Validated (on the day, for a scheduled payment) and ready to move money. A corporate payment paid today requests its allocations first. A Pay with Bank Transfer payment waits here for M3's notice that the bank has settled it. | No |
 | `ALLOCATING` | A corporate payment whose allocations have been requested from the allocations manager. Batches may be arriving. | No |
 | `ALLOCATED` | A corporate payment whose batches add up to its amount, ready to execute: at once if it was paid today, at its execution time if it was scheduled. | No |
-| `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. A Pay with Bank Transfer or debit card payment has no clearing, because its money has already moved: Execute sends One-Data the settlement event Billpay creates instead. | No |
+| `PROCESSING` | Being executed: clearing with the bank, the Accounts Receivable (AR) balance reduced, open-to-buy raised. A Pay with Bank Transfer or debit card payment has no clearing, because its money has already moved. For a debit card, Execute sends One-Data the settlement event Billpay creates instead; for Pay with Bank Transfer, M3's settled notice is the settlement. | No |
 | `PROCESSED` | Clearing, AR, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier have all succeeded, and the lifecycle event (RTF) and the customer's message (Raven) have gone out. | No |
 | `REPRESENTING` | The next presentment of a returned payment: a new row, numbered one higher, waiting for the date the market's rules set. | No |
-| `PAID` | Settled with the bank and posted to Accounts Receivable. For a Pay with Bank Transfer or debit card payment, the settlement is the event Billpay created in Execute. | Yes, unless a return arrives |
+| `PAID` | Settled with the bank and posted to Accounts Receivable. For a debit card payment, the settlement is the event Billpay created in Execute; for Pay with Bank Transfer, M3's settled notice. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank sent the funds back. | Yes. A representment is a new row |
 | `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
-| `DECLINED` | Failed validation, or a representment failed its recheck; or the bank-confirmation provider gave no redirect link, or the card provider gave no answer; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
-| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or never confirmed before the market's confirmation window closed; or a debit card payment whose 3D Secure callback didn't come within 2 minutes; or the customer said no to a payment waiting for bank confirmation. | Yes |
+| `DECLINED` | Failed validation, or a representment failed its recheck; or Amex Pay with Bank Transfer gave no redirect link, or the card provider gave no answer; or the bank's answer was no, or neither a confirm nor M3's notice came within the market's wait; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
+| `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or a debit card payment whose 3D Secure callback didn't come within 2 minutes; or the customer said no to a payment waiting for bank confirmation. | Yes |
 | `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
 `PROCESSED` is a higher bar than it looks. A payment reaches it only after every must-succeed system has answered and the customer has been told, which is why an outage at RTF or Raven holds payments at `PROCESSING` rather than letting them through with a gap.
@@ -131,9 +131,11 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | Input | `PENDING` | Capture |
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
-| `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when the bank provider gives no redirect link, or the card provider gives no answer (Proposed) |
-| `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify, once the caller confirms or the card provider calls back. For a debit card, `ACCEPTED` means the authorization has debited the customer's account |
-| `PENDING` (bank confirmation or 3D Secure) | `CANCELLED` | Cancel, once the confirmation window closes unconfirmed or the 2-minute authentication window closes with no callback, or on the customer's no |
+| `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when Amex Pay with Bank Transfer gives no redirect link, or the card provider gives no answer (Proposed) |
+| `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify. For a bank, on the first confirm's answer, the channel's or Amex Pay with Bank Transfer's, with no call. For a debit card, once the card provider calls back, and `ACCEPTED` means the authorization has debited the customer's account |
+| `PENDING` (bank confirmation) | `ACCEPTED` | Verify, on M3's settled notice when no confirm came first. Billpay logs the missing confirm |
+| `PENDING` (bank confirmation) | `DECLINED` | Verify, once the market's wait of 24 to 48 hours ends with no confirm and no settled notice, with `CONFIRMATION_NOT_RECEIVED` (Proposed) |
+| `PENDING` (bank confirmation or 3D Secure) | `CANCELLED` | Cancel, on the customer's no, or once a debit card's 2-minute authentication window closes with no callback |
 | `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines, with `MARKET_OUT_OF_SERVICE` (Proposed) |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
 | `SCHEDULED` | `CANCELLED` | Cancel, inside the cancellation window only |
@@ -179,7 +181,7 @@ UPDATE trans_dtl SET status = 'CANCELLED'
 
 A payment that has been represented has a row per presentment, so Return's guard names the presentment too. When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm doesn't race the end of the confirmation window, or a no from another tab, in the database: the payment's own workflow takes one answer, and a confirm or a no that comes after it, or once the workflow no longer waits, gets 409. Its commits are still guarded on `PENDING`, like every other.
+A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A confirm doesn't race the end of the bank's wait, M3's notice, the other source's confirm or a no from another tab in the database: the payment's own workflow takes one answer. A second confirm gets the same answer, a confirm after the payment was decided another way gets its current state, and a no that comes too late gets 409. Its commits are still guarded on `PENDING`, like every other.
 
 ## Split payments
 

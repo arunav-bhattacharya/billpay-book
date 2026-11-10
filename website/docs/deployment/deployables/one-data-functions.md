@@ -14,7 +14,7 @@ import Lead from '@site/src/components/Lead';
 - The functions channels and other platforms call, each a versioned contract. Most front one billpay-online API. [Build → One-Data Functions](../../build/api-spec/one-data.md) lists every one.
 - The event handlers for money movement, Accounts Receivable (AR) and authorization events. The first two store what arrives, and the authorization handler only acknowledges its events. None of them starts a workflow.
 - The inbox functions Billpay calls to read and update the inbox, and `UpdateUnmatchedPayments.v1`, which One-Data runs on its own schedule.
-- The hourly sweep of pending entries, which One-Data also runs on its own schedule. It removes entries more than 2 hours old whose payments billpay-online has decided, or never got ([Stored creates and the pending check](../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)).
+- The hourly sweep of pending entries, which One-Data also runs on its own schedule. It removes entries older than their market's sweep age, 2 hours unless the market sets it, whose payments billpay-online has decided, or never got ([Stored creates and the pending check](../../build/api-spec/one-data.md#stored-creates-and-the-pending-check)).
 - A Redis store in each site, IPC1 and IPC2, run as one active-active database. It holds every create as Pending and each card account's pending payments, so One-Data can hold a create while billpay-online is slow ([High Availability](../../architecture/high-availability.md#gateway)).
 
 One-Data runs active in both sites, so losing a site doesn't close the front door.
@@ -39,7 +39,7 @@ A start request is `READY` as soon as it is stored, and its dispatcher marks it 
 
 ### Rows for PAID
 
-A payment turns `PAID` once both the bank's settlement and AR's posting are in. Every payment gets both, even where `requiresArPosting` is N. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead: Execute hands it to the money movement handler, dated when the money moved, so its row pairs the same way and needs no rule of its own (Proposed). A corporate payment settles once, as a whole, while each leg posts on its own, so a corporate leg takes its payment's settlement: the payment's own row holds only the settlement, and each leg's row pairs its posting with it. A consumer split's legs clear on their own, so each settles on its own too (agreed 2026-11-07).
+A payment turns `PAID` once both the bank's settlement and AR's posting are in. Every payment gets both, even where `requiresArPosting` is N. A debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead: Execute hands it to the money movement handler, dated when the money moved, so its row pairs the same way and needs no rule of its own (Proposed). A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement; how it reaches the pairing is open (2026-11-10). A corporate payment settles once, as a whole, while each leg posts on its own, so a corporate leg takes its payment's settlement: the payment's own row holds only the settlement, and each leg's row pairs its posting with it. A consumer split's legs clear on their own, so each settles on its own too (agreed 2026-11-07).
 
 | `sta_cd` | Meaning |
 | --- | --- |

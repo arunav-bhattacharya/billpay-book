@@ -255,7 +255,7 @@ The customer picks a date inside the range Payment Options gives them. Billpay c
 
 ### Pay by Bank today
 
-Some markets let a customer pay from a bank account they confirm on the bank's own side: Plaid in the US, Pay with Bank Transfer in the UK. The customer starts the payment as usual, gets sent to the provider's site to confirm their bank details, and comes back. Billpay holds the payment at `PENDING` meanwhile, and one workflow, `CreatePaymentIntentWorkflow`, waits for the customer on a timer, so the payment's whole story shows in one place in the Temporal UI.
+Some markets let a customer pay straight from their bank account, confirming the payment at their bank: Pay with Bank Transfer in the UK, Plaid in the US. Billpay talks to one service for all of them, Amex Pay with Bank Transfer, which works with each market's provider. The customer starts the payment as usual, gets sent to their bank, and comes back. Billpay holds the payment at `PENDING` meanwhile, and one workflow, `CreatePaymentIntentWorkflow`, waits for the answer and then for M3's word that the money settled, so the payment's whole story shows in one place in the Temporal UI.
 
 <JourneyMap
   kind="customer"
@@ -272,13 +272,15 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   }}
   entry={[
     {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
-    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', logo: 'oneData', note: 'once confirmed'},
+    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', logo: 'oneData', note: "the channel's confirm"},
   ]}
   core={[
     {kind: 'api', label: 'POST /payments'},
     {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
+    {kind: 'api', label: 'POST /payments/{payment-id}/bank-confirmation', note: "Amex PwBT's confirm"},
+    {kind: 'api', label: 'POST /payments/{payment-id}/settlement', note: "M3's notice"},
   ]}
-  workflow={{label: 'CreatePaymentIntentWorkflow', note: "the caller's confirm arrives as an update"}}
+  workflow={{label: 'CreatePaymentIntentWorkflow', note: "the first confirm arrives as an update, M3's notice as a signal"}}
   steps={[
     {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
     {
@@ -298,36 +300,41 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
       state: 'PENDING',
       mode: 'live',
       caption: 'caller gets the link',
-      systems: ['Bank provider'],
+      systems: ['Amex PwBT'],
     },
     {
       icon: 'bank',
       name: 'Customer confirms',
       state: 'PENDING',
       mode: 'awaiting',
-      caption: "on the provider's site",
-      exit: {state: 'CANCELLED'},
+      caption: 'at their bank; up to 24 to 48 hours',
+      exit: {state: 'DECLINED'},
     },
     {
       icon: 'shieldCheck',
       name: 'Verify',
       state: 'ACCEPTED',
       mode: 'live',
-      caption: 'caller confirms, gets a response',
-      systems: ['Payment Instruments', 'Bank provider'],
-      parallel: true,
-      fanNote: 'the token; in GB, the funds',
+      caption: "the first confirm, the channel's or Amex PwBT's",
       exit: {state: 'DECLINED'},
       handoffAfter: true,
+    },
+    {
+      icon: 'clock',
+      name: 'Settled',
+      state: 'ACCEPTED',
+      mode: 'awaiting',
+      caption: "M3's notice that the bank settled",
+      systems: ['MR/M3'],
     },
     {
       icon: 'parallelArrows',
       name: 'Execute',
       state: 'PROCESSING',
       mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
+      systems: ['GAR', 'Payment Instruments', 'AMP'],
       parallel: true,
-      fanNote: 'no MR/M3 for Pay with Bank Transfer',
+      fanNote: 'no clearing call',
     },
     {
       icon: 'broadcast',
@@ -349,15 +356,16 @@ Some markets let a customer pay from a bank account they confirm on the bank's o
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
     {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before the bank step: Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionByIdentifier.v1` confirms the option they picked, and Plans returns the mandate details where the market requires one. A payment that fails them is `DECLINED` at once, with no redirect link. One that passes stays `PENDING`, and nothing is committed.'},
-    {step: 3, text: 'RequestConfirmation asks the market\'s provider for the customer\'s redirect link and stores it on the payment. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If the provider gives no link, the payment is `DECLINED` instead.'},
-    {step: 4, text: 'The customer confirms their bank details on the provider\'s site while the workflow waits on its timer: the market\'s confirmation window and a short grace. If no confirm comes in that time, the workflow runs Cancel itself, and the payment ends `CANCELLED`: RTF gets the event, and the customer gets the message through Raven.'},
-    {step: 5, text: 'The caller comes back with the same payment ID, and `POST /payments/{payment-id}/confirm` sends an update to the waiting workflow. The provider has already verified the customer\'s bank details, and Amex\'s own checks passed at the create, so Verify runs only the bank-side checks. To guard against fraud, it asks Payment Instruments whether the verification token it holds for the instrument is valid (Payment Instruments decides), then commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`. A payment without a valid token is `DECLINED`. In GB, Verify also checks that the customer\'s bank account holds enough money for the payment, and declines it if not. The confirm\'s reply returns here. A confirm that arrives after the payment was cancelled gets 409. Once Verify has decided, the delete takes the payment off the account\'s pending list, and a Plaid payment works the same way (2026-11-08).'},
-    {text: 'Everything after this runs with nobody waiting, in the same workflow, exactly as on [Pay my bill today](#pay-my-bill-today).'},
-    {step: 6, text: 'For Pay with Bank Transfer there is no clearing call: the money moved at the bank, during the customer\'s bank connection. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). Otherwise Execute clears with the bank as usual (whether a payment confirmed through Plaid in the US clears is still open). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
-    {step: 7, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 8, text: '`PAID` follows once the settlement and the AR posting are both in One-Data\'s inbox. For Pay with Bank Transfer, the settlement is the one Billpay created in Execute.'},
+    {step: 3, text: 'RequestConfirmation asks Amex Pay with Bank Transfer for the customer\'s redirect link and stores it on the payment. Billpay never calls a market\'s provider itself. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If no link comes back, the payment is `DECLINED` instead.'},
+    {step: 4, text: 'The customer confirms the payment at their bank while the workflow waits on its timer: the market\'s wait, 24 to 48 hours, and a short grace. The customer can still say no, and the payment ends `CANCELLED`. If neither a confirm nor M3\'s notice comes in time, Verify declines it with `CONFIRMATION_NOT_RECEIVED` (the code is Proposed), and RTF and Raven are told. Until the payment is decided, its pending entry blocks the account\'s next payment.'},
+    {step: 5, text: 'The confirm comes from the channel, `POST /payments/{payment-id}/confirm`, or from Amex Pay with Bank Transfer, the PISP (Payment Initiation Service Provider) interface, straight to billpay-online through `POST /payments/{payment-id}/bank-confirmation`. Each carries the bank\'s answer, and both are the same update to the waiting workflow, so whichever lands first decides and the second gets the same answer. Verify commits `ACCEPTED` or `DECLINED` on that answer, guarded on `PENDING`, and calls nothing: there is no Payment Instruments token check and no funds check once the bank has confirmed. The first confirm\'s reply returns here, and the delete takes the payment off the account\'s pending list.'},
+    {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
+    {step: 6, text: 'An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it tells Amex; M3 intercepts that message and calls billpay-online\'s `POST /payments/{payment-id}/settlement`, which signals the workflow. If M3\'s notice arrives before any confirm, Billpay accepts the payment on it, carries on, and logs that no confirm came for that payment ID. If the notice never comes, the payment goes on the exception list with an alert; how long Billpay waits is still open.'},
+    {step: 7, text: 'Execute makes no clearing call, since the money moved at the bank. The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
+    {step: 8, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
+    {step: 9, text: '`PAID` follows once the settlement and the AR posting are both in. M3\'s notice is this payment\'s settlement; how it reaches One-Data\'s pairing is still open.'},
   ]}
-  reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-and-confirm', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-confirm-and-settlement', label: 'Sequence diagram'}}
 />
 
 ### Pay by Debit card
@@ -1016,7 +1024,7 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
 
 ### A payment is paid
 
-This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A Pay with Bank Transfer or debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other.
+This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. How it reaches the pairing is still open.
 
 <JourneyMap
   kind="system"
@@ -1045,14 +1053,14 @@ This is where a payment turns `PAID`, or for a split payment, each of its legs. 
     {icon: 'doubleCheck', name: 'Mark', mode: 'background', caption: 'DONE or UNMATCHED'},
   ]}
   detail={[
-    {text: 'A payment reaches this point `PROCESSED`: the money has gone to the bank and every system has been told. Two confirmations are still owed. The bank says the money settled, and Accounts Receivable says the payment posted. For a Pay with Bank Transfer or debit card payment, the settlement is the one Billpay created in Execute.'},
+    {text: 'A payment reaches this point `PROCESSED`: the money has gone to the bank and every system has been told. Two confirmations are still owed. The bank says the money settled, and Accounts Receivable says the payment posted. For a debit card payment, the settlement is the one Billpay created in Execute; for Pay with Bank Transfer, it is M3\'s settled notice.'},
     {text: 'Both arrive as events, sometimes 1,000 a second, and neither touches Billpay directly. One-Data\'s event handlers store each one in its inbox, a Postgres database of its own, and whichever arrives second marks the payment\'s row `READY`.'},
     {step: 1, text: 'A Schedule starts `ProcessPaidEventsWorkflow` every 30 seconds, and only one run is ever active. Each batch fetches up to 500 `READY` rows through a One-Data function.'},
     {step: 2, text: 'Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a guarded update, and tags each `PAID` timeline row with the batch\'s ID. A retried Settle finds the payments it already moved by that ID.'},
     {step: 3, text: 'The `PAID` events go to RTF.'},
     {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data\'s own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row is `DONE` only once its event has gone out.'},
     {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its settlement is in. A corporate leg takes its parent\'s settlement, and a consumer split\'s leg settles on its own. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split.'},
-    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a Pay with Bank Transfer or debit card payment, which MR/M3 never settles: it asks GAR alone, and always hands over Billpay\'s own settlement event again, since Billpay can\'t read the inbox (Proposed).'},
+    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a debit card payment, which MR/M3 never settles: it asks GAR alone, and always hands over Billpay\'s own settlement event again, since Billpay can\'t read the inbox (Proposed). For Pay with Bank Transfer, M3\'s notice is the settlement, and how it reaches the pairing is open.'},
   ]}
   reference={{to: '/docs/design/sequence-diagrams#10-paid-events', label: 'Sequence diagram'}}
 />

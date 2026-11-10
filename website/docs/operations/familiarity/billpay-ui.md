@@ -20,7 +20,7 @@ The Operations step holds the settings that drive a market at runtime:
 - when corporate allocations are fetched, and when a late one raises an alert
 - its representment rules
 - which status changes send a Raven message
-- its bank-confirmation provider and window
+- its bank-confirmation wait, 24 to 48 hours, and the instrument statuses each journey context offers
 - its card provider and authentication window, for debit cards
 - its verification rule settings, such as the largest payment and the instrument types it takes
 - its scheduling horizon and whether it offers Pay with MR Points (both Proposed)

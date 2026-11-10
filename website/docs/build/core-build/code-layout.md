@@ -44,7 +44,7 @@ The Gradle module graph makes a violation a compile error, not a review comment.
 - A market that really does something differently gets a class of its own in `market/{m}/`: usually a check or a method, and a stage only when its flow differs. Its workflows, activities and clients stay as they are.
 - A new downstream system means a new `{System}Client`, the `{System}Activities` that calls it, and the stage that uses it.
 
-This is where naming classes for their jobs earns its keep. The check that verifies a mandate is `MandateCheck`, not a Germany check, so the next market that needs a mandate turns the behavior on and gets the same class. Only a class that really belongs to one market carries that market's code, at the front, such as `GBFundsCheck` ([the naming rule](../../design/component-model/stages.md#naming)).
+This is where naming classes for their jobs earns its keep. The check that verifies a mandate is `MandateCheck`, not a Germany check, so the next market that needs a mandate turns the behavior on and gets the same class. Only a class that really belongs to one market carries that market's code, at the front, `{Market}{Job}Check`; no market has one today ([the naming rule](../../design/component-model/stages.md#naming)).
 
 ## The two app modules
 

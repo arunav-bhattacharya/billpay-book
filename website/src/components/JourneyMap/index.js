@@ -64,7 +64,7 @@ const SYSTEMS = {
   Installments: 'Installments, which owns the instalment plan',
   Globestar: 'Globestar, which holds the instalment plan',
   Allocations: 'Allocations Manager, which returns a corporate breakdown',
-  'Bank provider': "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
+  'Amex PwBT': "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
   'Card provider': "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
 };
 

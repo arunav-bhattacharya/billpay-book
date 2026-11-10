@@ -140,7 +140,7 @@ private fun checkAmountAgainstPaymentOption() {
 }
 ```
 
-If the customer named the amount, or the option is already verified, the amount must be there. For any other option, Verify works the amount out later, so supplying one up front is an error. The defaults are `presentmentSequence = 1`, `hasMoneyMovement = true`, `planDetailData = null` and `bankConfirmation = null`. A payment that waits for its customer's bank holds a `BankConfirmation`: the provider's reference and the redirect link.
+If the customer named the amount, or the option is already verified, the amount must be there. For any other option, Verify works the amount out later, so supplying one up front is an error. The defaults are `presentmentSequence = 1`, `hasMoneyMovement = true`, `planDetailData = null` and `bankConfirmation = null`. A payment that waits for its customer's bank holds a `BankConfirmation`: Amex Pay with Bank Transfer's reference and the redirect link.
 
 ## A move, in code
 

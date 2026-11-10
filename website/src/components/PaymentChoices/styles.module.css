@@ -170,18 +170,52 @@
   color: var(--pc-ink);
 }
 
+/* A call the channel makes, named on the page: the site's channel-call look,
+   a navy chip with a Bright Blue key square (the --amex-call-* tokens). */
 .callTag {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  padding: 0.18rem 0.45rem 0.2rem 0.4rem;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-call-channel);
+  color: var(--amex-call-channel-ink);
+  box-shadow: var(--amex-call-shadow);
   font-size: 0.7rem;
-  color: var(--amex-mut);
+  font-weight: 600;
+}
+
+.callKey {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: 2px;
+  background: var(--amex-call-key);
+}
+
+.callTagN {
+  composes: ordinal from '../../css/recipes.module.css';
+  font-size: 0.6rem;
+  color: var(--amex-call-channel-sub);
+}
+
+/* A read Billpay makes for the channel: the pale side of the rule. */
+.readTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-call-other);
+  color: var(--amex-call-other-ink);
+  font-size: 0.7rem;
 }
 
 .readVia {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: var(--amex-mut);
 }
 
 .callsMore .asideNote {
@@ -406,25 +440,59 @@
   margin-top: 0;
 }
 
+/* Every call in this column is one the channel makes, so each is the navy
+   block with the key square, numbered in it. */
 .call {
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
   padding: 0.8rem 0.9rem;
   border-radius: 10px;
-  background: var(--pc-card);
-  box-shadow: var(--amex-sh-sm);
+  background: var(--amex-call-channel);
+  box-shadow: var(--amex-call-shadow);
+  --call-ink: var(--amex-call-channel-ink);
+  --call-sub: var(--amex-call-channel-sub);
   transition: opacity 0.2s;
 }
 
-.callNew {
-  background: var(--pc-navy);
-  --call-ink: var(--amex-white);
+.callSquare {
+  composes: ordinal from '../../css/recipes.module.css';
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: var(--amex-badge-radius);
+  background: var(--amex-call-key);
+  color: var(--amex-call-channel-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
-.callNew .badge {
-  background: var(--amex-white);
-  color: var(--amex-midnight);
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.45rem;
+  border-radius: var(--amex-badge-radius);
+  background: color-mix(in srgb, var(--amex-call-channel-ink) 9%, transparent);
+  font-family: var(--amex-font-mono);
+  font-size: 0.68rem;
+}
+
+.filterKey {
+  color: var(--amex-call-key);
+  font-weight: 600;
+}
+
+.filterVal {
+  color: var(--call-ink);
 }
 
 .callOff {
@@ -455,14 +523,13 @@
 .callLine {
   margin: 0.25rem 0 0;
   font-size: 0.8rem;
-  color: var(--call-ink, var(--amex-mut));
-  opacity: 0.92;
+  color: var(--call-sub, var(--amex-mut));
 }
 
 .status {
   font-family: var(--amex-font-mono);
   font-size: 0.66rem;
-  color: var(--amex-mut);
+  color: var(--call-sub, var(--amex-mut));
 }
 
 .statusNew {

@@ -26,7 +26,7 @@ These are the payment dimensions. Every stage that varies between markets varies
 | `requiresArPosting` | Y, N or BOTH | Whether the processed payment is posted to Accounts Receivable |
 | `requiresRealtimeClearing` | Y, N or BOTH | Whether clearing is realtime or batch |
 | `requiresMandateAuthorization` | Y, N or BOTH | Whether the payment's mandate is checked, with its details from Plans, at Verify and again at Reverify on the due date. A mandate that fails its check declines the payment |
-| `requiresBankConfirmation` | Y, N or BOTH | Whether the customer confirms their bank details on the market's provider's site, such as Plaid in the US or Pay with Bank Transfer in the UK, before the payment is processed |
+| `requiresBankConfirmation` | Y, N or BOTH | Whether the customer confirms the payment at their bank, through Amex Pay with Bank Transfer, before it is processed. Billpay calls no market's provider directly: Amex Pay with Bank Transfer works with each one, Plaid in the US among them |
 
 ## BOTH, resolved per journey
 

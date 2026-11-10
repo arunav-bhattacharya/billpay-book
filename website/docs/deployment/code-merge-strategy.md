@@ -63,7 +63,7 @@ A pull request does one thing, small enough to review in one sitting.
 - The description says what changed and why, and links the ticket.
 - It stays a draft until it is ready for review.
 - A change to what a combination runs updates the checked-in stage report in the same pull request, so the reviewer sees the rows that moved.
-- A new market class carries the market's code at the front of its name, such as `GBFundsCheck`, and sits in that market's module.
+- A new market class carries the market's code at the front of its name, `{Market}{Job}Check`, and sits in that market's module.
 
 ## Reviews and code owners
 

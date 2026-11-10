@@ -41,8 +41,9 @@ A stage makes its calls first, in parallel wherever they don't depend on each ot
 @Singleton
 class DefaultPaymentExecuteStage(
     // RealtimeClearing or BatchClearing; BankTransferSettlement or
-    // CardSettlement, which make no clearing call and hand One-Data
-    // the settlement event Billpay creates
+    // CardSettlement, which make no clearing call. CardSettlement hands
+    // One-Data the settlement event Billpay creates; for a bank, M3's
+    // settled notice is the settlement
     private val clearingMethods: MethodRegistry<ClearingMethod>,
 ) : PaymentExecuteStage {
     override val key = EXECUTE
@@ -109,7 +110,7 @@ val stages = stageResolver.resolve(profile)
 
 No `when` or `if` maps a resolved profile to classes, and there is no list to edit. Each stage, check and method says what job it does, its key, and where it applies, its `appliesTo`: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each key, the most specific class that applies wins. A class tied to a market beats one that isn't, so a market is the exception wherever it has a class of its own. Quarkus finds every class at build time, and a registry works out every combination when the app starts.
 
-GB is the example today. A Pay with Bank Transfer payment there also runs `GBFundsCheck`, which asks the bank-confirmation provider whether the customer's bank account holds enough money for the payment. That one class, in GB's module, is all GB adds. That is why the resolved profile carries the market. A debit card works the same way, with no market in it: `CardAuthorizationCheck` applies where card authentication is Y, and Verify runs it last, because an approved authorization has already taken the customer's money. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
+No market has a class of its own today: GB's funds check went on 2026-11-10, once the bank's confirm through Amex Pay with Bank Transfer became enough for a bank payment. A market that needs one adds a single class in its module, and that is why the resolved profile carries the market. A debit card shows the same mechanism with a behavior in place of a market: `CardAuthorizationCheck` applies where card authentication is Y, and Verify runs it last, because an approved authorization has already taken the customer's money. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
 
 Stages are never `abstract`. A variation is a class of its own that the registry picks, not an override of a base class, so reading one file tells you everything that class does. Deploys are rolling, so a deploy that changes a class a running payment uses is patched like any workflow change, and the replay tests prove old histories still replay (2026-11-08).
 
@@ -119,9 +120,9 @@ Names are for people. The registries read `appliesTo`, never a name.
 
 - A stage interface is `Payment{Step}Stage`, such as `PaymentVerifyStage`.
 - The stage every market runs is `DefaultPayment{Step}Stage`.
-- A market whose flow for a step really differs gets a stage of its own, named with the market's code first, `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. GB doesn't need one today.
+- A market whose flow for a step really differs gets a stage of its own, named with the market's code first, `{Market}Payment{Step}Stage`, such as `GBPaymentVerifyStage`. No market needs one today.
 - A shared stage whose whole flow for a step differs by a behavior is named for that behavior, `Payment{Step}StageWith{Behavior}`. Execute and Reverify have one each for a corporate payment, `PaymentExecuteStageWithCorporateAccount` and `PaymentReverifyStageWithCorporateAccount` (Proposed, 2026-11-08). A behavior that only adds or swaps a call is a check or a method.
-- A check or a method is named for its job, such as `MandateCheck`, `TokenCheck` or `RealtimeClearing`, and a market's own starts with its code, such as `GBFundsCheck`. A test fails when a class tied to a market doesn't start with that market's code.
+- A check or a method is named for its job, such as `MandateCheck`, `CardAuthorizationCheck` or `RealtimeClearing`, and a market's own starts with its code, `{Market}{Job}Check`. A test fails when a class tied to a market doesn't start with that market's code.
 
 A name says what a class does, never what it calls. A market that needs a mandate doesn't get a mandate stage: Verify gets `MandateCheck`, which fetches the mandate details from Plans, and the rules that check them run. The next section shows that check.
 
@@ -133,7 +134,7 @@ Here are the pieces of a rule as a class diagram:
 
 <ClassMap {...rulePieces} />
 
-`GBRules` lives in GB's module and holds GB's funds rule. The rule registry gets every `RuleSet` bean the way the stage registries get every check.
+`CardRules` holds the debit card's rules. A market's own rule set would live in its module; none does today. The rule registry gets every `RuleSet` bean the way the stage registries get every check.
 
 A rule is built from specifications. A specification is a named yes/no question about the facts, and specifications combine with `and`, `or` and `not`, so each question is written once and shared:
 
@@ -208,7 +209,7 @@ object DeclineCodes {
         "MANDATE_ACTIVE" to DeclineCode.MANDATE_NOT_ACTIVE,
         "OPTION_VALID" to DeclineCode.PAYMENT_OPTION_INVALID,
         "BALANCE_OWED" to DeclineCode.NO_BALANCE_OWED,
-        "FUNDS_AVAILABLE" to DeclineCode.INSUFFICIENT_FUNDS,
+        "BANK_CONFIRMED" to DeclineCode.BANK_CONFIRMATION_DECLINED,
     )
     fun of(ruleId: String): DeclineCode? = byRule[ruleId]
 }
@@ -229,8 +230,8 @@ The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INS
 | The scheduling horizon | `DATE_BEYOND_SCHEDULING_HORIZON` |
 | `OPTION_VALID`, at Reverify (agreed 2026-11-07) | `PAYMENT_OPTION_INVALID` |
 | `BALANCE_OWED`, at Reverify (agreed 2026-11-07) | `NO_BALANCE_OWED` |
-| `TOKEN_VALID` (Proposed) | `TOKEN_INVALID` |
-| `FUNDS_AVAILABLE`, GB's funds rule (Proposed) | `INSUFFICIENT_FUNDS` |
+| `BANK_CONFIRMED`, on the bank's answer (Proposed) | `BANK_CONFIRMATION_DECLINED` |
+| `CONFIRMATION_RECEIVED`, when the bank's wait ends (Proposed) | `CONFIRMATION_NOT_RECEIVED` |
 | `CARD_AUTHENTICATED` (Proposed) | `CARD_AUTHENTICATION_FAILED` |
 | `CARD_AUTHORIZED` (Proposed) | `CARD_AUTHORIZATION_DECLINED` |
 | `CONFIRMATION_AVAILABLE` (Proposed) | `CONFIRMATION_UNAVAILABLE` |
@@ -247,7 +248,7 @@ A test asks the rule registry for every rule it holds and fails if `DeclineCodes
 - There is one Verify stage. A payment that needs no mandate never gets `MandateCheck` or `MANDATE_ACTIVE`, so it gathers no mandate details and runs no mandate rule.
 - `runsWhen` replaces any list of rule dependencies. `INSTRUMENT_OPEN` only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed, and the decision carries `INSTRUMENT_FOUND`'s code.
 - A rule keeps one decline code. Specifications combine inside a rule only when one code fits the whole condition; otherwise they are two rules.
-- The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. GB's funds rule sits beside `GBFundsCheck` in `market/gb/` and names GB and bank confirmation, as the check does. MX's split also lives in `market/mx/`, with its numbers as rule settings in MX's release (Proposed, 2026-11-07), but it shapes the legs Verify's `ACCEPTED` commit writes rather than passing or declining the payment; [When a consumer payment splits](../../design/component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.
+- The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. No market has a rule of its own today. MX's split lives in `market/mx/`, with its numbers as rule settings in MX's release (Proposed, 2026-11-07), but it shapes the legs Verify's `ACCEPTED` commit writes rather than passing or declining the payment; [When a consumer payment splits](../../design/component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.
 - `fetchAll` waits for every check. An activity returns what its system said, such as a closed account or an expired mandate, as data, and throws only on an error, which Temporal retries. So an outage never declines a payment, and a "no" is never retried.
 - The shared checks sit in `core/lib/stages`, package `checks`, beside the stages: a check is part of its stage, and its call goes through the stage's own stubs (agreed 2026-11-08). The shared rules sit in `core/lib/rules`, each with the steps it runs in, beside `CheckKey`, `VerificationFacts`, the specifications, the `RuleSet` beans, the rule registry, the decline codes and the split policies. `core/lib/rules` depends on the domain alone, with no activity interfaces and no Temporal SDK, so the build stops a rule from calling anything (agreed 2026-11-08). The systems' answers the facts hold are domain types in `domain.answers`, which the activity interfaces return (agreed 2026-11-08). The business names stay: `VerificationFacts` and `billpay_verification_declines_total` still name these rules. Reverify runs the same `MandateCheck` and `MANDATE_ACTIVE` on the due date. Represent calls none of Payment Instruments, Payment Options and Plans: it will add checks and rules of its own once they are defined, and until then its recheck passes (Proposed, 2026-11-07).
 - A rule reads only the facts, never `Instant.now()` or a service. That is what makes it safe inside the workflow, where a replay must reach the same decision.

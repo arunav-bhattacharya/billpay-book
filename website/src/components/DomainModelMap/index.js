@@ -70,7 +70,7 @@ const BOXES = [
     extra: 'It carries a declineCode and no confirmation code.'},
 
   {id: 'pendF', col: 'full', row: 0, state: 'PENDING', cls: 'PendingFullPayment', tone: 'mid',
-    extra: "While it waits for the customer's bank it holds bankConfirmation: the provider's reference and the redirect link (not in the code yet)."},
+    extra: "While it waits for the customer's bank it holds bankConfirmation: Amex Pay with Bank Transfer's reference and the redirect link (not in the code yet)."},
   {id: 'schF', col: 'full', row: 1, state: 'SCHEDULED', cls: 'ScheduledFullPayment', tone: 'mid'},
   {id: 'accF', col: 'full', row: 2, state: 'ACCEPTED', cls: 'AcceptedFullPayment', tone: 'mid'},
   {id: 'allocF', col: 'full', row: 3, state: 'ALLOCATING', cls: 'AllocatingFullPayment', tone: 'mid', corp: true, todo: true},
@@ -123,7 +123,7 @@ const EDGES = [
     d: `M${R('pendF')},${r(0)} H520 V${r(2) - 14} H${R('accF')}`},
   {a: 'pendF', b: 'disallowed', fn: 'toDisallowedFullPayment(...)', note: 'a push payment only', todo: true,
     d: `M${L('pendF')},${r(0) - 8} H${R('disallowed')}`},
-  {a: 'pendF', b: 'canF', fn: 'toCancelledFullPayment()', note: "the confirmation window closed, or the customer's no", todo: true,
+  {a: 'pendF', b: 'canF', fn: 'toCancelledFullPayment()', note: "the customer's no, or a debit card's window closed", todo: true,
     d: `M${L('pendF')},${r(0) + 8} H250 V${r(1) - 14} H${R('canF')}`},
   {a: 'pendF', b: 'decF', fn: 'toDeclinedFullPayment(option, instrument, declineCode)',
     d: `M300,${top('pendF')} V189 H10 V${r(4)} H${L('decF')}`},
@@ -288,7 +288,7 @@ const VALUES = [
     term: 'BankConfirmation',
     desc: "On a PendingFullPayment as bankConfirmation, null unless the payment waits for the customer's bank. Not in the code yet.",
     lines: [
-      ['providerReference', "the bank-confirmation provider's reference"],
+      ['providerReference', "Amex Pay with Bank Transfer's reference"],
       ['redirectLink', 'the link the customer follows'],
     ],
   },
@@ -345,7 +345,7 @@ function ToolIcon({name}) {
 }
 
 const LABEL =
-  "The payment domain model as agreed on 2026-10-17. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have all eleven states on the path, from PendingFullPayment through AllocatingFullPayment and AllocatedFullPayment, which only a corporate payment reaches, to RepresentedFullPayment, plus DisallowedFullPayment, CancelledFullPayment and DeclinedFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have five states, ending at ReturnedSplitPayment, since only a whole payment is represented; a leg is never pending, scheduled, allocating, allocated, cancelled or declined. The transition functions join them: a pending payment is accepted, scheduled or declined, cancelled when its confirmation window closes or the customer says no, or, for a push payment, disallowed; a scheduled one is accepted, declined or cancelled, or for a corporate payment moves to allocating at the fetch time; an accepted one moves to processing, or for a corporate payment paid today to allocating; allocating moves to allocated, which moves to processing when it was paid today, or back to accepted or on to declined at Reverify when it was scheduled; a processing, processed or paid payment can be returned; a returned full payment builds its next presentment, numbered one higher, which is representing; a representing one is represented, or declined when its recheck fails; and a represented one can be returned again, with that return's own details. A returned leg stays returned. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. Dashed lines and outlines mark what the supplied code does not have yet: the two corporate classes and their moves, PENDING to CANCELLED, PROCESSING to RETURNED for a payment and a leg, DisallowedFullPayment, and REPRESENTING to DECLINED.";
+  "The payment domain model as agreed on 2026-10-17. At the top, a Transaction is either a Payment or a Refund, the two root types, drawn as the deepest boxes; Refund has no concrete types yet. Payments come in two shapes, a FullPayment and a SplitPayment, a leg whose ID is its parent's plus a sequence number. Each lifecycle state has a class for each shape that can be in it, drawn as a grid with one row per state from PENDING down to REPRESENTED. Full payments have all eleven states on the path, from PendingFullPayment through AllocatingFullPayment and AllocatedFullPayment, which only a corporate payment reaches, to RepresentedFullPayment, plus DisallowedFullPayment, CancelledFullPayment and DeclinedFullPayment in a column on the left where a payment stops. Legs start at ACCEPTED and have five states, ending at ReturnedSplitPayment, since only a whole payment is represented; a leg is never pending, scheduled, allocating, allocated, cancelled or declined. The transition functions join them: a pending payment is accepted, scheduled or declined, cancelled when the customer says no or a debit card's window closes, or, for a push payment, disallowed; a scheduled one is accepted, declined or cancelled, or for a corporate payment moves to allocating at the fetch time; an accepted one moves to processing, or for a corporate payment paid today to allocating; allocating moves to allocated, which moves to processing when it was paid today, or back to accepted or on to declined at Reverify when it was scheduled; a processing, processed or paid payment can be returned; a returned full payment builds its next presentment, numbered one higher, which is representing; a representing one is represented, or declined when its recheck fails; and a represented one can be returned again, with that return's own details. A returned leg stays returned. An accepted or processing full payment makes accepted legs from a split slice, drawn in blue. Every class from SCHEDULED to REPRESENTED is a VerifiedPayment, which guarantees a tokenized account, an amount, a verified option and instrument, and an executable timeline; RETURNED, REPRESENTING and REPRESENTED also carry ReturnedInfo. Dashed lines and outlines mark what the supplied code does not have yet: the two corporate classes and their moves, PENDING to CANCELLED, PROCESSING to RETURNED for a payment and a leg, DisallowedFullPayment, and REPRESENTING to DECLINED.";
 
 /* ------------------------------------------------------------- the map --- */
 

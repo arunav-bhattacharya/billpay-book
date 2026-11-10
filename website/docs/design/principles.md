@@ -75,7 +75,7 @@ Rules aren't a layer. Like the domain, they are pure code a stage uses: inside a
 | Layer | Name | Lives in |
 | --- | --- | --- |
 | Workflow | `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow` | `core/lib/workflows/impl/` |
-| Stage | A `Payment{Step}Stage` interface, named for the journey step, such as `PaymentVerifyStage`. The stage every market runs is `DefaultPayment{Step}Stage`; its checks and methods are named for their jobs, such as `MandateCheck`, and a market's own class starts with the market's code, such as `GBFundsCheck` ([the full rule](./component-model/stages.md#naming)) | `core/lib/stages/impl/{step}/`; a market's own classes in `market/{m}/` |
+| Stage | A `Payment{Step}Stage` interface, named for the journey step, such as `PaymentVerifyStage`. The stage every market runs is `DefaultPayment{Step}Stage`; its checks and methods are named for their jobs, such as `MandateCheck`, and a market's own class starts with the market's code, `{Market}{Job}Check`, though no market has one today ([the full rule](./component-model/stages.md#naming)) | `core/lib/stages/impl/{step}/`; a market's own classes in `market/{m}/` |
 | Activity | `{System}Activities`, such as `ClearingActivities`. Oracle reads and writes go through the stores: `PaymentStore`, `WorkTrackerStore`, `AllocationBatchStore`, `ConfigStore` and `ControlStore` | `core/lib/activities/` and `impl/` |
 | Client | `{System}Client` | `core/lib/clients/` |
 
@@ -89,7 +89,7 @@ Naming a class for its job rather than its market means a check that several mar
 
 ## How a workflow finds its stages
 
-A workflow is never handed its stages. When the Router starts it, the Router pins a **resolved profile**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market's own classes can apply, such as GB's extra check for Pay with Bank Transfer. The workflow reads its resolved profile and looks up its stages at runtime.
+A workflow is never handed its stages. When the Router starts it, the Router pins a **resolved profile**: the market, the journey, the market's behaviors resolved for that journey, and the version of the market's config. The market is in the key so a market's own classes can apply, when a market has some. The workflow reads its resolved profile and looks up its stages at runtime.
 
 Nothing maps a resolved profile to classes by hand. Each stage, and each check or method a stage uses, says what job it does and where it applies: a market or every market, an account type, and the behaviors that must be Y or N. For each job the most specific class that applies wins, so a market's own class beats the shared one in that market, and different jobs add up. Quarkus finds every class when the code is built, and a registry works out every combination when the app starts, so a running workflow reads its answers and decides nothing. [Routing](./routing.md#from-profile-to-stages) follows one profile through to the stages it runs.
 

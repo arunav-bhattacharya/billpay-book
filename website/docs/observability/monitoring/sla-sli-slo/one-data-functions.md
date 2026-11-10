@@ -66,7 +66,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 **One-Data Function** · `ReadBillpayInstruments.v1` · SLA availability: not set yet
 
-**SLI:** latency for the list of instruments, banks or wallets the payment page may offer, for one source. Its targets are still to come.
+**SLI:** latency for the list of instruments or banks the payment page may offer, for one source and journey context. Its targets are still to come.
 
 ## Create Credit Balance Refund
 
@@ -162,4 +162,4 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 `UpdateUnmatchedPayments.v1` has no SLA. One-Data runs it on a cron schedule and nobody calls it, so the measure is the alert it raises for a row `UNMATCHED` for 48 hours.
 
-The hourly sweep of pending entries has none either, for the same reason. Its measure is its alert, raised when a run removes entries whose delete never landed or finds payments still `PENDING` after 2 hours.
+The hourly sweep of pending entries has none either, for the same reason. Its measure is its alert, raised when a run removes entries whose delete never landed or finds payments still `PENDING` past their market's sweep age.

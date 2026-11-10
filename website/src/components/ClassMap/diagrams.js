@@ -18,7 +18,7 @@ export const strategyFamily = {
   width: 700,
   height: 436,
   label:
-    'Class diagram of the strategies. At the top is the Strategy interface, with a key and an appliesTo. Three interfaces are kinds of Strategy: PaymentVerifyStage, with run; Check, with steps and fetch; and ClearingMethod, with clear. DefaultPaymentVerifyStage implements PaymentVerifyStage, with the key VERIFY, in every market. MandateCheck and GBFundsCheck implement Check: MandateCheck has the key MANDATE and applies where mandate authorization is Y, and GBFundsCheck, which only GB has, has the key FUNDS and applies in GB with bank confirmation Y. Their keys differ, so both can run. RealtimeClearing and BatchClearing implement ClearingMethod with the same key, CLEARING, one for realtime clearing Y and one for N, so exactly one runs.',
+    'Class diagram of the strategies. At the top is the Strategy interface, with a key and an appliesTo. Three interfaces are kinds of Strategy: PaymentVerifyStage, with run; Check, with steps and fetch; and ClearingMethod, with clear. DefaultPaymentVerifyStage implements PaymentVerifyStage, with the key VERIFY, in every market. MandateCheck and CardAuthorizationCheck implement Check: MandateCheck has the key MANDATE and applies where mandate authorization is Y, and CardAuthorizationCheck has the key CARD_AUTHORIZATION and applies where card authentication is Y. Their keys differ, so both can run. RealtimeClearing and BatchClearing implement ClearingMethod with the same key, CLEARING, one for realtime clearing Y and one for N, so exactly one runs.',
   classes: [
     {id: 'strategy', kind: 'interface', name: 'Strategy<K>', x: 284, y: 12, w: 200, members: ['key: K', 'appliesTo: AppliesTo']},
     {id: 'stage', kind: 'interface', name: 'PaymentVerifyStage', x: 10, y: 158, w: 256, members: ['run(ctx, paymentId)']},
@@ -26,7 +26,7 @@ export const strategyFamily = {
     {id: 'clearing', kind: 'interface', name: 'ClearingMethod', x: 502, y: 158, w: 188, members: ['clear(ctx, paymentId)']},
     {id: 'default', kind: 'class', name: 'DefaultPaymentVerifyStage', note: 'VERIFY · every market', x: 32, y: 284, w: 234},
     {id: 'mandate', kind: 'class', name: 'MandateCheck', note: 'MANDATE · mandate Y', x: 312, y: 284, w: 166},
-    {id: 'funds', kind: 'class', name: 'GBFundsCheck', note: 'FUNDS · GB, bank Y', market: 'GB', x: 312, y: 348, w: 166},
+    {id: 'card', kind: 'class', name: 'CardAuthorizationCheck', note: 'CARD_AUTHORIZATION · card Y', x: 312, y: 348, w: 186},
     {id: 'realtime', kind: 'class', name: 'RealtimeClearing', note: 'CLEARING · realtime Y', x: 524, y: 284, w: 166},
     {id: 'batch', kind: 'class', name: 'BatchClearing', note: 'CLEARING · realtime N', x: 524, y: 348, w: 166},
   ],
@@ -81,13 +81,13 @@ export const rulePieces = {
   width: 700,
   height: 436,
   label:
-    'Class diagram of the verification rules. The RuleRegistry, with evaluate, holds every RuleSet bean. RuleSet is an interface with a list of rules; InstrumentRules, MandateRules and GBRules implement it, and GBRules is GB\'s own. A RuleSet holds Rules. A Rule has an id, an appliesTo, the steps it runs in, two specifications, runsWhen and passes, a decline code and a priority. It uses the Spec interface, which has isSatisfiedBy, and, or and not. A Spec asks about the VerificationFacts: each check\'s answer, the settings and the time.',
+    'Class diagram of the verification rules. The RuleRegistry, with evaluate, holds every RuleSet bean. RuleSet is an interface with a list of rules; InstrumentRules, MandateRules and CardRules implement it; a market\'s own rule set would sit beside them, and none has one today. A RuleSet holds Rules. A Rule has an id, an appliesTo, the steps it runs in, two specifications, runsWhen and passes, a decline code and a priority. It uses the Spec interface, which has isSatisfiedBy, and, or and not. A Spec asks about the VerificationFacts: each check\'s answer, the settings and the time.',
   classes: [
     {id: 'registry', kind: 'class', name: 'RuleRegistry', x: 10, y: 12, w: 226, members: ['evaluate(profile, step, facts)']},
     {id: 'set', kind: 'interface', name: 'RuleSet', x: 10, y: 128, w: 218, members: ['rules: List<Rule>']},
     {id: 'instrument', kind: 'class', name: 'InstrumentRules', x: 272, y: 105, w: 172},
     {id: 'mandate', kind: 'class', name: 'MandateRules', x: 272, y: 151, w: 172},
-    {id: 'gb', kind: 'class', name: 'GBRules', market: 'GB', x: 272, y: 197, w: 172},
+    {id: 'gb', kind: 'class', name: 'CardRules', x: 272, y: 197, w: 172},
     {
       id: 'rule',
       kind: 'data',

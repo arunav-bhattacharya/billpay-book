@@ -37,7 +37,7 @@ export const SETTINGS = [
   'Cancellation window',
   'Cutoff',
   'Allocation fetch',
-  'Bank confirmation window',
+  'Bank confirmation wait',
   'Card provider and 3D Secure window',
   'Representment rules',
   'Raven notifications',

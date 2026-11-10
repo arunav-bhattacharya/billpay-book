@@ -22,7 +22,13 @@ import styles from "./styles.module.css";
  * alone, then pay today. The list shows the journeys in the order customers
  * meet them, which is not the order the Router checks them in, and the
  * footnote says so. Where the spec has no answer yet, the model says that
- * instead of picking a journey. No wallet is offered until a journey takes one.
+ * instead of picking a journey.
+ *
+ * Every call the channel makes keeps the site's channel-call look: a navy
+ * block or chip with a Bright Blue key square. The read Billpay makes behind
+ * ReadBillpayInstruments.v1 is a pale tag, since the channel never makes it.
+ * Call 2 shows its two mandatory filters: the source this page's answer maps
+ * to, and the journey context, ONE_TIME_DIRECT_DEBIT on this page.
  */
 
 const ALL_JOURNEYS = "/docs/design/journeys/all-journeys";
@@ -100,29 +106,29 @@ const OPTIONS_RETURNS = [
   "the range of dates a future payment can take",
 ];
 
-/* The read billpay-online makes behind ReadBillpayInstruments.v1, by source. */
+/* The read billpay-online makes behind ReadBillpayInstruments.v1, by source,
+   and the source value the channel passes. */
 const READS = {
   bank: {
+    source: "EnrolledInstruments",
     read: "ReadInstruments",
     what: "the instruments the customer has enrolled",
     pick: "Which instrument",
   },
   debit: {
+    source: "DebitCard",
     read: "ReadBanksForRealtimePayments.v1",
     what: "the banks the customer can pay from by debit card",
     pick: "Which bank",
   },
   transfer: {
+    source: "PayWithBankTransfer",
     read: "ReadBanksForRealtimePayments.v1",
     what: "the banks the customer can pay from in real time",
     pick: "Which bank",
   },
-  wallet: {
-    read: "ReadEligibleWallets.v1",
-    what: "the wallets the customer can pay with",
-    pick: "Which wallet",
-  },
 };
+const CONTEXT = "ONE_TIME_DIRECT_DEBIT";
 
 const OPEN = [
   [
@@ -134,11 +140,14 @@ const OPEN = [
     "its contract, and the billpay-online endpoint's path",
   ],
   [
-    "The bank and wallet reads",
-    "who owns them, probably the Instruments domain, and their contracts",
+    "The bank read",
+    "who owns ReadBanksForRealtimePayments.v1, probably the Instruments domain, and its contract",
+  ],
+  [
+    "Pay with Bank Transfer",
+    "the contracts of Amex Pay with Bank Transfer's confirm and M3's settled notice, and how long a payment waits for M3",
   ],
   ["Pay with MR Points", "its steps, and its calls to Loyalty"],
-  ["Wallet", "which instrument it is, and whether it needs a bank step"],
 ];
 
 /* What the Router does with one set of answers. Returns a result with a
@@ -210,7 +219,7 @@ function decide(a) {
       kind: "pick",
       id: "bank",
       met,
-      text: "The Router starts CreatePaymentIntentWorkflow. Amex's own checks run first, and a payment that fails them is DECLINED with no link. Otherwise it replies PENDING with the provider's link and waits for the confirm.",
+      text: "The Router starts CreatePaymentIntentWorkflow. Amex's own checks run first, and a payment that fails them is DECLINED with no link. Otherwise it replies PENDING with Amex Pay with Bank Transfer's link and waits, for up to the market's 24 to 48 hours. The first confirm decides, the channel's or Amex Pay with Bank Transfer's: ACCEPTED or DECLINED on the bank's answer, with no further check. Execute and Fulfil wait for M3's settled notice, which accepts the payment on its own if no confirm came.",
     };
   }
   if (later) {
@@ -256,19 +265,23 @@ function Badge({ n, quiet }) {
   );
 }
 
+/* A call the channel makes: the navy chip with the key square, numbered. */
 function CallTag({ n, name }) {
   return (
     <span className={styles.callTag}>
-      <Badge n={n} quiet />
+      <span className={styles.callKey} aria-hidden="true" />
+      <span className={styles.srOnly}>Call {n}, made by the channel: </span>
       <span className={styles.mono}>{name}</span>
+      <span className={styles.callTagN} aria-hidden="true">{n}</span>
     </span>
   );
 }
 
+/* A read Billpay makes for the channel: pale, never the channel's own. */
 function ReadTag({ name }) {
   return (
-    <span className={styles.callTag}>
-      <span className={styles.readVia}>via</span>
+    <span className={styles.readTag}>
+      <span className={styles.readVia}>Billpay calls</span>
       <span className={styles.mono}>{name}</span>
     </span>
   );
@@ -517,6 +530,10 @@ function TheCalls({ a }) {
   const uid = useId();
   const pointsOnly = a.points && a.pointsMode === "only";
   const source = a.owed && !pointsOnly ? READS[a.method] : null;
+  const bankStep =
+    a.owed && !pointsOnly && !a.points && a.method === "transfer" && a.date === "today" && !a.pending;
+  const card =
+    a.owed && !pointsOnly && !a.points && a.method === "debit" && a.date === "today" && !a.pending;
   const calls = [
     {
       n: 1,
@@ -529,8 +546,12 @@ function TheCalls({ a }) {
       n: 2,
       name: "ReadBillpayInstruments.v1",
       line: source
-        ? `billpay-online calls ${source.read} for ${source.what}, and keeps only what the market's rules allow for this payment.`
+        ? `Billpay calls ${source.read} for ${source.what}, and keeps only what the market's rules allow for this payment.`
         : "Where the customer pays from. Not called when MR Points pay alone.",
+      filters: source && [
+        ["source", source.source],
+        ["journeyContext", CONTEXT],
+      ],
       on: Boolean(source),
       status: "new",
     },
@@ -543,10 +564,18 @@ function TheCalls({ a }) {
       on: a.owed,
       status: "exists",
     },
+    {
+      n: 4,
+      name: "CreateConfirmPendingPayment.v1",
+      line: "Pay with Bank Transfer only: the customer is back from their bank, with the bank's answer. If Amex Pay with Bank Transfer confirmed first, this gets the same answer.",
+      on: bankStep,
+      status: "exists",
+    },
   ];
   const gates = [
     "once the customer picks where to pay from",
     "on Review and pay",
+    "once the customer is back from their bank",
   ];
   return (
     <section
@@ -574,11 +603,10 @@ function TheCalls({ a }) {
               <div
                 className={clsx(
                   styles.call,
-                  c.status === "new" && styles.callNew,
                   !c.on && styles.callOff,
                 )}
               >
-                <Badge n={c.n} />
+                <span className={styles.callSquare} aria-hidden="true">{c.n}</span>
                 <div className={styles.callBody}>
                   <p className={styles.callName}>
                     <span className={styles.mono}>{c.name}</span>
@@ -592,6 +620,16 @@ function TheCalls({ a }) {
                     </span>
                   </p>
                   <p className={styles.callLine}>{c.line}</p>
+                  {c.filters && (
+                    <p className={styles.filters}>
+                      {c.filters.map(([k, v]) => (
+                        <span key={k} className={styles.filter}>
+                          <span className={styles.filterKey}>{k}</span>
+                          <span className={styles.filterVal}>{v}</span>
+                        </span>
+                      ))}
+                    </p>
+                  )}
                 </div>
                 <span className={styles.srOnly}>
                   {c.on
@@ -602,11 +640,20 @@ function TheCalls({ a }) {
             </li>
           ))}
         </ol>
-        <p className={clsx(styles.callback, a.owed && a.method === "debit" && !(a.points && a.pointsMode === "only") && styles.callbackOn)}>
+        <p className={styles.kickerQuiet}>Never from the channel</p>
+        <p className={clsx(styles.callback, card && styles.callbackOn)}>
           <span className={styles.hollow} aria-hidden="true" />
           <span>
-            For a debit card, one more call comes in after the create: the card provider&apos;s 3D Secure callback,
-            straight to billpay-online and not from the channel.
+            For a debit card, the card provider&apos;s 3D Secure callback comes
+            in after the create, straight to billpay-online.
+          </span>
+        </p>
+        <p className={clsx(styles.callback, bankStep && styles.callbackOn)}>
+          <span className={styles.hollow} aria-hidden="true" />
+          <span>
+            For Pay with Bank Transfer, Amex Pay with Bank Transfer can send its
+            own confirm, and M3&apos;s settled notice comes after, both straight
+            to billpay-online.
           </span>
         </p>
       </div>
@@ -622,28 +669,23 @@ function TheCalls({ a }) {
           ))}
         </ul>
 
-        <p className={styles.kickerQuiet}>Where call 2 looks</p>
+        <p className={styles.kickerQuiet}>Where call 2 looks, by source</p>
         <ul className={styles.returns}>
-          {Object.entries(READS)
-            .filter(([id]) => id !== "debit")
-            .map(([id, r]) => (
-              <li key={id}>
-                <span className={styles.dotSquare} aria-hidden="true" />
-                <span>
-                  {id === "transfer"
-                    ? "Pay with Bank Transfer or debit card"
-                    : id === "wallet"
-                      ? "Wallet, not offered until a journey takes one"
-                      : METHODS.find((m) => m.id === id).label}
-                  <span className={styles.source}>{r.read}</span>
-                </span>
-              </li>
-            ))}
+          {Object.entries(READS).map(([id, r]) => (
+            <li key={id}>
+              <span className={styles.dotSquare} aria-hidden="true" />
+              <span>
+                <span className={styles.mono}>{r.source}</span>
+                <span className={styles.source}>Billpay calls {r.read}</span>
+              </span>
+            </li>
+          ))}
         </ul>
         <p className={styles.asideNote}>
-          The market&apos;s rules filter each list. An instrument enrolled
-          through Autopay that is still pending verification carries its
-          Autopay payments, but isn&apos;t offered for a payment made now.
+          This page passes the journey context ONE_TIME_DIRECT_DEBIT. Setting
+          up Autopay passes RECURRING_DIRECT_DEBIT, which takes enrolled
+          instruments only, and the market&apos;s enrolledInstrumentStatuses
+          says which instrument statuses each context offers.
         </p>
 
         <p className={styles.kickerQuiet}>Still to be defined</p>
@@ -780,13 +822,6 @@ function TheRouter({ a, set, result }) {
             <strong>Pay &amp; Plan</strong> is its own call,{" "}
             <code>CreatePaymentInstallment.v1</code>, and its own composite
             workflow. One-Data&apos;s pending check covers it too.
-          </span>
-        </li>
-        <li>
-          <span className={styles.hollow} aria-hidden="true" />
-          <span>
-            <strong>Wallet</strong> isn&apos;t offered: no journey takes one
-            yet, so the page shows none until one does.
           </span>
         </li>
       </ul>

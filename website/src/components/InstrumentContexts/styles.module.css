@@ -1,0 +1,304 @@
+/* InstrumentContexts. Two identical columns; only the fills change. An
+   offered instrument is a white tile with a Bright Blue square; one left out
+   drops to the field with a grey square. The journey context the channel
+   passes keeps the channel's navy chip. Every colour is a token. */
+
+.wrap {
+  composes: panel from '../../css/recipes.module.css';
+
+  --ic-field: var(--amex-rail);
+  --ic-tile: var(--amex-call-lit);
+  --ic-key: var(--amex-call-key);
+  --ic-off: var(--amex-line-strong);
+  --ic-mut: var(--amex-mut);
+  --ic-ink: var(--amex-txt);
+  --ic-chip: var(--amex-call-channel);
+  --ic-chip-ink: var(--amex-call-channel-ink);
+  --ic-shadow: var(--amex-call-shadow);
+  --ic-setting: var(--amex-call-other);
+  --ic-setting-ink: var(--amex-call-other-ink);
+
+  margin: 1.4rem 0 2rem;
+  padding: 1.1rem 1.2rem 1rem;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ic-mut);
+}
+
+.toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 8px;
+  background: var(--ic-field);
+}
+
+.seg {
+  border: 0;
+  background: transparent;
+  color: var(--ic-mut);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.seg[aria-pressed='true'] {
+  background: var(--ic-tile);
+  color: var(--ic-ink);
+  font-weight: 600;
+  box-shadow: var(--ic-shadow);
+}
+
+.seg:focus-visible {
+  outline: 2px solid var(--ic-key);
+  outline-offset: 2px;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.col {
+  background: var(--ic-field);
+  border-radius: 10px;
+  padding: 0.85rem 0.85rem 0.6rem;
+}
+
+.colHead {
+  margin: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.22rem 0.55rem 0.24rem 0.45rem;
+  border-radius: var(--amex-badge-radius);
+  background: var(--ic-chip);
+  color: var(--ic-chip-ink);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.78rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.key {
+  width: 0.6rem;
+  height: 0.6rem;
+  flex: none;
+  border-radius: 2px;
+  background: var(--ic-key);
+}
+
+.then {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.5rem;
+  align-items: baseline;
+  margin: 0.45rem 0 0.7rem;
+  font-size: 0.76rem;
+  color: var(--ic-mut);
+}
+
+.mono {
+  font-family: var(--ifm-font-family-monospace);
+}
+
+.who {
+  font-size: 0.72rem;
+}
+
+/* The call the channel makes next, in the channel-call look. */
+.callChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.4rem 0.12rem 0.35rem;
+  border-radius: var(--amex-badge-radius);
+  background: var(--ic-chip);
+  color: var(--ic-chip-ink);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.callKey {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 2px;
+  background: var(--ic-key);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.inst {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 7px;
+  background: var(--ic-tile);
+  box-shadow: var(--ic-shadow);
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.sq {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+  border-radius: 2px;
+  background: var(--ic-key);
+}
+
+.label {
+  font-size: 0.86rem;
+  color: var(--ic-ink);
+}
+
+.status {
+  margin-left: auto;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.68rem;
+  color: var(--ic-mut);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.instOff {
+  background: transparent;
+  box-shadow: none;
+}
+
+.instOff .sq {
+  background: var(--ic-off);
+}
+
+.instOff .label {
+  color: var(--ic-mut);
+}
+
+.setting {
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem 0.85rem;
+  border-radius: 10px;
+  background: var(--ic-setting);
+  color: var(--ic-setting-ink);
+}
+
+.settingHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.3rem 1rem;
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ic-mut);
+}
+
+.settingWhere {
+  letter-spacing: 0.08em;
+  text-transform: none;
+  font-weight: 400;
+}
+
+.code {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  box-shadow: none;
+}
+
+.codeKey {
+  color: var(--ic-key);
+  font-weight: 600;
+}
+
+.line {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ic-ink);
+}
+
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  margin: 0.85rem 0 0;
+}
+
+.legendItem {
+  composes: legendItem from '../../css/recipes.module.css';
+}
+
+.sqOn,
+.sqOff {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+}
+
+.sqOn {
+  background: var(--ic-key);
+}
+
+.sqOff {
+  background: var(--ic-off);
+}
+
+.chipSwatch {
+  width: 1.3rem;
+  height: 0.8rem;
+  border-radius: 3px;
+  background: var(--ic-chip);
+}
+
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
+}
+
+@media (max-width: 640px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inst {
+    transition: none;
+  }
+}

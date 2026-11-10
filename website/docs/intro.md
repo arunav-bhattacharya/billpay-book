@@ -20,7 +20,7 @@ A payment passes through a handful of layers on its way in, and each one has a s
 | **Stages** | One business step each, such as Verify or Execute. The only layer that changes with a market's behaviors | [Design › Stages](design/component-model/stages.md) |
 | **Activities** | The calls to one system, grouped as `{System}Activities`. Oracle is reached only through the stores, such as `PaymentStore` | [Design › Activities](design/component-model/activities.md) |
 | **Clients** | The adapter for one external system's contract | [Build › Clients](build/core-build/clients.md) |
-| **Event Handlers** | Events from other platforms, held in One-Data's inbox. A return waits there until the returns dispatcher pulls it. Settlement and Accounts Receivable (AR) posting wait until a payment, or a leg of a split payment, has both, and Billpay then marks it `PAID`. For a Pay with Bank Transfer or debit card payment, which has no clearing, Billpay creates the settlement event itself | [API Spec › One-Data](build/api-spec/one-data.md) |
+| **Event Handlers** | Events from other platforms, held in One-Data's inbox. A return waits there until the returns dispatcher pulls it. Settlement and Accounts Receivable (AR) posting wait until a payment, or a leg of a split payment, has both, and Billpay then marks it `PAID`. For a debit card payment, which has no clearing, Billpay creates the settlement event itself; for Pay with Bank Transfer, M3's settled notice is the settlement | [API Spec › One-Data](build/api-spec/one-data.md) |
 | **Schedules** | Start the dispatchers, which release dated work and pull work waiting in One-Data's inbox at the rate the governor sets, and the periodic jobs | [Build › Schedules](build/schedules.md) |
 
 ## How to read these docs
@@ -38,7 +38,7 @@ After that, the path depends on what you need.
 
 - States are written in `UPPER_SNAKE_CASE`, for example `PENDING`, `ACCEPTED`, `PROCESSED`.
 - Workflows are named `{Verb}{Object}Workflow`, such as `ExecuteScheduledPaymentWorkflow`.
-- Stages are named for the step they perform: a `PaymentVerifyStage` interface, and `DefaultPaymentVerifyStage` for the stage every market runs. The checks and methods a stage uses are named for their jobs, such as `MandateCheck`, and a market's own class starts with the market's code, such as `GBFundsCheck`.
+- Stages are named for the step they perform: a `PaymentVerifyStage` interface, and `DefaultPaymentVerifyStage` for the stage every market runs. The checks and methods a stage uses are named for their jobs, such as `MandateCheck`, and a market's own class would start with the market's code.
 - Activities are grouped per system as `{System}Activities`, such as `ClearingActivities`. Clients are `{System}Client`.
 - A workflow ID is the payment ID plus a suffix, such as `{paymentId}-execute`, so any payment can be found from its ID alone.
 - The state and sequence diagrams are [Mermaid](https://mermaid.js.org/), so you can copy one straight into Confluence or another Mermaid host. The system maps, journey maps and the legacy estate map are React components, and those only render here.

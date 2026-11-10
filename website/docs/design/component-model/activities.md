@@ -18,7 +18,7 @@ export const ACTIVITIES = [
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
     queue: "Verify's calls on the Online cluster: a local activity. Otherwise the workflow's queue: Payment Instruments has no rate limit",
-    calledBy: "Verify, Reverify; at confirm, Verify also asks it whether the instrument's verification token is valid; Execute, for the instrument's clear-text data, before the open-to-buy call",
+    calledBy: "Verify, Reverify; Execute, for the instrument's clear-text data, before the open-to-buy call",
   },
   {
     name: 'OptionsActivities',
@@ -82,21 +82,21 @@ export const ACTIVITIES = [
   },
   {
     name: 'BankConfirmationActivities',
-    system: "The market's bank-confirmation provider, such as Plaid in the US or Pay with Bank Transfer in the UK",
+    system: "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
     queue: "A local activity, inside the create's first workflow task: only the Online cluster calls it",
-    calledBy: "RequestConfirmation, for the redirect link, with one try. Verify doesn't call it for the bank details, which the provider verifies itself. In GB, Verify asks it whether the customer's bank account holds enough money for the payment",
+    calledBy: "RequestConfirmation, for the redirect link, with one try. Nothing else calls it: the bank's answer comes back in the confirm",
   },
   {
     name: 'CardActivities',
     system: "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK; other markets' providers will be added over time",
-    queue: 'A local activity inside the decision, as for the bank-confirmation provider: only the Online cluster calls it. The authorization carries the payment ID as its idempotency key, so a retry never debits twice (Proposed)',
+    queue: 'A local activity inside the decision, as for Amex Pay with Bank Transfer: only the Online cluster calls it. The authorization carries the payment ID as its idempotency key, so a retry never debits twice (Proposed)',
     calledBy: "RequestConfirmation, to start 3D Secure with Billpay's callback URL and get the challenge link; Verify's card authorization check, last, which debits the customer's account or is declined",
   },
   {
     name: 'InboxActivities',
     system: "One-Data's inbox functions, event handlers and delete API",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; every create workflow once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a Pay with Bank Transfer or debit card payment (Proposed)',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; every create workflow once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a debit card payment (Proposed); a Pay with Bank Transfer payment\'s settlement is M3\'s notice',
   },
   {
     name: 'LifecycleEventActivities',
@@ -124,7 +124,7 @@ An activity takes what it needs as lightly as it can: usually the payment ID, or
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks the provider for the redirect link, and in GB, for the Funds check. The provider verifies the customer's bank details itself, and for Pay with Bank Transfer the money moves at the bank during the customer's bank connection.
+`BankConfirmationActivities` asks Amex Pay with Bank Transfer for the redirect link, and for nothing else. The bank's answer comes back in the confirm, from the channel or from Amex Pay with Bank Transfer itself, and M3's notice says when the money has settled; neither is an activity, since both call billpay-online.
 
 `CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-online's callback, and the waiting workflow takes it as an update.
 
@@ -158,7 +158,7 @@ Every database activity runs local first, which is what lets a payment ride out 
 | Call | Runs as | Why |
 | --- | --- | --- |
 | Oracle reads and writes, through the stores | A local activity on the first 2 attempts; a regular activity for every retry after | A healthy call needs no task round trip; a retry runs on a worker like any activity, with the full retry policy |
-| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and the provider in RequestConfirmation | A local activity. A Verify call that fails its 2 attempts runs again as a regular activity on `online-wf`, for up to 24 hours (agreed 2026-11-08). The provider in RequestConfirmation gets one try, since its link must come back inside the caller's wait | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
+| The decision's calls on the Online cluster: Payment Instruments, Payment Options and Plans in Verify, the card provider's authorization in Verify for a debit card, and Amex Pay with Bank Transfer or the card provider in RequestConfirmation | A local activity. A Verify call that fails its 2 attempts runs again as a regular activity on `online-wf`, for up to 24 hours (agreed 2026-11-08). RequestConfirmation gets one try, since its link must come back inside the caller's wait | The caller's answer comes out of the workflow's first task, with no task round trip. None of these systems has a rate limit, which a local activity would skip |
 | Calls a downstream may throttle, Execute's and Fulfil's on both clusters | A regular activity on that system's `ds-*` queue | The queue's server-side rate limit is the throttle, and priority and fairness apply there. The governor sets the limits on both clusters (agreed 2026-11-07) |
 | Slow calls nobody throttles | A regular activity on the workflow's queue, with eager dispatch on | Eager dispatch skips matching and saves writes |
 

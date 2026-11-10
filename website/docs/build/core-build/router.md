@@ -33,7 +33,7 @@ Every start but the allocations callback's produces a resolved profile, which th
 
 ```kotlin
 data class ResolvedProfile(
-    val market: Market,                           // so a market's own classes, such as GB's, can apply
+    val market: Market,                           // so a market's own classes, when it has some, can apply
     val journey: Journey,
     val accountType: AccountType,                 // CONSUMER, CORPORATE or BUSINESS_TRAVEL
     val requiresArPosting: Boolean,               // the other four behaviors arrive resolved,
@@ -184,7 +184,7 @@ The version is the active one, with one exception. A new version is tested with 
 
 ### 4. Pin the resolved profile
 
-The workflow gets the resolved profile as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages. The profile carries the market as well as the behaviors, because a market's own class, such as GB's funds check for Pay with Bank Transfer, applies by market:
+The workflow gets the resolved profile as an input and looks up its stages with it at runtime. Nothing else ever hands a workflow its stages. The profile carries the market as well as the behaviors, because a market's own class, when a market has one, applies by market:
 
 ```kotlin
 val stages = stageResolver.resolve(profile)              // inside the workflow, on its own thread
@@ -194,7 +194,7 @@ Each stage, and each check or method a stage uses, says where it applies: a mark
 
 The Router builds the resolved profile but never picks a class. During a rolling deploy the Router and the workers can run different builds, so the classes are picked by the build that runs them. [Building Stages](./stages.md#how-a-stage-gets-picked) shows how a class says where it applies, and [Building the Stage Resolver](./stage-resolver.md) works through one payment from its resolved profile to the checks it runs.
 
-The profile also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the profile carries the market's confirmation window too, which the workflow's timer uses.
+The profile also carries the market's rule settings from the same version, such as its largest payment and the instrument types it takes (agreed 2026-10-18). The [verification rules](./stages.md#writing-verification-rules) in Verify, Reverify and Represent read them from there, so a market changes a threshold with a release, and a running payment keeps the values it started with. For a payment that waits for its customer, the profile carries the market's window too, which the workflow's timer uses: the bank's wait of 24 to 48 hours, or a debit card's 2 minutes.
 
 
 #### Rule settings, with an example

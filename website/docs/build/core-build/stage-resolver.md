@@ -49,7 +49,7 @@ Every class the registries pick is a strategy. This class diagram shows it for V
 
 <ClassMap {...strategyFamily} />
 
-`InstrumentCheck`, `OptionsCheck` and `TokenCheck` sit beside `MandateCheck` and look the same. `GBFundsCheck` is the one that lives in GB's module.
+`InstrumentCheck` and `OptionsCheck` sit beside `MandateCheck` and `CardAuthorizationCheck` and look the same. No market has a check of its own today. One would live in its market's module, with the market's code at the front of its name.
 
 These are the classes that do the picking, numbered in the order they act:
 
@@ -68,7 +68,7 @@ A strategy whose key no other strategy shares simply runs wherever it applies. T
 
 ## The complete picture
 
-Here is everything at once for the payment the worked example below follows: a GB customer paying with Pay with Bank Transfer. The workflow finds its stage, the stage finds its checks, the checks make their calls, and the rules decide. Because this payment waits for its customer, Verify runs in two parts: Amex's own checks at the create, and the bank-side checks after the confirm.
+Here is everything at once for the payment the worked example below follows: a UK customer paying by debit card. The workflow finds its stage, the stage finds its checks, the checks make their calls, and the rules decide. Because this payment waits for its customer, Verify runs in two parts: Amex's own checks at the create, and the card authorization after the card provider's 3D Secure callback.
 
 ```mermaid
 ---
@@ -88,14 +88,14 @@ sequenceDiagram
 
   Note over X,R: When the app starts, Quarkus hands each registry every class of its kind, and each registry works out every combination once. A tie stops the start.
 
-  W->>X: resolve(profile): GB, consumer, bank confirmation Y
+  W->>X: resolve(profile): GB, consumer, card authentication Y
   X->>X: makes the stubs and picks the Verify stage
   X-->>W: the stages, bound to this payment
   W->>S: verify.ownChecks(paymentId), at the create
   S->>C: which checks apply?
-  C-->>S: Instrument, Options, Token, GBFunds
-  Note over C: GBFundsCheck is picked because it exists and says GB. Nothing else names GB.
-  Note over S: Token and GBFunds need the bank step, so only Amex's own checks run now.
+  C-->>S: Instrument, Options, CardAuthorization
+  Note over C: CardAuthorizationCheck is picked because card authentication is Y. Nothing names a market.
+  Note over S: CardAuthorization needs the 3D Secure result, so only Amex's own checks run now.
   par Amex's own checks at once
     S->>A: Payment Instruments: the instrument
   and
@@ -104,17 +104,13 @@ sequenceDiagram
   A-->>S: the first facts
   S->>R: which rules apply, and do they pass?
   R-->>S: they pass, so nothing is committed yet
-  Note over W: RequestConfirmation gets the redirect link, and the workflow waits for the customer.
-  W->>S: verify.bankChecks(paymentId, the first facts), after the confirm
-  par the bank-side checks at once
-    S->>A: Payment Instruments: the token
-  and
-    S->>A: the provider: the funds
-  end
+  Note over W: RequestConfirmation starts 3D Secure, and the workflow waits for the card provider's callback.
+  W->>S: verify.cardAuthorization(paymentId, the first facts), after the callback
+  S->>A: the card provider: authorize, with the 3D Secure result
   A-->>S: all the facts
   S->>R: which rules apply, and do they pass?
   Note over R: Each rule: runsWhen first, then passes. A rule that doesn't fit the facts is skipped, not failed.
-  R-->>S: GB's funds rule failed, so DECLINED
+  R-->>S: the card's bank declined the authorization, so DECLINED
   rect rgba(102,169,226,0.40)
     S->>P: one guarded commit: DECLINED
   end
@@ -123,9 +119,9 @@ sequenceDiagram
 
 What the design does for this payment:
 
-- No code maps the payment to classes. Picking the stage (step 2), the checks (step 5) and the rules (steps 10 and 16) are lookups in answers the registries worked out when the app started.
-- GB's difference is one class in GB's module. The stage, the shared checks and the shared rules are the same code every market runs.
-- Each part's calls run in parallel and the commit happens once, so the customer's answer isn't held up by a list of checks run one after another. A payment that failed Amex's own checks would get its one commit, `DECLINED`, right after step 11, and never a redirect link.
+- No code maps the payment to classes. Picking the stage (step 2), the checks (step 5) and the rules (steps 10 and 15) are lookups in answers the registries worked out when the app started.
+- The debit card's difference is one class, `CardAuthorizationCheck`, picked because card authentication is Y. The stage, the other checks and the rules are the same code every payment runs. A market that ever needed a check of its own would work the same way: one class in its module, and nothing else changes.
+- Each part's calls run in parallel and the commit happens once, so the customer's answer isn't held up by a list of checks run one after another. A payment that failed Amex's own checks would get its one commit, `DECLINED`, right after step 11, and 3D Secure would never start.
 - The order of the checks is fixed, so a replay of this workflow makes the same calls in the same order.
 
 ## A worked example: Verify
@@ -134,16 +130,16 @@ Verify decides whether a payment can go ahead. Its flow never changes: it makes 
 
 ### The checks
 
-Six checks exist today. Each is a class, and each says where it applies:
+Four checks exist today. Each is a class, and each says where it applies:
 
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
 | `InstrumentCheck` | `INSTRUMENT` | Everywhere | Payment Instruments, about the payment's instrument |
 | `OptionsCheck` | `OPTIONS` | Everywhere, and it runs where the create carries an option ID (agreed 2026-11-06). Proposed: an option ID isn't part of the profile, so the check makes no call for a payment without one | Payment Options. In Verify, `ReadPaymentOptionByIdentifier.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
-| `TokenCheck` | `TOKEN` | Bank confirmation Y | Payment Instruments, whether the verification token it holds for the instrument is valid |
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
-| `GBFundsCheck` | `FUNDS` | GB, bank confirmation Y | The bank-confirmation provider, whether the customer's bank account holds enough money for the payment |
 | `CardAuthorizationCheck` | `CARD_AUTHORIZATION` | Card authentication Y | The card provider, to authorize a debit card payment with its 3D Secure result. Approved, it debits the customer's account, so it runs after the other checks' rules pass (Proposed) |
+
+Bank confirmation adds no check. Once Amex Pay with Bank Transfer has confirmed a payment, a rule reads the bank's answer and nothing is called: the token check and GB's funds check are gone (2026-11-10).
 
 In code, a check is this small:
 
@@ -170,17 +166,18 @@ class MandateCheck : Check {
             ctx.stubs.plans::mandateDetails, paymentId)
 }
 
-// in market/gb/
 @Singleton
-class GBFundsCheck : Check {
-    override val key = CheckKey.FUNDS
+class CardAuthorizationCheck : Check {
+    override val key = CheckKey.CARD_AUTHORIZATION
     override val steps = setOf(VERIFY)
     override val appliesTo =
-        AppliesTo(market = GB, on = setOf(BANK_CONFIRMATION))
+        AppliesTo(on = setOf(CARD_AUTHENTICATION))
+    // an approved authorization debits the account, so it runs last
+    override val movesMoney = true
 
     override fun fetch(ctx: StageContext, paymentId: String) =
         Async.function(
-            ctx.stubs.bankConfirmation::funds, paymentId)
+            ctx.stubs.card::authorize, paymentId)
 }
 ```
 
@@ -189,7 +186,7 @@ class GBFundsCheck : Check {
 - `@Singleton` makes the class a bean: Quarkus creates one instance and hands it to anything that asks for its type. That is how the check reaches the registry, with no list to edit.
 - `steps` lets one class serve two stages. `MandateCheck` runs at Verify, and again at Reverify on the due date.
 - The check takes the stubs it calls through from `ctx` and keeps nothing between payments.
-- GB's check lives in GB's module. GB needs no Verify class of its own, because this class existing is enough.
+- A market's own check would add its market to `appliesTo` and live in that market's module. The market would need no Verify class of its own, because the check existing would be enough. No market has one today.
 
 ### The stage
 
@@ -227,13 +224,13 @@ class DefaultPaymentVerifyStage(
 
 *(A sketch.)*
 
-A payment that waits for its customer runs Verify in two parts. Amex's own checks, `InstrumentCheck`, `OptionsCheck` and `MandateCheck`, run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06). The checks that need the customer's bank step, `TokenCheck`, `GBFundsCheck` and `CardAuthorizationCheck`, run after the confirm or the callback. Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
+A payment that waits for its customer runs Verify in two parts. Amex's own checks, `InstrumentCheck`, `OptionsCheck` and `MandateCheck`, run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. After a bank's confirm Verify calls nothing: a rule reads the bank's answer (2026-11-10). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
 
 The stage never asks which market it is in or which behaviors are on. It asks the registries for its checks and its rules and runs the same flow every time, so there is no `if` on a behavior anywhere in Verify.
 
 ### One payment, start to finish
 
-A GB customer pays their bill with Pay with Bank Transfer. The Router pins the resolved profile: market GB, a consumer account, bank confirmation Y and mandate authorization N.
+A UK customer pays their bill by debit card. The Router pins the resolved profile: market GB, a consumer account, card authentication Y, bank confirmation N and mandate authorization N.
 
 1. The Verify registry holds one stage, `DefaultPaymentVerifyStage`, which applies everywhere, so it runs.
 2. The check registry reads each check's `appliesTo` against the resolved profile:
@@ -242,32 +239,28 @@ A GB customer pays their bill with Pay with Bank Transfer. The Router pins the r
 | --- | --- | --- |
 | `InstrumentCheck` | Everywhere | Runs |
 | `OptionsCheck` | Everywhere, with an option ID | Runs |
-| `TokenCheck` | Bank confirmation Y | Runs |
 | `MandateCheck` | Mandate authorization Y | Not picked |
-| `GBFundsCheck` | GB, bank confirmation Y | Runs |
+| `CardAuthorizationCheck` | Card authentication Y | Runs, after the callback |
 
-3. The calls go out in two parts, because the payment waits for its customer. At the create, before the redirect, Amex's own checks call Payment Instruments and Payment Options' `ReadPaymentOptionByIdentifier.v1` at the same time. After the customer confirms, the bank-side checks call Payment Instruments, for the token, and the bank-confirmation provider, for the funds, at the same time.
-4. The answers become one set of facts. The rule registry picks the payment's rules the same way it picked the checks: GB's funds rule names GB and bank confirmation, as its check does, and it runs because a funds answer is among the facts. If the account holds less than the payment, the funds rule fails and the payment is `DECLINED`.
+3. The calls go out in two parts, because the payment waits for its customer. At the create, before the redirect, Amex's own checks call Payment Instruments and Payment Options' `ReadPaymentOptionByIdentifier.v1` at the same time. After the card provider's callback, the card authorization asks the card provider to authorize the payment with the 3D Secure result.
+4. The answers become one set of facts. The rule registry picks the payment's rules the same way it picked the checks: the authorization rule names card authentication, as its check does, and it runs because an authorization answer is among the facts. If the card's bank declines the authorization, the rule fails and the payment is `DECLINED`.
 5. One guarded commit writes the decision and the timeline row, with the ID of the rule that failed.
 
-A consumer whose profile requires mandate authorization goes through the same stage and gets the Instrument, Options and Mandate checks. Nothing in the code names a market, except the one class GB owns.
+A consumer whose profile requires mandate authorization goes through the same stage and gets the Instrument, Options and Mandate checks. Nothing in the code names a market.
 
 ### Every combination
 
 A test writes what every combination gets, and the result is checked in. This is Verify's part. Every row runs `DefaultPaymentVerifyStage`, so the stage's column is left out here:
 
 ```text
-VERIFY     mandate=N bank=N  Instrument, Options
-VERIFY     mandate=N bank=Y  Instrument, Options, Token
-VERIFY     mandate=Y bank=N  Instrument, Options, Mandate
-VERIFY     mandate=Y bank=Y  Instrument, Options, Token, Mandate
-VERIFY GB  mandate=N bank=N  Instrument, Options
-VERIFY GB  mandate=N bank=Y  Instrument, Options, Token, Funds
-VERIFY GB  mandate=Y bank=N  Instrument, Options, Mandate
-VERIFY GB  mandate=Y bank=Y  Instrument, Options, Token, Mandate, Funds
+VERIFY  mandate=N bank=N card=N  Instrument, Options
+VERIFY  mandate=N bank=Y card=N  Instrument, Options
+VERIFY  mandate=N bank=N card=Y  Instrument, Options, CardAuthorization
+VERIFY  mandate=Y bank=N card=N  Instrument, Options, Mandate
+VERIFY  mandate=Y bank=Y card=N  Instrument, Options, Mandate
 ```
 
-One stage serves all eight rows. The last row, a GB payment that needs both a mandate and bank confirmation, gets every check that applies to it, with no class written for that combination.
+One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds nothing to Verify's checks: after the confirm, a rule reads the bank's answer. A payment that needs both a mandate and a debit card would get every check that applies to it, with no class written for that combination.
 
 :::info[Placeholder: Represent's checks]
 Represent's rows in the report list no checks yet. Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules are classes like these, listing Represent among their steps, and the report shows them on its rows.
@@ -299,7 +292,7 @@ class BatchClearing : ClearingMethod {
 
 Realtime clearing is either Y or N for any payment, so exactly one of the two applies. Execute's stage asks the registry for its clearing method and never needs to know which one it got.
 
-Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank during the customer's bank connection, or at the card authorization. MR/M3 will never send a settlement for them either, so each gets a clearing method that makes no clearing call and creates the settlement event instead. It hands the event to One-Data's money movement handler, `CreateMoneyMovementEventHandler.v1`, through `InboxActivities`, dated when the money moved, and One-Data pairs it with the AR posting like any other. Each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names and mechanism Proposed):
+Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank, or at the card authorization. Each gets a clearing method that makes no clearing call. MR/M3 never sends a settlement for a debit card, so its method creates the settlement event instead. It hands the event to One-Data's money movement handler, `CreateMoneyMovementEventHandler.v1`, through `InboxActivities`, dated when the money moved, and One-Data pairs it with the AR posting like any other. For Pay with Bank Transfer, M3 reports the settlement itself, and its notice is the settlement, so that method creates no event (2026-11-10). Each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names and mechanism Proposed):
 
 ```kotlin
 @Singleton
@@ -313,7 +306,7 @@ class CardSettlement : ClearingMethod {
 }
 ```
 
-`BankTransferSettlement` is the same, with `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`. As written it would also catch a US payment confirmed through Plaid; if that money still clears, the class becomes GB's own (open). RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
+`BankTransferSettlement` names `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`, and creates no event. A US payment confirmed through Plaid is Pay with Bank Transfer too, so it names no market. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
 
 ## How the registry decides
 
@@ -402,7 +395,7 @@ The stubs are the reason for the context. Temporal only lets a workflow make act
 | A market's own rule | A rule in a `RuleSet` in `market/{m}/`, with `market = M` | Only that market runs it. With a shared rule's ID, it replaces that rule there |
 | A market's Verify flow really differs | `{M}PaymentVerifyStage`, with `market = M` | It beats `DefaultPaymentVerifyStage` in that market. Its checks still come from the registry |
 | A step's whole flow differs by a behavior | `Payment{Step}StageWith{Behavior}`, with the behavior in `on` | It beats the default stage wherever that behavior is Y. Execute and Reverify have one each for the corporate account type (Proposed, 2026-11-08) |
-| Two classes claim the same job equally, by mistake | Nothing | The app refuses to start: `Verify check tie for FUNDS at GB [BANK_CONFIRMATION]: [GBFundsCheck, GBBalanceCheck]` |
+| Two classes claim the same job equally, by mistake | Nothing | The app refuses to start: `Verify check tie for MANDATE at DE [MANDATE_AUTHORIZATION]: [DEMandateCheck, DEMandateRulesCheck]` |
 
 None of these changes touches shared code, the resolver or a list.
 
