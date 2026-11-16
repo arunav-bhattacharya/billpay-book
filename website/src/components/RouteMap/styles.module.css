@@ -1,8 +1,10 @@
 /* RouteMap: the fork tree. Blue Box rules: tinted trays on the panel, filled
    workflow boxes with a cluster square, grey connectors, no outlines.
 
-   Colour means cluster only. The two cluster tones come from the worker
-   tokens, so they match WorkerChip everywhere; everything else is grey.
+   Colour on a box means cluster. The two cluster tones come from the worker
+   tokens, so they match WorkerChip everywhere. A connector is grey, or the
+   trigger pink when something outside starts the workflow: every line rule
+   reads --rm-line, so .trigger and .plainLine only reset that one token.
 
    Geometry. Every vertical line is 1px wide and runs down the centre of a
    workflow's square: the square is 9px at an 8px inset, so its centre sits
@@ -17,7 +19,9 @@
   --rm-tray: var(--amex-rail);
   --rm-ink: var(--amex-txt);
   --rm-mut: var(--amex-mut);
-  --rm-line: color-mix(in srgb, var(--amex-platinum) 80%, transparent);
+  --rm-line-base: color-mix(in srgb, var(--amex-platinum) 80%, transparent);
+  --rm-line: var(--rm-line-base);
+  --rm-trigger: var(--amex-trigger);
   --rm-on: var(--amex-worker-online);
   --rm-off: var(--amex-worker-offline);
   --rm-on-fill: color-mix(in srgb, var(--rm-on) 9%, var(--rm-tray));
@@ -45,13 +49,27 @@
 :global([data-theme='dark']) .wrap {
   --rm-tray: var(--amex-card-hover);
   --rm-mut: var(--amex-platinum);
-  --rm-line: color-mix(in srgb, var(--amex-platinum) 52%, transparent);
+  --rm-line-base: color-mix(in srgb, var(--amex-platinum) 52%, transparent);
   --rm-on-fill: color-mix(in srgb, var(--rm-on) 17%, var(--rm-tray));
   --rm-off-fill: color-mix(in srgb, var(--rm-off) 13%, var(--rm-tray));
 }
 
 .srOnly {
   composes: srOnly from '../../css/recipes.module.css';
+}
+
+/* A line something outside starts: pink, with its words in pink. Every other
+   line resets to grey, so nothing inherits the pink by accident. */
+.trigger {
+  --rm-line: var(--rm-trigger);
+}
+.plainLine {
+  --rm-line: var(--rm-line-base);
+}
+.edge.trigger > .mode,
+.trigger > .arm .mode,
+.keyItem.trigger {
+  color: var(--rm-trigger);
 }
 
 /* ---- the key ---------------------------------------------------------- */

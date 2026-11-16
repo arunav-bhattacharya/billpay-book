@@ -1,5 +1,6 @@
 import React from "react";
 import clsx from "clsx";
+import TriggerTag from "../TriggerTag";
 import styles from "./styles.module.css";
 
 /**
@@ -11,6 +12,10 @@ import styles from "./styles.module.css";
  * calls at a glance. `who="billpay"` is a call Billpay makes, and
  * `who="other"` one that reaches Billpay from another system: both are a pale
  * tint, because the channel never makes them.
+ *
+ * `trigger` marks a call that starts or resumes a waiting payment, with the
+ * mechanism as its value (`update`, `signal`, ...): a pink TriggerTag follows
+ * the chip, the same mark the journeys and sequence diagrams use.
  */
 const SAYS = {
   channel: "A call the channel makes: ",
@@ -18,12 +23,21 @@ const SAYS = {
   other: "A call from another system: ",
 };
 
-export default function CallChip({ name, who = "channel" }) {
-  return (
+export default function CallChip({ name, who = "channel", trigger }) {
+  const chip = (
     <span className={clsx(styles.chip, who === "channel" ? styles.channel : styles.other)}>
       <span className={styles.key} aria-hidden="true" />
       <span className={styles.srOnly}>{SAYS[who]}</span>
       <span className={styles.name}>{name}</span>
+    </span>
+  );
+  if (!trigger) {
+    return chip;
+  }
+  return (
+    <span className={styles.pair}>
+      {chip}
+      <TriggerTag kind={trigger} />
     </span>
   );
 }

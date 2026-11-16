@@ -50,3 +50,12 @@
 .srOnly {
   composes: srOnly from '../../css/recipes.module.css';
 }
+
+/* A chip with its trigger tag: kept together on one line where it fits. */
+.pair {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35em;
+  vertical-align: 0.04em;
+}

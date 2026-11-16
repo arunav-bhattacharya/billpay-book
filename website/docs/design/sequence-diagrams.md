@@ -16,6 +16,7 @@ import Lead from '@site/src/components/Lead';
 - The group on the left is whoever starts the flow: a One-Data contract such as `CreatePayment.v3`, or One-Data's inbox when Billpay pulls the work. The light-blue group is the Billpay Platform.
 - Every payment workflow starts through the Router, and its note names the hops: admit, pin the resolved profile, then choose the run site on a cluster. The PAID drain and the missing-events check start from Schedules instead.
 - A Bright Blue band is the Online cluster, where a caller is waiting. A Deep Blue band is the Offline cluster, where dispatchers pace the work. A grey, dashed band is time when nothing runs, because the work is waiting in Oracle, in One-Data's inbox, or on a workflow's timer.
+- A pink arrow is where something outside starts or resumes the payment: an update or a signal to its running workflow, a dispatcher or a callback starting the next workflow, or the events One-Data pairs before `PAID`. [All Journeys](./journeys/all-journeys.md) marks the same steps with pink flags.
 - The participants are the workflow and its stages, such as Capture, Verify and Execute. The systems a stage calls, such as clearing and Accounts Receivable, appear in its notes rather than as participants.
 - A pale-blue chip, such as `state → ACCEPTED`, is a commit through `PaymentStore`: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
 - RTF and Raven are drawn because their timing matters. Each change is announced to RTF, and to Raven where the customer is told, after the commit that makes it. Fulfil is the exception: it tells both before it commits `PROCESSED`.
@@ -109,6 +110,8 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: dispatcher start
   autonumber
 
   box rgba(0,23,90,0.07) Caller
@@ -184,6 +187,11 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: start RequestAllocationsWorkflow
+  %% trigger: dispatcher start
+  %% trigger: start each leg through the Router
+  %% trigger: count the parent's
   autonumber
 
   box rgba(0,23,90,0.07) Caller
@@ -293,6 +301,10 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: start RequestAllocationsWorkflow
+  %% trigger: async start ReceiveAllocationsWorkflow
+  %% trigger: dispatcher start
   autonumber
 
   box rgba(0,111,207,0.05) Billpay Platform
@@ -486,6 +498,8 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: dispatcher start
   autonumber
 
   participant MM as MR/M3
@@ -553,6 +567,8 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: dispatcher start
   autonumber
 
   box rgba(0,111,207,0.05) Billpay Platform
@@ -606,6 +622,8 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: dispatcher start
   autonumber
 
   participant TP as Third party
@@ -671,6 +689,9 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: settlement,
+  %% trigger: AR posting,
   autonumber
 
   participant MM as MR/M3
@@ -813,6 +834,8 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: async start
   autonumber
 
   box rgba(0,23,90,0.07) Caller
@@ -873,6 +896,9 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: update confirm
+  %% trigger: signal settled
   autonumber
 
   box rgba(0,23,90,0.07) Caller
@@ -1071,6 +1097,8 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  %% Pink arrows: something outside starts or resumes the payment.
+  %% trigger: update authenticated
   autonumber
 
   box rgba(0,23,90,0.07) Caller

@@ -192,12 +192,13 @@ Pass the array, get the component.
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
-| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller) and `trigger` (`{kind, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`) | One payment journey as a banded process flow. A triggered step's incoming connector is drawn as a dashed wait, and a key appears under the rail. |
+| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller) and `trigger` (`{kind, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`) | One payment journey as a banded process flow. A triggered step gets a pink flag naming its `kind`, its incoming connector is drawn as a pink dashed wait, and a key appears under the rail. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
-| `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row` or `child`) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
+| `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row`, `child`, or `update` or `signal` to a running workflow; every one but `uws` and `child` draws its line in the trigger pink) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
 | `WorkflowMeta` | `worker`, `behaviors` | The metadata strip above a workflow section. |
 | `WorkerChip` | `worker`, `children` | The Online or Offline tag, inline. |
+| `TriggerTag` | `kind` (`update`, `signal`, `callback`, `dispatcher` or `events`), `label?` | The pink trigger mark, inline: something outside starts or resumes the payment here. `CallChip` takes the same value as `trigger`. |
 | `Lead` | `children` | The thesis paragraph at the top of a page. With the H1 it forms the page banner. |
 | `ClusterMap` | none | The two Temporal clusters, Oracle as the only hand-off between them, and the shared downstreams. |
 | `ClassMap` | `classes: [{id, kind, name, x, y, w, note?, members?, market?}]`, `links: [{type, points, head?, label?, at?, align?, step?}]`, `texts?`, `width`, `height`, `label`, `caption?`, `legend?` | A UML class diagram in the house style. `kind` is `interface`, `class` or `data`; `type` is `extends`, `implements`, `holds`, `uses` or `makes`, and keeps its UML end. Points are hand-placed against the card heights the component documents, and the legend lists the line types drawn. The Build pages' diagrams live in `ClassMap/diagrams.js`. |
@@ -268,6 +269,14 @@ the same file. Use tokens and both themes work for free.
 | `--amex-worker-online`, `--amex-worker-offline` | The two Temporal clusters: anything Online is Bright Blue, anything Offline the deeper navy. |
 | `--amex-sh-sm`, `--amex-sh`, `--amex-glow` | Shadows. |
 | `--amex-font-sans`, `--amex-font-mono` | Type. |
+
+One colour sits outside the DLS on purpose. `--amex-trigger`, a pink, with
+`--amex-trigger-ink` for type on it, marks anything that starts or resumes a payment
+from outside its running work: a Temporal update or signal, a callback, a dispatcher,
+or the events One-Data pairs. Temporal's own UI marks signals in pink, and a blue mark
+would sink among the blue arrows. Use it only for that, and through one of the three
+places that already draw it: JourneyMap's trigger flags, the `TriggerTag` component
+(also `CallChip`'s `trigger` prop), RouteMap's lines, and a sequence diagram's `%% trigger:` lines.
 
 The lifecycle colours, `--amex-state-intermediate`, `--amex-state-success`,
 `--amex-state-failure` and `--amex-state-choice`, live in
@@ -774,6 +783,11 @@ teach patterns this repo does not use.
   the integration, which is already configured here. The site's own theming lives in
   [`src/css/mermaid.css`](website/src/css/mermaid.css) and the expand control in
   [`src/theme/Mermaid/`](website/src/theme/Mermaid/index.js).
+- A sequence diagram marks its trigger arrows in its own source, with Mermaid comments
+  that Mermaid ignores. `%% trigger: signal settled` turns pink every message whose
+  label starts with `signal settled`: the label, the line and its arrowhead. Mark the
+  arrow that wakes the payment's workflow (an update or signal to it, a dispatcher's or
+  callback's start), not the diagram's opening request.
 
 **If you want to explore further**
 

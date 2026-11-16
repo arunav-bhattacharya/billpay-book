@@ -81,7 +81,7 @@ Update-With-Start is what keeps the online journeys fast. It starts the workflow
 
 ## Trigger to workflow
 
-One tray per trigger. The square on each workflow is the cluster it runs on, and the line into it says how the Router starts it. Where a payment branches, by account type or by bank confirmation, the tree forks.
+One tray per trigger. The square on each workflow is the cluster it runs on, and the line into it says how the Router starts it. A pink line is something outside starting or resuming the payment: an update or a signal, a callback's async start, or a dispatcher. Where a payment branches, by account type or by bank confirmation, the tree forks.
 
 <RouteMap
   triggers={[
@@ -118,7 +118,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
               caption: ['Capture, Verify\'s own checks, RequestConfirmation for a bank or a card, then the wait', 'After the answer: Verify on the bank\'s answer, or the card authorization; then Execute and Fulfil, for a bank once M3 says the money settled'],
             },
           ],
-          note: "The confirm and the no arrive as updates. No answer by the window's end: cancelled.",
+          note: "The confirm, the no and the 3D Secure callback arrive as updates, and M3's settled notice as a signal. No answer by the end of the wait: a bank payment is declined, a debit card cancelled.",
         },
         {
           desc: 'Today, several instructions',
@@ -215,6 +215,10 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
     {
       term: '3D Secure callback',
       routes: [{desc: "PENDING, the debit card authenticated; from the card provider, not One-Data", flow: [{via: 'update', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
+    },
+    {
+      term: "M3's settled notice",
+      routes: [{desc: 'A Pay with Bank Transfer payment, ACCEPTED or still PENDING; from M3, not One-Data', flow: [{via: 'signal', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
     },
     {
       term: 'Credit balance refund',

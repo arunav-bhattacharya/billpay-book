@@ -256,6 +256,15 @@
   font-size: 0.82rem;
 }
 
+/* A name with its trigger tag beside it, wrapping under it when narrow. */
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.45rem;
+  min-width: 0;
+}
+
 .backWhat {
   grid-column: 2;
   font-size: 0.74rem;

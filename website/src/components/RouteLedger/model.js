@@ -1000,6 +1000,18 @@ export const CORP = {
 
 /* ---------------------------------------------------------- the rules -- */
 
+/* How something outside starts or resumes the payment on this road, in the
+   words the journeys and sequence diagrams use. A caller's own request starts
+   nothing from outside, so it has no tag. */
+export function roadTrigger(j) {
+  if (j.signal) return 'signal';
+  if (j.update) return 'update';
+  if (j.band.drain) return 'events';
+  if (j.band.key === 'callback') return 'callback';
+  if (j.band.key === 'pulled' || j.band.key === 'due') return 'dispatcher';
+  return null;
+}
+
 export const plain = (s) => s.replace(/\|/g, '');
 
 /* every road, with what it inherits from its band and its request, in

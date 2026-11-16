@@ -1,5 +1,6 @@
 import React, { useId, useState } from "react";
 import clsx from "clsx";
+import TriggerTag from "../TriggerTag";
 import styles from "./styles.module.css";
 
 /**
@@ -14,7 +15,9 @@ import styles from "./styles.module.css";
  * enrolled instruments only, and is then set up through the Autopay system's
  * CreatePaymentPlan.v1, not a Billpay API. Below, the calls that reach
  * Billpay from other systems, which a channel never makes, light for the
- * source that brings them.
+ * source that brings them. A pink TriggerTag marks each call that wakes a
+ * payment already waiting, as an update or a signal, the same mark the
+ * journeys and sequence diagrams use.
  */
 
 const SOURCES = [
@@ -51,12 +54,13 @@ function Filter({ name, options, value, onChange, refuse }) {
   );
 }
 
-function Call({ n, name, line, off, children }) {
+function Call({ n, name, line, off, trigger, children }) {
   return (
     <div className={clsx(styles.call, off && styles.callOff)}>
       <p className={styles.callHead}>
         <Key />
         <span className={styles.callName}>{name}</span>
+        {trigger && <TriggerTag kind={trigger} />}
         <span className={styles.callN}>{String(n).padStart(2, "0")}</span>
       </p>
       <p className={styles.callLine}>{line}</p>
@@ -74,7 +78,14 @@ function Back({ items, note, off, refused }) {
       {items.map((it) => (
         <p key={it.name} className={clsx(styles.backItem, it.lit && styles.backLit)}>
           <span className={styles.hollow} aria-hidden="true" />
-          <span className={clsx(styles.backName, it.plain && styles.plain)}>{it.name}</span>
+          {it.trigger ? (
+            <span className={styles.nameRow}>
+              <span className={clsx(styles.backName, it.plain && styles.plain)}>{it.name}</span>
+              <TriggerTag kind={it.trigger} />
+            </span>
+          ) : (
+            <span className={clsx(styles.backName, it.plain && styles.plain)}>{it.name}</span>
+          )}
           {it.what && <span className={styles.backWhat}>{it.what}</span>}
         </p>
       ))}
@@ -248,6 +259,7 @@ export default function ChannelCalls() {
             name="CreateConfirmPendingPayment.v1"
             line="Pay with Bank Transfer only: the customer is back from their bank, with the bank's answer."
             off={!bank}
+            trigger="update"
           />
           <Thread off={!bank} />
           <Back
@@ -255,7 +267,7 @@ export default function ChannelCalls() {
             items={[
               { name: "The first confirm decides", plain: true, what: "the channel's, or Amex Pay with Bank Transfer's", lit: bank },
               { name: "ACCEPTED or DECLINED", what: "on the bank's answer, with no call", lit: bank },
-              { name: "Then M3's settled notice", plain: true, what: "before Execute and Fulfil run", lit: bank },
+              { name: "Then M3's settled notice", plain: true, what: "before Execute and Fulfil run", lit: bank, trigger: "signal" },
             ]}
           />
         </li>
@@ -266,17 +278,26 @@ export default function ChannelCalls() {
         <ul className={styles.otherList}>
           <li className={clsx(styles.other, bank && styles.otherLit)}>
             <span className={styles.hollow} aria-hidden="true" />
-            <Path text="POST /payments/{payment-id}/bank-confirmation" />
+            <span className={styles.nameRow}>
+              <Path text="POST /payments/{payment-id}/bank-confirmation" />
+              <TriggerTag kind="update" />
+            </span>
             <span className={styles.backWhat}>Amex Pay with Bank Transfer&apos;s own confirm</span>
           </li>
           <li className={clsx(styles.other, bank && styles.otherLit)}>
             <span className={styles.hollow} aria-hidden="true" />
-            <Path text="POST /payments/{payment-id}/settlement" />
+            <span className={styles.nameRow}>
+              <Path text="POST /payments/{payment-id}/settlement" />
+              <TriggerTag kind="signal" />
+            </span>
             <span className={styles.backWhat}>M3&apos;s settled notice, before Execute runs</span>
           </li>
           <li className={clsx(styles.other, card && styles.otherLit)}>
             <span className={styles.hollow} aria-hidden="true" />
-            <Path text="POST /payments/{payment-id}/authentication" />
+            <span className={styles.nameRow}>
+              <Path text="POST /payments/{payment-id}/authentication" />
+              <TriggerTag kind="update" />
+            </span>
             <span className={styles.backWhat}>the card provider&apos;s 3D Secure callback</span>
           </li>
         </ul>
@@ -290,6 +311,10 @@ export default function ChannelCalls() {
         <span className={styles.legendItem}>
           <span className={clsx(styles.swatch, styles.swatchOther)} aria-hidden="true" />
           What Billpay does, or a call from another system
+        </span>
+        <span className={styles.legendItem}>
+          <TriggerTag kind="update" label="Update · Signal" />
+          Wakes a payment that is waiting
         </span>
         <span className={styles.legendItem}>
           <span className={styles.swatchChoice} aria-hidden="true" />

@@ -324,6 +324,25 @@
   fill: var(--seq-ink) !important;
   stroke: var(--seq-ink) !important;
 }
+/* Triggers: a message where something outside starts or resumes a payment
+   (a signal, an update to a running workflow, a dispatcher's or callback's
+   start, the events One-Data pairs). The diagram's source names them with
+   `%% trigger:` comments, and src/theme/Mermaid marks them. One class more
+   than the message rules above, so these win by specificity, not by order. */
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .bp-trigger.messageLine0,
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] .bp-trigger.messageLine1 {
+  stroke: var(--amex-trigger) !important;
+  stroke-width: 2px !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] text.messageText.bp-trigger {
+  fill: var(--amex-trigger) !important;
+  font-weight: 700 !important;
+}
+.docusaurus-mermaid-container svg[aria-roledescription='sequence'] marker.bp-trigger-marker path {
+  fill: var(--amex-trigger) !important;
+  stroke: var(--amex-trigger) !important;
+}
+
 /* Autonumber badges — Amex-blue disc, white numeral. */
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] marker circle {
   fill: #016fd0 !important;

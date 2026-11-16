@@ -24,6 +24,12 @@
  *   Ink       headings in Deep Blue, body in DLS grey 900.
  *   Accent    Bright Blue on links, badges, heading marks and the active page.
  *
+ *   Trigger   one pink, outside the DLS on purpose, for anything that starts
+ *             or resumes a step from outside: a Temporal signal or update, a
+ *             callback, a dispatcher, an event. Temporal's own UI marks
+ *             signals in pink, and blue would sink among the blue arrows.
+ *             It appears nowhere else.
+ *
  * There is no gold, violet or cyan. Both light and dark modes are
  * first-class. All values are CSS custom properties, so components never
  * hardcode a colour.
@@ -353,6 +359,11 @@ h3 {
   --amex-call-lit: #ffffff;
   --amex-call-shadow: 0 6px 18px rgba(0, 23, 90, 0.16);
 
+  /* Something from outside starts or resumes a step: a signal, an update, a
+     callback, a dispatcher or an event. White ink on it is 5.6:1. */
+  --amex-trigger: #c4167a;
+  --amex-trigger-ink: #ffffff;
+
   /* How much of its own hue a tinted chip mixes into the panel. Read by the
      chipTinted recipe as a fallback, so a chip can still opt out of either. */
   --chip-fill-base: 10%;
@@ -539,6 +550,10 @@ h3 {
   --amex-call-other-key: #2b438c;
   --amex-call-lit: #12356a;
   --amex-call-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+
+  /* Navy ink on it is 6.6:1; the pink on the page is 7.1:1. */
+  --amex-trigger: #ec6fae;
+  --amex-trigger-ink: #000f3c;
 
   --chip-fill-base: 15%;
   --chip-line-base: 34%;

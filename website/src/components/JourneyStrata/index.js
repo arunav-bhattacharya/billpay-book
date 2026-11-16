@@ -1,7 +1,8 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import clsx from 'clsx';
 import RouteLedger from '../RouteLedger';
-import {IFACES, ROAD, calls, plain, seq} from '../RouteLedger/model';
+import {IFACES, ROAD, calls, plain, roadTrigger, seq} from '../RouteLedger/model';
+import TriggerTag from '../TriggerTag';
 import useOverlay from '../../lib/useOverlay';
 import {GROUPS, JOURNEY} from './journeys';
 import styles from './styles.module.css';
@@ -401,12 +402,21 @@ function Board({journey}) {
         style={{gridTemplateColumns: columns, '--js-design': width, minWidth: `calc(${width} * 10px)`}}>
         <div className={styles.phases}>
           <span />
-          {segs.map((s, i) => (
-            <div className={clsx(styles.phase, s.kind === 'wait' && styles.phaseWait)} key={i}>
-              <span className={styles.phaseTerm}>{s.phase[0]}</span>
-              <span className={styles.phaseNote}>{s.phase[1]}</span>
-            </div>
-          ))}
+          {segs.map((s, i) => {
+            // A run that something outside starts or resumes carries the pink
+            // trigger tag, as on All Journeys. The journey's first run is its
+            // start, not a wake, so it has none.
+            const trigger = s.kind === 'run' && i !== runs[0] ? roadTrigger(s.j) : null;
+            return (
+              <div className={clsx(styles.phase, s.kind === 'wait' && styles.phaseWait)} key={i}>
+                <span className={styles.phaseHead}>
+                  <span className={styles.phaseTerm}>{s.phase[0]}</span>
+                  {trigger && <TriggerTag kind={trigger} />}
+                </span>
+                <span className={styles.phaseNote}>{s.phase[1]}</span>
+              </div>
+            );
+          })}
         </div>
         {strata.map(({key, term, desc, Comp, rails}) => (
           <div className={clsx(styles.stratum, styles[`stratum_${key}`], rails && styles.hasRails)} key={key}>

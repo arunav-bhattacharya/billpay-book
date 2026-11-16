@@ -34,6 +34,6 @@ Dispatcher runs are named for their Schedule, such as `dispatch-scheduled-paymen
 
 - A scheduled payment before its due date. It has no workflow yet: it waits in Oracle as a Work Tracker row, and the scheduled-payments dispatcher starts its workflow on the day. Look in Oracle instead ([Oracle DB](./oracle-db.md)).
 - Work waiting in One-Data's inbox, such as a return that hasn't been pulled yet.
-- Signals. No payment workflow takes one. The confirm and the no reach a waiting payment as updates, and a cancel of a scheduled payment is a workflow of its own, `{paymentId}-cancel`.
+- Signals on most payments. Only a Pay with Bank Transfer payment takes one, M3's `settled` notice. The confirm and the no reach a waiting payment as updates, and a cancel of a scheduled payment is a workflow of its own, `{paymentId}-cancel`.
 
 Workflow payloads show as plain data because the [Codec Server](../../deployment/deployables/codec-server-app.md) decrypts them.

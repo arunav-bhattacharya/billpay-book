@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import clsx from 'clsx';
 import useOverlay from '../../lib/useOverlay';
+import TriggerTag from '../TriggerTag';
 import styles from './styles.module.css';
 import {
   ALL,
@@ -21,6 +22,7 @@ import {
   routerLine,
   seq,
   uses,
+  roadTrigger,
 } from './model';
 
 /**
@@ -255,6 +257,7 @@ function RoadRow({j, on, dim, act, only, onRoad, rowRef}) {
             <b>{j.cluster}</b>, {j.start || j.band.start}
           </>
         )}
+        {roadTrigger(j) && <TriggerTag kind={roadTrigger(j)} className={styles.trig} />}
       </span>
       <Strip j={j} act={act} only={only} />
     </button>
@@ -894,6 +897,7 @@ function RoadCard({j, corp, setCorp, open, setOpen, go, pickAct, onClear, wide})
           <Name text={j.wf} />
         </span>
         {j.tag && <span className={styles.titleTag}>{j.tag}</span>}
+        {roadTrigger(j) && <TriggerTag kind={roadTrigger(j)} className={styles.titleTrig} />}
       </p>
       <div className={styles.leadRow}>
         <p className={styles.cardLead}>{mode ? mode.lead : j.lead}</p>

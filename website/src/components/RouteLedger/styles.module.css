@@ -734,6 +734,14 @@
   font-weight: 650;
   font-size: 1.3em;
 }
+/* The pink trigger tag beside a road's start, and beside the card title. */
+.trig {
+  --tt-margin: 0 0 0 0.45em;
+}
+.titleTrig {
+  --tt-margin: 0 0 0 0.55rem;
+  --tt-valign: 0.3em;
+}
 .titleTag {
   display: inline-block;
   margin-left: 0.55em;

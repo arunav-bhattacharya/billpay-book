@@ -1,0 +1,35 @@
+/* The trigger pink, as a small tag. It matches JourneyMap's trigger flag:
+   uppercase, tracked, filled, with the arrow-in icon. A caller moves it with
+   --tt-margin and --tt-valign, never with a competing declaration. */
+.tag {
+  /* Holds its screen-reader text, which is absolutely placed: without this,
+     inside a sideways scroller that text escapes and widens the page. */
+  position: relative;
+  margin: var(--tt-margin, 0);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 1px 5px 1px 4px;
+  border-radius: 6px;
+  background: var(--amex-trigger);
+  color: var(--amex-trigger-ink);
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.6rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: var(--tt-valign, 0.12em);
+  cursor: help;
+}
+
+.icon {
+  flex: none;
+  width: 10px;
+  height: 10px;
+}
+
+.srOnly {
+  composes: srOnly from '../../css/recipes.module.css';
+}

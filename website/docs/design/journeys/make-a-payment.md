@@ -10,6 +10,7 @@ import PaymentChoices from '@site/src/components/PaymentChoices';
 import ChannelCalls from '@site/src/components/ChannelCalls';
 import InstrumentContexts from '@site/src/components/InstrumentContexts';
 import CallChip from '@site/src/components/CallChip';
+import TriggerTag from '@site/src/components/TriggerTag';
 
 # Make a Payment Journey
 
@@ -21,7 +22,7 @@ A page that listed every instrument on file would let the customer pick one this
 
 ## The calls a channel makes
 
-A channel integrates with a short list of calls, and this site marks every one of them the same way: a navy block or chip with a bright square, like <CallChip name="CreatePayment.v3" />. Anything in a pale tint, like <CallChip who="billpay" name="ReadInstruments" />, is a call Billpay makes for the channel, or one that reaches Billpay from another system. The channel never makes those, and never has to know about them.
+A channel integrates with a short list of calls, and this site marks every one of them the same way: a navy block or chip with a bright square, like <CallChip name="CreatePayment.v3" />. Anything in a pale tint, like <CallChip who="billpay" name="ReadInstruments" />, is a call Billpay makes for the channel, or one that reaches Billpay from another system. The channel never makes those, and never has to know about them. A pink tag, like <TriggerTag kind="signal" />, marks a call that wakes a payment already waiting, and names how it reaches the workflow: as a Temporal update, which answers the caller, or a signal, which doesn't.
 
 <ChannelCalls />
 
@@ -37,13 +38,13 @@ A channel integrates with a short list of calls, and this site marks every one o
 
    - `journeyContext`, what the instruments are for: `ONE_TIME_DIRECT_DEBIT` for a payment made through `CreatePayment.v3`, or `RECURRING_DIRECT_DEBIT` for setting up Autopay. Autopay is set up from enrolled instruments only, so a recurring direct debit with any other source gets 400 (Proposed).
 3. <CallChip name="CreatePayment.v3" />, when the customer reviews and pays. It carries the ID of the option the customer chose, and it is the only call that starts anything. Setting up Autopay ends instead with <CallChip name="CreatePaymentPlan.v1" />, which belongs to the Autopay system, not to Billpay.
-4. <CallChip name="CreateConfirmPendingPayment.v1" />, for Pay with Bank Transfer only, once the customer is back from their bank. It carries the bank's answer ([below](#pay-with-bank-transfer)).
+4. <CallChip name="CreateConfirmPendingPayment.v1" trigger="update" />, for Pay with Bank Transfer only, once the customer is back from their bank. It carries the bank's answer ([below](#pay-with-bank-transfer)).
 
 Three more calls reach billpay-online directly, and none of them comes from the channel:
 
-- <CallChip who="other" name="POST /payments/{payment-id}/bank-confirmation" />: Amex Pay with Bank Transfer's own confirm for the same payment.
-- <CallChip who="other" name="POST /payments/{payment-id}/settlement" />: M3's notice that the bank has settled a Pay with Bank Transfer payment.
-- <CallChip who="other" name="POST /payments/{payment-id}/authentication" />: the card provider's 3D Secure callback for a debit card.
+- <CallChip who="other" name="POST /payments/{payment-id}/bank-confirmation" trigger="update" />: Amex Pay with Bank Transfer's own confirm for the same payment.
+- <CallChip who="other" name="POST /payments/{payment-id}/settlement" trigger="signal" />: M3's notice that the bank has settled a Pay with Bank Transfer payment.
+- <CallChip who="other" name="POST /payments/{payment-id}/authentication" trigger="update" />: the card provider's 3D Secure callback for a debit card.
 
 The reads only guide the page. Verify calls Payment Options and Payment Instruments again once the payment is created, and those calls decide. Verify's Options check validates the chosen option through Payment Options' `ReadPaymentOptionByIdentifier.v1`. A scheduled payment is checked again on its due date: Reverify calls `ReadPaymentOptions.v1` to confirm the customer still owes money and the option still holds, and declines the payment if not. A Statement Balance or Total Balance payment pays what the option gives that day, which can differ from the amount at the create. A payment with several instructions, such as a bank account plus MR Points, carries one option ID for the whole payment. Payments from Accounts Receivable, corporate payments and Pay with MR Points alone carry none, and their Verify skips the Options check. The Router and Verify also check the payment against the market's release that is active when it arrives, so a release that goes live while the customer is on the page can't let through a payment it would refuse.
 
@@ -93,7 +94,7 @@ Billpay talks to one bank-transfer service, Amex Pay with Bank Transfer, which w
 
 1. The Router starts `CreatePaymentIntentWorkflow`. Amex's own checks run first: the Instrument, Options and Mandate checks. A payment that fails them is `DECLINED` at once, with no link.
 2. RequestConfirmation asks Amex Pay with Bank Transfer for the customer's redirect link, and the reply is `PENDING` with it. The customer confirms the payment at their bank.
-3. The confirm can come from two places: the channel, through <CallChip name="CreateConfirmPendingPayment.v1" />, or Amex Pay with Bank Transfer, the PISP (Payment Initiation Service Provider) interface, straight to billpay-online. Each carries the bank's answer. Billpay acts on whichever comes first and acknowledges both: the second gets the same answer. The payment is `ACCEPTED` or `DECLINED` on the bank's answer, and nothing else is checked: no Payment Instruments token check, and no funds check.
+3. The confirm can come from two places: the channel, through <CallChip name="CreateConfirmPendingPayment.v1" trigger="update" />, or Amex Pay with Bank Transfer, the PISP (Payment Initiation Service Provider) interface, straight to billpay-online. Each carries the bank's answer. Billpay acts on whichever comes first and acknowledges both: the second gets the same answer. The payment is `ACCEPTED` or `DECLINED` on the bank's answer, and nothing else is checked: no Payment Instruments token check, and no funds check.
 4. An `ACCEPTED` payment waits once more. When the bank settles the payment in real time, it tells Amex; M3 intercepts that message and calls billpay-online, and only then do Execute and Fulfil run. Execute makes no clearing call, since the money moved at the bank, and M3's notice is the payment's settlement.
 5. If M3's notice comes and neither confirm has, Billpay accepts the payment anyway, carries on with Execute and Fulfil, and logs that no confirm came for that payment ID.
 

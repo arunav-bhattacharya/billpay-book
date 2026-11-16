@@ -110,10 +110,90 @@ function useIsScaledDown(ref) {
   return scaledDown;
 }
 
+/**
+ * Pink the arrows where something outside starts or resumes a payment.
+ *
+ * A sequence diagram names them in its own source, as Mermaid comments, which
+ * Mermaid itself ignores:
+ *
+ *   %% trigger: signal settled
+ *
+ * Every message whose label starts with that text gets the trigger pink: the
+ * label, the line and its arrowhead. The arrowhead is a shared marker, so a
+ * marked line points at a pink copy of it. Marking is idempotent and runs again
+ * whenever Mermaid redraws the diagram, such as on a theme change.
+ */
+function readTriggers(source) {
+  return String(source || '')
+    .split('\n')
+    .map((line) => line.trim().match(/^%%\s*trigger:\s*(.+)$/))
+    .filter(Boolean)
+    .map((m) => m[1].trim());
+}
+
+function markTriggers(svg, prefixes) {
+  if (svg.getAttribute('aria-roledescription') !== 'sequence') {
+    return;
+  }
+  // Mermaid draws each message as its label lines, then the line itself.
+  let label = [];
+  svg.querySelectorAll('text.messageText, .messageLine0, .messageLine1').forEach((el) => {
+    if (el.matches('text.messageText')) {
+      label.push(el);
+      return;
+    }
+    const first = label.length ? label[0].textContent.trim() : '';
+    const lines = label;
+    label = [];
+    if (!prefixes.some((p) => first.startsWith(p))) {
+      return;
+    }
+    lines.forEach((t) => t.classList.add('bp-trigger'));
+    el.classList.add('bp-trigger');
+    const ref = (el.getAttribute('marker-end') || '').match(/url\(#(.+)\)/)?.[1];
+    if (!ref || ref.endsWith('-trigger')) {
+      return;
+    }
+    const id = `${ref}-trigger`;
+    if (!svg.querySelector(`#${CSS.escape(id)}`)) {
+      const original = svg.querySelector(`#${CSS.escape(ref)}`);
+      if (!original) {
+        return;
+      }
+      const copy = original.cloneNode(true);
+      copy.id = id;
+      copy.classList.add('bp-trigger-marker');
+      original.parentNode.appendChild(copy);
+    }
+    el.setAttribute('marker-end', `url(#${id})`);
+  });
+}
+
+function useTriggerArrows(ref, source) {
+  useEffect(() => {
+    const prefixes = readTriggers(source);
+    const node = ref.current;
+    if (!node || prefixes.length === 0) {
+      return undefined;
+    }
+    const run = () => {
+      const svg = node.querySelector('svg');
+      if (svg) {
+        markTriggers(svg, prefixes);
+      }
+    };
+    run();
+    const watcher = new MutationObserver(run);
+    watcher.observe(node, {childList: true, subtree: true});
+    return () => watcher.disconnect();
+  }, [ref, source]);
+}
+
 export default function Mermaid(props) {
   const wrapRef = useRef(null);
   const closeRef = useRef(null);
   const scaledDown = useIsScaledDown(wrapRef);
+  useTriggerArrows(wrapRef, props.value);
   const [expanded, setExpanded] = useState(false);
   const [actualSize, setActualSize] = useState(false);
 

@@ -36,16 +36,17 @@
      The same system tone the journey index uses, so a system trigger reads
      the same on both. */
   --jm-async: var(--amex-journey-system);
-  /* A wait between two steps: muted ink, so it reads as a pause, not a move. */
-  --jm-wait: color-mix(in srgb, var(--amex-mut) 75%, transparent);
   /* The reply flag takes the channel tone from the Make a Payment page: the
-     navy that marks the channel's side of the line. The trigger flag takes the
-     accent, so the two never read as the same thing. */
+     navy that marks the channel's side of the line. The trigger flag takes
+     the site's one trigger pink, so it never sinks among the blue arrows, and
+     the wait into a triggered step is dashed in the same pink, a little
+     lighter, so the eye runs from the wait into the step. */
   --jm-reply: var(--amex-call-channel);
   --jm-reply-ink: var(--amex-call-channel-ink);
   --jm-reply-key: var(--amex-call-key);
-  --jm-trigger: var(--jm-accent);
-  --jm-trigger-ink: var(--amex-white);
+  --jm-trigger: var(--amex-trigger);
+  --jm-trigger-ink: var(--amex-trigger-ink);
+  --jm-wait: color-mix(in srgb, var(--jm-trigger) 78%, transparent);
   --jm-gap: 30px;
   --jm-vgap: 26px;
 }
@@ -60,8 +61,6 @@
   --jm-wf: var(--amex-deep-200);
   --jm-wf-ink: var(--amex-navy);
   --jm-outer: var(--amex-blue-bright);
-  /* The lifted accent needs dark ink rather than white. */
-  --jm-trigger-ink: var(--amex-navy);
 }
 
 /* ==================================================================== *
@@ -770,8 +769,8 @@
   z-index: 1;
 }
 
-/* The connector into a step something outside starts: dashed and muted, with
-   no arrowhead, because nothing moves until the trigger lands. */
+/* The connector into a step something outside starts: dashed in the trigger
+   pink, with no arrowhead, because nothing moves until the trigger lands. */
 .waitsNext .node::after {
   height: 0;
   margin-top: -1px;

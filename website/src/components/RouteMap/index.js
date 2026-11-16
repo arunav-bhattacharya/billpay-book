@@ -6,15 +6,20 @@ import styles from './styles.module.css';
  * RouteMap: the fork tree. For each trigger, the workflow the Router starts,
  * how it starts it, and the Temporal cluster it runs on.
  *
- * One tray per trigger. Colour means cluster and nothing else: the square on
- * a workflow is Bright Blue for Online and the deeper navy for Offline. How a
- * workflow starts is drawn on the line into it, never in colour:
+ * One tray per trigger. The square on a workflow is its cluster, Bright Blue
+ * for Online and the deeper navy for Offline. How a workflow starts is drawn
+ * on the line into it:
  *
  *   solid line    it starts at once (Update-With-Start, or an async start),
- *                 or an update reaches it while it runs
+ *                 or an update or a signal reaches it while it runs
  *   dashed line   it waits for a dispatcher (from One-Data's inbox, or from
  *                 a Work Tracker row)
  *   elbow         a child, started by its parent on the parent's cluster
+ *
+ * A line is pink when something outside starts or resumes the payment: an
+ * update or a signal, a callback's async start, or a dispatcher. The caller's
+ * own Update-With-Start and a parent's child stay grey. The pink is the site's
+ * one trigger colour, as on All Journeys and the sequence diagrams.
  *
  * A payment workflow that branches, by account type or by bank confirmation,
  * forks at grey junction squares. A branch with no child ends in a box saying
@@ -28,7 +33,8 @@ import styles from './styles.module.css';
  *   {desc, flow, fork?, note?, across?}
  * `flow` lists the workflows in order, each {via, detail?, name, cluster,
  * caption?}, where `via` says how it starts: 'uws', 'async', 'inbox', 'row'
- * or 'child', or 'update' for a message to a workflow already running, and
+ * or 'child', or 'update' or 'signal' for a message to a workflow already
+ * running, and
  * `caption` is a line or two of what that workflow runs.
  * The first one's `via` is the line from the trigger. `fork` lists branches,
  *   {term, via, detail?, flow, notes?}   or   {term, self: [caption, ...]}
@@ -39,17 +45,22 @@ import styles from './styles.module.css';
 
 const VIA = {
   uws: {label: 'Update-With-Start'},
-  async: {label: 'Async start'},
-  inbox: {label: 'From the inbox', waits: true},
-  row: {label: 'Work Tracker row', waits: true},
+  async: {label: 'Async start', trigger: true},
+  inbox: {label: 'From the inbox', waits: true, trigger: true},
+  row: {label: 'Work Tracker row', waits: true, trigger: true},
   child: {label: 'Child'},
-  update: {label: 'Update, to the running workflow'},
+  update: {label: 'Update', sub: 'to the running workflow', trigger: true},
+  signal: {label: 'Signal', sub: 'to the running workflow', trigger: true},
 };
+
+/* Pink for a line something outside starts; grey, reset, for every other,
+   so a grey line inside a pink branch stays grey. */
+const lineTone = (via) => (VIA[via].trigger ? styles.trigger : styles.plainLine);
 
 const SELF = 'Runs it all itself';
 
 const LABEL =
-  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A create that waits for the customer, for bank confirmation or a debit card\'s 3D Secure, starts CreatePaymentIntent, and the confirm, the no and the card provider\'s callback reach that same workflow as updates.';
+  'Trigger to workflow, drawn as a fork tree. Each trigger has a tray. Each condition in it leads to the workflow the Router starts, with how it starts written on the line into it: a solid line starts at once, a dashed line waits for a dispatcher, and an elbow is a child workflow on its parent\'s cluster. The square on each workflow is its cluster, Bright Blue for Online and navy for Offline. Payment workflows fork by account type: a consumer payment of one amount, which the workflow runs itself, a consumer split, and a corporate payment. A create that waits for the customer, for bank confirmation or a debit card\'s 3D Secure, starts CreatePaymentIntent, and the confirm, the no and the card provider\'s callback reach that same workflow as updates, and M3\'s settled notice as a signal. A line is pink when something outside starts or resumes the payment: an update, a signal, an async start from a callback, or a dispatcher.';
 
 const offline = (cluster) => String(cluster).trim().toLowerCase() === 'offline';
 const tone = (cluster) => (offline(cluster) ? styles.off : styles.on);
@@ -96,7 +107,9 @@ function SelfBox({cluster, lines}) {
 }
 
 /* How a workflow starts, in words: the mode, then any detail. */
-function How({via, detail}) {
+function How({via, detail: given}) {
+  // The mode stays one short word above the line; the rest goes below it.
+  const detail = given || VIA[via].sub;
   return (
     <>
       <span className={styles.mode}>{VIA[via].label}</span>
@@ -113,7 +126,7 @@ function How({via, detail}) {
 /* The line into a workflow. Its parent decides which way it runs. */
 function Edge({via, detail}) {
   return (
-    <span className={clsx(styles.edge, VIA[via].waits && styles.waits)}>
+    <span className={clsx(styles.edge, VIA[via].waits && styles.waits, lineTone(via))}>
       <How via={via} detail={detail} />
     </span>
   );
@@ -136,7 +149,7 @@ function Step({step, first, aside}) {
   if (first) return node;
   if (step.via === 'child') {
     return (
-      <span className={styles.child}>
+      <span className={clsx(styles.child, styles.plainLine)}>
         <span className={styles.childHow}>
           <How via="child" detail={step.detail} />
         </span>
@@ -166,7 +179,12 @@ function Fork({branches, cluster}) {
       {branches.map((b) => (
         <span
           key={b.term}
-          className={clsx(styles.branch, b.self && styles.selfBranch, !b.self && VIA[b.via].waits && styles.waits)}>
+          className={clsx(
+            styles.branch,
+            b.self && styles.selfBranch,
+            !b.self && VIA[b.via].waits && styles.waits,
+            b.self ? styles.plainLine : lineTone(b.via),
+          )}>
           <i className={styles.junction} aria-hidden="true" />
           <span className={styles.arm}>
             <span className={styles.armHead}>
@@ -238,22 +256,22 @@ function Key() {
             <i className={styles.kLine} aria-hidden="true" />
             Update-With-Start
           </span>
-          <span className={styles.keyItem}>
+          <span className={clsx(styles.keyItem, styles.trigger)}>
             <i className={styles.kLine} aria-hidden="true" />
             Async start
           </span>
-          <span className={styles.keyItem}>
+          <span className={clsx(styles.keyItem, styles.trigger)}>
             <i className={styles.kLine} aria-hidden="true" />
-            Update, to the running workflow
+            Update or signal, to the running workflow
           </span>
         </span>
         <span className={styles.keyHead}>Waits for a dispatcher</span>
         <span className={styles.keyItems}>
-          <span className={styles.keyItem}>
+          <span className={clsx(styles.keyItem, styles.trigger)}>
             <i className={clsx(styles.kLine, styles.kDash)} aria-hidden="true" />
             From the inbox
           </span>
-          <span className={styles.keyItem}>
+          <span className={clsx(styles.keyItem, styles.trigger)}>
             <i className={clsx(styles.kLine, styles.kDash)} aria-hidden="true" />
             Work Tracker row
           </span>
@@ -270,7 +288,9 @@ function Key() {
           </span>
         </span>
       </div>
-      <p className={styles.keyNote}>Names drop the Workflow suffix.</p>
+      <p className={styles.keyNote}>
+        Pink lines: something outside starts or resumes the payment. Names drop the Workflow suffix.
+      </p>
     </div>
   );
 }

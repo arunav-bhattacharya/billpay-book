@@ -4,6 +4,7 @@ import Link from '@docusaurus/Link';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import {links} from '../../lib/inlineMarkup';
 import styles from './styles.module.css';
+import {TRIGGER_KIND as TRIGGERS, TRIGGER_ICON} from '../../lib/triggers';
 
 /**
  * JourneyMap: one payment journey as a business process flow.
@@ -98,16 +99,9 @@ const MODE_NOTE = {
   awaiting: 'awaiting events',
 };
 
-/* What wakes a step from outside the workflow. The word is the mechanism, so
-   an engineer can tell an update (which gets an answer back) from a signal
-   (which doesn't), and both from a new run a dispatcher or a callback starts. */
-const TRIGGER_KIND = {
-  update: {word: 'Update', note: 'a Temporal update to the running workflow, which answers its sender'},
-  signal: {word: 'Signal', note: 'a Temporal signal to the running workflow, with no answer back'},
-  callback: {word: 'Callback', note: 'a partner system calls Billpay back, which starts this step'},
-  dispatcher: {word: 'Dispatcher', note: 'a dispatcher picks up a due row and starts this step'},
-  events: {word: 'Events', note: "events from other systems, paired in One-Data's inbox, start this step"},
-};
+/* What wakes a step from outside the workflow: the shared table, so every
+   trigger mark on the site names the same mechanisms. */
+const TRIGGER_KIND = TRIGGERS;
 
 /* ------------------------------------------------------------------ *
  * Icons: monoline, 24-unit grid, stroke inherits the surrounding ink
@@ -138,7 +132,7 @@ const PATHS = {
   // an answer going back up to whoever asked
   replyUp: ['M12 19.4V6', 'M6.6 11.2L12 5.8l5.4 5.4'],
   // something arriving from outside and landing here
-  triggerIn: ['M12 3.6v10.6', 'M7 9.4l5 5 5-5', 'M5 19.6h14'],
+  triggerIn: TRIGGER_ICON,
   // a payment card
   card: ['M3.4 6.2h17.2a1 1 0 0 1 1 1v9.6a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V7.2a1 1 0 0 1 1-1z', 'M2.4 10h19.2', 'M5.8 14.6h4'],
   // sent somewhere else, to come back later
