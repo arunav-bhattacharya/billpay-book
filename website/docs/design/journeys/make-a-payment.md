@@ -20,7 +20,7 @@ A page that listed every instrument on file would let the customer pick one this
 
 ## The calls a channel makes
 
-A channel makes at most four calls. Each one is drawn as a navy chip, like <CallChip name="CreatePayment.v3" />. A pale chip, like <CallChip who="billpay" name="ReadInstruments" />, is a call Billpay makes, or one that reaches Billpay from another system; the channel never makes those. A pink tag, like <TriggerTag kind="signal" />, marks a call that resumes a payment already waiting.
+A channel makes at most four calls. Each one is drawn as a navy chip, like <CallChip name="CreatePayment.v3" />. A pale chip, like <CallChip who="billpay" name="ReadInstruments" />, is a call Billpay makes, or one that reaches Billpay from another system; the channel never makes those. A pink tag, like <TriggerTag kind="update" label="Channel Confirm Event" />, marks a call that resumes a payment already waiting, named as the event it is.
 
 1. <CallChip name="ReadPaymentOptions.v1" />, from Payment Options, not Billpay. It returns what the customer owes and the options to pay it (Statement Balance, Total Balance, Minimum Due and Other Amount), each with a payment option ID. It also says whether the customer can pay today, later, or both, and the range of dates a later payment can take. If nothing is owed, the journey never starts.
 2. <CallChip name="ReadBillpayInstruments.v1" />, once the customer picks where to pay from. It is a One-Data function in front of a billpay-online endpoint. The channel passes two mandatory filters: `source`, where the customer pays from, and `journeyContext`, what the instruments are for. Billpay makes the call the source needs:
@@ -32,9 +32,9 @@ A channel makes at most four calls. Each one is drawn as a navy chip, like <Call
    | `PayWithBankTransfer` | Amex Pay with Bank Transfer's `GET /banks` | The banks the customer can pay from in real time, Plaid in the US included |
 
 3. <CallChip name="CreatePayment.v3" />, when the customer reviews and pays. It carries the chosen option's ID, and it is the only call that starts anything.
-4. <CallChip name="CreateConfirmPendingPayment.v1" trigger="signal" />, for Pay with Bank Transfer only, once the payer's bank routes the customer back to the channel. It carries no answer. It tells Billpay the customer is back, and Billpay then asks Amex Pay with Bank Transfer for the payment's status ([below](#pay-with-bank-transfer)).
+4. <CallChip name="CreateConfirmPendingPayment.v1" trigger="update" event="Channel Confirm Event" />, for Pay with Bank Transfer only, once the payer's bank routes the customer back to the channel. Billpay asks Amex Pay with Bank Transfer for the payment's status and answers with it: `PENDING`, `ACCEPTED` or `DECLINED` ([below](#pay-with-bank-transfer)). The channel shows the customer that status, and its part of the payment ends there.
 
-Two more calls reach billpay-online directly, never from the channel: <CallChip who="other" name="POST /payments/{payment-id}/settlement" trigger="signal" />, M3's notice that the bank has settled a Pay with Bank Transfer payment, and <CallChip who="other" name="POST /payments/{payment-id}/authentication" trigger="update" />, the card provider's 3D Secure callback for a debit card.
+Two more calls reach billpay-online directly, never from the channel: <CallChip who="other" name="POST /payments/{payment-id}/settlement" trigger="signal" event="Bank Settled Event" />, M3's notice that the bank has settled a Pay with Bank Transfer payment, and <CallChip who="other" name="POST /payments/{payment-id}/authentication" trigger="update" event="Card Authenticated Event" />, the card provider's 3D Secure callback for a debit card.
 
 The reads only guide the page. Once the payment is created, Verify calls Payment Options and Payment Instruments again, and those calls decide. A scheduled payment is checked once more on its due date, when Reverify confirms the customer still owes money and the option still holds. Pay with Bank Transfer, a debit card and MR Points pay today only, so once the customer picks a later date the page doesn't offer them, and a later create with one gets 422 before any workflow starts. Wallets aren't a source for now.
 
@@ -81,11 +81,11 @@ Billpay talks to one bank-transfer service, Amex Pay with Bank Transfer, which w
 
 1. The Router starts `CreatePaymentIntentWorkflow`. Amex's own checks run first: the Instrument, Options and Mandate checks. A payment that fails them is `DECLINED` at once, with no link.
 2. RequestConfirmation asks Amex Pay with Bank Transfer for the customer's redirect link, and the reply is `PENDING` with it. The customer approves the payment at their bank.
-3. The payer's bank routes the customer back to the channel, and the channel calls <CallChip name="CreateConfirmPendingPayment.v1" trigger="signal" />. That signals the waiting workflow and carries no answer. If the channel never calls, Billpay waits a fixed time and moves on anyway.
-4. Billpay calls Amex Pay with Bank Transfer's `GET /payment-status`. Success makes the payment `ACCEPTED`, and failure makes it `DECLINED`. Pending means the bank hasn't finished, so Billpay waits a fixed interval and asks again, until the answer is success or failure. A call that times out or fails counts as pending.
+3. The payer's bank routes the customer back to the channel, and the channel calls <CallChip name="CreateConfirmPendingPayment.v1" trigger="update" event="Channel Confirm Event" />. The channel waits while Billpay calls Amex Pay with Bank Transfer's `GET /payment-status` once. Success makes the payment `ACCEPTED`, and failure makes it `DECLINED`. Pending, or a call that times out or fails, leaves it `PENDING`. The reply carries that status, the channel shows it to the customer, and the channel's part ends there.
+4. While the answer is pending, Billpay waits a fixed interval and asks again, until the answer is success or failure. Nobody waits for it. If the channel never calls, Billpay waits a fixed time and starts asking anyway.
 5. An `ACCEPTED` payment waits once more, for M3's notice that the bank has settled the money. Only then do Execute and Fulfil run. Execute makes no clearing call, since the money moved at the bank. If M3's notice comes before the status says success, Billpay accepts the payment on it and stops asking.
 
-The channel learns the outcome from `GET /payments/{payment-id}`. The customer can say no at any point until the payment is decided, and it ends `CANCELLED`. An `ACCEPTED` payment whose notice never comes goes on the exception list with an alert.
+The customer sees the final state later in their list of payments, which the channel reads through `ReadPayments.v1`. The customer can say no at any point until the payment is decided, and it ends `CANCELLED`. An `ACCEPTED` payment whose notice never comes goes on the exception list with an alert.
 
 ## Debit card
 
@@ -110,7 +110,7 @@ MR Points sit next to the way to pay. Points alone run the Pay with MR Points co
 - Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions.v1` is one option.
 - The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-online endpoint behind it.
 - The contract of Amex Pay with Bank Transfer's `GET /banks`.
-- For Pay with Bank Transfer: the fixed time before Billpay first asks for the status when the channel sends no signal, the interval between calls, and where both are set; whether anything caps the calls; the contract of `GET /payment-status`; and the contract of M3's notice, how long an `ACCEPTED` payment waits for it, and what Billpay does when money moves on a declined payment.
+- For Pay with Bank Transfer: the fixed time before Billpay first asks for the status when the channel doesn't call, the interval between calls, and where both are set; the status call's timeout inside the channel's call; whether anything caps the calls; the contract of `GET /payment-status`; and the contract of M3's notice, how long an `ACCEPTED` payment waits for it, and what Billpay does when money moves on a declined payment.
 - Whether Verify's `INSTRUMENT_OPEN` rule, which takes `ACTIVE` alone, follows `enrolledInstrumentStatuses` when a market adds a status for a one-time payment.
 - The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionByIdentifier.v1`, and the decline code for an option that no longer holds.
 - The steps of the Pay with MR Points composite, and its calls to Loyalty.

@@ -92,11 +92,7 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 **One-Data Function** · `CreateConfirmPendingPayment.v1` · SLA availability: **99.95%**
 
-| P50 | P90 | P99 | P99.9 | P99.99 |
-| --- | --- | --- | --- | --- |
-| 130 ms | 270 ms | 540 ms | 950 ms | 1.6 s |
-
-**SLI:** caller-observed latency for the channel's call once the customer is back from their bank, until billpay-online's 202. One-Data doesn't hold it for RTF: if billpay-online doesn't answer within 3 seconds, or answers with a 5xx, the channel gets 503 and calls again (agreed 2026-11-08). Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency for the channel's call once the customer is back from their bank, until billpay-online answers with the payment's status, which includes Billpay's one call to Amex Pay with Bank Transfer. One-Data doesn't hold it for RTF: if billpay-online doesn't answer within 3 seconds, or answers with a 5xx, the channel gets 503 and calls again (agreed 2026-11-08). The targets are still to be set (2026-11-22). **Error budget:** 0.05% / 30-day window.
 
 ## Create Payment Allocations
 

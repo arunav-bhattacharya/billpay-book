@@ -15,7 +15,9 @@ import styles from "./styles.module.css";
  *
  * `trigger` marks a call that starts or resumes a waiting payment, with the
  * mechanism as its value (`update`, `signal`, ...): a pink TriggerTag follows
- * the chip, the same mark the journeys and sequence diagrams use.
+ * the chip, the same mark the journeys and sequence diagrams use. `event`
+ * names it the way the journeys do ("Channel Confirm Event"), in place of
+ * the mechanism, which stays on hover.
  */
 const SAYS = {
   channel: "A call the channel makes: ",
@@ -23,7 +25,7 @@ const SAYS = {
   other: "A call from another system: ",
 };
 
-export default function CallChip({ name, who = "channel", trigger }) {
+export default function CallChip({ name, who = "channel", trigger, event }) {
   const chip = (
     <span className={clsx(styles.chip, who === "channel" ? styles.channel : styles.other)}>
       <span className={styles.key} aria-hidden="true" />
@@ -37,7 +39,7 @@ export default function CallChip({ name, who = "channel", trigger }) {
   return (
     <span className={styles.pair}>
       {chip}
-      <TriggerTag kind={trigger} />
+      <TriggerTag kind={trigger} label={event} />
     </span>
   );
 }

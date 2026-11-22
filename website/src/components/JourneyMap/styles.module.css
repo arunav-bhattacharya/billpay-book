@@ -40,6 +40,10 @@
   --jm-quiet: var(--amex-mut);
   --jm-field: color-mix(in srgb, var(--amex-deep-200) 14%, transparent);
 
+  /* The sync box: the steps a caller waits on. */
+  --jm-sync: color-mix(in srgb, var(--amex-blue) 7%, transparent);
+  --jm-sync-ink: var(--amex-blue);
+
   /* The grid. */
   --jm-label: 50px;
   --jm-col: 64px;
@@ -64,6 +68,8 @@
   --jm-done-ink: var(--amex-navy);
   --jm-end: var(--amex-grey-600);
   --jm-field: color-mix(in srgb, var(--amex-deep-200) 8%, transparent);
+  --jm-sync: color-mix(in srgb, var(--amex-blue-bright) 11%, transparent);
+  --jm-sync-ink: var(--amex-blue-bright);
 }
 
 /* ==================================================================== *
@@ -181,7 +187,6 @@
 
 .lanes {
   display: grid;
-  grid-template-rows: auto auto auto auto auto;
   column-gap: 0;
   overflow-x: auto;
   padding-bottom: 0.2rem;
@@ -251,7 +256,11 @@
 }
 .arrivePink {
   color: var(--jm-trigger);
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: normal;
+  text-align: center;
 }
 .arrivePink > i {
   background: var(--jm-trigger);
@@ -262,6 +271,41 @@
 .reply > i {
   background: transparent;
   box-shadow: inset 0 0 0 2px var(--jm-reply);
+}
+
+/* Sync: one tinted box behind the steps a caller waits on, from the top of
+   the lanes to the bottom, tagged in the row above the arrivals. */
+.syncBox {
+  margin: 0 2px;
+  padding: 0.3rem 0.45rem;
+  border-radius: 10px;
+  background: var(--jm-sync);
+}
+.syncRow {
+  grid-column: 1;
+  height: 1.15rem;
+}
+.syncTag {
+  display: inline-block;
+  font-size: 0.56rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--jm-sync-ink);
+}
+.syncKey {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 3px 7px 3px 4px;
+  border-radius: 5px;
+  background: var(--jm-sync);
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--jm-sync-ink);
 }
 
 /* Step: the numbered square, and its name under it. */
@@ -321,14 +365,14 @@
   align-items: center;
   min-height: 1.75rem;
   margin: 0 1.5px;
-  padding: 0 0.3rem;
+  padding: 0 0.2rem;
   border-radius: var(--amex-badge-radius);
   overflow: hidden;
 }
 .stateName,
 .itemState {
   font-family: var(--ifm-font-family-monospace);
-  font-size: 0.56rem;
+  font-size: 0.54rem;
   font-weight: 600;
   letter-spacing: 0;
   color: var(--jm-state-ink);
@@ -412,16 +456,24 @@
   background: var(--jm-live);
 }
 .pollLabel {
+  max-width: 100%;
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.6rem;
+  line-height: 1.25;
+  text-align: center;
   color: var(--jm-quiet);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.itemBody .pollLabel {
+  text-align: left;
 }
 
 /* Ends: a grey square and the state the payment leaves in. */
 .ends {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.55rem 0.15rem 0.2rem;
 }
 .end {
@@ -517,6 +569,25 @@
 }
 .item {
   padding: 0.55rem 0;
+}
+.itemSync {
+  margin: 0 -0.5rem;
+  padding: 0.55rem 0.5rem;
+  background: var(--jm-sync);
+}
+.itemSyncFirst {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+.itemSyncLast {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+.itemSyncLast + .itemSyncFirst {
+  margin-top: 0.5rem;
+}
+.itemHead .syncTag {
+  margin-left: 0.2rem;
 }
 .itemWait {
   display: flex;

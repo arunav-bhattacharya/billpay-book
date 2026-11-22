@@ -60,11 +60,11 @@ const JOURNEYS = {
     term: 'Pay by Bank today',
     to: `${ALL}#pay-by-bank-today`,
     wf: 'CreatePaymentIntentWorkflow',
-    text: 'The reply is PENDING with the redirect link. Once the customer is back, Billpay asks Amex Pay with Bank Transfer for the status until it is success or failure, then waits for M3 before Execute.',
+    text: 'The reply is PENDING with the redirect link. Once the customer is back, the channel calls again, and Billpay answers with the status. While it is pending, Billpay keeps asking, then waits for M3 before Execute.',
     after: [
-      {name: 'CreateConfirmPendingPayment.v1', who: 'channel', trigger: 'signal', note: "once the payer's bank routes the customer back"},
-      {name: 'GET /payment-status', who: 'billpay', repeat: true, note: 'Billpay asks Amex Pay with Bank Transfer, again at a fixed interval while it says pending'},
-      {name: 'POST /payments/{payment-id}/settlement', who: 'other', trigger: 'signal', note: "M3's notice that the money settled"},
+      {name: 'CreateConfirmPendingPayment.v1', who: 'channel', trigger: 'update', event: 'Channel Confirm Event', note: "once the payer's bank routes the customer back. Billpay asks for the status once and replies PENDING, ACCEPTED or DECLINED; the channel's part ends there"},
+      {name: 'GET /payment-status', who: 'billpay', repeat: true, note: 'Billpay asks Amex Pay with Bank Transfer again at a fixed interval while it says pending, with nobody waiting'},
+      {name: 'POST /payments/{payment-id}/settlement', who: 'other', trigger: 'signal', event: 'Bank Settled Event', note: "M3's notice that the money settled"},
     ],
   },
   card: {
@@ -72,7 +72,7 @@ const JOURNEYS = {
     to: `${ALL}#pay-by-debit-card`,
     wf: 'CreatePaymentIntentWorkflow',
     text: 'The reply is PENDING with a 3D Secure challenge link, or none. The card provider calls back, and Verify authorizes the payment. No callback in 2 minutes, and it is cancelled.',
-    after: [{name: 'POST /payments/{payment-id}/authentication', who: 'other', trigger: 'update', note: "the card provider's 3D Secure callback"}],
+    after: [{name: 'POST /payments/{payment-id}/authentication', who: 'other', trigger: 'update', event: 'Card Authenticated Event', note: "the card provider's 3D Secure callback"}],
   },
   multi: {
     term: 'Pay with multiple instructions',
@@ -194,7 +194,7 @@ function After({items}) {
           <span className={styles.callBody}>
             <span className={styles.afterHead}>
               <CallChip name={c.name} who={c.who} />
-              {c.trigger && <TriggerTag kind={c.trigger} />}
+              {c.trigger && <TriggerTag kind={c.trigger} label={c.event} />}
             </span>
             <span className={styles.callNote}>{c.note}</span>
           </span>

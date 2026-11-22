@@ -103,6 +103,6 @@ Temporal retries work that fails, and sometimes work that didn't. A local activi
 
 - Every HTTP call carries an idempotency key, such as `{paymentId}-{step}`.
 - Every Oracle write is insert-if-absent, or a conditional update on the current state.
-- Search attributes are set once, at start. There are no queries on the hot path, and signals only where nobody needs an answer. What a caller sends a running workflow and waits on, such as the no for a payment that waits, goes in as an update, which answers the caller. The channel's call once the customer is back from their bank, and M3's settled notice, are signals.
+- Search attributes are set once, at start. There are no queries on the hot path, and signals only where nobody needs an answer. What a caller sends a running workflow and waits on, such as the no for a payment that waits, or the channel's call once the customer is back from their bank, goes in as an update, which answers the caller. M3's settled notice is a signal.
 
 The [Component Model](./component-model/index.md) lists what exists at each layer. The [Payment State Model](./payment-state-model.md) shows the states those stages move a payment between.

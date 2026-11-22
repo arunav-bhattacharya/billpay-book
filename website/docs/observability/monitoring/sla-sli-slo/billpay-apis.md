@@ -94,11 +94,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **Billpay Core API** · `POST /payments/{payment-id}/confirm` · SLA availability: **99.95%**
 
-| P50 | P90 | P99 | P99.9 | P99.99 |
-| --- | --- | --- | --- | --- |
-| 120 ms | 250 ms | 500 ms | 900 ms | 1.5 s |
-
-**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It signals the payment's waiting workflow and answers 202 with the payment's current state, so no workflow starts and it waits for no decision. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It is an update to the payment's waiting workflow, which calls Amex Pay with Bank Transfer's `GET /payment-status` once and answers with the status, so its latency includes that call. The targets are still to be set, together with the status call's timeout (2026-11-22). **Error budget:** 0.05% / 30-day window.
 
 ## M3's Settled Notice
 
@@ -114,7 +110,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 | --- | --- | --- | --- | --- |
 | 150 ms | 300 ms | 600 ms | 1 s | 1.5 s |
 
-**SLI:** request-to-response latency for the card provider's 3D Secure callback. Like a confirm, it answers through an update to the payment's waiting workflow and waits at most 2.5 seconds for a decision, but its Verify includes the card authorization, one more call. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
+**SLI:** request-to-response latency for the card provider's 3D Secure callback. Like a confirm, it answers through an update to the payment's waiting workflow and waits at most 2.5 seconds for an answer; here the answer is Verify's decision, which includes the card authorization. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
 
 ## Allocations Callback
 

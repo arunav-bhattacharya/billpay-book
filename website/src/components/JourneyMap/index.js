@@ -11,14 +11,19 @@ import {TRIGGER_KIND as TRIGGERS} from '../../lib/triggers';
  * Every journey reads left to right in the same five lanes, and a column holds
  * one step from top to bottom:
  *
- *   Outside   what reaches the workflow from outside (pink), the request that
- *             starts it, and the reply that goes back to the caller
+ *   Outside   what reaches the workflow from outside (pink, named as the
+ *             event it is), the request that starts it, and the reply that
+ *             goes back to the caller
  *   Step      the numbered step. Bright Blue while a caller waits, Deep Blue
  *             once nobody does, pale while it waits for something outside
  *   State     the payment's lifecycle state, as one continuous field per state
  *   Calls     the systems the step calls; a repeated call is a row of small
  *             squares that ends in a solid one
  *   Ends      where the payment can leave the journey at that step
+ *
+ * A run of steps a caller waits on, from its request to its reply, sits in
+ * one tinted box marked Sync, so the sync part of a journey reads apart from
+ * the part that runs with nobody waiting.
  *
  * Alignment does the work connectors used to do: a mark belongs to the step
  * above or below it. A wait between steps is a run of dots. The words live in
@@ -104,6 +109,7 @@ const JOURNEY_KIND = {
 };
 
 const LANES = [
+  {key: 'sync', label: ''},
   {key: 'outside', label: 'Outside'},
   {key: 'step', label: 'Step'},
   {key: 'state', label: 'State'},
@@ -143,11 +149,31 @@ function stateRuns(cols) {
   return runs.filter((r) => r.state);
 }
 
+/* The runs of steps a caller waits on: consecutive live columns, broken by a
+   wait or by a step nobody waits on. */
+function syncRuns(cols) {
+  const runs = [];
+  let open = null;
+  cols.forEach((c, ci) => {
+    if (!c.wait && paceOf(c.step) === 'live') {
+      if (open) open.to = ci;
+      else runs.push((open = {from: ci, to: ci}));
+    } else {
+      open = null;
+    }
+  });
+  return runs;
+}
+
 /* The arrival into the first step: the request a caller makes, or the start a
-   system makes. */
+   system makes. Something from outside shows as the event it is, by name;
+   the mechanism (an update, a signal) is on hover. */
 function arrivalFor(step, i, kind) {
   const t = triggerOf(step);
-  if (t) return {pink: true, word: t.word, title: `${t.word}: ${step.trigger.label}. ${t.note}.`};
+  if (t) {
+    const word = step.trigger.name || t.word;
+    return {pink: true, word, title: `${word}: ${step.trigger.label}. ${t.word}: ${t.note}.`};
+  }
   if (i === 0) {
     const word = step.arrives || (kind === 'system' ? 'start' : 'request');
     return {word, title: kind === 'system' ? 'Started by a system' : "The caller's request starts the workflow"};
@@ -193,6 +219,7 @@ function Calls({step}) {
 
 function End({exit}) {
   if (!exit) return null;
+  if (Array.isArray(exit)) return exit.map((e, k) => <End key={k} exit={e} />);
   return (
     <span className={clsx(styles.end, !exit.state && styles.endSoft)} title={exit.label || exit.state}>
       <i aria-hidden="true" />
@@ -260,13 +287,24 @@ function Route({origin, entry, core, workflows}) {
 function Lanes({steps, kind}) {
   const cols = columnsFor(steps);
   const runs = stateRuns(cols);
+  const syncs = syncRuns(cols);
   const template = ['var(--jm-label)', ...cols.map((c) => (c.wait ? 'var(--jm-wait)' : 'minmax(var(--jm-col), var(--jm-col-max))'))].join(' ');
   const at = (ci) => ci + 2; // grid column of a column index; the labels take the first
-  const row = (key) => LANES.findIndex((l) => l.key === key) + 1;
+  const lanes = syncs.length ? LANES : LANES.filter((l) => l.key !== 'sync');
+  const row = (key) => lanes.findIndex((l) => l.key === key) + 1;
 
   return (
     <div className={styles.lanes} style={{gridTemplateColumns: template}} aria-hidden="true">
-      {LANES.map((l) => (
+      {syncs.map((r) => (
+        <span
+          key={`sync${r.from}`}
+          className={styles.syncBox}
+          style={{gridRow: `${row('sync')} / ${row('ends') + 1}`, gridColumn: `${at(r.from)} / ${at(r.to) + 1}`}}>
+          <span className={styles.syncTag}>Sync</span>
+        </span>
+      ))}
+      {syncs.length > 0 && <span className={styles.syncRow} style={{gridRow: row('sync')}} />}
+      {lanes.filter((l) => l.label).map((l) => (
         <span key={l.key} className={styles.laneLabel} style={{gridRow: row(l.key)}}>
           {l.label}
         </span>
@@ -332,12 +370,26 @@ function Lanes({steps, kind}) {
 
 /* The same journey as a list, for a narrow column. */
 function List({steps, kind}) {
+  /* The same Sync runs as the lanes: live steps, broken by a wait. */
+  const live = (i) => i >= 0 && i < steps.length && paceOf(steps[i]) === 'live';
+  const waitBefore = (i) => i > 0 && i < steps.length && (steps[i].trigger || awaits(steps[i]));
   return (
     <ol className={styles.list} aria-hidden="true">
       {steps.map((step, i) => {
         const a = arrivalFor(step, i, kind);
+        const sync = live(i);
+        const first = sync && (!live(i - 1) || waitBefore(i));
+        const last = sync && (!live(i + 1) || waitBefore(i + 1));
         return (
-          <li key={step.name} className={clsx(styles.item, styles[`pace_${paceOf(step)}`])}>
+          <li
+            key={step.name}
+            className={clsx(
+              styles.item,
+              styles[`pace_${paceOf(step)}`],
+              sync && styles.itemSync,
+              first && styles.itemSyncFirst,
+              last && styles.itemSyncLast,
+            )}>
             {i > 0 && (step.trigger || awaits(step)) && (
               <span className={styles.itemWait}>
                 <i />
@@ -348,6 +400,7 @@ function List({steps, kind}) {
             <div className={styles.itemHead}>
               <b className={styles.square}>{i + 1}</b>
               <span className={styles.stepName}>{step.name}</span>
+              {paceOf(step) === 'live' && <span className={styles.syncTag}>Sync</span>}
               {step.state && <span className={clsx(styles.itemState, styles[`tone_${toneFor(step.state)}`])}>{step.state}</span>}
             </div>
             <div className={styles.itemBody}>
@@ -375,17 +428,25 @@ function List({steps, kind}) {
 
 function Legend({steps}) {
   const has = (f) => steps.some(f);
-  const kinds = [...new Set(steps.filter((s) => s.trigger).map((s) => triggerOf(s).word))];
   const items = [];
   if (has((s) => paceOf(s) === 'live'))
-    items.push({key: 'live', node: <b className={clsx(styles.square, styles.squareKey)} />, text: 'a caller waits'});
+    items.push({
+      key: 'live',
+      node: (
+        <span className={styles.syncKey}>
+          <b className={clsx(styles.square, styles.squareKey)} />
+          Sync
+        </span>
+      ),
+      text: 'a caller waits for the reply',
+    });
   if (has((s) => paceOf(s) === 'background'))
     items.push({key: 'bg', node: <b className={clsx(styles.square, styles.squareKey, styles.keyBackground)} />, text: 'nobody waits'});
-  if (kinds.length)
+  if (has((s) => s.trigger))
     items.push({
       key: 'trig',
-      node: <span className={clsx(styles.arrive, styles.arrivePink)}><i />{kinds.join(' · ')}</span>,
-      text: 'arrives from outside and resumes the step',
+      node: <span className={clsx(styles.arrive, styles.arrivePink)}><i />Event</span>,
+      text: 'arrives from outside and resumes the payment',
     });
   if (has((s, i) => i > 0 && (s.trigger || awaits(s))))
     items.push({key: 'wait', node: <span className={styles.wait}><i /><i /><i /></span>, text: 'a wait'});
@@ -414,13 +475,14 @@ function describe(title, steps) {
       const t = triggerOf(s);
       return [
         `step ${i + 1}, ${s.name}`,
-        t && `started from outside by ${t.word.toLowerCase()}: ${s.trigger.label}`,
+        paceOf(s) === 'live' && 'sync, a caller waits',
+        t && `started from outside by the ${s.trigger.name || t.word.toLowerCase()}: ${s.trigger.label}`,
         s.state && `reaches ${s.state}`,
         s.reply && `replies ${s.reply}`,
         s.poll && `calls ${s.poll.label} again and again until it answers`,
         s.systems && s.systems.length && `calls ${s.systems.join(', ')}`,
         s.table && `works in the ${s.table}`,
-        s.exit && `can end ${[s.exit.state, s.exit.label].filter(Boolean).join(', ')}`,
+        s.exit && `can end ${[].concat(s.exit).map((e) => [e.state, e.label].filter(Boolean).join(', ')).join(', or ')}`,
       ]
         .filter(Boolean)
         .join(', ');

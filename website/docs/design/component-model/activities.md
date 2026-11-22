@@ -84,7 +84,7 @@ export const ACTIVITIES = [
     name: 'BankConfirmationActivities',
     system: "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
     queue: "Local activities with one try, on the Online cluster only: the redirect link inside the create's first workflow task, and the status call once each interval (Proposed)",
-    calledBy: "RequestConfirmation, for the redirect link, with one try; Verify, for GET /payment-status, once each interval until the status is final. billpay-online's instruments read calls its GET /banks too",
+    calledBy: "RequestConfirmation, for the redirect link, with one try; Verify, for GET /payment-status, once at the channel's call and then once each interval until the status is final. billpay-online's instruments read calls its GET /banks too",
   },
   {
     name: 'CardActivities',
@@ -124,7 +124,7 @@ An activity takes what it needs as lightly as it can: usually the payment ID, or
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks Amex Pay with Bank Transfer for two things: the redirect link, at the create, and the payment's status, through `GET /payment-status`, once the customer is back. The status call has one try each time, and the next interval is its retry, so a timeout or a 5xx counts as pending. The channel's call and M3's notice are not activities: both call billpay-online, which signals the workflow.
+`BankConfirmationActivities` asks Amex Pay with Bank Transfer for two things: the redirect link, at the create, and the payment's status, through `GET /payment-status`, once the customer is back, and again at a fixed interval while it says pending. The status call has one try each time, and the next interval is its retry, so a timeout or a 5xx counts as pending. The channel's call and M3's notice are not activities: both call billpay-online, which sends the channel's call to the workflow as an update and M3's notice as a signal.
 
 `CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-online's callback, and the waiting workflow takes it as an update.
 

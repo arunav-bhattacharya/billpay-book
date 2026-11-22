@@ -15,7 +15,7 @@ import styles from './styles.module.css';
 export default function TriggerTag({kind, label, className}) {
   const k = triggerKind(kind);
   return (
-    <span className={clsx(styles.tag, className)} title={`Starts or resumes the payment from outside: ${k.note}.`}>
+    <span className={clsx(styles.tag, className)} title={`Starts or resumes the payment from outside. ${k.word}: ${k.note}.`}>
       <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         {TRIGGER_ICON.map((d) => <path key={d} d={d} />)}

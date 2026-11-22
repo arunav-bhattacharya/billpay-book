@@ -125,7 +125,7 @@ export const GROUPS = [
           },
           {
             phase: ['At the bank', 'until the customer is back'],
-            wait: "The workflow waits for the channel's signal, or a fixed time if none comes. The customer's no cancels the payment at any point until it is decided. Until then its pending entry blocks the account.",
+            wait: "The workflow waits for the channel's call, or a fixed time if none comes. The customer's no cancels the payment at any point until it is decided. Until then its pending entry blocks the account.",
             customer: [{t: 'Approves at the bank', s: 'through Amex Pay with Bank Transfer', m: 'choice'}],
           },
           {
@@ -133,13 +133,13 @@ export const GROUPS = [
             road: 'confirm',
             waiting: true,
             customer: [
-              {t: 'Comes back', s: "the payer's bank routes them back to the channel", st: 'ACCEPTED', m: 'on', at: 'Verify'},
+              {t: 'Comes back', s: "the payer's bank routes them back, and the channel shows them the status", st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
             oneData: [
-              {c: 'CreateConfirmPendingPayment.v1', s: 'a signal: the customer is back, with no answer', at: 'Verify'},
+              {c: 'CreateConfirmPendingPayment.v1', s: 'the customer is back; answered with the status', at: 'Verify'},
               {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'},
             ],
-            after: "Verify asks Amex Pay with Bank Transfer's GET /payment-status: success is ACCEPTED, failure DECLINED, and pending means it asks again after a fixed interval. No token check and no funds check. The channel reads the outcome from the payment. An ACCEPTED payment then waits for M3.",
+            after: "Verify asks Amex Pay with Bank Transfer's GET /payment-status at once, and the channel gets the status: success is ACCEPTED, failure DECLINED, and anything else PENDING. The channel's part ends there. While it is pending, Billpay asks again after a fixed interval. No token check and no funds check. An ACCEPTED payment then waits for M3.",
           },
           {
             phase: ['Settled', "M3's notice, straight to billpay-online"],

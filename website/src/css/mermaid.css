@@ -378,7 +378,10 @@
  *   rgba(0,23,90,0.12)      Offline cluster
  *   rgba(83,86,90,0.14)     waiting, nothing running
  *   rgba(102,169,226,0.40)  a PaymentStore commit
- *   rgba(0,111,207,0.06)    a numbered phase: a tinted field, no edge
+ *   rgba(89,89,89,0.08)     phase 1 of a diagram whose phases take hues
+ *   rgba(0,89,52,0.08)      phase 2
+ *   rgba(140,65,12,0.08)    phase 3
+ *   rgba(0,23,90,0.08)      phase 4
  * ------------------------------------------------------------------------ */
 
 /* The two participant groups. Mermaid outlines them in its default grey. */
@@ -418,15 +421,6 @@
   stroke-dasharray: 6 4 !important;
 }
 
-/* A numbered phase. Its first note names it; the field itself has no edge,
-   so the phases read as three calm bands rather than three boxes. */
-.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.06)'] {
-  fill: color-mix(in srgb, var(--amex-worker-online) 6%, var(--amex-panel)) !important;
-  stroke: none !important;
-  rx: 10px !important;
-  ry: 10px !important;
-}
-
 /* Commit chips: one colour for every state change, because the chip already
    spells the state out (state -> ACCEPTED). */
 .docusaurus-mermaid-container rect[fill='rgba(102,169,226,0.40)'] {
@@ -435,4 +429,51 @@
   stroke-width: 1px !important;
   rx: 6px !important;
   ry: 6px !important;
+}
+
+/* Phases in their own hues. Each phase is a calm field in one muted hue; the
+   note that names it (its first, "1 · Create") takes a stronger tint of the
+   same hue, and src/theme/Mermaid finds that note and tags it. In a diagram
+   with these phases the other notes go grey, so the only strong blue left is
+   the participants. The :root and attribute in front of the note rules out-
+   rank the dark theme's blue notes above, by specificity, not by order. */
+.docusaurus-mermaid-container rect[fill='rgba(89,89,89,0.08)'] { --phase: var(--amex-phase-1); }
+.docusaurus-mermaid-container rect[fill='rgba(0,89,52,0.08)'] { --phase: var(--amex-phase-2); }
+.docusaurus-mermaid-container rect[fill='rgba(140,65,12,0.08)'] { --phase: var(--amex-phase-3); }
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.08)'] { --phase: var(--amex-phase-4); }
+.docusaurus-mermaid-container rect[fill='rgba(89,89,89,0.08)'],
+.docusaurus-mermaid-container rect[fill='rgba(0,89,52,0.08)'],
+.docusaurus-mermaid-container rect[fill='rgba(140,65,12,0.08)'],
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.08)'] {
+  fill: color-mix(in srgb, var(--phase) 7%, var(--amex-panel)) !important;
+  stroke: none !important;
+  rx: 10px !important;
+  ry: 10px !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(89,89,89,0.08)'],
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(0,89,52,0.08)'],
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(140,65,12,0.08)'],
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.08)'] {
+  fill: color-mix(in srgb, var(--phase) 12%, var(--amex-panel)) !important;
+}
+
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] rect.note {
+  fill: color-mix(in srgb, var(--amex-grey-600) 10%, var(--amex-panel)) !important;
+  stroke: none !important;
+}
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText,
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText > tspan {
+  fill: var(--amex-txt) !important;
+}
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-1 { --phase: var(--amex-phase-1); }
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-2 { --phase: var(--amex-phase-2); }
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-3 { --phase: var(--amex-phase-3); }
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-4 { --phase: var(--amex-phase-4); }
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] rect.note.bp-phase-label {
+  fill: color-mix(in srgb, var(--phase) 16%, var(--amex-panel)) !important;
+}
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText.bp-phase-label,
+:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText.bp-phase-label > tspan {
+  fill: var(--phase) !important;
+  font-weight: 700 !important;
 }

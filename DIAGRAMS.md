@@ -192,13 +192,13 @@ Pass the array, get the component.
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
-| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems` and `table` | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends. A wait is three dots; a repeated call is a row of small squares ending in a solid one. Under 540px of its own width it folds into a list. |
+| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, name, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`, and `name` the event the lane shows, such as `Channel Confirm Event`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems` and `table` | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals named as events), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends. Each run of steps a caller waits on sits in one tinted box tagged Sync. A wait is three dots; a repeated call is a row of small squares ending in a solid one; `exit` can be a list. Under 540px of its own width it folds into a list. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
 | `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row`, `child`, or `update` or `signal` to a running workflow; every one but `uws` and `child` draws its line in the trigger pink) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
 | `WorkflowMeta` | `worker`, `behaviors` | The metadata strip above a workflow section. |
 | `WorkerChip` | `worker`, `children` | The Online or Offline tag, inline. |
-| `TriggerTag` | `kind` (`update`, `signal`, `callback`, `dispatcher` or `events`), `label?` | The pink trigger mark, inline: something outside starts or resumes the payment here. `CallChip` takes the same value as `trigger`. |
+| `TriggerTag` | `kind` (`update`, `signal`, `callback`, `dispatcher` or `events`), `label?` | The pink trigger mark, inline: something outside starts or resumes the payment here. `label` names the event in place of the mechanism. `CallChip` takes the same values as `trigger` and `event`. |
 | `Lead` | `children` | The thesis paragraph at the top of a page. With the H1 it forms the page banner. |
 | `ClusterMap` | none | The two Temporal clusters, Oracle as the only hand-off between them, and the shared downstreams. |
 | `ClassMap` | `classes: [{id, kind, name, x, y, w, note?, members?, market?}]`, `links: [{type, points, head?, label?, at?, align?, step?}]`, `texts?`, `width`, `height`, `label`, `caption?`, `legend?` | A UML class diagram in the house style. `kind` is `interface`, `class` or `data`; `type` is `extends`, `implements`, `holds`, `uses` or `makes`, and keeps its UML end. Points are hand-placed against the card heights the component documents, and the legend lists the line types drawn. The Build pages' diagrams live in `ClassMap/diagrams.js`. |
@@ -278,6 +278,11 @@ or the events One-Data pairs. Temporal's own UI marks signals in pink, and a blu
 would sink among the blue arrows. Use it only for that, and through one of the three
 places that already draw it: JourneyMap's Outside lane, the `TriggerTag` component
 (also `CallChip`'s `trigger` prop), RouteMap's lines, and a sequence diagram's `%% trigger:` lines.
+
+The four `--amex-phase-*` hues are the other exception (chosen by the user, 2026-11-22):
+DLS grey 700, the DLS status set's deep green and deep orange, and Deep Blue, each with a
+lighter step for dark mode. They colour a sequence diagram's numbered phases and nothing
+else, so the phases don't read as more shades of the participants' blue.
 
 The lifecycle colours, `--amex-state-intermediate`, `--amex-state-success`,
 `--amex-state-failure` and `--amex-state-choice`, live in
@@ -788,7 +793,14 @@ teach patterns this repo does not use.
   that Mermaid ignores. `%% trigger: signal settled` turns pink every message whose
   label starts with `signal settled`: the label, the line and its arrowhead. Mark the
   arrow that wakes the payment's workflow (an update or signal to it, a dispatcher's or
-  callback's start), not the diagram's opening request.
+  callback's start), not the diagram's opening request. Name an outside call by its
+  event on the label's first line, such as `Channel Confirm Event`, as the journeys do.
+- Numbered phases are `rect` blocks with a phase sentinel fill: `rgba(89,89,89,0.08)`,
+  `rgba(0,89,52,0.08)`, `rgba(140,65,12,0.08)` and `rgba(0,23,90,0.08)`, in that order
+  (the `--amex-phase-1` to `-4` hues). Open each with a note across every lifeline that
+  starts with its number and a middle dot, `Note over A,Z: 2 · Customer back`, and the
+  theme colours that note in the phase's hue. Any other note in a phased diagram turns
+  grey, so the participants are the only strong blue. Diagram 14 is the model.
 
 **If you want to explore further**
 

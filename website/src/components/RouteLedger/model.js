@@ -273,7 +273,7 @@ export const BANDS = [
             },
             stop: {
               title: 'The workflow waits here.',
-              text: "Until the channel says the customer is back from their bank, with a signal to this same workflow, or a fixed time passes with none. Then Billpay asks Amex Pay with Bank Transfer's GET /payment-status, again at a fixed interval while it says pending. Until it is decided, its pending entry blocks the account.",
+              text: "Until the channel says the customer is back from their bank, with an update to this same workflow that Billpay answers with the status, or a fixed time passes with none. While the status is pending, Billpay asks Amex Pay with Bank Transfer's GET /payment-status again at a fixed interval. Until it is decided, its pending entry blocks the account.",
             },
             then: [
               {to: 'confirm', text: 'the channel says the customer is back, with the same payment ID'},
@@ -398,25 +398,25 @@ export const BANDS = [
             id: 'confirm',
             wf: 'CreatePaymentIntent',
             tag: 'the customer is back',
-            signal: 'returned',
-            start: 'a signal to the running workflow',
-            lead: "Decide a payment that waits for bank confirmation, on Amex Pay with Bank Transfer's status, once the customer is back.",
+            update: '{paymentId}-returned',
+            start: 'an update to the running workflow',
+            lead: "Decide a payment that waits for bank confirmation, on Amex Pay with Bank Transfer's status, once the customer is back, and answer the channel with the status.",
             stages: ['Verify'],
             journey: 'Customer back from the bank, PENDING and waiting for bank confirmation',
             wfId: '{paymentId}-init',
-            answer: '202 at once, with the payment\'s current state',
+            answer: 'PENDING, ACCEPTED or DECLINED, the status of one call to GET /payment-status; the channel\'s part ends there',
             chips: five('CONSUMER', 'Y', 'Y'),
             behave: "Example values. Bank confirmation makes Verify ask Amex Pay with Bank Transfer for the status, makes the payment wait for M3 before Execute, and takes clearing out of Execute.",
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "Calls GET /payment-status. Success commits ACCEPTED and failure DECLINED, guarded on PENDING. Pending, a timeout or a 5xx means it asks again after a fixed interval, until the status is final. No token check and no funds check. If no signal ever comes, the same calls start after a fixed time.",
+                "Calls GET /payment-status at once, and the update replies with the answer. Success commits ACCEPTED and failure DECLINED, guarded on PENDING. Pending, a timeout or a 5xx replies PENDING, and Billpay asks again after a fixed interval, with nobody waiting, until the status is final. No token check and no funds check. If the channel never calls, the same calls start after a fixed time.",
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
               'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
               'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-              'Verify|BankConfirmationActivities': {kind: 'call', note: 'GET /payment-status, again at a fixed interval while it says pending'},
+              'Verify|BankConfirmationActivities': {kind: 'call', note: 'GET /payment-status once for the reply, then again at a fixed interval while it says pending'},
             },
             stop: {
               title: 'An ACCEPTED payment waits here.',

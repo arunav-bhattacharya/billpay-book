@@ -58,7 +58,7 @@ Requests reach Billpay through its API gateway, the **One-Data Functions**, and 
     },
     {
       term: 'Pay by bank',
-      desc: `Pay straight from a bank account, confirming the payment at the bank: Pay with Bank Transfer in the UK, Plaid in the US, all through Amex Pay with Bank Transfer. Billpay asks Amex Pay with Bank Transfer how the payment went until it has a final answer, then waits for word that the money has settled, and the money moves at the bank.`,
+      desc: `Pay straight from a bank account, confirming the payment at the bank: Pay with Bank Transfer in the UK, Plaid in the US, all through Amex Pay with Bank Transfer. When the customer is back, Billpay asks Amex Pay with Bank Transfer how the payment went and shows the customer the answer, then keeps asking while it is pending until it has a final one, then waits for word that the money has settled, and the money moves at the bank.`,
     },
     {
       term: 'Pay by Debit card',

@@ -132,7 +132,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
 | `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when Amex Pay with Bank Transfer gives no redirect link, or the card provider gives no answer (Proposed) |
-| `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify. For a bank, on Amex Pay with Bank Transfer's `GET /payment-status`: success or failure, asked again while it says pending. For a debit card, once the card provider calls back, and `ACCEPTED` means the authorization has debited the customer's account |
+| `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify. For a bank, on Amex Pay with Bank Transfer's `GET /payment-status`: success or failure, asked once at the channel's call, which gets the status as its reply, and again while it says pending. For a debit card, once the card provider calls back, and `ACCEPTED` means the authorization has debited the customer's account |
 | `PENDING` (bank confirmation) | `ACCEPTED` | Verify, on M3's settled notice when the status hasn't said success yet. Billpay logs it |
 | `PENDING` (bank confirmation) | `DECLINED` | Verify, when `GET /payment-status` says the payment failed, with `BANK_CONFIRMATION_DECLINED` (Proposed) |
 | `PENDING` (bank confirmation or 3D Secure) | `CANCELLED` | Cancel, on the customer's no, or once a debit card's 2-minute authentication window closes with no callback |

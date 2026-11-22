@@ -885,13 +885,14 @@ sequenceDiagram
 
 ## 14. Pay by bank: create, status and settlement
 
-Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in three phases:
+Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in four phases. The first two are sync: the channel waits for the reply.
 
 1. **Create.** Amex's own checks run first (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link. The channel gets `PENDING` with the link.
-2. **Wait, then ask.** Once the payer's bank routes the customer back, the channel's call, `POST /payments/{payment-id}/confirm`, signals the workflow. It carries no answer, so Billpay asks Amex Pay with Bank Transfer's `GET /payment-status`, and asks again at a fixed interval while the answer is pending.
-3. **Settle.** M3's notice that the bank has settled the money lets Execute and Fulfil run, with no clearing call.
+2. **Customer back.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/confirm`, the Channel Confirm Event. Billpay asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
+3. **While pending.** Billpay asks again at a fixed interval until the answer is success or failure. Nobody waits for it.
+4. **Settle.** M3's notice that the bank has settled the money, the Bank Settled Event, lets Execute and Fulfil run, with no clearing call.
 
-Pink arrows are the two signals that reach the waiting workflow from outside.
+Pink arrows are the events and Temporal messages that reach the waiting workflow from outside.
 
 ```mermaid
 ---
@@ -901,58 +902,69 @@ config:
 ---
 sequenceDiagram
   %% Pink arrows: something outside resumes the payment.
-  %% trigger: confirm
-  %% trigger: POST /payments/{payment-id}/settlement
-  %% trigger: signal
+  %% trigger: Channel Confirm Event
+  %% trigger: update returned
+  %% trigger: Bank Settled Event
+  %% trigger: signal settled
 
   participant CH as Channel,<br/>through One-Data
   participant R as Billpay Router
   participant WF as CreatePaymentIntent<br/>Workflow
   participant PW as Amex Pay with<br/>Bank Transfer
   participant M3
-  participant OR as Oracle
+  participant PS as PaymentStore<br/>(Oracle)
 
-  rect rgba(0,111,207,0.06)
-    Note over CH,OR: 1 · Create
+  rect rgba(89,89,89,0.08)
+    Note over CH,PS: 1 · Create · sync, the channel waits
     CH->>R: POST /payments
     R->>WF: Update-With-Start
     Note over WF: Capture, then<br/>own checks
     WF->>PW: redirect link, one try
     PW-->>WF: link
-    WF->>OR: PENDING, with the link
+    WF->>PS: PENDING, with the link
     WF-->>R: update result
     R-->>CH: PENDING, with the link
   end
 
-  rect rgba(0,111,207,0.06)
-    Note over CH,OR: 2 · Wait, then ask
+  rect rgba(0,89,52,0.08)
+    Note over CH,PS: 2 · Customer back · sync, the channel waits
     Note over CH,PW: the customer approves the payment at their bank
-    CH->>R: confirm: the customer is back
-    R->>WF: signal returned
-    R-->>CH: 202, still PENDING
+    CH->>R: Channel Confirm Event<br/>POST /payments/{payment-id}/confirm
+    R->>WF: update returned
+    WF->>PW: GET /payment-status, one try
+    PW-->>WF: success, failure or pending
+    WF->>PS: ACCEPTED or DECLINED, once final
+    WF-->>R: the status
+    R-->>CH: 200: PENDING, ACCEPTED or DECLINED
+    Note over CH,R: the customer sees the status,<br/>and the channel's part ends here
+  end
+
+  rect rgba(140,65,12,0.08)
+    Note over CH,PS: 3 · While pending · nobody waits
     loop every fixed interval, while pending
       WF->>PW: GET /payment-status
       PW-->>WF: success, failure or pending
     end
-    WF->>OR: ACCEPTED, or DECLINED on failure
+    WF->>PS: ACCEPTED, or DECLINED on failure
   end
 
-  rect rgba(0,111,207,0.06)
-    Note over CH,OR: 3 · Settle
-    M3->>R: POST /payments/{payment-id}/settlement
+  rect rgba(0,23,90,0.08)
+    Note over CH,PS: 4 · Settle · nobody waits
+    M3->>R: Bank Settled Event<br/>POST /payments/{payment-id}/settlement
     R->>WF: signal settled
     R-->>M3: 202
     Note over WF: Execute,<br/>then Fulfil
-    WF->>OR: PROCESSING, then PROCESSED
+    WF->>PS: PROCESSING, then PROCESSED
   end
 ```
 
 What the picture leaves out, so it stays readable:
 
 - **Declines at the create.** A failed own check, or no link from Amex Pay with Bank Transfer, makes the payment `DECLINED` in one commit guarded on `PENDING`, and the channel gets `DECLINED` with no link.
-- **No signal.** If the channel never calls, the workflow waits a fixed time and starts asking anyway. The fixed time and the interval are still to be set, and so is whether anything caps the calls.
-- **A failed status call.** A timeout or a 5xx counts as pending, and Billpay asks again at the next interval.
-- **The outcome.** The channel's call gets 202 and the payment's current state, never the decision. The channel reads the outcome from `GET /payments/{payment-id}`. RTF gets every state change as an event, and Raven sends the customer the market's messages.
+- **A failed status call.** If the call during the channel's confirm times out or gets a 5xx, the reply is `PENDING`, and Billpay asks again at the next interval.
+- **After the reply.** The customer sees the payment's final state later in their list of payments, which the channel reads through `ReadPayments.v1`. RTF gets every state change as an event, and Raven sends the customer the market's messages.
+- **No call from the channel.** The workflow waits a fixed time and starts asking anyway. The fixed time, the interval and the status call's timeout are still to be set, and so is whether anything caps the calls.
+- **A repeated confirm.** It attaches to the same update and gets the same answer.
 - **M3 first.** If M3's notice comes before the status says success, it accepts the payment on its own, the calls stop, and Billpay logs it.
 - **No notice.** An `ACCEPTED` payment whose notice never comes goes on the exception list, with an alert. How long it waits is open.
 - **The customer's no.** It cancels the payment at any point until it is decided, as in [Cancel a payment](./journeys/all-journeys.md#cancel-a-payment).

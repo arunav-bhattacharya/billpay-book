@@ -364,6 +364,15 @@ h3 {
   --amex-trigger: #c4167a;
   --amex-trigger-ink: #ffffff;
 
+  /* The numbered phases of a sequence diagram, one muted hue each, so the
+     phases don't read as more shades of the blue the participants use. Taken
+     from the DLS greys, the DLS status set's deep green and deep orange, and
+     Deep Blue (chosen by the user, 2026-11-22). Read by mermaid.css only. */
+  --amex-phase-1: #595959;
+  --amex-phase-2: #005934;
+  --amex-phase-3: #8c410c;
+  --amex-phase-4: #00175a;
+
   /* How much of its own hue a tinted chip mixes into the panel. Read by the
      chipTinted recipe as a fallback, so a chip can still opt out of either. */
   --chip-fill-base: 10%;
@@ -554,6 +563,11 @@ h3 {
   /* Navy ink on it is 6.6:1; the pink on the page is 7.1:1. */
   --amex-trigger: #ec6fae;
   --amex-trigger-ink: #000f3c;
+
+  --amex-phase-1: #bdbdbd;
+  --amex-phase-2: #6cc49c;
+  --amex-phase-3: #eda46e;
+  --amex-phase-4: #8fb4ec;
 
   --chip-fill-base: 15%;
   --chip-line-base: 34%;
