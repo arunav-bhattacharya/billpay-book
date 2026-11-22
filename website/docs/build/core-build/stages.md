@@ -110,7 +110,7 @@ val stages = stageResolver.resolve(profile)
 
 No `when` or `if` maps a resolved profile to classes, and there is no list to edit. Each stage, check and method says what job it does, its key, and where it applies, its `appliesTo`: a market or every market, an account type or every account type, and the behaviors that must be Y or N. For each key, the most specific class that applies wins. A class tied to a market beats one that isn't, so a market is the exception wherever it has a class of its own. Quarkus finds every class at build time, and a registry works out every combination when the app starts.
 
-No market has a class of its own today: GB's funds check went on 2026-11-10, once the bank's confirm through Amex Pay with Bank Transfer became enough for a bank payment. A market that needs one adds a single class in its module, and that is why the resolved profile carries the market. A debit card shows the same mechanism with a behavior in place of a market: `CardAuthorizationCheck` applies where card authentication is Y, and Verify runs it last, because an approved authorization has already taken the customer's money. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
+No market has a class of its own today: GB's funds check went on 2026-11-10, once Amex Pay with Bank Transfer's word on a bank payment became enough. A market that needs one adds a single class in its module, and that is why the resolved profile carries the market. A debit card shows the same mechanism with a behavior in place of a market: `CardAuthorizationCheck` applies where card authentication is Y, and Verify runs it last, because an approved authorization has already taken the customer's money. [Building the Stage Resolver](./stage-resolver.md) works through Verify for every combination, shows a payment from start to finish, and explains why this design replaced a code generator.
 
 Stages are never `abstract`. A variation is a class of its own that the registry picks, not an override of a base class, so reading one file tells you everything that class does. Deploys are rolling, so a deploy that changes a class a running payment uses is patched like any workflow change, and the replay tests prove old histories still replay (2026-11-08).
 
@@ -230,8 +230,8 @@ The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INS
 | The scheduling horizon | `DATE_BEYOND_SCHEDULING_HORIZON` |
 | `OPTION_VALID`, at Reverify (agreed 2026-11-07) | `PAYMENT_OPTION_INVALID` |
 | `BALANCE_OWED`, at Reverify (agreed 2026-11-07) | `NO_BALANCE_OWED` |
-| `BANK_CONFIRMED`, on the bank's answer (Proposed) | `BANK_CONFIRMATION_DECLINED` |
-| `CONFIRMATION_RECEIVED`, when the bank's wait ends (Proposed) | `CONFIRMATION_NOT_RECEIVED` |
+| `BANK_CONFIRMED`, on Amex Pay with Bank Transfer's status (Proposed) | `BANK_CONFIRMATION_DECLINED` |
+| `CONFIRMATION_RECEIVED`, unused while nothing caps the status calls (Proposed) | `CONFIRMATION_NOT_RECEIVED` |
 | `CARD_AUTHENTICATED` (Proposed) | `CARD_AUTHENTICATION_FAILED` |
 | `CARD_AUTHORIZED` (Proposed) | `CARD_AUTHORIZATION_DECLINED` |
 | `CONFIRMATION_AVAILABLE` (Proposed) | `CONFIRMATION_UNAVAILABLE` |

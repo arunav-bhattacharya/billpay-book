@@ -1,872 +1,259 @@
-import React, { useId, useState } from "react";
-import clsx from "clsx";
-import Link from "@docusaurus/Link";
-import styles from "./styles.module.css";
+import React, {useId, useState} from 'react';
+import clsx from 'clsx';
+import Link from '@docusaurus/Link';
+import CallChip from '../CallChip';
+import TriggerTag from '../TriggerTag';
+import styles from './styles.module.css';
 
 /**
- * PaymentChoices: the Make a Payment Journey page, as one working model.
+ * PaymentChoices: the Make a Payment page as three answers and one result.
  *
- * Three columns. The first is the page a channel shows a customer, with
- * working controls. The second is the calls the channel makes behind it, in
- * order, lit when this set of answers makes them: ReadPaymentOptions.v1, then
- * ReadBillpayInstruments.v1 for the source the customer picked (billpay-online
- * makes the one read that source needs), then CreatePayment.v3. The third is
- * the Router's side: one door, CreatePayment.v3, and the journeys it can
- * pick, each a Temporal workflow. Change an answer and the picked journey
- * moves.
+ * On the left, the three questions the channel's page asks: how much, when,
+ * and from where. On the right, one card that follows the answers: the
+ * journey the Router picks, the Temporal workflow that runs it, the calls the
+ * channel makes in order, and what reaches the payment afterwards. A pink tag
+ * marks anything that resumes a waiting payment from outside.
  *
- * Before the Router, One-Data's pending check: a create on an account that
- * already has a payment in PENDING is declined there, and never reaches
- * Billpay. Then the spec's Router: it checks for a wait first (a bank step or
- * a debit card), then a later date, then several instructions, then MR Points
- * alone, then pay today. The list shows the journeys in the order customers
- * meet them, which is not the order the Router checks them in, and the
- * footnote says so. Where the spec has no answer yet, the model says that
- * instead of picking a journey.
- *
- * Every call the channel makes keeps the site's channel-call look: a navy
- * block or chip with a Bright Blue key square. The read Billpay makes behind
- * ReadBillpayInstruments.v1 is a pale tag, since the channel never makes it.
- * Call 2 shows its two mandatory filters: the source this page's answer maps
- * to, and the journey context, ONE_TIME_DIRECT_DEBIT on this page.
+ * Any combination can be picked. One the design refuses, such as a debit card
+ * on a later date, shows the 422 and why, so the rule is visible instead of
+ * hidden behind a disabled button.
  */
 
-const ALL_JOURNEYS = "/docs/design/journeys/all-journeys";
+const ALL = '/docs/design/journeys/all-journeys';
 
-const JOURNEYS = [
-  {
-    id: "today",
-    term: "Pay my bill today",
-    when: ["today", "one instruction"],
-    wf: "CreateImmediatePayment",
-    to: `${ALL_JOURNEYS}#pay-my-bill-today`,
-  },
-  {
-    id: "later",
-    term: "Pay on a future date",
-    when: ["a later date"],
-    wf: "CreateScheduledPayment",
-    to: `${ALL_JOURNEYS}#pay-on-a-future-date`,
-  },
-  {
-    id: "bank",
-    term: "Pay by Bank today",
-    when: ["today", "a bank step"],
-    wf: "CreatePaymentIntent",
-    to: `${ALL_JOURNEYS}#pay-by-bank-today`,
-  },
-  {
-    id: "card",
-    term: "Pay by Debit card",
-    when: ["today", "a debit card"],
-    wf: "CreatePaymentIntent",
-    to: `${ALL_JOURNEYS}#pay-by-debit-card`,
-  },
-  {
-    id: "multi",
-    term: "Pay with multiple instructions",
-    when: ["today", "account and points"],
-    wf: "CreatePaymentWithMultipleInstructions",
-    to: `${ALL_JOURNEYS}#pay-with-multiple-instructions`,
-  },
-  {
-    id: "points",
-    term: "Pay with MR Points",
-    when: ["today", "points only"],
-    wf: "Pay with MR Points",
-    composite: true,
-    to: `${ALL_JOURNEYS}#pay-with-mr-points`,
-  },
+const AMOUNTS = [
+  {id: 'statement', label: 'Statement balance'},
+  {id: 'total', label: 'Total balance'},
+  {id: 'minimum', label: 'Minimum due'},
+  {id: 'other', label: 'Other amount'},
 ];
-const JOURNEY = Object.fromEntries(JOURNEYS.map((j) => [j.id, j]));
-
-const METHODS = [
-  { id: "bank", label: "Enrolled Instruments" },
-  {
-    id: "debit",
-    label: "Debit card",
-    note: "checked with 3D Secure",
-    todayOnly: true,
-  },
-  {
-    id: "transfer",
-    label: "Pay with Bank Transfer",
-    note: "you confirm it at your bank",
-    todayOnly: true,
-  },
+const WHEN = [
+  {id: 'today', label: 'Today'},
+  {id: 'later', label: 'A later date'},
 ];
-const TODAY_ONLY = new Set(
-  METHODS.filter((m) => m.todayOnly).map((m) => m.id),
-);
-
-const OPTIONS_RETURNS = [
-  "what the customer owes. Nothing owed, and the journey never starts",
-  "the payment options, Statement Balance, Total Balance, Minimum Due and Other Amount, each with a payment option ID the create carries",
-  "whether the customer can pay today, on a future date, or both",
-  "the range of dates a future payment can take",
+/* Where the customer pays from, and the source the channel passes to
+   ReadBillpayInstruments.v1. MR Points alone need no instruments read. */
+const SOURCES = [
+  {id: 'enrolled', label: 'Enrolled instrument', source: 'EnrolledInstruments', behind: 'ReadInstruments', owner: 'Payment Instruments'},
+  {id: 'debit', label: 'Debit card', source: 'DebitCard', behind: 'GET /banks', owner: 'Amex Pay with Bank Transfer', todayOnly: true},
+  {id: 'transfer', label: 'Pay with Bank Transfer', source: 'PayWithBankTransfer', behind: 'GET /banks', owner: 'Amex Pay with Bank Transfer', todayOnly: true},
+  {id: 'mixed', label: 'Account and MR Points', source: 'EnrolledInstruments', behind: 'ReadInstruments', owner: 'Payment Instruments', todayOnly: true},
+  {id: 'points', label: 'MR Points only', todayOnly: true},
 ];
+const SOURCE = Object.fromEntries(SOURCES.map((s) => [s.id, s]));
 
-/* The read billpay-online makes behind ReadBillpayInstruments.v1, by source,
-   and the source value the channel passes. */
-const READS = {
+const JOURNEYS = {
+  today: {
+    term: 'Pay my bill today',
+    to: `${ALL}#pay-my-bill-today`,
+    wf: 'CreateImmediatePaymentWorkflow',
+    text: 'Verify decides inside the create, so the channel has ACCEPTED or DECLINED in its reply. Execute and Fulfil follow with nobody waiting.',
+  },
+  later: {
+    term: 'Pay on a future date',
+    to: `${ALL}#pay-on-a-future-date`,
+    wf: 'CreateScheduledPaymentWorkflow',
+    then: 'ExecuteScheduledPaymentWorkflow',
+    text: 'The reply is SCHEDULED. On the due date a dispatcher starts the second workflow on the Offline cluster, which checks the payment again and runs it.',
+  },
   bank: {
-    source: "EnrolledInstruments",
-    read: "ReadInstruments",
-    what: "the instruments the customer has enrolled",
-    pick: "Which instrument",
+    term: 'Pay by Bank today',
+    to: `${ALL}#pay-by-bank-today`,
+    wf: 'CreatePaymentIntentWorkflow',
+    text: 'The reply is PENDING with the redirect link. Once the customer is back, Billpay asks Amex Pay with Bank Transfer for the status until it is success or failure, then waits for M3 before Execute.',
+    after: [
+      {name: 'CreateConfirmPendingPayment.v1', who: 'channel', trigger: 'signal', note: "once the payer's bank routes the customer back"},
+      {name: 'GET /payment-status', who: 'billpay', repeat: true, note: 'Billpay asks Amex Pay with Bank Transfer, again at a fixed interval while it says pending'},
+      {name: 'POST /payments/{payment-id}/settlement', who: 'other', trigger: 'signal', note: "M3's notice that the money settled"},
+    ],
   },
-  debit: {
-    source: "DebitCard",
-    read: "ReadBanksForRealtimePayments.v1",
-    what: "the banks the customer can pay from by debit card",
-    pick: "Which bank",
+  card: {
+    term: 'Pay by Debit card',
+    to: `${ALL}#pay-by-debit-card`,
+    wf: 'CreatePaymentIntentWorkflow',
+    text: 'The reply is PENDING with a 3D Secure challenge link, or none. The card provider calls back, and Verify authorizes the payment. No callback in 2 minutes, and it is cancelled.',
+    after: [{name: 'POST /payments/{payment-id}/authentication', who: 'other', trigger: 'update', note: "the card provider's 3D Secure callback"}],
   },
-  transfer: {
-    source: "PayWithBankTransfer",
-    read: "ReadBanksForRealtimePayments.v1",
-    what: "the banks the customer can pay from in real time",
-    pick: "Which bank",
+  multi: {
+    term: 'Pay with multiple instructions',
+    to: `${ALL}#pay-with-multiple-instructions`,
+    wf: 'CreatePaymentWithMultipleInstructionsWorkflow',
+    text: 'The composite decides each instruction and replies with every decision. Each accepted instruction runs Execute and Fulfil in a child.',
+  },
+  points: {
+    term: 'Pay with MR Points',
+    to: `${ALL}#pay-with-mr-points`,
+    wf: 'Pay with MR Points composite',
+    text: 'A composite across Billpay and Loyalty. Its steps are still to be defined.',
   },
 };
-const CONTEXT = "ONE_TIME_DIRECT_DEBIT";
 
-const OPEN = [
-  [
-    "The rest of the page",
-    "where it gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. ReadPaymentOptions.v1 is one option",
-  ],
-  [
-    "ReadBillpayInstruments.v1",
-    "its contract, and the billpay-online endpoint's path",
-  ],
-  [
-    "The bank read",
-    "who owns ReadBanksForRealtimePayments.v1, probably the Instruments domain, and its contract",
-  ],
-  [
-    "Pay with Bank Transfer",
-    "the contracts of Amex Pay with Bank Transfer's confirm and M3's settled notice, and how long a payment waits for M3",
-  ],
-  ["Pay with MR Points", "its steps, and its calls to Loyalty"],
-];
-
-/* What the Router does with one set of answers. Returns a result with a
-   kind: 'none' (nothing owed), 'declined' (One-Data's pending check),
-   'open' (the design has no answer yet), 'refused' (422), or 'pick' with
-   the journey's id. */
-function decide(a) {
-  if (!a.owed) {
+/* What the design does with one set of answers. */
+function decide({when, from, pending}) {
+  const src = SOURCE[from];
+  if (pending) {
     return {
-      kind: "none",
-      text: "Nothing is owed, so the page offers no payment. The channel calls nothing else, and no journey starts.",
+      kind: 'declined',
+      term: 'Declined by One-Data',
+      text: "One-Data finds another payment still PENDING on the account and declines this create itself: 200 with DECLINED and a reason. billpay-online is never called.",
     };
   }
-  const pointsOnly = a.points && a.pointsMode === "only";
-  const instructions = pointsOnly
-    ? ["points"]
-    : a.points
-      ? [a.method, "points"]
-      : [a.method];
-  const several = instructions.length > 1;
-  const bankStep = instructions.includes("transfer");
-  const card = instructions.includes("debit");
-  const later = a.date === "later";
-  const met = new Set([later ? "a later date" : "today"]);
-  if (several) met.add("account and points");
-  else if (pointsOnly) met.add("points only");
-  else met.add("one instruction");
-  if (bankStep) met.add("a bank step");
-  if (card) met.add("a debit card");
-
-  if (a.pending) {
+  if (when === 'later' && src.todayOnly) {
     return {
-      kind: "declined",
-      met,
-      text: "One-Data's pending check finds the payment already PENDING on the account, and declines this one there and then: 200 with DECLINED and its reason. billpay-online is never called, so no payment exists in Billpay. The customer can pay again once the pending one is decided.",
+      kind: 'refused',
+      term: 'Turned away, 422',
+      text: `${src.label} pays today only, so a future-dated create gets 422 before any workflow starts. The page doesn't offer it once a later date is picked.`,
     };
   }
-  if (card && (several || later)) {
-    return {
-      kind: "refused",
-      met,
-      text: "A debit card pays today only, with one instruction and no MR Points, so this create gets 422 before any workflow starts.",
-    };
-  }
-  if (card) {
-    return {
-      kind: "pick",
-      id: "card",
-      met,
-      text: `The Router starts CreatePaymentIntentWorkflow. Amex's own checks run first, and a payment that fails them is DECLINED before 3D Secure. Then it starts 3D Secure with the card provider and replies PENDING with the challenge link, or none. The card provider's callback brings the result, and Verify authorizes the payment last: approved, the money leaves the customer's account; declined by the card's bank, the payment is DECLINED. No callback in 2 minutes, and the payment is cancelled.`,
-    };
-  }
-  if (bankStep && several) {
-    return {
-      kind: "refused",
-      met,
-      text: "Several instructions never take bank confirmation, so this create gets 422 before any workflow starts.",
-    };
-  }
-  if (bankStep && later) {
-    return {
-      kind: "refused",
-      met,
-      text: "Pay with Bank Transfer pays today only, so a future-dated create gets 422 before any workflow starts.",
-    };
-  }
-  if (bankStep) {
-    return {
-      kind: "pick",
-      id: "bank",
-      met,
-      text: "The Router starts CreatePaymentIntentWorkflow. Amex's own checks run first, and a payment that fails them is DECLINED with no link. Otherwise it replies PENDING with Amex Pay with Bank Transfer's link and waits, for up to the market's 24 to 48 hours. The first confirm decides, the channel's or Amex Pay with Bank Transfer's: ACCEPTED or DECLINED on the bank's answer, with no further check. Execute and Fulfil wait for M3's settled notice, which accepts the payment on its own if no confirm came.",
-    };
-  }
-  if (later) {
-    return {
-      kind: "pick",
-      id: "later",
-      met,
-      text: `The Router starts CreateScheduledPaymentWorkflow on the Online cluster. On the due date, ExecuteScheduledPaymentWorkflow runs it on the Offline cluster.`,
-    };
-  }
-  if (several) {
-    return {
-      kind: "pick",
-      id: "multi",
-      met,
-      text: `The Router starts CreatePaymentWithMultipleInstructionsWorkflow, which decides every instruction itself and replies, then runs each accepted instruction's Execute and Fulfil in a child.`,
-    };
-  }
-  if (pointsOnly) {
-    return {
-      kind: "pick",
-      id: "points",
-      met,
-      text: `The Router starts the Pay with MR Points composite, across Billpay and Loyalty. Its steps are still to be defined.`,
-    };
-  }
-  return {
-    kind: "pick",
-    id: "today",
-    met,
-    text: `The Router starts CreateImmediatePaymentWorkflow on the Online cluster, and the customer has an answer once Verify decides.`,
-  };
+  const id = {debit: 'card', transfer: 'bank', mixed: 'multi', points: 'points'}[from] || (when === 'later' ? 'later' : 'today');
+  return {kind: 'pick', id, ...JOURNEYS[id]};
 }
 
-function Badge({ n, quiet }) {
+function Choice({n, term, options, value, onChange}) {
+  const uid = useId();
   return (
-    <span
-      className={clsx(styles.badge, quiet && styles.badgeQuiet)}
-      aria-hidden="true"
-    >
-      {n}
-    </span>
-  );
-}
-
-/* A call the channel makes: the navy chip with the key square, numbered. */
-function CallTag({ n, name }) {
-  return (
-    <span className={styles.callTag}>
-      <span className={styles.callKey} aria-hidden="true" />
-      <span className={styles.srOnly}>Call {n}, made by the channel: </span>
-      <span className={styles.mono}>{name}</span>
-      <span className={styles.callTagN} aria-hidden="true">{n}</span>
-    </span>
-  );
-}
-
-/* A read Billpay makes for the channel: pale, never the channel's own. */
-function ReadTag({ name }) {
-  return (
-    <span className={styles.readTag}>
-      <span className={styles.readVia}>Billpay calls</span>
-      <span className={styles.mono}>{name}</span>
-    </span>
-  );
-}
-
-const SOURCE_CHOICES = {
-  debit: [["listed", "A bank from the list"]],
-  transfer: [["listed", "A bank from the list"]],
-};
-
-function Segmented({ label, options, value, onChange, disabled }) {
-  return (
-    <div className={styles.segmented} role="group" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          className={styles.seg}
-          aria-pressed={value === o.id}
-          disabled={disabled?.(o.id)}
-          onClick={() => onChange(o.id)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Field({ n, term, call, children }) {
-  return (
-    <div className={styles.field}>
-      <div className={styles.fieldHead}>
-        <span className={styles.fieldTerm}>
-          <Badge n={n} />
-          {term}
+    <div className={styles.question} role="group" aria-labelledby={uid}>
+      <p className={styles.qHead} id={uid}>
+        <span className={styles.badge} aria-hidden="true">
+          {n}
         </span>
-        {call}
+        {term}
+      </p>
+      <div className={styles.options}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            className={styles.option}
+            aria-pressed={value === o.id}
+            onClick={() => onChange(o.id)}>
+            {o.label}
+          </button>
+        ))}
       </div>
-      {children}
     </div>
   );
 }
 
-function ThePage({ a, set }) {
-  const uid = useId();
-  const pointsOnly = a.points && a.pointsMode === "only";
-  const method = METHODS.find((m) => m.id === a.method);
-  const later = a.date === "later";
-  /* A later date is not offered once the customer has picked something
-     that pays today only, and the reverse: no choice is undone for them. */
-  const todayOnly = a.points || (!pointsOnly && TODAY_ONLY.has(a.method));
-  return (
-    <section
-      className={clsx(styles.col, styles.colPage)}
-      aria-labelledby={`${uid}-page`}
-    >
-      <header className={styles.colHead}>
-        <p className={styles.kicker} id={`${uid}-page`}>
-          Make a payment
-        </p>
-        <p className={styles.colSub}>
-          What the channel&apos;s page asks. Try it: the other columns follow.
-        </p>
-      </header>
-
-      <Field
-        n={1}
-        term="How much"
-        call={<CallTag n={1} name="ReadPaymentOptions.v1" />}
-      >
-        <Segmented
-          label="How much"
-          value={a.amount}
-          onChange={(v) => set({ amount: v })}
-          disabled={() => !a.owed}
-          options={[
-            { id: "statement", label: "Statement balance" },
-            { id: "total", label: "Total balance" },
-            { id: "min", label: "Minimum due" },
-            { id: "other", label: "Other amount" },
-          ]}
-        />
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={!a.owed}
-            onChange={(e) => set({ owed: !e.target.checked })}
-          />
-          <span>The account owes nothing</span>
-        </label>
-      </Field>
-
-      <div className={clsx(styles.rest, !a.owed && styles.off)} inert={!a.owed}>
-        <Field
-          n={2}
-          term="When"
-          call={<CallTag n={1} name="ReadPaymentOptions.v1" />}
-        >
-          <Segmented
-            label="When"
-            value={a.date}
-            onChange={(v) => set({ date: v })}
-            disabled={(id) => id === "later" && todayOnly}
-            options={[
-              { id: "today", label: "Today" },
-              { id: "later", label: "A later date" },
-            ]}
-          />
-          <p className={styles.hint}>
-            {todayOnly
-              ? `${a.points ? "MR Points pay" : `${method.label} pays`} today only.`
-              : "Today, or a date inside the range ReadPaymentOptions.v1 gives this customer."}
-          </p>
-        </Field>
-
-        <Field
-          n={3}
-          term="From where"
-          call={<CallTag n={2} name="ReadBillpayInstruments.v1" />}
-        >
-          <div className={styles.selectWrap}>
-            <select
-              className={styles.select}
-              aria-label="From where"
-              value={a.method}
-              disabled={pointsOnly}
-              onChange={(e) =>
-                set({
-                  method: e.target.value,
-                  ...(e.target.value === "debit" ? { points: false } : {}),
-                })
-              }
-            >
-              {METHODS.map((m) => (
-                <option
-                  key={m.id}
-                  value={m.id}
-                  disabled={later && m.todayOnly}
-                >
-                  {m.label}
-                  {later && m.todayOnly ? " (today only)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          {later && !pointsOnly && (
-            <p className={styles.hint}>
-              Pay with Bank Transfer and a debit card pay today only, so a
-              later date doesn&apos;t offer them.
-            </p>
-          )}
-          {method.note && !pointsOnly && !later && (
-            <p className={styles.hint}>{method.note}</p>
-          )}
-          {!pointsOnly && (
-            <div className={styles.sub}>
-              <div className={styles.subHead}>
-                <span>{READS[a.method].pick}</span>
-                <ReadTag name={READS[a.method].read} />
-              </div>
-              <div className={styles.selectWrap}>
-                {a.method === "bank" ? (
-                  <select
-                    className={styles.select}
-                    aria-label="Which instrument"
-                    value={a.account}
-                    onChange={(e) => set({ account: e.target.value })}
-                  >
-                    <option value="checking">Checking account</option>
-                    <option value="savings">Savings account</option>
-                  </select>
-                ) : (
-                  <select
-                    key={a.method}
-                    className={styles.select}
-                    aria-label={READS[a.method].pick}
-                    defaultValue={SOURCE_CHOICES[a.method][0][0]}
-                  >
-                    {SOURCE_CHOICES[a.method].map(([id, label]) => (
-                      <option key={id} value={id}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-          )}
-          <label className={clsx(styles.check, styles.checkStrong)}>
-            <input
-              type="checkbox"
-              checked={a.points}
-              disabled={a.method === "debit" || later}
-              onChange={(e) => set({ points: e.target.checked })}
-            />
-            <span>Pay with MR Points</span>
-            <span className={styles.checkNote}>
-              {a.method === "debit"
-                ? "not with a debit card"
-                : later
-                  ? "today only"
-                  : "where the market offers them"}
-            </span>
-          </label>
-          {a.points && (
-            <Segmented
-              label="How the points pay"
-              value={a.pointsMode}
-              onChange={(v) => set({ pointsMode: v })}
-              options={[
-                { id: "with", label: "With the instrument above" },
-                { id: "only", label: "Points only" },
-              ]}
-            />
-          )}
-        </Field>
-
-        <div className={styles.pay}>
-          <span className={styles.payButton}>Review and pay</span>
-          <CallTag n={3} name="CreatePayment.v3" />
-        </div>
-
-        <div className={styles.aside}>
-          <p className={styles.kickerQuiet}>Shown only when offered</p>
-          <p className={styles.asideLine}>
-            <span className={styles.hollow} aria-hidden="true" />
-            <span>
-              <strong>Pay and set up a plan.</strong> Its own call,{" "}
-              <code>CreatePaymentInstallment.v1</code>, and its own journey, Pay
-              &amp; Plan.
-            </span>
-          </p>
-          <p className={styles.kickerQuiet}>On each payment in the list</p>
-          <p className={styles.asideNote}>
-            Change and Cancel until the window closes. Confirm and Say no while
-            it waits.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TheCalls({ a }) {
-  const uid = useId();
-  const pointsOnly = a.points && a.pointsMode === "only";
-  const source = a.owed && !pointsOnly ? READS[a.method] : null;
-  const bankStep =
-    a.owed && !pointsOnly && !a.points && a.method === "transfer" && a.date === "today" && !a.pending;
-  const card =
-    a.owed && !pointsOnly && !a.points && a.method === "debit" && a.date === "today" && !a.pending;
+function Calls({a, result}) {
+  const src = SOURCE[a.from];
   const calls = [
-    {
-      n: 1,
-      name: "ReadPaymentOptions.v1",
-      line: "What the customer owes and the options to pay it, and when they can pay. Nothing owed, nothing more.",
-      on: true,
-      status: "exists",
+    {name: 'ReadPaymentOptions.v1', note: 'the amounts, the options with their IDs, and when the customer can pay'},
+    src.source && {
+      name: 'ReadBillpayInstruments.v1',
+      note: (
+        <>
+          <code>source={src.source}</code>. Billpay calls {src.owner}&apos;s <code>{src.behind}</code>
+        </>
+      ),
     },
     {
-      n: 2,
-      name: "ReadBillpayInstruments.v1",
-      line: source
-        ? `Billpay calls ${source.read} for ${source.what}, and keeps only what the market's rules allow for this payment.`
-        : "Where the customer pays from. Not called when MR Points pay alone.",
-      filters: source && [
-        ["source", source.source],
-        ["journeyContext", CONTEXT],
-      ],
-      on: Boolean(source),
-      status: "new",
+      name: 'CreatePayment.v3',
+      note:
+        result.kind === 'declined'
+          ? 'stopped at One-Data'
+          : result.kind === 'refused'
+            ? 'answered 422'
+            : a.from === 'points'
+              ? 'with no option ID, since points alone carry none. The Router picks the journey'
+              : `with the ${AMOUNTS.find((x) => x.id === a.amount).label.toLowerCase()} option's ID. The Router picks the journey`,
     },
-    {
-      n: 3,
-      name: "CreatePayment.v3",
-      line: pointsOnly
-        ? "The payment, with no option ID: MR Points alone carry none. The Router picks the journey."
-        : "The payment, with the chosen option's ID. The Router picks the journey.",
-      on: a.owed,
-      status: "exists",
-    },
-    {
-      n: 4,
-      name: "CreateConfirmPendingPayment.v1",
-      line: "Pay with Bank Transfer only: the customer is back from their bank, with the bank's answer. If Amex Pay with Bank Transfer confirmed first, this gets the same answer.",
-      on: bankStep,
-      status: "exists",
-    },
-  ];
-  const gates = [
-    "once the customer picks where to pay from",
-    "on Review and pay",
-    "once the customer is back from their bank",
-  ];
+  ].filter(Boolean);
   return (
-    <section
-      className={clsx(styles.col, styles.colCalls)}
-      aria-labelledby={`${uid}-calls`}
-    >
-      <div className={styles.callsMain}>
-        <header className={styles.colHead}>
-          <p className={styles.kicker} id={`${uid}-calls`}>
-            The calls behind this page
-          </p>
-          <p className={styles.colSub}>
-            The channel makes them, in this order.
-          </p>
-        </header>
-        <ol className={styles.calls}>
-          {calls.map((c, i) => (
-            <li key={c.n} className={styles.callItem}>
-              {i > 0 && (
-                <p className={clsx(styles.gate, !c.on && styles.gateOff)}>
-                  <span className={styles.gateLine} aria-hidden="true" />
-                  {gates[i - 1]}
-                </p>
-              )}
-              <div
-                className={clsx(
-                  styles.call,
-                  !c.on && styles.callOff,
-                )}
-              >
-                <span className={styles.callSquare} aria-hidden="true">{c.n}</span>
-                <div className={styles.callBody}>
-                  <p className={styles.callName}>
-                    <span className={styles.mono}>{c.name}</span>
-                    <span
-                      className={clsx(
-                        styles.status,
-                        c.status === "new" && styles.statusNew,
-                      )}
-                    >
-                      {c.status}
-                    </span>
-                  </p>
-                  <p className={styles.callLine}>{c.line}</p>
-                  {c.filters && (
-                    <p className={styles.filters}>
-                      {c.filters.map(([k, v]) => (
-                        <span key={k} className={styles.filter}>
-                          <span className={styles.filterKey}>{k}</span>
-                          <span className={styles.filterVal}>{v}</span>
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                </div>
-                <span className={styles.srOnly}>
-                  {c.on
-                    ? "Called for these answers."
-                    : "Not called for these answers."}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <p className={styles.kickerQuiet}>Never from the channel</p>
-        <p className={clsx(styles.callback, card && styles.callbackOn)}>
-          <span className={styles.hollow} aria-hidden="true" />
-          <span>
-            For a debit card, the card provider&apos;s 3D Secure callback comes
-            in after the create, straight to billpay-online.
+    <ol className={styles.calls}>
+      {calls.map((c, i) => (
+        <li key={c.name}>
+          <span className={styles.callN} aria-hidden="true">
+            {i + 1}
           </span>
-        </p>
-        <p className={clsx(styles.callback, bankStep && styles.callbackOn)}>
-          <span className={styles.hollow} aria-hidden="true" />
-          <span>
-            For Pay with Bank Transfer, Amex Pay with Bank Transfer can send its
-            own confirm, and M3&apos;s settled notice comes after, both straight
-            to billpay-online.
+          <span className={styles.callBody}>
+            <CallChip name={c.name} />
+            <span className={styles.callNote}>{c.note}</span>
           </span>
-        </p>
-      </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
-      <div className={styles.callsMore}>
-        <p className={styles.kickerQuiet}>What call 1 returns</p>
-        <ul className={styles.returns}>
-          {OPTIONS_RETURNS.map((what) => (
-            <li key={what}>
-              <span className={styles.dotSquare} aria-hidden="true" />
-              <span>{what}</span>
-            </li>
-          ))}
-        </ul>
-
-        <p className={styles.kickerQuiet}>Where call 2 looks, by source</p>
-        <ul className={styles.returns}>
-          {Object.entries(READS).map(([id, r]) => (
-            <li key={id}>
-              <span className={styles.dotSquare} aria-hidden="true" />
-              <span>
-                <span className={styles.mono}>{r.source}</span>
-                <span className={styles.source}>Billpay calls {r.read}</span>
+function After({items}) {
+  return (
+    <ol className={styles.after}>
+      {items.map((c) => (
+        <li key={c.name}>
+          <span className={clsx(styles.afterMark, c.trigger && styles.afterPink)} aria-hidden="true">
+            {c.repeat && (
+              <span className={styles.cadence}>
+                <i />
+                <i />
+                <i />
+                <b />
               </span>
-            </li>
-          ))}
-        </ul>
-        <p className={styles.asideNote}>
-          This page passes the journey context ONE_TIME_DIRECT_DEBIT. Setting
-          up Autopay passes RECURRING_DIRECT_DEBIT, which takes enrolled
-          instruments only, and the market&apos;s enrolledInstrumentStatuses
-          says which instrument statuses each context offers.
-        </p>
+            )}
+          </span>
+          <span className={styles.callBody}>
+            <span className={styles.afterHead}>
+              <CallChip name={c.name} who={c.who} />
+              {c.trigger && <TriggerTag kind={c.trigger} />}
+            </span>
+            <span className={styles.callNote}>{c.note}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
-        <p className={styles.kickerQuiet}>Still to be defined</p>
-        <ul className={styles.open}>
-          {OPEN.map(([term, what]) => (
-            <li key={term}>
-              <span className={styles.hollow} aria-hidden="true" />
-              <span>
-                <strong>{term}</strong>
-                <span className={styles.openWhat}>{what}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+function Result({a}) {
+  const r = decide(a);
+  return (
+    <section className={clsx(styles.result, r.kind !== 'pick' && styles.resultStop)} aria-live="polite">
+      <p className={styles.kicker}>{r.kind === 'pick' ? 'The journey' : 'No journey'}</p>
+      <h4 className={styles.resultTerm}>{r.to ? <Link to={r.to}>{r.term}</Link> : r.term}</h4>
+      {r.wf && (
+        <p className={styles.wfRow}>
+          <span className={styles.wf}>{r.wf}</span>
+          {r.then && (
+            <>
+              <span className={styles.then}>then, on the date</span>
+              <span className={styles.wf}>{r.then}</span>
+            </>
+          )}
+        </p>
+      )}
+      <p className={styles.resultText}>{r.text}</p>
+
+      <p className={styles.kicker}>The channel&apos;s calls, in order</p>
+      <Calls a={a} result={r} />
+
+      {r.after && (
+        <>
+          <p className={styles.kicker}>Then, after the reply</p>
+          <After items={r.after} />
+        </>
+      )}
     </section>
   );
 }
 
-function TheRouter({ a, set, result }) {
-  const uid = useId();
-  const picked = result.kind === "pick" ? result.id : null;
-  return (
-    <section
-      className={clsx(styles.col, styles.colRouter)}
-      aria-labelledby={`${uid}-router`}
-    >
-      <header className={styles.colHead}>
-        <p className={styles.kicker} id={`${uid}-router`}>
-          How the answers become a journey
-        </p>
-        <p className={styles.colSub}>
-          The channel sends one request. The Router reads it and picks one
-          journey.
-        </p>
-      </header>
-
-      <div className={styles.door}>
-        <span className={clsx(styles.mono, styles.doorName)}>CreatePayment.v3</span>
-        <span className={styles.doorFields}>
-          amount · account · date · instructions
-        </span>
-      </div>
-
-      <div className={styles.knows}>
-        <p className={styles.kickerQuiet}>Before the Router: One-Data&apos;s pending check</p>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={a.pending}
-            onChange={(e) => set({ pending: e.target.checked })}
-          />
-          <span>Another payment on the account is still PENDING</span>
-          <span className={styles.checkNote}>One-Data declines this one</span>
-        </label>
-      </div>
-
-      <p className={styles.legend}>
-        <span className={styles.wfSwatch} aria-hidden="true" />
-        The Router starts each journey as one Temporal workflow.
-      </p>
-
-      <ol className={styles.journeys}>
-        {JOURNEYS.map((j, i) => {
-          const on = picked === j.id;
-          return (
-            <li
-              key={j.id}
-              className={clsx(
-                styles.journey,
-                on && styles.journeyOn,
-                picked && !on && styles.journeyDim,
-              )}
-            >
-              <span className={styles.journeyN} aria-hidden="true">
-                {i + 1}
-              </span>
-              <span className={styles.conds}>
-                {j.when.map((c) => (
-                  <span
-                    key={c}
-                    className={clsx(
-                      styles.cond,
-                      on && result.met?.has(c) && styles.condOn,
-                    )}
-                  >
-                    {c}
-                  </span>
-                ))}
-              </span>
-              <span className={styles.arrow} aria-hidden="true" />
-              <span className={styles.journeyMain}>
-                <Link className={styles.journeyTerm} to={j.to}>
-                  <span className={styles.square} aria-hidden="true" />
-                  {j.term}
-                  {on && <span className={styles.srOnly}> (picked)</span>}
-                </Link>
-                <span className={styles.wf}>
-                  <span className={styles.wfDot} aria-hidden="true" />
-                  {j.composite ? `${j.wf} composite` : j.wf}
-                </span>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-
-      <div
-        className={clsx(styles.result, styles[`result_${result.kind}`])}
-        aria-live="polite"
-      >
-        <p className={styles.resultTerm}>
-          {result.kind === "pick" && JOURNEY[result.id].term}
-          {result.kind === "none" && "No journey"}
-          {result.kind === "refused" && "Turned away, 422"}
-          {result.kind === "open" && "Not in the design yet"}
-          {result.kind === "declined" && "Declined by One-Data"}
-        </p>
-        <p className={styles.resultText}>{result.text}</p>
-      </div>
-
-      <ul className={styles.notes}>
-        <li>
-          <span className={styles.hollow} aria-hidden="true" />
-          <span>
-            <strong>A corporate account</strong> asks for its allocations before
-            any money moves, and takes neither bank confirmation nor a debit
-            card: a corporate create with either gets 422.
-          </span>
-        </li>
-        <li>
-          <span className={styles.hollow} aria-hidden="true" />
-          <span>
-            <strong>Pay &amp; Plan</strong> is its own call,{" "}
-            <code>CreatePaymentInstallment.v1</code>, and its own composite
-            workflow. One-Data&apos;s pending check covers it too.
-          </span>
-        </li>
-      </ul>
-
-      <p className={styles.footnote}>
-        The list is in the order customers meet these journeys. The Router
-        checks them in its own order: a wait first, then a later date, then
-        several instructions, then MR Points alone, then pay today. The
-        ordered list is Proposed.
-      </p>
-    </section>
-  );
-}
-
-const START = {
-  owed: true,
-  amount: "statement",
-  method: "bank",
-  account: "checking",
-  points: false,
-  pointsMode: "with",
-  date: "today",
-  pending: false,
-};
+const START = {amount: 'statement', when: 'today', from: 'transfer', pending: false};
 
 export default function PaymentChoices() {
   const [a, setA] = useState(START);
-  const set = (patch) => setA((prev) => ({ ...prev, ...patch }));
-  const result = decide(a);
+  const set = (patch) => setA((prev) => ({...prev, ...patch}));
   return (
     <div className={styles.wrap}>
-      <div className={styles.grid}>
-        <ThePage a={a} set={set} />
-        <TheCalls a={a} />
-        <TheRouter a={a} set={set} result={result} />
-      </div>
-      <div className={styles.foot}>
-        <button
-          type="button"
-          className={styles.reset}
-          onClick={() => setA(START)}
-        >
-          Start again
-        </button>
-      </div>
+      <section className={styles.page} aria-label="The payment page">
+        <p className={styles.kicker}>The payment page</p>
+        <Choice n={1} term="How much" options={AMOUNTS} value={a.amount} onChange={(v) => set({amount: v})} />
+        <Choice n={2} term="When" options={WHEN} value={a.when} onChange={(v) => set({when: v})} />
+        <Choice n={3} term="From where" options={SOURCES} value={a.from} onChange={(v) => set({from: v})} />
+        <label className={styles.check}>
+          <input type="checkbox" checked={a.pending} onChange={(e) => set({pending: e.target.checked})} />
+          <span>Another payment on this account is still PENDING</span>
+        </label>
+      </section>
+      <Result a={a} />
     </div>
   );
 }

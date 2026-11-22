@@ -261,7 +261,7 @@ The customer picks a date inside the range Payment Options gives them. Billpay c
 
 ### Pay by Bank today
 
-Some markets let a customer pay straight from their bank account, confirming the payment at their bank: Pay with Bank Transfer in the UK, Plaid in the US. Billpay talks to one service for all of them, Amex Pay with Bank Transfer, which works with each market's provider. The customer starts the payment as usual, gets sent to their bank, and comes back. Billpay holds the payment at `PENDING` meanwhile, and one workflow, `CreatePaymentIntentWorkflow`, waits for the answer and then for M3's word that the money settled, so the payment's whole story shows in one place in the Temporal UI.
+Some markets let a customer pay straight from their bank account, confirming the payment at their bank: Pay with Bank Transfer in the UK, Plaid in the US. Billpay talks to one service for all of them, Amex Pay with Bank Transfer, which works with each market's provider. The customer starts the payment as usual, goes to their bank, and comes back. Billpay holds the payment at `PENDING` meanwhile, then asks Amex Pay with Bank Transfer how the payment went, and keeps asking until it has a final answer. One workflow, `CreatePaymentIntentWorkflow`, runs all of it, so the payment's whole story shows in one place in the Temporal UI.
 
 <JourneyMap
   kind="customer"
@@ -277,60 +277,51 @@ Some markets let a customer pay straight from their bank account, confirming the
     note: 'Which payment methods need bank confirmation is a market setting, resolved per request.',
   }}
   entry={[
-    {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
-    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', logo: 'oneData', note: "the channel's confirm"},
+    {kind: 'function', label: 'CreatePayment.v3'},
+    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', note: 'once the customer is back'},
   ]}
   core={[
     {kind: 'api', label: 'POST /payments'},
     {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
-    {kind: 'api', label: 'POST /payments/{payment-id}/bank-confirmation', note: "Amex PwBT's confirm"},
     {kind: 'api', label: 'POST /payments/{payment-id}/settlement', note: "M3's notice"},
   ]}
-  workflow={{label: 'CreatePaymentIntentWorkflow', note: "the first confirm arrives as an update, M3's notice as a signal"}}
+  workflow={{label: 'CreatePaymentIntentWorkflow'}}
   steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
+    {name: 'Capture', state: 'PENDING', mode: 'live', arrives: 'create'},
     {
-      icon: 'shieldCheck',
       name: 'Own checks',
       state: 'PENDING',
       mode: 'live',
-      caption: 'before the bank step',
+      caption: 'Amex\'s own checks, before the bank step',
       systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
       exit: {state: 'DECLINED'},
     },
     {
-      icon: 'redirect',
       name: 'Redirect',
       state: 'PENDING',
       mode: 'live',
-      caption: 'replies PENDING with the link',
+      caption: 'replies PENDING with the redirect link',
       reply: 'to the caller with PENDING and the redirect link',
       systems: ['Amex PwBT'],
       exit: {state: 'DECLINED', label: 'no link'},
     },
     {
-      icon: 'bank',
-      name: 'Customer confirms',
+      name: 'Customer back',
       state: 'PENDING',
       mode: 'awaiting',
-      caption: 'the confirm, from the channel or Amex PwBT',
-      trigger: {kind: 'update', label: 'the confirm, from the channel or straight from Amex Pay with Bank Transfer; the first one decides'},
-      exit: {state: 'DECLINED', label: 'none in 24 to 48 h'},
+      caption: 'the channel signals once the payer\'s bank routes the customer back',
+      trigger: {kind: 'signal', label: "the channel's call once the payer's bank routes the customer back; with no signal, a fixed time passes instead"},
+      exit: {state: 'CANCELLED', label: "the customer's no"},
     },
     {
-      icon: 'shieldCheck',
-      name: 'Verify',
+      name: 'Status',
       state: 'ACCEPTED',
-      mode: 'live',
-      caption: 'replies to the confirm',
-      reply: "to the confirm with ACCEPTED or DECLINED, on the bank's answer",
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
+      mode: 'background',
+      caption: 'GET /payment-status until success or failure',
+      poll: {label: 'GET /payment-status', note: 'Amex Pay with Bank Transfer, asked at a fixed interval until it answers success or failure'},
+      exit: {state: 'DECLINED', label: 'failed'},
     },
     {
-      icon: 'clock',
       name: 'Settled',
       state: 'ACCEPTED',
       mode: 'awaiting',
@@ -339,45 +330,40 @@ Some markets let a customer pay straight from their bank account, confirming the
       exit: {label: 'no notice: exception list'},
     },
     {
-      icon: 'parallelArrows',
       name: 'Execute',
       state: 'PROCESSING',
       mode: 'background',
+      caption: 'no clearing call',
       systems: ['GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'no clearing call',
     },
     {
-      icon: 'broadcast',
       name: 'Fulfil',
       state: 'PROCESSED',
       mode: 'background',
       systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
     },
     {
-      icon: 'doubleCheck',
       name: 'Paid',
       state: 'PAID',
       mode: 'awaiting',
       trigger: {kind: 'events', label: "M3's settlement and Accounts Receivable's posting"},
       caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
       exit: {state: 'RETURNED'},
     },
   ]}
   detail={[
     {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
-    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before the bank step: Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionByIdentifier.v1` confirms the option they picked, and Plans returns the mandate details where the market requires one. A payment that fails them is `DECLINED` at once, with no redirect link. One that passes stays `PENDING`, and nothing is committed.'},
-    {step: 3, text: 'RequestConfirmation asks Amex Pay with Bank Transfer for the customer\'s redirect link and stores it on the payment. Billpay never calls a market\'s provider itself. The caller\'s update returns `PENDING` with the link, and the `PENDING` event goes to RTF. If no link comes back, the payment is `DECLINED` instead.'},
-    {step: 4, text: 'The customer confirms the payment at their bank while the workflow waits on its timer: the market\'s wait, 24 to 48 hours, and a short grace. The customer can still say no, and the payment ends `CANCELLED`. If neither a confirm nor M3\'s notice comes in time, Verify declines it with `CONFIRMATION_NOT_RECEIVED` (the code is Proposed), and RTF and Raven are told. Until the payment is decided, its pending entry blocks the account\'s next payment.'},
-    {step: 5, text: 'The confirm comes from the channel, `POST /payments/{payment-id}/confirm`, or from Amex Pay with Bank Transfer, the PISP (Payment Initiation Service Provider) interface, straight to billpay-online through `POST /payments/{payment-id}/bank-confirmation`. Each carries the bank\'s answer, and both are the same update to the waiting workflow, so whichever lands first decides and the second gets the same answer. Verify commits `ACCEPTED` or `DECLINED` on that answer, guarded on `PENDING`, and calls nothing: there is no Payment Instruments token check and no funds check once the bank has confirmed. The first confirm\'s reply returns here, and the delete takes the payment off the account\'s pending list.'},
-    {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
-    {step: 6, text: 'An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it tells Amex; M3 intercepts that message and calls billpay-online\'s `POST /payments/{payment-id}/settlement`, which signals the workflow. If M3\'s notice arrives before any confirm, Billpay accepts the payment on it, carries on, and logs that no confirm came for that payment ID. If the notice never comes, the payment goes on the exception list with an alert; how long Billpay waits is still open.'},
+    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before the bank step: Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionByIdentifier.v1` confirms the option they picked, and Plans returns the mandate details where the market requires one. A payment that fails them is `DECLINED` at once, with no redirect link.'},
+    {step: 3, text: 'RequestConfirmation asks Amex Pay with Bank Transfer for the customer\'s redirect link and stores it on the payment. Billpay never calls a market\'s provider itself. The caller gets `PENDING` with the link, and the `PENDING` event goes to RTF. If no link comes back, the payment is `DECLINED` instead.'},
+    {step: 4, text: 'The customer approves the payment at their bank, and the payer\'s bank routes them back to the channel. The channel then calls `CreateConfirmPendingPayment.v1`, which reaches billpay-online as `POST /payments/{payment-id}/confirm` and signals the workflow. The call carries no answer: it only says the customer is back. If the channel never calls, Billpay waits a fixed time and moves on anyway. The customer can still say no at any point until the payment is decided, and it ends `CANCELLED`. Until then, the payment\'s pending entry blocks the account\'s next payment.'},
+    {text: 'Everything after this runs with nobody waiting, in the same workflow. The channel learns the outcome from `GET /payments/{payment-id}`.'},
+    {step: 5, text: 'Verify calls Amex Pay with Bank Transfer\'s `GET /payment-status`. Success commits `ACCEPTED`, and failure commits `DECLINED` with `BANK_CONFIRMATION_DECLINED` (the code is Proposed). Pending means the bank hasn\'t finished: the workflow waits a fixed interval and asks again, until the answer is success or failure. A call that times out or fails counts as pending. The delay and the interval are still to be set, and so is whether anything caps the calls.'},
+    {step: 6, text: 'An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it tells Amex; M3 intercepts that message and calls billpay-online\'s `POST /payments/{payment-id}/settlement`, which signals the workflow. If M3\'s notice arrives before the status says success, Billpay accepts the payment on it, stops asking, and logs it. If the notice never comes, the payment goes on the exception list with an alert; how long Billpay waits is still open.'},
     {step: 7, text: 'Execute makes no clearing call, since the money moved at the bank. The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
     {step: 8, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
     {step: 9, text: '`PAID` follows once the settlement and the AR posting are both in. M3\'s notice is this payment\'s settlement; how it reaches One-Data\'s pairing is still open.'},
   ]}
-  reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-confirm-and-settlement', label: 'Sequence diagram'}}
+  reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-status-and-settlement', label: 'Sequence diagram'}}
 />
 
 ### Pay by Debit card

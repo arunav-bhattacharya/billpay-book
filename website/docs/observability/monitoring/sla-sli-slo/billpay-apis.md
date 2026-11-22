@@ -78,7 +78,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **Billpay Core API** · `GET /instruments/account/{account-id}?source={source}&journeyContext={journeyContext}` (path Proposed) · SLA availability: not set yet
 
-**SLI:** latency for one source's list, including billpay-online's call to `ReadInstruments` or `ReadBanksForRealtimePayments.v1` and the filter by the market's rules and the journey context. Its targets are still to come.
+**SLI:** latency for one source's list, including billpay-online's call to `ReadInstruments` or Amex Pay with Bank Transfer's `GET /banks` and the filter by the market's rules and the journey context. Its targets are still to come.
 
 ## Payment Installments
 
@@ -90,7 +90,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **SLI:** end-to-end latency at the core API, covering the composite's own decision, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
 
-## Confirm Payment
+## Customer Back From the Bank
 
 **Billpay Core API** · `POST /payments/{payment-id}/confirm` · SLA availability: **99.95%**
 
@@ -98,13 +98,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 | --- | --- | --- | --- | --- |
 | 120 ms | 250 ms | 500 ms | 900 ms | 1.5 s |
 
-**SLI:** request-to-response latency for a confirm. It answers through an update to the payment's waiting workflow, so no workflow starts, and like a create it waits at most 2.5 seconds for a decision before it replies `PENDING`. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
-
-## Amex Pay with Bank Transfer's Confirm
-
-**Billpay Core API** · `POST /payments/{payment-id}/bank-confirmation` (path Proposed) · SLA availability: not set yet
-
-**SLI:** request-to-response latency for Amex Pay with Bank Transfer's own confirm. It is the same update as the channel's confirm, and Verify makes no call, so it should sit close to the confirm's figures. Its targets are still to come.
+**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It signals the payment's waiting workflow and answers 202 with the payment's current state, so no workflow starts and it waits for no decision. Targets Proposed (2026-10-20). **Error budget:** 0.05% / 30-day window.
 
 ## M3's Settled Notice
 

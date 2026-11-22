@@ -192,7 +192,7 @@ Pass the array, get the component.
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
-| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller) and `trigger` (`{kind, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`) | One payment journey as a banded process flow. A triggered step gets a pink flag naming its `kind`, its incoming connector is drawn as a pink dashed wait, and a key appears under the rail. |
+| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems` and `table` | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends. A wait is three dots; a repeated call is a row of small squares ending in a solid one. Under 540px of its own width it folds into a list. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
 | `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row`, `child`, or `update` or `signal` to a running workflow; every one but `uws` and `child` draws its line in the trigger pink) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
@@ -209,7 +209,8 @@ Two of these are worth a second look before you build anything new.
 picture. It is already written and it takes your data.
 
 **`JourneyMap`** is the most reused diagram on the site: one page,
-[design/journeys](website/docs/design/journeys/index.md), draws 18 of them from data. If
+[design/journeys](website/docs/design/journeys/index.md), draws 19 of them from data, all in the
+same five lanes, so a reader who learns one journey can read them all. If
 your diagram is a process with steps, states and side calls, start here rather than
 from scratch.
 
@@ -275,7 +276,7 @@ One colour sits outside the DLS on purpose. `--amex-trigger`, a pink, with
 from outside its running work: a Temporal update or signal, a callback, a dispatcher,
 or the events One-Data pairs. Temporal's own UI marks signals in pink, and a blue mark
 would sink among the blue arrows. Use it only for that, and through one of the three
-places that already draw it: JourneyMap's trigger flags, the `TriggerTag` component
+places that already draw it: JourneyMap's Outside lane, the `TriggerTag` component
 (also `CallChip`'s `trigger` prop), RouteMap's lines, and a sequence diagram's `%% trigger:` lines.
 
 The lifecycle colours, `--amex-state-intermediate`, `--amex-state-success`,

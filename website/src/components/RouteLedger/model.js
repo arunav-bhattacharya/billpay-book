@@ -141,8 +141,8 @@ export const IFACES = [
     system: 'Amex PwBT',
     long: "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls. It works with each market's provider, Plaid in the US among them",
     queue: 'local activity',
-    at: ['RequestConfirmation'],
-    note: 'only the Online cluster calls it',
+    at: ['RequestConfirmation', 'Verify'],
+    note: 'only the Online cluster calls it: the redirect link, then GET /payment-status',
   },
   {
     name: 'CardActivities',
@@ -273,11 +273,10 @@ export const BANDS = [
             },
             stop: {
               title: 'The workflow waits here.',
-              text: "On its own timer: the market's wait, 24 to 48 hours, and a short grace. The first confirm, the channel's or Amex Pay with Bank Transfer's, arrives as an update to this same workflow, and M3's settled notice as a signal. If neither comes in time, Verify declines the payment with CONFIRMATION_NOT_RECEIVED (Proposed). Until it is decided, its pending entry blocks the account.",
+              text: "Until the channel says the customer is back from their bank, with a signal to this same workflow, or a fixed time passes with none. Then Billpay asks Amex Pay with Bank Transfer's GET /payment-status, again at a fixed interval while it says pending. Until it is decided, its pending entry blocks the account.",
             },
             then: [
-              {to: 'confirm', text: 'the channel confirms, with the same payment ID'},
-              {to: 'pwbtConfirm', text: 'or Amex Pay with Bank Transfer confirms'},
+              {to: 'confirm', text: 'the channel says the customer is back, with the same payment ID'},
               {to: 'settled', text: "or M3's notice comes first"},
               {to: 'no', text: 'or the customer says no'},
             ],
@@ -382,7 +381,7 @@ export const BANDS = [
             move: {Cancel: 'PENDING to CANCELLED'},
             notes: {
               Cancel:
-                "No window check. One guarded update on PENDING. A yes and a no from two tabs are two updates to one workflow: the first one it accepts wins, and the other gets 409. For a debit card, the same Cancel runs if the timer fires with no answer; a bank payment is declined then instead. The event and message go out after the reply.",
+                "No window check. One guarded update on PENDING. A yes and a no from two tabs are two updates to one workflow: the first one it accepts wins, and the other gets 409. For a debit card, the same Cancel runs if the timer fires with no callback. The event and message go out after the reply.",
             },
             end: 'CANCELLED is final.',
           },
@@ -392,70 +391,32 @@ export const BANDS = [
         fn: ['CreateConfirm|PendingPayment.v1'],
         from: 'a channel',
         calls: 'A channel calls',
-        does: "confirm a payment that waits for bank confirmation, with the bank's answer and the same payment ID",
+        does: "say the customer is back from their bank, once the payer's bank routes them back, with the same payment ID",
         api: ['POST', '/payments/{payment-id}/confirm'],
         roads: [
           {
             id: 'confirm',
             wf: 'CreatePaymentIntent',
-            tag: 'the confirm',
-            update: '{paymentId}-confirm',
-            start: 'an update to the running workflow',
-            lead: "Decide a payment that waits for bank confirmation, on the bank's answer the channel brings back.",
+            tag: 'the customer is back',
+            signal: 'returned',
+            start: 'a signal to the running workflow',
+            lead: "Decide a payment that waits for bank confirmation, on Amex Pay with Bank Transfer's status, once the customer is back.",
             stages: ['Verify'],
-            journey: "Confirm payment, PENDING and waiting for bank confirmation, inside the market's wait",
+            journey: 'Customer back from the bank, PENDING and waiting for bank confirmation',
             wfId: '{paymentId}-init',
-            answer: 'once Verify decides',
+            answer: '202 at once, with the payment\'s current state',
             chips: five('CONSUMER', 'Y', 'Y'),
-            behave: 'Example values. Bank confirmation makes Verify read the bank\'s answer and call nothing, makes the payment wait for M3 before Execute, and takes clearing out of Execute.',
+            behave: "Example values. Bank confirmation makes Verify ask Amex Pay with Bank Transfer for the status, makes the payment wait for M3 before Execute, and takes clearing out of Execute.",
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "No call: a rule reads the bank's answer and commits ACCEPTED or DECLINED, guarded on PENDING. The bank has confirmed, so there is no token check and no funds check. The first confirm decides, the channel's or Amex Pay with Bank Transfer's: both send this update, and the second gets the same answer. A confirm after the payment was decided another way gets its current state.",
+                "Calls GET /payment-status. Success commits ACCEPTED and failure DECLINED, guarded on PENDING. Pending, a timeout or a 5xx means it asks again after a fixed interval, until the status is final. No token check and no funds check. If no signal ever comes, the same calls start after a fixed time.",
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
               'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
               'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-            },
-            stop: {
-              title: 'An ACCEPTED payment waits here.',
-              text: "For M3's notice that the bank has settled it in real time. Only then do Execute and Fulfil run. If the notice never comes, the payment goes on the exception list with an alert; how long it waits is still open.",
-            },
-            then: [{to: 'settled', text: "M3's settled notice"}],
-          },
-        ],
-      },
-      {
-        fn: ['Amex PwBT|confirm'],
-        from: 'Amex Pay with Bank Transfer',
-        calls: 'Amex Pay with Bank Transfer calls',
-        direct: true,
-        does: "its own confirm for a payment that waits for bank confirmation, with the bank's answer",
-        api: ['POST', '/payments/{payment-id}/bank-confirmation'],
-        roads: [
-          {
-            id: 'pwbtConfirm',
-            wf: 'CreatePaymentIntent',
-            tag: "Amex PwBT's confirm",
-            update: '{paymentId}-confirm',
-            start: 'an update to the running workflow',
-            lead: "Decide a payment that waits for bank confirmation, on the bank's answer Amex Pay with Bank Transfer sends, the PISP interface's own word.",
-            stages: ['Verify'],
-            journey: "Confirm payment, PENDING and waiting for bank confirmation, inside the market's wait",
-            wfId: '{paymentId}-init',
-            answer: 'once Verify decides',
-            chips: five('CONSUMER', 'Y', 'Y'),
-            behave: 'Example values. Bank confirmation makes Verify read the bank\'s answer and call nothing, makes the payment wait for M3 before Execute, and takes clearing out of Execute.',
-            move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
-            notes: {
-              Verify:
-                "No call: a rule reads the bank's answer and commits ACCEPTED or DECLINED, guarded on PENDING. The bank has confirmed, so there is no token check and no funds check. The first confirm decides, the channel's or Amex Pay with Bank Transfer's: both send this update, and the second gets the same answer. A confirm after the payment was decided another way gets its current state.",
-            },
-            exc: {
-              'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-              'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-              'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
+              'Verify|BankConfirmationActivities': {kind: 'call', note: 'GET /payment-status, again at a fixed interval while it says pending'},
             },
             stop: {
               title: 'An ACCEPTED payment waits here.',
@@ -481,15 +442,15 @@ export const BANDS = [
             start: 'a signal to the running workflow',
             lead: "Carry on with a Pay with Bank Transfer payment once M3 says the bank has settled it.",
             stages: ['Verify', 'Execute', 'Fulfil'],
-            cond: {Verify: "Only when no confirm came first: it accepts the payment on M3's notice, and Billpay logs the missing confirm."},
+            cond: {Verify: "Only when the status hasn't said success yet: it accepts the payment on M3's notice, the status calls stop, and Billpay logs it."},
             journey: 'Settled notice, a Pay with Bank Transfer payment, PENDING or ACCEPTED',
             wfId: '{paymentId}-init',
             answer: '202 at once',
             chips: five('CONSUMER', 'Y', 'Y'),
             behave: "Example values. M3's notice is the payment's settlement, so Execute makes no clearing call and Billpay creates no settlement event.",
-            move: {Verify: 'PENDING to ACCEPTED, with no confirm'},
+            move: {Verify: 'PENDING to ACCEPTED, before a success'},
             notes: {
-              Verify: "Runs only when the payment is still PENDING: no confirm came from the channel or Amex Pay with Bank Transfer. One guarded commit to ACCEPTED, and a log line that names the payment ID with no confirm.",
+              Verify: "Runs only when the payment is still PENDING: GET /payment-status hasn't said success yet. One guarded commit to ACCEPTED, and a log line that names the payment ID.",
               Execute: "No clearing call: the money moved at the bank, and M3's notice is the settlement. The AR balance and open-to-buy calls go out.",
             },
             exc: {
@@ -1166,7 +1127,7 @@ export function calls(j, f) {
 
 /* roads whose workflow calls the delete API at One-Data, always after the
    caller's reply: every create workflow once Verify decides, whatever
-   started it; a payment that waits, once the confirm, the callback, the no
+   started it; a payment that waits, once the status, the callback, the no
    or the timer decides it (agreed 2026-11-08) */
 const DELETES = new Set(['immediate', 'scheduled', 'bank', 'card', 'confirm', 'authenticated', 'no', 'refund', 'arScheduled', 'arRefund', 'multiple', 'payplan']);
 /* creates One-Data never stored, so the delete finds nothing to remove */
@@ -1183,13 +1144,13 @@ export function inboxUse(j) {
   /* a payment that waits for its customer stays in One-Data's Redis until it
      is decided, and makes one delete call then (agreed 2026-11-08) */
   if (j.id === 'bank' || j.id === 'card') {
-    return "calls the delete API here only for a payment declined at the create. A payment that waits keeps its pending entry, which blocks the account, and makes its one delete call once the confirm, M3's notice, the callback, the no or the timer decides it";
+    return "calls the delete API here only for a payment declined at the create. A payment that waits keeps its pending entry, which blocks the account, and makes its one delete call once the status, M3's notice, the callback, the no or the timer decides it";
   }
-  if (j.id === 'confirm' || j.id === 'pwbtConfirm') {
-    return "calls the delete API once Verify decides, so the account's pending entry goes and the customer can pay again";
+  if (j.id === 'confirm') {
+    return "calls the delete API once Verify decides on the final status, so the account's pending entry goes and the customer can pay again";
   }
   if (j.id === 'settled') {
-    return "calls the delete API here only when M3's notice is what accepts the payment, with no confirm before it";
+    return "calls the delete API here only when M3's notice is what accepts the payment, before the status says success";
   }
   if (j.id === 'authenticated') {
     return "calls the delete API once Verify decides, so the account's pending entry goes. Execute hands One-Data the settlement event Billpay creates, dated when the money moved";

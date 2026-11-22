@@ -111,7 +111,7 @@ export const GROUPS = [
         id: 'bank',
         term: 'Pay by Bank today',
         kind: 'customer',
-        meta: ['customer initiated', 'Online, one workflow throughout', 'up to the market\'s 24 to 48 hours'],
+        meta: ['customer initiated', 'Online, one workflow throughout', 'until the bank\'s status is final'],
         segments: [
           {
             phase: ['The create', 'the customer waits for the link'],
@@ -124,22 +124,22 @@ export const GROUPS = [
             oneData: [{...CREATE, at: 'Capture'}],
           },
           {
-            phase: ['At the bank', "the market's wait, 24 to 48 hours"],
-            wait: "The workflow waits on its own timer. No confirm and no settled notice in time, and Verify declines the payment with CONFIRMATION_NOT_RECEIVED (Proposed). The customer's no cancels it. Until then its pending entry blocks the account.",
-            customer: [{t: 'Confirms at the bank', s: 'through Amex Pay with Bank Transfer', m: 'choice'}],
+            phase: ['At the bank', 'until the customer is back'],
+            wait: "The workflow waits for the channel's signal, or a fixed time if none comes. The customer's no cancels the payment at any point until it is decided. Until then its pending entry blocks the account.",
+            customer: [{t: 'Approves at the bank', s: 'through Amex Pay with Bank Transfer', m: 'choice'}],
           },
           {
-            phase: ['The confirm', 'the first one decides'],
+            phase: ['The status', 'asked until it is final'],
             road: 'confirm',
             waiting: true,
             customer: [
-              {t: 'Comes back', s: "the channel's confirm, or Amex Pay with Bank Transfer's first", st: 'ACCEPTED', m: 'on', at: 'Verify'},
+              {t: 'Comes back', s: "the payer's bank routes them back to the channel", st: 'ACCEPTED', m: 'on', at: 'Verify'},
             ],
             oneData: [
-              {c: 'CreateConfirmPendingPayment.v1', s: "the channel's confirm, with the bank's answer", at: 'Verify'},
+              {c: 'CreateConfirmPendingPayment.v1', s: 'a signal: the customer is back, with no answer', at: 'Verify'},
               {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'},
             ],
-            after: "Verify calls nothing: it reads the bank's answer, with no token check and no funds check. Amex Pay with Bank Transfer can send the same confirm straight to billpay-online, and whichever lands first decides. An ACCEPTED payment then waits for M3.",
+            after: "Verify asks Amex Pay with Bank Transfer's GET /payment-status: success is ACCEPTED, failure DECLINED, and pending means it asks again after a fixed interval. No token check and no funds check. The channel reads the outcome from the payment. An ACCEPTED payment then waits for M3.",
           },
           {
             phase: ['Settled', "M3's notice, straight to billpay-online"],
@@ -147,7 +147,7 @@ export const GROUPS = [
             customer: [
               {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
             ],
-            after: "The bank tells Amex the payment has settled, and M3 passes it on as a signal. Execute makes no clearing call: M3's notice is the settlement. If the notice comes before any confirm, Billpay accepts the payment on it and logs the missing confirm. If it never comes, the payment goes on the exception list with an alert.",
+            after: "The bank tells Amex the payment has settled, and M3 passes it on as a signal. Execute makes no clearing call: M3's notice is the settlement. If the notice comes before the status says success, Billpay accepts the payment on it and stops asking. If it never comes, the payment goes on the exception list with an alert.",
           },
           {
             ...PAID_SEGMENT,

@@ -19,9 +19,9 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 - The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it. It needs neither the market nor the account type: its payment already exists, and the payment's workflows keep the config version they started on. So it starts with no resolved profile, and its workflow has no `Market`, `ConfigVersion` or `DueDate` search attribute (`DueDate` agreed 2026-11-07, the rest Proposed).
 - The dispatchers, in billpay-offline, once for each Work Tracker row or inbox request they release.
 
-On every `/payments` call, the create, the update, the cancel and the confirm, One-Data passes the card account's market and account type, which it looks up with `ReadCustomerAccountInfo.v1`, so the Router makes no lookup of its own. A create also carries each instruction's instrument type and payment ID (agreed 2026-11-07). The wire names of these fields come with the API contracts and are placeholders until then.
+On every `/payments` call, the create, the update, the cancel and the channel's call after the bank, One-Data passes the card account's market and account type, which it looks up with `ReadCustomerAccountInfo.v1`, so the Router makes no lookup of its own. A create also carries each instruction's instrument type and payment ID (agreed 2026-11-07). The wire names of these fields come with the API contracts and are placeholders until then.
 
-The confirm, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, as an update, so there is nothing to pick, pin or choose ([6. Start](#6-start) shows the call).
+The channel's call once the customer is back from their bank, and the customer's no to a payment that waits, go through admission only. They reach a workflow that is already running, the call as a signal and the no as an update, so there is nothing to pick, pin or choose ([6. Start](#6-start) shows the call).
 
 Calling it is a plain function call inside the app. Each app holds a Temporal client for its own cluster only, so the run site always names that cluster: billpay-online starts on the Online cluster and billpay-offline on the Offline cluster. The dispatchers call it from their `claimAndStart` activity, never from workflow code, because starting a workflow is I/O and workflow code [has to stay deterministic](./workflows.md#why-workflow-code-must-be-deterministic).
 
@@ -159,7 +159,7 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 The request's payment method comes from the instrument type One-Data passes for each instruction, so the Router knows before anything starts whether a way to pay needs bank confirmation (Pay with Bank Transfer, Plaid), is a debit card (3D Secure) or is MR Points (agreed 2026-11-07).
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait and takes the confirm and the no as updates. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait, takes the channel's call as a signal and the no as an update, and asks Amex Pay with Bank Transfer for the status. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
 
 No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-online ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
@@ -302,23 +302,33 @@ try {
 
 `REJECT_DUPLICATE` refuses a second run once the first has closed, so a row released twice can't execute a payment twice. The allocations callback starts the same way and also sets conflict policy `USE_EXISTING`. Its API replies 202 only after the start returns, so the workflow exists before the allocations manager hears back. While the Offline cluster is down, that start fails, and the API answers 503 with `Retry-After`.
 
-The confirm, and the no to a payment that waits, start nothing. They are updates to the payment's running `CreatePaymentIntentWorkflow`:
+The channel's call and the no to a payment that waits start nothing. They reach the payment's running `CreatePaymentIntentWorkflow`: the call as a signal, since it carries no answer and waits for none, and the no as an update, since the channel needs the decision back:
 
 ```kotlin
 val stub = onlineClient.newUntypedWorkflowStub("$paymentId-init")
+
+// The customer is back from their bank: a signal, then the payment's current state.
+fun returned(paymentId: String): PaymentDecision = try {
+    stub.signal("returned")                                     // Billpay asks Amex PwBT for the status next
+    answerFromOracle(paymentId)                                 // 202, still PENDING
+} catch (e: WorkflowNotFoundException) {
+    answerFromOracle(paymentId)                                 // closed: a retry whose reply was lost
+}
+
+// The customer's no: an update, answered with the decision.
 val options = UpdateOptions.newBuilder(PaymentDecision::class.java)
-    .setUpdateName("confirm")
-    .setUpdateId("$paymentId-confirm")                          // a repeat attaches to the same update
+    .setUpdateName("decline")
+    .setUpdateId("$paymentId-no")                               // a repeat attaches to the same update
     .setWaitForStage(WorkflowUpdateStage.COMPLETED)
     .build()
 val reply = try {
     CompletableFuture.supplyAsync({ stub.startUpdate(options).result }, temporalCalls)
-        .get(2500, TimeUnit.MILLISECONDS)                       // Verify's decision, under the same bound
+        .get(2500, TimeUnit.MILLISECONDS)                       // CANCELLED, under the same bound
 } catch (e: TimeoutException) {
     PaymentDecision.PENDING                                     // it finishes on its own
 } catch (e: ExecutionException) {
     when (e.cause) {
-        is WorkflowUpdateException -> answerFromOracle(paymentId)     // turned away: 409 for a cancelled payment
+        is WorkflowUpdateException -> answerFromOracle(paymentId)     // turned away: 409 once it no longer waits
         is WorkflowNotFoundException -> answerFromOracle(paymentId)   // closed: a retry whose reply was lost
         else -> throw e
     }
@@ -327,7 +337,7 @@ val reply = try {
 
 *(A sketch: the API names are the Java SDK's, the rest illustrative.)*
 
-The workflow's validator turns away a confirm that comes after it has an answer, or once it no longer waits, before anything is written to its history.
+The workflow's validator turns away a no that comes once the workflow no longer waits, before anything is written to its history. A signal has no validator: a repeated `returned` signal simply changes nothing.
 
 Neither cluster uses eager workflow start: the server refuses it with Update-With-Start (`RequestEagerExecution is not supported`), and online latency comes from Update-With-Start and local activities instead. On the Online cluster, Verify's calls run as local activities, so the whole decision happens in the workflow's first task.
 

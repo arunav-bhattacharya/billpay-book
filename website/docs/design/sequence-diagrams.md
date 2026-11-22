@@ -883,11 +883,15 @@ sequenceDiagram
   end
 ```
 
-## 14. Pay by bank: create, confirm and settlement
+## 14. Pay by bank: create, status and settlement
 
-Some payments wait for the customer to confirm the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end. Amex's own checks run first, before the bank step, and a payment that fails them is `DECLINED` with no link. The create's update ends at `PENDING` with the redirect link, or at `DECLINED` when no link comes back, so no payment waits without one. The workflow then waits on its timer, for the market's wait of 24 to 48 hours.
+Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in three phases:
 
-The confirm can come from the channel or from Amex Pay with Bank Transfer, the PISP (Payment Initiation Service Provider) interface, and both carry the bank's answer. Both send the same update, so whichever lands first decides and the second gets the same answer. Verify commits `ACCEPTED` or `DECLINED` on the answer and calls nothing: no token check, no funds check. An `ACCEPTED` payment then waits for M3, which intercepts the bank's message that the payment has settled and tells billpay-online; that signal lets Execute and Fulfil run, with no clearing call. If M3's notice comes before any confirm, it accepts the payment on its own, and Billpay logs the missing confirm. If nothing comes before the timer fires, Verify declines the payment. Once the payment is decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15). The customer's no still cancels a waiting payment, as in [Cancel a payment](./journeys/all-journeys.md#cancel-a-payment).
+1. **Create.** Amex's own checks run first (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link. The channel gets `PENDING` with the link.
+2. **Wait, then ask.** Once the payer's bank routes the customer back, the channel's call, `POST /payments/{payment-id}/confirm`, signals the workflow. It carries no answer, so Billpay asks Amex Pay with Bank Transfer's `GET /payment-status`, and asks again at a fixed interval while the answer is pending.
+3. **Settle.** M3's notice that the bank has settled the money lets Execute and Fulfil run, with no clearing call.
+
+Pink arrows are the two signals that reach the waiting workflow from outside.
 
 ```mermaid
 ---
@@ -896,134 +900,65 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
-  %% Pink arrows: something outside starts or resumes the payment.
-  %% trigger: update confirm
-  %% trigger: signal settled
-  autonumber
+  %% Pink arrows: something outside resumes the payment.
+  %% trigger: confirm
+  %% trigger: POST /payments/{payment-id}/settlement
+  %% trigger: signal
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as CreatePayment.v3
-    participant OC as CreateConfirm<br/>PendingPayment.v1
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant WF as CreatePaymentIntent<br/>Workflow
-    participant RQC as Request<br/>Confirmation
-    participant VER as Verify
-    participant PS as PaymentStore (Oracle)
-  end
-
+  participant CH as Channel,<br/>through One-Data
+  participant R as Billpay Router
+  participant WF as CreatePaymentIntent<br/>Workflow
   participant PW as Amex Pay with<br/>Bank Transfer
   participant M3
-  participant RTF
-  participant RAV as Raven
+  participant OR as Oracle
 
-  OD->>R: POST /payments,<br/>today, bank confirmation
-  Note over R: admit, resolve requiresBankConfirmation<br/>to Y, pick the intent journey,<br/>pin profile, run on Online
-  R->>WF: Update-With-Start,<br/>{paymentId}-init
-
-  rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster, the first workflow task
-    Note over WF: Capture first: PENDING
-    WF->>VER: own checks, before the bank step
-    Note over VER: Instruments, Options by option ID,<br/>and Plans for a mandate, in parallel
-    alt a check's rule fails
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → DECLINED,<br/>guarded on PENDING
-      end
-    else they pass: still PENDING, nothing committed
-      WF->>RQC: run
-      RQC->>PW: ask for the customer's<br/>redirect link, one try
-      alt the link comes back
-        rect rgba(102,169,226,0.40)
-          RQC->>PS: the link and its reference,<br/>guarded on PENDING
-        end
-      else no link: Amex Pay with Bank Transfer is down or too slow
-        rect rgba(102,169,226,0.40)
-          RQC->>PS: state → DECLINED,<br/>guarded on PENDING
-        end
-      end
-    end
-  end
-
-  WF-->>R: update result
-  R-->>OD: PENDING with the redirect link,<br/>or DECLINED with none
-
-  rect rgba(0,111,207,0.12)
-    Note over WF,RTF: Online cluster, after the reply
-    WF->>RTF: PENDING event. With no link, the DECLINED event<br/>and Raven message, and the workflow ends
-  end
-
-  rect rgba(83,86,90,0.14)
-    Note over WF,M3: The customer confirms at their bank. The workflow waits on its timer: the market's wait of 24 to 48 hours and a 10-second grace
-  end
-
-  alt a confirm comes first
-    alt from the channel
-      OC->>R: POST /payments/{payment-id}/confirm,<br/>with the bank's answer
-      Note over OC,R: no answer in 3 s, or a 5xx: One-Data doesn't hold the confirm.<br/>It answers 503, and the customer confirms again with the same update ID
-    else from Amex Pay with Bank Transfer, straight to billpay-online
-      PW->>R: POST /payments/{payment-id}/<br/>bank-confirmation, with the bank's answer
-    end
-    Note over R: admit, then the same update<br/>to the running workflow
-    R->>WF: update confirm,<br/>ID {paymentId}-confirm
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow
-      WF->>VER: the bank's answer
-      Note over VER: no call: a rule reads the answer.<br/>No token check, no funds check
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
-      end
-    end
+  rect rgba(0,111,207,0.06)
+    Note over CH,OR: 1 · Create
+    CH->>R: POST /payments
+    R->>WF: Update-With-Start
+    Note over WF: Capture, then<br/>own checks
+    WF->>PW: redirect link, one try
+    PW-->>WF: link
+    WF->>OR: PENDING, with the link
     WF-->>R: update result
-    R-->>OC: ACCEPTED or DECLINED. The second confirm,<br/>from either source, gets the same answer
-    rect rgba(0,111,207,0.12)
-      Note over WF,RAV: Online cluster, after the reply
-      WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: DECLINED: the Raven message, then the workflow ends.<br/>ACCEPTED: the workflow waits for M3
+    R-->>CH: PENDING, with the link
+  end
+
+  rect rgba(0,111,207,0.06)
+    Note over CH,OR: 2 · Wait, then ask
+    Note over CH,PW: the customer approves the payment at their bank
+    CH->>R: confirm: the customer is back
+    R->>WF: signal returned
+    R-->>CH: 202, still PENDING
+    loop every fixed interval, while pending
+      WF->>PW: GET /payment-status
+      PW-->>WF: success, failure or pending
     end
-    rect rgba(83,86,90,0.14)
-      Note over WF,M3: ACCEPTED, waiting for the bank to settle the payment in real time
-    end
-    M3->>R: POST /payments/{payment-id}/settlement:<br/>the bank says the money has settled
-    R->>WF: signal settled
-    R-->>M3: 202
-    rect rgba(0,111,207,0.12)
-      Note over WF,RAV: Online cluster, the same workflow
-      Note over WF: Execute, with no clearing call:<br/>M3's notice is the settlement. Then Fulfil
-      WF->>RTF: PROCESSING, then PROCESSED
-      WF->>RAV: the messages the market sends
-    end
-    Note over WF,M3: No notice before its own timer: the payment goes on<br/>the exception list in ACCEPTED, with an alert (how long it waits is open)
-  else M3's notice comes before any confirm
+    WF->>OR: ACCEPTED, or DECLINED on failure
+  end
+
+  rect rgba(0,111,207,0.06)
+    Note over CH,OR: 3 · Settle
     M3->>R: POST /payments/{payment-id}/settlement
     R->>WF: signal settled
     R-->>M3: 202
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow
-      WF->>VER: accept on M3's notice
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED,<br/>guarded on PENDING
-      end
-      Note over WF: log: no confirm from the channel or<br/>Amex Pay with Bank Transfer for this payment ID
-      Note over WF: Execute, with no clearing call, then Fulfil
-      WF->>RTF: ACCEPTED, PROCESSING, then PROCESSED
-    end
-  else nothing before the timer fires
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow. A timer handled late ends it the same way
-      WF->>VER: no answer
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → DECLINED, CONFIRMATION_NOT_RECEIVED<br/>(Proposed), guarded on PENDING
-      end
-      WF->>RTF: DECLINED event
-      WF->>RAV: DECLINED message
-    end
+    Note over WF: Execute,<br/>then Fulfil
+    WF->>OR: PROCESSING, then PROCESSED
   end
 ```
 
-A yes from the bank, or M3's notice, that arrives after the payment was declined means money moved on a `DECLINED` payment. For now Billpay puts it on the exception list and raises an alert; whether that stays the answer is open, and so is what M3 sends for a settlement that failed.
+What the picture leaves out, so it stays readable:
+
+- **Declines at the create.** A failed own check, or no link from Amex Pay with Bank Transfer, makes the payment `DECLINED` in one commit guarded on `PENDING`, and the channel gets `DECLINED` with no link.
+- **No signal.** If the channel never calls, the workflow waits a fixed time and starts asking anyway. The fixed time and the interval are still to be set, and so is whether anything caps the calls.
+- **A failed status call.** A timeout or a 5xx counts as pending, and Billpay asks again at the next interval.
+- **The outcome.** The channel's call gets 202 and the payment's current state, never the decision. The channel reads the outcome from `GET /payments/{payment-id}`. RTF gets every state change as an event, and Raven sends the customer the market's messages.
+- **M3 first.** If M3's notice comes before the status says success, it accepts the payment on its own, the calls stop, and Billpay logs it.
+- **No notice.** An `ACCEPTED` payment whose notice never comes goes on the exception list, with an alert. How long it waits is open.
+- **The customer's no.** It cancels the payment at any point until it is decided, as in [Cancel a payment](./journeys/all-journeys.md#cancel-a-payment).
+- **The delete.** Once the payment is decided, the workflow calls One-Data's delete API, so the account can take its next payment (diagram 15).
+
+M3's notice that arrives after the payment was declined means money moved on a `DECLINED` payment. For now Billpay puts it on the exception list and raises an alert; whether that stays the answer is open, and so is what M3 sends for a settlement that failed.
 
 ## 15. A new payment while another is pending
 

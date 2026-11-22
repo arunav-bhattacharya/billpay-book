@@ -1,51 +1,58 @@
 import React from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
-import useBaseUrl from '@docusaurus/useBaseUrl';
 import {links} from '../../lib/inlineMarkup';
 import styles from './styles.module.css';
-import {TRIGGER_KIND as TRIGGERS, TRIGGER_ICON} from '../../lib/triggers';
+import {TRIGGER_KIND as TRIGGERS} from '../../lib/triggers';
 
 /**
- * JourneyMap: one payment journey as a business process flow.
+ * JourneyMap: one payment journey, drawn as lanes.
  *
- * The diagram splits into two banded layers. The top band is what the customer
- * touches: the person, the Amex channels, and the One-Data function the
- * channels call. The lower band is Billpay core: the API, the router, and the
- * workflow drawn as a rail of steps.
+ * Every journey reads left to right in the same five lanes, and a column holds
+ * one step from top to bottom:
  *
- * A step shows an icon, a name and the lifecycle state it reaches. Nothing else.
- * The words live in the numbered notes below the diagram, keyed to the same step
- * numbers.
+ *   Outside   what reaches the workflow from outside (pink), the request that
+ *             starts it, and the reply that goes back to the caller
+ *   Step      the numbered step. Bright Blue while a caller waits, Deep Blue
+ *             once nobody does, pale while it waits for something outside
+ *   State     the payment's lifecycle state, as one continuous field per state
+ *   Calls     the systems the step calls; a repeated call is a row of small
+ *             squares that ends in a solid one
+ *   Ends      where the payment can leave the journey at that step
  *
- * Three things the layout does on purpose:
- *   - systems fan out below a step, so Execute's parallel calls look parallel
- *   - exceptions branch above it, in their own colour, so a call and an off-ramp
- *     never read as the same thing
- *   - a persistence strip runs under the rail, because every state change is
- *     written to the payment's history and published as an event
+ * Alignment does the work connectors used to do: a mark belongs to the step
+ * above or below it. A wait between steps is a run of dots. The words live in
+ * the numbered notes below the diagram, keyed to the same step numbers.
  *
- * Passing no `steps` renders the compact form: the layers and route only, with a
- * panel saying why there is no journey to draw. That is for the APIs the spec
- * names but does not describe.
+ * Under 540px of its own width the lanes fold into a list, one step per row.
+ *
+ * Passing no `steps` renders the compact form: the route only, with a panel
+ * saying why there is no journey to draw.
  */
 
-/* Green means the money landed, so the last pill in a journey reads as the
-   payoff. Anything still in flight stays blue however far along it is, because
-   PROCESSED is not finished. RETURNED is amber rather than green: it is terminal,
-   but nobody should read "the money came back" as a success. */
+/* How a state's field is filled. Anything still in flight is a blue tint that
+   deepens as the payment moves on; the payoff is solid; an end that is not a
+   success is grey, and stays in the Ends lane. */
 const STATE_TONE = {
-  PAID: 'good',
-  REPRESENTED: 'good',
-  DECLINED: 'bad',
-  CANCELLED: 'bad',
-  DISALLOWED: 'bad',
-  RETURNED: 'warn',
+  PENDING: 'held',
+  SCHEDULED: 'held',
+  INPUT: 'held',
+  ACCEPTED: 'flight',
+  ALLOCATING: 'flight',
+  ALLOCATED: 'flight',
+  REPRESENTING: 'flight',
+  PROCESSING: 'moving',
+  PROCESSED: 'moving',
+  PAID: 'done',
+  REPRESENTED: 'done',
+  DECLINED: 'end',
+  CANCELLED: 'end',
+  DISALLOWED: 'end',
+  RETURNED: 'end',
 };
-const TERMINAL = new Set(Object.keys(STATE_TONE));
 const toneFor = (state) => STATE_TONE[state] || 'flight';
 
-/* Short names on the diagram, full names on hover. */
+/* Short names in the lane, full names on hover. */
 const SYSTEMS = {
   GAR: 'Accounts Receivable (GAR), which holds the statement balance',
   AR: 'Accounts Receivable, which holds the statement balance',
@@ -68,15 +75,21 @@ const SYSTEMS = {
   'Amex PwBT': "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
   'Card provider': "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
 };
+const SHORT = {
+  'Payment Instruments': 'Instruments',
+  'Payment Options': 'Options',
+};
+/* A lane cell holds three calls at most; the rest fold into a count. */
+const MAX_CALLS = 3;
 
 const ROUTE_KIND = {
-  function: {cls: 'kFunction', label: 'One-Data function'},
-  api: {cls: 'kApi', label: 'Billpay core API'},
-  workflow: {cls: 'kWorkflow', label: 'Temporal workflow'},
-  schedule: {cls: 'kSchedule', label: 'Temporal Schedule'},
-  event: {cls: 'kEvent', label: 'Inbound event'},
-  inbox: {cls: 'kEvent', label: "Held in One-Data's inbox until Billpay pulls it"},
-  dispatcher: {cls: 'kSchedule', label: 'A dispatcher, which starts work at the rate the governor sets'},
+  function: 'One-Data function',
+  api: 'Billpay core API',
+  workflow: 'Temporal workflow',
+  schedule: 'Temporal Schedule',
+  event: 'Inbound event',
+  inbox: "Held in One-Data's inbox until Billpay pulls it",
+  dispatcher: 'A dispatcher, which starts work at the rate the governor sets',
 };
 
 const STATUS_KIND = {
@@ -85,194 +98,274 @@ const STATUS_KIND = {
   'read-only': 'Read-only, no workflow',
 };
 
-/* Who set the journey off. The same two words the index at the top of the page
-   uses, repeated here so a reader who scrolled straight to a diagram still
-   knows which kind they are looking at. */
 const JOURNEY_KIND = {
   customer: 'Customer initiated',
   system: 'System initiated',
 };
 
-const MODE_NOTE = {
-  live: 'the customer is waiting',
-  background: 'runs in the background',
-  awaiting: 'awaiting events',
-};
+const LANES = [
+  {key: 'outside', label: 'Outside'},
+  {key: 'step', label: 'Step'},
+  {key: 'state', label: 'State'},
+  {key: 'calls', label: 'Calls'},
+  {key: 'ends', label: 'Ends'},
+];
 
-/* What wakes a step from outside the workflow: the shared table, so every
-   trigger mark on the site names the same mechanisms. */
-const TRIGGER_KIND = TRIGGERS;
+const triggerOf = (step) => (step.trigger ? TRIGGERS[step.trigger.kind] || TRIGGERS.events : null);
+const awaits = (step) => step.waiting ?? step.mode === 'awaiting';
+/* Bright Blue while a caller waits, Deep Blue once nobody does, pale while the
+   step waits on something from outside. */
+const paceOf = (step) => (awaits(step) ? 'await' : step.mode === 'live' || !step.mode ? 'live' : 'background');
 
-/* ------------------------------------------------------------------ *
- * Icons: monoline, 24-unit grid, stroke inherits the surrounding ink
- * ------------------------------------------------------------------ */
-
-const PATHS = {
-  user: ['M12 4.2a3.9 3.9 0 1 0 0 7.8 3.9 3.9 0 0 0 0-7.8z', 'M4.6 20.4a7.4 7.4 0 0 1 14.8 0'],
-  monitor: ['M3.4 5.2h17.2a1 1 0 0 1 1 1v9.2a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V6.2a1 1 0 0 1 1-1z', 'M9 20.4h6', 'M12 16.4v4'],
-  phone: ['M8 2.8h8a2 2 0 0 1 2 2v14.4a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4.8a2 2 0 0 1 2-2z', 'M11 18h2'],
-  headset: ['M5 13.4v-1.2a7 7 0 0 1 14 0v1.2', 'M3.2 13.6h2.4a.8.8 0 0 1 .8.8v3.4a.8.8 0 0 1-.8.8H3.2z', 'M18.4 13.6h2.4v5H18.4a.8.8 0 0 1-.8-.8v-3.4a.8.8 0 0 1 .8-.8z', 'M20 18.8v.6a2 2 0 0 1-2 2h-3.2'],
-  // idempotency: recorded once, and only once
-  fingerprint: ['M4 12a8 8 0 0 1 13.7-5.6', 'M7 12a5 5 0 0 1 10 0v2.5', 'M12 12v4a7 7 0 0 1-.8 3.2', 'M6.6 17.8A9 9 0 0 0 7.4 14'],
-  shieldCheck: ['M12 3.2l7 2.8v5c0 4.3-2.9 8-7 9.8-4.1-1.8-7-5.5-7-9.8V6z', 'M9 12.1l2.2 2.2 4.1-4.6'],
-  // three calls, at the same time
-  parallelArrows: ['M3.5 7h8', 'M9.8 5.2L11.6 7 9.8 8.8', 'M3.5 12h12', 'M13.8 10.2L15.6 12l-1.8 1.8', 'M3.5 17h8', 'M9.8 15.2L11.6 17l-1.8 1.8'],
-  broadcast: ['M8.6 8.6a4.8 4.8 0 0 0 0 6.8', 'M15.4 8.6a4.8 4.8 0 0 1 0 6.8', 'M6 6a8.5 8.5 0 0 0 0 12', 'M18 6a8.5 8.5 0 0 1 0 12'],
-  // the two confirmations that close a payment
-  doubleCheck: ['M2.8 12.4l3.4 3.4L12.4 8', 'M10.6 14.6l1.6 1.6L20.8 7'],
-  clock: ['M12 4.2a7.8 7.8 0 1 0 0 15.6 7.8 7.8 0 0 0 0-15.6z', 'M12 7.8V12l2.8 1.8'],
-  inbox: ['M3.6 13.2V6.4a2 2 0 0 1 2-2h12.8a2 2 0 0 1 2 2v6.8', 'M3.6 13.2h4.2l1.4 2.4h5.6l1.4-2.4h4.2v4.4a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2z'],
-  bank: ['M3.6 9.4L12 4.4l8.4 5', 'M5.6 9.4v8.2M10 9.4v8.2M14 9.4v8.2M18.4 9.4v8.2', 'M3.6 19.6h16.8'],
-  database: ['M12 3.4c4 0 7.2 1.2 7.2 2.7S16 8.8 12 8.8 4.8 7.6 4.8 6.1 8 3.4 12 3.4z', 'M4.8 6.1v11.8c0 1.5 3.2 2.7 7.2 2.7s7.2-1.2 7.2-2.7V6.1', 'M4.8 12c0 1.5 3.2 2.7 7.2 2.7s7.2-1.2 7.2-2.7'],
-  // claimed for this run, so nothing else can take it
-  lock: ['M6.8 10.4h10.4a1.6 1.6 0 0 1 1.6 1.6v6.4a1.6 1.6 0 0 1-1.6 1.6H6.8a1.6 1.6 0 0 1-1.6-1.6V12a1.6 1.6 0 0 1 1.6-1.6z', 'M8.4 10.4V7.6a3.6 3.6 0 0 1 7.2 0v2.8', 'M12 14.2v2.2'],
-  calendar: ['M5.4 6.4h13.2a1.4 1.4 0 0 1 1.4 1.4v11a1.4 1.4 0 0 1-1.4 1.4H5.4A1.4 1.4 0 0 1 4 18.8v-11a1.4 1.4 0 0 1 1.4-1.4z', 'M4 10.6h16', 'M8.4 3.6v3.4', 'M15.6 3.6v3.4'],
-  // money coming back the way it went out
-  undo: ['M4.2 9.6h9.8a5.2 5.2 0 1 1 0 10.4H7.8', 'M8.2 5.4L4 9.6l4.2 4.2'],
-  // an answer going back up to whoever asked
-  replyUp: ['M12 19.4V6', 'M6.6 11.2L12 5.8l5.4 5.4'],
-  // something arriving from outside and landing here
-  triggerIn: TRIGGER_ICON,
-  // a payment card
-  card: ['M3.4 6.2h17.2a1 1 0 0 1 1 1v9.6a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V7.2a1 1 0 0 1 1-1z', 'M2.4 10h19.2', 'M5.8 14.6h4'],
-  // sent somewhere else, to come back later
-  redirect: ['M13.6 4.6h5.8v5.8', 'M19.4 4.6l-8.2 8.2', 'M17.6 13.8v4.4a1.6 1.6 0 0 1-1.6 1.6H6.2a1.6 1.6 0 0 1-1.6-1.6V8.4a1.6 1.6 0 0 1 1.6-1.6h4.4'],
-  // checked again, later
-  recheck: ['M20 12a8 8 0 1 1-2.5-5.8', 'M20.4 3.8v4.4H16'],
-  // one thing driving several: the orchestrator
-  orchestrate: ['M12 4v5.4', 'M6.5 9.4h11', 'M6.5 9.4v3.4', 'M12 9.4v3.4', 'M17.5 9.4v3.4', 'M4.8 12.8h3.4', 'M10.3 12.8h3.4', 'M15.8 12.8h3.4'],
-  /* One-Data Functions, drawn for this site: many sources resolved into one
-     contract, exposed as a single callable function. */
-  oneData: [
-    'M3.6 6.6h3',
-    'M3.6 12h3',
-    'M3.6 17.4h3',
-    'M6.6 6.6c3.6 0 2.4 5.4 6 5.4',
-    'M6.6 12h6',
-    'M6.6 17.4c3.6 0 2.4-5.4 6-5.4',
-    'M12.6 12h3.8',
-    'M16.4 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0',
-  ],
-};
-
-/* Filled brand marks, kept apart from the stroked icon set above because they
-   carry their own geometry and viewBox. The Temporal glyph is the official mark
-   from temporal.io's favicon, with the gradient plate dropped so it inherits the
-   surrounding ink instead of forcing its own colour. */
-const BRAND_MARKS = {
-  temporal: {
-    viewBox: '0 0 192 192',
-    d: 'M123.34 68.6596C119.655 41.0484 110.327 18 96 18C81.6731 18 72.3454 41.0484 68.6596 68.6596C41.0484 72.3454 18 81.6731 18 96C18 110.327 41.0525 119.655 68.6596 123.34C72.3454 150.948 81.6731 174 96 174C110.327 174 119.655 150.948 123.34 123.34C150.952 119.655 174 110.327 174 96C174 81.6731 150.948 72.3454 123.34 68.6596ZM67.7583 115.298C41.3151 111.479 25.893 102.737 25.893 96C25.893 89.2629 41.3151 80.5212 67.7583 76.7021C67.1764 83.0674 66.8733 89.566 66.8733 96C66.8733 102.434 67.1764 108.937 67.7583 115.298ZM96 25.893C102.737 25.893 111.479 41.3151 115.298 67.7583C108.937 67.1764 102.434 66.8733 96 66.8733C89.566 66.8733 83.0633 67.1764 76.7021 67.7583C80.5212 41.3151 89.2629 25.893 96 25.893ZM124.242 115.298C122.94 115.488 117.602 116.114 116.252 116.248C116.118 117.602 115.488 122.936 115.302 124.238C111.483 150.681 102.741 166.103 96.0041 166.103C89.267 166.103 80.5253 150.681 76.7061 124.238C76.5202 122.936 75.8898 117.598 75.7564 116.248C75.1421 109.979 74.7703 103.246 74.7703 96C74.7703 88.7537 75.1421 82.0206 75.7564 75.7483C82.0247 75.134 88.7577 74.7622 96.0041 74.7622C103.25 74.7622 109.983 75.134 116.252 75.7483C117.606 75.8817 122.94 76.5121 124.242 76.698C150.685 80.5172 166.111 89.2629 166.111 95.996C166.111 102.729 150.685 111.479 124.242 115.298Z',
-  },
-};
-
-function BrandMark({name, className}) {
-  const m = BRAND_MARKS[name];
-  if (!m) return null;
-  return (
-    <svg
-      className={clsx(styles.icon, className)}
-      viewBox={m.viewBox}
-      fill="currentColor"
-      aria-hidden="true">
-      <path d={m.d} />
-    </svg>
-  );
+/* The columns: one per step, and a narrow one for the wait before any step
+   that something outside has to start. */
+function columnsFor(steps) {
+  const cols = [];
+  steps.forEach((step, i) => {
+    if (i > 0 && (step.trigger || awaits(step))) cols.push({wait: true, before: i});
+    cols.push({step, i});
+  });
+  return cols;
 }
 
-function Icon({name, className}) {
-  const d = PATHS[name];
-  if (!d) return null;
+/* One field per run of the same state, including the waits inside the run. A
+   step that names no state keeps the one before it. */
+function stateRuns(cols) {
+  const runs = [];
+  let current = null;
+  cols.forEach((c, ci) => {
+    const s = c.wait ? current : c.step.state || current;
+    current = s;
+    const last = runs[runs.length - 1];
+    if (last && last.state === s) last.to = ci;
+    else runs.push({state: s, from: ci, to: ci});
+  });
+  return runs.filter((r) => r.state);
+}
+
+/* The arrival into the first step: the request a caller makes, or the start a
+   system makes. */
+function arrivalFor(step, i, kind) {
+  const t = triggerOf(step);
+  if (t) return {pink: true, word: t.word, title: `${t.word}: ${step.trigger.label}. ${t.note}.`};
+  if (i === 0) {
+    const word = step.arrives || (kind === 'system' ? 'start' : 'request');
+    return {word, title: kind === 'system' ? 'Started by a system' : "The caller's request starts the workflow"};
+  }
+  return null;
+}
+
+function Calls({step}) {
+  const systems = step.systems || [];
+  const shown = systems.length > MAX_CALLS ? systems.slice(0, MAX_CALLS - 1) : systems;
+  const rest = systems.slice(shown.length);
   return (
-    <svg
-      className={clsx(styles.icon, className)}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true">
-      {d.map((p, i) => (
-        <path key={i} d={p} />
+    <>
+      {step.poll && (
+        <span className={styles.poll} title={step.poll.note || step.poll.label}>
+          <span className={styles.cadence} aria-hidden="true">
+            {Array.from({length: 5}).map((_, k) => (
+              <i key={k} />
+            ))}
+            <b />
+          </span>
+          <span className={styles.pollLabel}>{step.poll.label}</span>
+        </span>
+      )}
+      {shown.map((s) => (
+        <abbr key={s} className={styles.call} title={SYSTEMS[s] || s}>
+          {SHORT[s] || s}
+        </abbr>
       ))}
-    </svg>
+      {rest.length > 0 && (
+        <abbr className={clsx(styles.call, styles.callMore)} title={rest.map((s) => SYSTEMS[s] || s).join('; ')}>
+          +{rest.length} more
+        </abbr>
+      )}
+      {step.table && (
+        <span className={clsx(styles.call, styles.callTable)} title="A table this step works in">
+          {step.table}
+        </span>
+      )}
+    </>
   );
 }
 
-/* ------------------------------------------------------------------ *
- * Shared pieces
- * ------------------------------------------------------------------ */
-
-function StatePill({state, className}) {
-  if (!state) return null;
+function End({exit}) {
+  if (!exit) return null;
   return (
-    <span
-      className={clsx(
-        styles.state,
-        styles[toneFor(state)],
-        TERMINAL.has(state) && styles.terminal,
-        className,
-      )}>
-      {state}
+    <span className={clsx(styles.end, !exit.state && styles.endSoft)} title={exit.label || exit.state}>
+      <i aria-hidden="true" />
+      <span>
+        {exit.state && <span className={styles.endState}>{exit.state}</span>}
+        {exit.label && <small>{exit.label}</small>}
+      </span>
     </span>
   );
 }
 
-function SystemFan({systems, parallel, note}) {
-  if (!systems || systems.length === 0) return null;
+function Route({origin, entry, core, workflows}) {
+  const groups = [];
+  if (origin && (origin.actor || (origin.channels || []).length)) {
+    groups.push({
+      label: 'From',
+      items: [
+        {
+          text: [origin.actor, (origin.channels || []).map((c) => c.label).join(', ')].filter(Boolean).join(' · '),
+          title: origin.note,
+          tone: 'origin',
+        },
+      ],
+    });
+  }
+  if (entry && entry.length) {
+    groups.push({label: 'Through', items: entry.map((r) => ({text: r.label, note: r.note, title: ROUTE_KIND[r.kind], tone: r.kind}))});
+  }
+  if (core && core.length) {
+    groups.push({label: 'Billpay', items: core.map((r) => ({text: r.label, note: r.note, title: ROUTE_KIND[r.kind], tone: r.kind}))});
+  }
+  if (workflows.length) {
+    groups.push({
+      label: 'Runs as',
+      items: workflows.map((w) => ({
+        text: w.label,
+        note: w.note,
+        title: w.child ? 'A child workflow the parent starts' : 'The Temporal workflow that runs this journey',
+        tone: 'workflow',
+      })),
+    });
+  }
+  if (!groups.length) return null;
   return (
-    <div className={styles.fan}>
-      <ul className={styles.fanList}>
-        {systems.map((s) => (
-          <li key={s}>
-            <abbr className={styles.sys} title={SYSTEMS[s] || s}>
-              {s}
-            </abbr>
-          </li>
-        ))}
-      </ul>
-      {parallel && systems.length > 1 && <p className={styles.fanNote}>{note || 'at the same time'}</p>}
-    </div>
+    <dl className={styles.route}>
+      {groups.map((g) => (
+        <div key={g.label} className={styles.routeRow}>
+          <dt>{g.label}</dt>
+          <dd>
+            {g.items.map((it, k) => (
+              <span key={k} className={styles.routeItem}>
+                <span className={clsx(styles.hop, styles[`hop_${it.tone}`])} title={it.title}>
+                  {it.text}
+                </span>
+                {it.note && <span className={styles.hopNote}>{it.note}</span>}
+              </span>
+            ))}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
-function ExitBranch({exit}) {
-  if (!exit) return null;
-  const tone = exit.state ? toneFor(exit.state) : 'warn';
+function Lanes({steps, kind}) {
+  const cols = columnsFor(steps);
+  const runs = stateRuns(cols);
+  const template = ['var(--jm-label)', ...cols.map((c) => (c.wait ? 'var(--jm-wait)' : 'minmax(var(--jm-col), var(--jm-col-max))'))].join(' ');
+  const at = (ci) => ci + 2; // grid column of a column index; the labels take the first
+  const row = (key) => LANES.findIndex((l) => l.key === key) + 1;
+
   return (
-    <div className={clsx(styles.exit, styles[`x_${tone}`])}>
-      <span className={styles.exitBody}>
-        <span className={styles.exitIcon} aria-hidden="true">
-          {exit.icon || (tone === 'bad' ? '✕' : '↩')}
+    <div className={styles.lanes} style={{gridTemplateColumns: template}} aria-hidden="true">
+      {LANES.map((l) => (
+        <span key={l.key} className={styles.laneLabel} style={{gridRow: row(l.key)}}>
+          {l.label}
         </span>
-        {exit.state ? <StatePill state={exit.state} /> : null}
-        {exit.label && <span className={styles.exitLabel}>{exit.label}</span>}
-      </span>
+      ))}
+
+      {cols.map((c, ci) =>
+        c.wait ? (
+          <span key={`w${ci}`} className={styles.wait} style={{gridRow: row('step'), gridColumn: at(ci)}}>
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : (
+          <React.Fragment key={c.step.name}>
+            {(() => {
+              const a = arrivalFor(c.step, c.i, kind);
+              return (
+                <span className={styles.outside} style={{gridRow: row('outside'), gridColumn: at(ci)}}>
+                  {a && (
+                    <span className={clsx(styles.arrive, a.pink && styles.arrivePink)} title={a.title}>
+                      <i />
+                      {a.word}
+                    </span>
+                  )}
+                  {c.step.reply && (
+                    <span className={styles.reply} title={`Replies ${c.step.reply}`}>
+                      <i />
+                      reply
+                    </span>
+                  )}
+                  {(a || c.step.reply) && <span className={clsx(styles.drop, a && a.pink && styles.dropPink)} />}
+                </span>
+              );
+            })()}
+            <span
+              className={clsx(styles.step, styles[`pace_${paceOf(c.step)}`])}
+              style={{gridRow: row('step'), gridColumn: at(ci)}}
+              title={c.step.caption}>
+              <b className={styles.square}>{c.i + 1}</b>
+              <span className={styles.stepName}>{c.step.name}</span>
+            </span>
+            <span className={styles.calls} style={{gridRow: row('calls'), gridColumn: at(ci)}}>
+              <Calls step={c.step} />
+            </span>
+            <span className={styles.ends} style={{gridRow: row('ends'), gridColumn: at(ci)}}>
+              <End exit={c.step.exit} />
+            </span>
+          </React.Fragment>
+        ),
+      )}
+
+      {runs.map((r) => (
+        <span
+          key={`${r.state}-${r.from}`}
+          className={clsx(styles.stateField, styles[`tone_${toneFor(r.state)}`])}
+          style={{gridRow: row('state'), gridColumn: `${at(r.from)} / ${at(r.to) + 1}`}}>
+          <span className={styles.stateName}>{r.state}</span>
+        </span>
+      ))}
     </div>
   );
 }
 
-function RouteChips({items}) {
-  if (!items || items.length === 0) return null;
+/* The same journey as a list, for a narrow column. */
+function List({steps, kind}) {
   return (
-    <ol className={styles.route}>
-      {items.map((r, i) => {
-        const kind = ROUTE_KIND[r.kind] || ROUTE_KIND.api;
+    <ol className={styles.list} aria-hidden="true">
+      {steps.map((step, i) => {
+        const a = arrivalFor(step, i, kind);
         return (
-          <li key={i} className={styles.routeItem}>
-            {i > 0 && (
-              <span className={styles.routeSep} aria-hidden="true">
-                ›
+          <li key={step.name} className={clsx(styles.item, styles[`pace_${paceOf(step)}`])}>
+            {i > 0 && (step.trigger || awaits(step)) && (
+              <span className={styles.itemWait}>
+                <i />
+                <i />
+                <i />
               </span>
             )}
-            <span
-              className={clsx(styles.hop, styles[kind.cls], r.logo && styles.hopWithLogo)}
-              title={kind.label}>
-              {r.logo && <Icon name={r.logo} className={styles.hopLogo} />}
-              {r.label}
-            </span>
-            {r.note && <span className={styles.hopNote}>{r.note}</span>}
+            <div className={styles.itemHead}>
+              <b className={styles.square}>{i + 1}</b>
+              <span className={styles.stepName}>{step.name}</span>
+              {step.state && <span className={clsx(styles.itemState, styles[`tone_${toneFor(step.state)}`])}>{step.state}</span>}
+            </div>
+            <div className={styles.itemBody}>
+              {a && a.pink && (
+                <span className={clsx(styles.arrive, styles.arrivePink)}>
+                  <i />
+                  {a.word}
+                </span>
+              )}
+              {step.reply && (
+                <span className={styles.reply}>
+                  <i />
+                  reply
+                </span>
+              )}
+              <Calls step={step} />
+              <End exit={step.exit} />
+            </div>
           </li>
         );
       })}
@@ -280,369 +373,109 @@ function RouteChips({items}) {
   );
 }
 
-/* An arrow can name what travels along it: a file drop, an event, a call. */
-const Arrow = ({label}) => (
-  <span className={clsx(styles.arrow, label && styles.arrowLabelled)} aria-hidden="true">
-    {label && <span className={styles.arrowLabel}>{label}</span>}
-  </span>
-);
-
-/* ------------------------------------------------------------------ *
- * The rail
- * ------------------------------------------------------------------ */
-
-/* A step where the flow forks: two things happening at once, rejoining later.
-   Each branch can carry its own start and end state, because a branch is often
-   a whole child payment with a lifecycle of its own. */
-function ForkNode({step, index}) {
+function Legend({steps}) {
+  const has = (f) => steps.some(f);
+  const kinds = [...new Set(steps.filter((s) => s.trigger).map((s) => triggerOf(s).word))];
+  const items = [];
+  if (has((s) => paceOf(s) === 'live'))
+    items.push({key: 'live', node: <b className={clsx(styles.square, styles.squareKey)} />, text: 'a caller waits'});
+  if (has((s) => paceOf(s) === 'background'))
+    items.push({key: 'bg', node: <b className={clsx(styles.square, styles.squareKey, styles.keyBackground)} />, text: 'nobody waits'});
+  if (kinds.length)
+    items.push({
+      key: 'trig',
+      node: <span className={clsx(styles.arrive, styles.arrivePink)}><i />{kinds.join(' · ')}</span>,
+      text: 'arrives from outside and resumes the step',
+    });
+  if (has((s, i) => i > 0 && (s.trigger || awaits(s))))
+    items.push({key: 'wait', node: <span className={styles.wait}><i /><i /><i /></span>, text: 'a wait'});
+  if (has((s) => s.reply)) items.push({key: 'reply', node: <span className={styles.reply}><i />reply</span>, text: 'the answer to the caller'});
+  if (has((s) => s.poll))
+    items.push({
+      key: 'poll',
+      node: <span className={styles.cadence}><i /><i /><i /><b /></span>,
+      text: 'the same call, repeated until it has an answer',
+    });
   return (
-    <div className={clsx(styles.node, styles.nodeFork)}>
-      <span className={styles.nodeNum}>{index + 1}</span>
-      <span className={styles.forkLabel}>{step.forkLabel || 'in parallel'}</span>
-      <div className={styles.forkBranches}>
-        {step.branches.map((b) => (
-          <div key={b.name} className={styles.branch}>
-            <span className={styles.branchHead}>
-              {b.icon && <Icon name={b.icon} className={styles.branchIcon} />}
-              {b.name}
-            </span>
-            {b.states && (
-              <span className={styles.branchStates}>
-                <StatePill state={b.states[0]} />
-                <span className={styles.branchArrow} aria-hidden="true">
-                  →
-                </span>
-                <StatePill state={b.states[1]} />
-              </span>
-            )}
-            {b.systems && b.systems.length > 0 && (
-              <span className={styles.branchSystems}>
-                {b.systems.map((s) => (
-                  <abbr key={s} className={styles.sys} title={SYSTEMS[s] || s}>
-                    {s}
-                  </abbr>
-                ))}
-              </span>
-            )}
-            {b.note && <span className={styles.branchNote}>{b.note}</span>}
-          </div>
-        ))}
-      </div>
-    </div>
+    <ul className={styles.legend} aria-hidden="true">
+      {items.map((it) => (
+        <li key={it.key}>
+          {it.node}
+          <span>{it.text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-/* The two moments a reader most needs to see: where the workflow answers the
-   party that called it, and where something outside wakes it. Both sit inside
-   the node, so they never fight an exception branch for the space above it. */
-function Flag({step}) {
-  if (step.trigger) {
-    const kind = TRIGGER_KIND[step.trigger.kind] || TRIGGER_KIND.events;
-    return (
-      <span
-        className={clsx(styles.flag, styles.flagTrigger)}
-        title={`Started from outside: ${step.trigger.label || kind.word}. ${kind.note}.`}>
-        <Icon name="triggerIn" />
-        {kind.word}
-      </span>
-    );
-  }
-  if (step.reply) {
-    return (
-      <span className={clsx(styles.flag, styles.flagReply)} title={`Replies ${step.reply}`}>
-        <Icon name="replyUp" />
-        Reply
-      </span>
-    );
-  }
-  return null;
-}
-
-function StepNode({step, index}) {
-  if (step.branches) return <ForkNode step={step} index={index} />;
-  /* A step that waits on events rather than doing work gets a timer, so a
-     long-running pause is visible instead of implied. */
-  const waiting = step.waiting ?? step.mode === 'awaiting';
-  return (
-    <div className={clsx(styles.node, waiting && styles.nodeWaiting)}>
-      <span className={styles.nodeNum}>{index + 1}</span>
-      {waiting && (
-        <span className={styles.timer} title="Long-running: this step waits for events to arrive">
-          <Icon name="clock" />
-        </span>
-      )}
-      <Flag step={step} />
-      <span className={styles.nodeIcon}>
-        <Icon name={step.icon} />
-      </span>
-      <span className={styles.nodeName}>{step.name}</span>
-      <StatePill state={step.state} />
-      {/* Some steps don't move the payment. They touch a table instead, and
-          naming it says more than repeating the state it came in with. */}
-      {step.table && (
-        <span className={styles.tableRef}>
-          <Icon name="database" />
-          {step.table}
-        </span>
-      )}
-    </div>
-  );
+function describe(title, steps) {
+  return `${title}: ${steps
+    .map((s, i) => {
+      const t = triggerOf(s);
+      return [
+        `step ${i + 1}, ${s.name}`,
+        t && `started from outside by ${t.word.toLowerCase()}: ${s.trigger.label}`,
+        s.state && `reaches ${s.state}`,
+        s.reply && `replies ${s.reply}`,
+        s.poll && `calls ${s.poll.label} again and again until it answers`,
+        s.systems && s.systems.length && `calls ${s.systems.join(', ')}`,
+        s.table && `works in the ${s.table}`,
+        s.exit && `can end ${[s.exit.state, s.exit.label].filter(Boolean).join(', ')}`,
+      ]
+        .filter(Boolean)
+        .join(', ');
+    })
+    .join('. ')}.`;
 }
 
 export default function JourneyMap({
   eyebrow,
   title,
   kind,
-  topLayer = 'UI & API layer',
-  coreLayer = 'Billpay core',
   origin,
   entry,
-  entryVia,
   core,
   workflow,
   steps,
   detail,
   detailLabel = 'How this works, step by step',
   detailOpen = false,
-  persist = true,
-  band = true,
   reference,
   status,
 }) {
-  const amexLogo = useBaseUrl('/img/amex-logo.png');
   const hasSteps = Array.isArray(steps) && steps.length > 0;
-  /* A journey can span two workflows, as a scheduled payment does: one to park
-     it, another to run it when the date arrives. */
   const workflows = workflow ? (Array.isArray(workflow) ? workflow : [workflow]) : [];
-
-  /* The band covers everything from the first step that runs with no caller
-     waiting. That boundary matters more than any single step, so it becomes a
-     region rather than a footnote. */
-  const handoffAt = hasSteps
-    ? steps.findIndex((s, i) => s.handoffAfter && i < steps.length - 1)
-    : -1;
-  const bandFrom =
-    handoffAt >= 0
-      ? handoffAt + 1
-      : hasSteps
-        ? steps.findIndex((s) => s.mode && s.mode !== 'live')
-        : -1;
-  const banded = band && bandFrom > 0 && bandFrom < (steps || []).length;
-  const flagged = hasSteps && steps.some((s) => s.trigger || s.reply);
-  const waits = hasSteps && steps.some((s, i) => i > 0 && s.trigger);
 
   return (
     <figure className={styles.wrap}>
       <header className={styles.head}>
-        <div className={styles.headText}>
+        <div>
           {eyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
           <h3 className={styles.title}>{title}</h3>
         </div>
         {JOURNEY_KIND[kind] && (
           <span className={styles.kind} data-kind={kind}>
-            <span className={styles.kindDot} aria-hidden="true" />
             {JOURNEY_KIND[kind]}
           </span>
         )}
       </header>
 
-      <div className={styles.canvas}>
-        {/* ---- what the customer touches ---- */}
-        <section className={clsx(styles.layer, styles.layerTop)}>
-          {topLayer && <span className={styles.layerLabel}>{topLayer}</span>}
-          <div className={styles.layerBody}>
-            {origin && (
-              <>
-                {/* Some journeys have no actor worth naming: the sources box is
-                    the whole story. */}
-                {origin.actor && (
-                  <>
-                    <div className={styles.actor}>
-                      <span className={styles.actorIcon}>
-                        <Icon name={origin.icon || 'user'} />
-                      </span>
-                      <span className={styles.actorName}>
-                        {origin.actor}
-                        {origin.note && (
-                          <abbr className={styles.info} title={origin.note}>
-                            ⓘ
-                          </abbr>
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
-                {/* Arrow and target travel together, so a wrap never strands an
-                    arrow pointing at empty space. */}
-                <span className={styles.linkGroup}>
-                  {origin.actor && <Arrow label={origin.via} />}
-                  <div className={styles.channels}>
-                  {origin.channelsLabel !== null && (
-                    <span className={styles.channelsLabel}>
-                      {origin.brandLogo !== false && (
-                        <img className={styles.brandLogo} src={amexLogo} alt="" aria-hidden="true" />
-                      )}
-                      {origin.channelsLabel || 'Channels'}
-                    </span>
-                  )}
-                    <ul className={styles.channelList}>
-                      {(origin.channels || []).map((c) => (
-                        <li key={c.label} className={styles.channel}>
-                          <Icon name={c.icon} />
-                          {c.label}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </span>
-              </>
-            )}
-            {entry && entry.length > 0 && (
-              <span className={styles.linkGroup}>
-                <Arrow label={entryVia} />
-                <RouteChips items={entry} />
-              </span>
-            )}
-          </div>
-        </section>
+      <Route origin={origin} entry={entry} core={core} workflows={workflows} />
 
-        <div className={styles.drop} aria-hidden="true" />
+      {!hasSteps && status && (
+        <div className={clsx(styles.panel, status.kind === 'tbd' && styles.panelTbd)}>
+          <p className={styles.panelLabel}>{STATUS_KIND[status.kind] || status.kind}</p>
+          <p className={styles.panelNote}>{status.note}</p>
+        </div>
+      )}
 
-        {/* ---- what Billpay does ---- */}
-        <section className={clsx(styles.layer, styles.layerCore)}>
-          <span className={styles.layerLabel}>{coreLayer}</span>
-          <div className={styles.layerBody}>
-            <RouteChips items={core} />
-          </div>
-
-          {workflows.length > 0 && (
-            <div className={styles.orchestratorRow}>
-              {workflows.map((w, i) => (
-                <React.Fragment key={w.label}>
-                  {i > 0 && <span className={styles.wfThen}>{w.via || 'then'}</span>}
-                  <span
-                    className={clsx(styles.orchestrator, w.child && styles.orchestratorChild)}
-                    title={
-                      w.child
-                        ? 'A child workflow the parent starts'
-                        : 'The Temporal workflow that orchestrates this journey'
-                    }>
-                    <BrandMark name="temporal" className={styles.wfLogo} />
-                    {w.label}
-                  </span>
-                  {w.note && <span className={styles.hopNote}>{w.note}</span>}
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-
-          {!hasSteps && status && (
-            <div className={clsx(styles.panel, status.kind === 'tbd' && styles.panelTbd)}>
-              <p className={styles.panelLabel}>{STATUS_KIND[status.kind] || status.kind}</p>
-              <p className={styles.panelNote}>{status.note}</p>
-            </div>
-          )}
-
-          {hasSteps && (
-            <div
-              className={clsx(styles.rail, steps.length >= 6 && styles.dense)}
-              style={{'--steps': steps.length, '--band-from': bandFrom + 1}}
-              role="img"
-              aria-label={`${title}: ${steps
-                .map(
-                  (s, i) =>
-                    `step ${i + 1}, ${s.name}${
-                      s.trigger
-                        ? `, started from outside by ${(TRIGGER_KIND[s.trigger.kind] || TRIGGER_KIND.events).word.toLowerCase()}: ${s.trigger.label}`
-                        : ''
-                    }${s.state ? `, reaches ${s.state}` : ''}${s.reply ? `, replies ${s.reply}` : ''}${
-                      s.table ? `, working in the ${s.table}` : ''
-                    }${
-                      s.systems && s.systems.length ? `, calling ${s.systems.join(', ')}` : ''
-                    }${s.exit ? `; exception ${s.exit.state || s.exit.label}` : ''}`,
-                )
-                .join('. ')}.`}>
-              {banded && (
-                <div className={styles.band} aria-hidden="true">
-                  <span className={styles.bandLabel}>async process</span>
-                </div>
-              )}
-
-              {steps.map((step, i) => (
-                <React.Fragment key={step.name}>
-                  <div className={styles.exitCell} style={{'--col': i + 1}}>
-                    <ExitBranch exit={step.exit} />
-                  </div>
-                  {/* The connector into a step something outside starts is a wait,
-                      not a move: drawn dashed, with no arrowhead. */}
-                  <div
-                    className={clsx(
-                      styles.nodeCell,
-                      i < steps.length - 1 && styles.linked,
-                      i < steps.length - 1 && steps[i + 1].trigger && styles.waitsNext,
-                    )}
-                    style={{'--col': i + 1}}>
-                    <StepNode step={step} index={i} />
-                    {/* A fork says what it is on its own label, so it needs no
-                        caption underneath. */}
-                    {!step.branches && (
-                      <span className={styles.modeNote}>
-                        {step.caption || MODE_NOTE[step.mode || 'live']}
-                      </span>
-                    )}
-                  </div>
-                  {persist && (
-                    <div className={styles.tickCell} style={{'--col': i + 1}} aria-hidden="true">
-                      <span className={styles.tick} />
-                    </div>
-                  )}
-                  <div className={styles.fanCell} style={{'--col': i + 1}}>
-                    <SystemFan systems={step.systems} parallel={step.parallel} note={step.fanNote} />
-                  </div>
-                </React.Fragment>
-              ))}
-
-              {persist && (
-                <p className={styles.persist}>
-                  <span className={styles.persistChip}>
-                    <Icon name="database" />
-                    Every state change is saved and published as an event
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
-
-          {flagged && (
-            <ul className={styles.legend} aria-label="Key">
-              {steps.some((s) => s.reply) && (
-                <li className={styles.legendItem}>
-                  <span className={clsx(styles.flag, styles.flagReply, styles.flagKey)} aria-hidden="true">
-                    <Icon name="replyUp" />
-                    Reply
-                  </span>
-                  the workflow answers whoever called it
-                </li>
-              )}
-              {steps.some((s) => s.trigger) && (
-                <li className={styles.legendItem}>
-                  <span className={clsx(styles.flag, styles.flagTrigger, styles.flagKey)} aria-hidden="true">
-                    <Icon name="triggerIn" />
-                    {[...new Set(steps.filter((s) => s.trigger).map((s) => (TRIGGER_KIND[s.trigger.kind] || TRIGGER_KIND.events).word))].join(' · ')}
-                  </span>
-                  something outside starts or resumes the step
-                </li>
-              )}
-              {waits && (
-                <li className={styles.legendItem}>
-                  <span className={styles.waitSwatch} aria-hidden="true" />
-                  a wait: the next step doesn't follow on its own
-                </li>
-              )}
-            </ul>
-          )}
-        </section>
-      </div>
+      {hasSteps && (
+        <div className={styles.canvas} role="img" aria-label={describe(title, steps)}>
+          <Lanes steps={steps} kind={kind} />
+          <List steps={steps} kind={kind} />
+          <Legend steps={steps} />
+        </div>
+      )}
 
       {(detail || reference) && (
         <figcaption className={styles.foot}>

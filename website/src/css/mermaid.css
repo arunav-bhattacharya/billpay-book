@@ -378,6 +378,7 @@
  *   rgba(0,23,90,0.12)      Offline cluster
  *   rgba(83,86,90,0.14)     waiting, nothing running
  *   rgba(102,169,226,0.40)  a PaymentStore commit
+ *   rgba(0,111,207,0.06)    a numbered phase: a tinted field, no edge
  * ------------------------------------------------------------------------ */
 
 /* The two participant groups. Mermaid outlines them in its default grey. */
@@ -415,6 +416,15 @@
   fill: color-mix(in srgb, var(--amex-platinum) 12%, var(--amex-panel)) !important;
   stroke: var(--amex-line-strong) !important;
   stroke-dasharray: 6 4 !important;
+}
+
+/* A numbered phase. Its first note names it; the field itself has no edge,
+   so the phases read as three calm bands rather than three boxes. */
+.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.06)'] {
+  fill: color-mix(in srgb, var(--amex-worker-online) 6%, var(--amex-panel)) !important;
+  stroke: none !important;
+  rx: 10px !important;
+  ry: 10px !important;
 }
 
 /* Commit chips: one colour for every state change, because the chip already

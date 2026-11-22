@@ -139,7 +139,7 @@ Four checks exist today. Each is a class, and each says where it applies:
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
 | `CardAuthorizationCheck` | `CARD_AUTHORIZATION` | Card authentication Y | The card provider, to authorize a debit card payment with its 3D Secure result. Approved, it debits the customer's account, so it runs after the other checks' rules pass (Proposed) |
 
-Bank confirmation adds no check. Once Amex Pay with Bank Transfer has confirmed a payment, a rule reads the bank's answer and nothing is called: the token check and GB's funds check are gone (2026-11-10).
+Bank confirmation adds no check class. Verify calls Amex Pay with Bank Transfer's `GET /payment-status` once the customer is back, asking again at a fixed interval while it says pending, and the `BANK_CONFIRMED` rule reads the status. The token check and GB's funds check are gone (2026-11-10; the status call 2026-11-22).
 
 In code, a check is this small:
 
@@ -224,7 +224,7 @@ class DefaultPaymentVerifyStage(
 
 *(A sketch.)*
 
-A payment that waits for its customer runs Verify in two parts. Amex's own checks, `InstrumentCheck`, `OptionsCheck` and `MandateCheck`, run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. After a bank's confirm Verify calls nothing: a rule reads the bank's answer (2026-11-10). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
+A payment that waits for its customer runs Verify in two parts. Amex's own checks, `InstrumentCheck`, `OptionsCheck` and `MandateCheck`, run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. For a bank, Verify calls `GET /payment-status` and a rule reads the status (2026-11-22). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
 
 The stage never asks which market it is in or which behaviors are on. It asks the registries for its checks and its rules and runs the same flow every time, so there is no `if` on a behavior anywhere in Verify.
 
@@ -260,7 +260,7 @@ VERIFY  mandate=Y bank=N card=N  Instrument, Options, Mandate
 VERIFY  mandate=Y bank=Y card=N  Instrument, Options, Mandate
 ```
 
-One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds nothing to Verify's checks: after the confirm, a rule reads the bank's answer. A payment that needs both a mandate and a debit card would get every check that applies to it, with no class written for that combination.
+One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: the status call and the rule that reads it serve every market. A payment that needs both a mandate and a debit card would get every check that applies to it, with no class written for that combination.
 
 :::info[Placeholder: Represent's checks]
 Represent's rows in the report list no checks yet. Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules are classes like these, listing Represent among their steps, and the report shows them on its rows.

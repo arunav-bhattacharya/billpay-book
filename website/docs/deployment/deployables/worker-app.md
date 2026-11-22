@@ -13,7 +13,7 @@ The codebase is billpay-core, a Gradle monorepo with two app modules, `apps/onli
 
 | App | What it runs | Its cluster |
 | --- | --- | --- |
-| billpay-online | The APIs channels call through One-Data: create, update, cancel, the confirm and the no, the credit balance refund, the reads and the instruments read. The card provider's 3D Secure callback. The Router for those requests, and the workers for the Online cluster | Online |
+| billpay-online | The APIs channels call through One-Data: create, update, cancel, the call once the customer is back from their bank, and the no, the credit balance refund, the reads and the instruments read. The card provider's 3D Secure callback. The Router for those requests, and the workers for the Online cluster | Online |
 | billpay-offline | The dispatchers and the governor. The allocations callback and the Market Onboarding API. The Router for pulled work and async starts, and the workers for the Offline cluster, control workers included | Offline |
 
 ## Why two apps
