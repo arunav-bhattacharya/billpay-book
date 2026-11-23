@@ -739,12 +739,11 @@ sequenceDiagram
 
 ## 14. Pay by bank: create, status and settlement
 
-Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in four phases. The first two are sync: the channel waits for the reply.
+Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in three phases. The first two are sync: the channel waits for the reply.
 
-1. **Create.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own checks run next (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
-2. **Customer back.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/confirm`, the Channel Confirm Event. Billpay asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
-3. **While pending.** Billpay asks again at a fixed interval until the answer is success or failure. Nobody waits for it.
-4. **Settle.** M3's notice that the bank has settled the money, the Bank Settled Event (`POST /payments/{payment-id}/settlement`), lets Execute and Fulfil run, with no clearing call.
+1. **Create a payment intent.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own checks run next (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
+2. **Channel confirm.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/confirm`, the Channel Confirm Event. Billpay asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
+3. **Async process.** Nobody waits from here on. While the status is pending, Billpay asks again at a fixed interval until the answer is success or failure. Then M3's notice that the bank has settled the money, the Bank Settled Event (`POST /payments/{payment-id}/settlement`), lets Execute and Fulfil run, with no clearing call.
 
 Pink arrows are the events and Temporal messages that reach the waiting workflow from outside.
 
@@ -770,7 +769,7 @@ sequenceDiagram
   participant PS as PaymentStore<br/>(Oracle)
 
   rect rgba(0,111,207,0.12)
-    Note over CH,PS: 1 · Create
+    Note over CH,PS: 1 · Create a payment intent
     CH->>R: POST /payments
     R->>WF: Update-With-Start
     WF->>PS: Capture: PENDING, if new
@@ -783,7 +782,7 @@ sequenceDiagram
   end
 
   rect rgba(0,111,207,0.12)
-    Note over CH,PS: 2 · Customer back
+    Note over CH,PS: 2 · Channel confirm
     Note over CH,PW: the customer approves at their bank
     CH->>R: Channel Confirm Event
     R->>WF: update returned
@@ -795,16 +794,12 @@ sequenceDiagram
   end
 
   rect rgba(0,111,207,0.12)
-    Note over CH,PS: 3 · While pending
+    Note over CH,PS: 3 · Async process
     loop every interval
       WF->>PW: GET /payment-status
       PW-->>WF: status
     end
     WF->>PS: ACCEPTED or DECLINED
-  end
-
-  rect rgba(0,111,207,0.12)
-    Note over CH,PS: 4 · Settle
     M3->>R: Bank Settled Event
     R->>WF: signal settled
     R-->>M3: 202
