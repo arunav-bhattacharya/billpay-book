@@ -887,10 +887,10 @@ sequenceDiagram
 
 Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in four phases. The first two are sync: the channel waits for the reply.
 
-1. **Create.** Amex's own checks run first (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link. The channel gets `PENDING` with the link.
+1. **Create.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own checks run next (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
 2. **Customer back.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/confirm`, the Channel Confirm Event. Billpay asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
 3. **While pending.** Billpay asks again at a fixed interval until the answer is success or failure. Nobody waits for it.
-4. **Settle.** M3's notice that the bank has settled the money, the Bank Settled Event, lets Execute and Fulfil run, with no clearing call.
+4. **Settle.** M3's notice that the bank has settled the money, the Bank Settled Event (`POST /payments/{payment-id}/settlement`), lets Execute and Fulfil run, with no clearing call.
 
 Pink arrows are the events and Temporal messages that reach the waiting workflow from outside.
 
@@ -901,6 +901,7 @@ config:
   fontSize: 15
 ---
 sequenceDiagram
+  autonumber
   %% Pink arrows: something outside resumes the payment.
   %% trigger: Channel Confirm Event
   %% trigger: update returned
@@ -915,45 +916,45 @@ sequenceDiagram
   participant PS as PaymentStore<br/>(Oracle)
 
   rect rgba(89,89,89,0.08)
-    Note over CH,PS: 1 · Create · sync, the channel waits
+    Note over CH,PS: 1 · Create
     CH->>R: POST /payments
     R->>WF: Update-With-Start
-    Note over WF: Capture, then<br/>own checks
-    WF->>PW: redirect link, one try
+    WF->>PS: Capture: PENDING, if new
+    Note over WF: own checks
+    WF->>PW: redirect link
     PW-->>WF: link
-    WF->>PS: PENDING, with the link
-    WF-->>R: update result
+    WF->>PS: the link
+    WF-->>R: PENDING, with the link
     R-->>CH: PENDING, with the link
   end
 
   rect rgba(0,89,52,0.08)
-    Note over CH,PS: 2 · Customer back · sync, the channel waits
-    Note over CH,PW: the customer approves the payment at their bank
-    CH->>R: Channel Confirm Event<br/>POST /payments/{payment-id}/confirm
+    Note over CH,PS: 2 · Customer back
+    Note over CH,PW: the customer approves at their bank
+    CH->>R: Channel Confirm Event
     R->>WF: update returned
-    WF->>PW: GET /payment-status, one try
-    PW-->>WF: success, failure or pending
-    WF->>PS: ACCEPTED or DECLINED, once final
-    WF-->>R: the status
-    R-->>CH: 200: PENDING, ACCEPTED or DECLINED
-    Note over CH,R: the customer sees the status,<br/>and the channel's part ends here
+    WF->>PW: GET /payment-status
+    PW-->>WF: status
+    WF->>PS: ACCEPTED or DECLINED, if final
+    WF-->>R: status
+    R-->>CH: 200, the status
   end
 
   rect rgba(140,65,12,0.08)
-    Note over CH,PS: 3 · While pending · nobody waits
-    loop every fixed interval, while pending
+    Note over CH,PS: 3 · While pending
+    loop every interval
       WF->>PW: GET /payment-status
-      PW-->>WF: success, failure or pending
+      PW-->>WF: status
     end
-    WF->>PS: ACCEPTED, or DECLINED on failure
+    WF->>PS: ACCEPTED or DECLINED
   end
 
   rect rgba(0,23,90,0.08)
-    Note over CH,PS: 4 · Settle · nobody waits
-    M3->>R: Bank Settled Event<br/>POST /payments/{payment-id}/settlement
+    Note over CH,PS: 4 · Settle
+    M3->>R: Bank Settled Event
     R->>WF: signal settled
     R-->>M3: 202
-    Note over WF: Execute,<br/>then Fulfil
+    Note over WF: Execute, Fulfil
     WF->>PS: PROCESSING, then PROCESSED
   end
 ```
