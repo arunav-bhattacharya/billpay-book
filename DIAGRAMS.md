@@ -192,7 +192,7 @@ Pass the array, get the component.
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
-| `JourneyMap` | `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, name, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`, and `name` the event the lane shows, such as `Channel Confirm Event`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems` and `table` | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals named as events), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends. Each run of steps a caller waits on sits in one tinted box tagged Sync. A wait is three dots; a repeated call is a row of small squares ending in a solid one; `exit` can be a list. Under 540px of its own width it folds into a list. |
+| `JourneyMap` | `journey`, the name of a file in `website/diagrams/journeys/` that holds the rest. Or, inline: `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, name, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`, and `name` the event the lane shows, such as `Channel Confirm Event`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems` and `table` | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals named as events), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends. Each run of steps a caller waits on sits in one tinted box tagged Sync. A wait is three dots; a repeated call is a row of small squares ending in a solid one; `exit` can be a list. Under 540px of its own width it folds into a list. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
 | `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row`, `child`, or `update` or `signal` to a running workflow; every one but `uws` and `child` draws its line in the trigger pink) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
@@ -213,6 +213,28 @@ picture. It is already written and it takes your data.
 same five lanes, so a reader who learns one journey can read them all. If
 your diagram is a process with steps, states and side calls, start here rather than
 from scratch.
+
+Its content lives in YAML, one file per journey, in
+[`website/diagrams/journeys/`](website/diagrams/journeys), and the page names the file:
+`<JourneyMap journey="pay-by-bank-today" />`. That lets someone who doesn't write React
+change a journey, in GitHub, VS Code or IntelliJ, and the figure links to its own file
+("Edit this diagram"). Three pieces make that safe:
+
+- [`diagrams/schemas/journey.schema.json`](website/diagrams/schemas/journey.schema.json)
+  is the rulebook: every field, its allowed values and a line on each. Editors read it
+  for suggestions and red underlines, through the two comment lines at the top of each
+  file (one for VS Code's YAML extension, one for IntelliJ). The list of systems a step
+  can call, with each one's full name, lives here too, and JourneyMap reads its tooltips
+  from it.
+- [`plugins/diagram-data`](website/plugins/diagram-data) loads the YAML at build time and
+  checks it against the schema. A mistake stops the build with a plain message that
+  names the file, the step and what to write instead. `npm run check:diagrams` runs the
+  same check in a second, and every pull request runs it too
+  ([`.github/workflows/check.yml`](.github/workflows/check.yml)).
+- [`diagrams/README.md`](website/diagrams/README.md) is the editor's guide.
+
+Other data-driven diagrams can move the same way: a folder under `website/diagrams`, a
+`<kind>.schema.json` named after the folder, and a component that reads its file.
 
 ### 3.3 Shared CSS recipes
 
@@ -279,10 +301,9 @@ would sink among the blue arrows. Use it only for that, and through one of the t
 places that already draw it: JourneyMap's Outside lane, the `TriggerTag` component
 (also `CallChip`'s `trigger` prop), RouteMap's lines, and a sequence diagram's `%% trigger:` lines.
 
-The four `--amex-phase-*` hues are the other exception (chosen by the user, 2026-11-22):
-DLS grey 700, the DLS status set's deep green and deep orange, and Deep Blue, each with a
-lighter step for dark mode. They colour a sequence diagram's numbered phases and nothing
-else, so the phases don't read as more shades of the participants' blue.
+A sequence diagram's phase labels ("1 · Create") all take one colour, `--amex-phase`:
+Deep Blue, with a lighter step for dark mode (chosen by the user, 2026-11-22). The field
+behind a phase says which side runs it.
 
 The lifecycle colours, `--amex-state-intermediate`, `--amex-state-success`,
 `--amex-state-failure` and `--amex-state-choice`, live in
@@ -795,12 +816,20 @@ teach patterns this repo does not use.
   arrow that wakes the payment's workflow (an update or signal to it, a dispatcher's or
   callback's start), not the diagram's opening request. Name an outside call by its
   event on the label's first line, such as `Channel Confirm Event`, as the journeys do.
-- Numbered phases are `rect` blocks with a phase sentinel fill: `rgba(89,89,89,0.08)`,
-  `rgba(0,89,52,0.08)`, `rgba(140,65,12,0.08)` and `rgba(0,23,90,0.08)`, in that order
-  (the `--amex-phase-1` to `-4` hues). Open each with a note across every lifeline that
-  starts with its number and a middle dot, `Note over A,Z: 2 · Customer back`, and the
-  theme colours that note in the phase's hue. Any other note in a phased diagram turns
-  grey, so the participants are the only strong blue. Diagram 14 is the model.
+- Every sequence diagram follows one style, diagram 14 being the model:
+  - `autonumber`, so every step has a number.
+  - A phase opens with a note across its lifelines that starts with its number and a
+    middle dot, `Note over A,Z: 2 · Customer back`. The theme draws every such label in
+    Deep Blue, and turns every other note grey.
+  - The phase sits in a `rect` that says which side runs it: `rgba(0,111,207,0.12)` for
+    Online (billpay-online and its cluster), `rgba(0,23,90,0.12)` for Offline. Leave a
+    step outside Billpay with no `rect`. The key under the diagram appears on its own.
+  - A wait is a plain note between phases, such as `the SCHED_EXEC row waits in Oracle
+    until the due date`.
+  - A commit is an arrow to `PaymentStore`, labelled with the state alone. No chip.
+  - Keep labels short. Detail goes in the paragraph above the diagram.
+  - Use the `Caller` and `Billpay Platform` boxes only where several outside systems
+    need telling apart, as with One-Data's inbox and MR/M3.
 
 **If you want to explore further**
 

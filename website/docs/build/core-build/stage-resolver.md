@@ -86,34 +86,35 @@ sequenceDiagram
   participant R as Rule registry
   participant P as PaymentStore
 
-  Note over X,R: When the app starts, Quarkus hands each registry every class of its kind, and each registry works out every combination once. A tie stops the start.
+  Note over W,P: at start-up, each registry works out every combination once, and a tie stops the start
 
-  W->>X: resolve(profile): GB, consumer, card authentication Y
-  X->>X: makes the stubs and picks the Verify stage
-  X-->>W: the stages, bound to this payment
-  W->>S: verify.ownChecks(paymentId), at the create
+  Note over W,P: 1 · Resolve
+  W->>X: resolve(profile): GB, consumer,<br/>card authentication Y
+  X->>X: picks the Verify stage
+  X-->>W: the stages for this payment
+
+  Note over W,P: 2 · Own checks, at the create
+  W->>S: verify.ownChecks(paymentId)
   S->>C: which checks apply?
-  C-->>S: Instrument, Options, CardAuthorization
-  Note over C: CardAuthorizationCheck is picked because card authentication is Y. Nothing names a market.
-  Note over S: CardAuthorization needs the 3D Secure result, so only Amex's own checks run now.
-  par Amex's own checks at once
-    S->>A: Payment Instruments: the instrument
+  C-->>S: Instrument, Options,<br/>CardAuthorization
+  Note over C,A: card authentication Y picks CardAuthorization.<br/>No market is named
+  par at once
+    S->>A: Payment Instruments
   and
-    S->>A: Payment Options: ReadPaymentOptionByIdentifier.v1
+    S->>A: Payment Options:<br/>ReadPaymentOptionByIdentifier.v1
   end
   A-->>S: the first facts
-  S->>R: which rules apply, and do they pass?
-  R-->>S: they pass, so nothing is committed yet
-  Note over W: RequestConfirmation starts 3D Secure, and the workflow waits for the card provider's callback.
-  W->>S: verify.cardAuthorization(paymentId, the first facts), after the callback
-  S->>A: the card provider: authorize, with the 3D Secure result
+  S->>R: which rules apply, and pass?
+  R-->>S: they pass, nothing committed
+
+  Note over W,P: 3 · Card authorization, after the callback
+  W->>S: verify.cardAuthorization(paymentId,<br/>the first facts)
+  S->>A: card provider: authorize,<br/>with the 3D Secure result
   A-->>S: all the facts
-  S->>R: which rules apply, and do they pass?
-  Note over R: Each rule: runsWhen first, then passes. A rule that doesn't fit the facts is skipped, not failed.
-  R-->>S: the card's bank declined the authorization, so DECLINED
-  rect rgba(102,169,226,0.40)
-    S->>P: one guarded commit: DECLINED
-  end
+  S->>R: which rules apply, and pass?
+  Note over A,R: runsWhen first, then passes.<br/>A rule that doesn't fit is skipped
+  R-->>S: the bank declined: DECLINED
+  S->>P: one guarded commit: DECLINED
   S-->>W: the outcome
 ```
 

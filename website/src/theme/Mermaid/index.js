@@ -170,42 +170,52 @@ function markTriggers(svg, prefixes) {
 }
 
 /**
- * Colour each numbered phase's label in its phase's hue.
+ * Mark each numbered phase's label.
  *
- * A phase is a `rect` block whose fill is one of the phase sentinels in
- * mermaid.css, and its label is the first note inside it ("1 · Create").
- * Mermaid draws the blocks and the notes apart, so the label is found by
- * position: the note that starts with a number and a dot and sits inside the
- * block. The svg gets `bp-phased`, which turns its other notes grey.
+ * A phase label is a note whose text starts with a number and a dot
+ * ("1 · Create"), and mermaid.css draws every one in Deep Blue. The field
+ * behind a phase says which side runs it, Online or Offline. Every sequence
+ * diagram gets `bp-phased`, which turns its other notes grey.
  */
-const PHASES = ['rgba(89,89,89,0.08)', 'rgba(0,89,52,0.08)', 'rgba(140,65,12,0.08)', 'rgba(0,23,90,0.08)'];
-
 function markPhases(svg) {
   if (svg.getAttribute('aria-roledescription') !== 'sequence') {
     return;
   }
-  const blocks = [...svg.querySelectorAll('rect')]
-    .map((r) => ({r, n: PHASES.indexOf(r.getAttribute('fill'))}))
-    .filter((b) => b.n >= 0);
-  if (!blocks.length) {
-    return;
-  }
   svg.classList.add('bp-phased');
-  const num = (el, a) => parseFloat(el.getAttribute(a)) || 0;
   svg.querySelectorAll('rect.note').forEach((note) => {
     const text = note.parentNode.querySelector('text.noteText');
     if (!text || !/^\d+\s*·/.test(text.textContent.trim())) {
       return;
     }
-    const y = num(note, 'y');
-    const block = blocks.find(({r}) => y >= num(r, 'y') && y <= num(r, 'y') + num(r, 'height'));
-    if (!block) {
-      return;
-    }
-    const cls = `bp-phase-${block.n + 1}`;
-    note.classList.add('bp-phase-label', cls);
-    text.classList.add('bp-phase-label', cls);
+    note.classList.add('bp-phase-label');
+    text.classList.add('bp-phase-label');
   });
+}
+
+/**
+ * The key under a sequence diagram: which fields mean Online and Offline, and
+ * the pink of a trigger, each shown only when the diagram uses it. Read from
+ * the source, so it is right before Mermaid has drawn anything.
+ */
+const ONLINE = 'rgba(0,111,207,0.12)';
+const OFFLINE = 'rgba(0,23,90,0.12)';
+
+function legendFor(source) {
+  const src = String(source || '');
+  if (!/^\s*sequenceDiagram/m.test(src)) {
+    return [];
+  }
+  const items = [];
+  if (src.includes(`rect ${ONLINE}`)) {
+    items.push({key: 'online', text: 'Online: billpay-online and its cluster'});
+  }
+  if (src.includes(`rect ${OFFLINE}`)) {
+    items.push({key: 'offline', text: 'Offline: billpay-offline and its cluster'});
+  }
+  if (readTriggers(src).length) {
+    items.push({key: 'trigger', text: 'Starts or resumes the payment from outside'});
+  }
+  return items;
 }
 
 function useTriggerArrows(ref, source) {
@@ -235,6 +245,7 @@ export default function Mermaid(props) {
   const scaledDown = useIsScaledDown(wrapRef);
   useTriggerArrows(wrapRef, props.value);
   const [expanded, setExpanded] = useState(false);
+  const legend = legendFor(props.value);
   const [actualSize, setActualSize] = useState(false);
 
   const collapse = useCallback(() => {
@@ -283,6 +294,17 @@ export default function Mermaid(props) {
       )}
 
       <OriginalMermaid {...props} />
+
+      {legend.length > 0 && !expanded && (
+        <div className={styles.legend}>
+          {legend.map((item) => (
+            <span key={item.key} className={styles.legendItem}>
+              <span className={item.key === 'trigger' ? styles.triggerBar : clsx(styles.legendSwatch, styles[`swatch_${item.key}`])} aria-hidden="true" />
+              {item.text}
+            </span>
+          ))}
+        </div>
+      )}
 
       {!expanded && scaledDown && (
         <button

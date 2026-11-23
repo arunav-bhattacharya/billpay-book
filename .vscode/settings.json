@@ -1,0 +1,8 @@
+{
+  "yaml.schemas": {
+    "./website/diagrams/schemas/journey.schema.json": "website/diagrams/journeys/*.yaml"
+  },
+  "yaml.completion": true,
+  "yaml.hover": true,
+  "yaml.validate": true
+}

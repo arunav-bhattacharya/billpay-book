@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Update a payment: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Update a payment
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: UpdatePayment.v1
+
+core:
+  - kind: api
+    label: PUT /payments/{payment-id}
+
+workflow:
+  - label: UpdatePaymentWorkflow
+  - label: CreateScheduledPaymentWorkflow
+    note: "{newId}-init"
+    child: true
+
+steps:
+  - name: Check
+    mode: live
+    caption: window and eligibility
+    exit:
+      label: 409 outside the window
+
+  - name: Cancel
+    state: CANCELLED
+    mode: live
+    caption: the original, guarded
+    exit:
+      label: 409 if it has left SCHEDULED
+
+  - name: Re-create
+    state: SCHEDULED
+    mode: live
+    caption: same confirmation number
+    reply: to the caller with the new payment's result
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Link
+    mode: background
+    caption: old payment to new
+    table: ORIG_TRANS_REFER_MAP
+
+detail:
+  - step: 1
+    text: >-
+      Read-only calls check the market's cancellation window and whether the payment can still
+      change. Outside the window the answer is 409.
+  - step: 2
+    text: >-
+      The original is cancelled with a guarded update, the same one [Cancel a
+      payment](#cancel-a-payment) uses. If the payment has already left `SCHEDULED`, which a
+      corporate payment does once its allocations are requested, no row changes and the answer is
+      409.
+  - step: 3
+    text: >-
+      The new payment starts as a child, `CreateScheduledPaymentWorkflow` with the ID
+      `{newId}-init`. It gets a new payment ID but keeps the confirmation number, so the customer
+      sees one payment rather than two. Its result is the caller's answer.
+  - step: 4
+    text: >-
+      The old and new payment IDs are mapped in `ORIG_TRANS_REFER_MAP`, so anyone can follow the
+      chain later.
+
+reference:
+  to: /docs/design/sequence-diagrams#5-update-a-scheduled-payment
+  label: Sequence diagram

@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Initiate a credit balance refund: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Initiate a credit balance refund
+eyebrow: Credit balance refund
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: CreateCreditBalanceRefund.v1
+
+core:
+  - kind: api
+    label: POST /refunds
+
+workflow:
+  - label: CreateBalanceRefundWorkflow
+
+status:
+  kind: tbd
+  note: >-
+    From a channel, the refund starts on the Online cluster with Update-With-Start. A refund that
+    Accounts Receivable raises waits in One-Data's inbox, and the AR intake dispatcher starts it on
+    the Offline cluster. Either way it follows the payment path (Capture, Verify, Execute, Fulfil),
+    but its detailed steps are still being defined.

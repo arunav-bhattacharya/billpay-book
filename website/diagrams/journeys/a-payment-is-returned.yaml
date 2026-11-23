@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# A payment is returned: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: A payment is returned
+kind: system
+
+origin:
+  actor: Bank
+  channels:
+    - MR/M3 returned
+
+entry:
+  - kind: event
+    label: Money movement handler
+  - kind: inbox
+    label: One-Data's inbox
+
+core:
+  - kind: dispatcher
+    label: Returns dispatcher
+
+workflow:
+  - label: ProcessReturnedPaymentWorkflow
+
+steps:
+  - name: Check
+    mode: background
+    caption: can this be returned
+    exit:
+      label: not in a returnable state
+
+  - name: Return
+    state: RETURNED
+    mode: background
+    caption: the money came back
+
+  - name: Judge
+    mode: background
+    caption: worth another try
+    exit:
+      label: not eligible, so it stays returned
+
+  - name: Queue
+    state: REPRESENTING
+    mode: background
+    caption: the next presentment
+
+detail:
+  - text: >-
+      Returns come in bursts, up to 100 a second and 100K a day. One-Data keeps each one in its
+      inbox, and the returns dispatcher starts them through the Router at the governor's pace, at
+      priority 5, the lowest priority level.
+  - step: 1
+    text: >-
+      Only a payment that got far enough can come back. The workflow checks the payment, whole or a
+      leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment
+      returned again.
+  - step: 2
+    text: The presentment that came back moves to `RETURNED`, and its row stays there.
+  - step: 3
+    text: >-
+      Not every return is worth another try. The market's release holds its representment rules:
+      which return reasons can be represented, how many times a payment can be, and how many days
+      after the return it goes again (agreed 2026-11-07). A return that fails either test stays
+      `RETURNED`, and so does a leg's, since only a whole payment is represented. The representment
+      date is the day the return arrived, in the market's time zone, plus those days.
+  - step: 4
+    text: >-
+      QueueRepresentment writes the next presentment as a new row, numbered one higher, in
+      `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due at
+      its start, so a same-day representment is due at once (Proposed). A return never starts the
+      representment itself; the date does.
+  - text: What happens on that date is [A payment is represented](#a-payment-is-represented).
+
+reference:
+  to: /docs/design/sequence-diagrams#7-return
+  label: Sequence diagram

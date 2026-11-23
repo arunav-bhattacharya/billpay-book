@@ -718,6 +718,28 @@
   color: var(--jm-reply);
 }
 
+/* The sequence diagram link and the edit link, on one row. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.2rem;
+}
+.edit {
+  font-size: 0.85rem;
+  color: var(--amex-mut);
+}
+.edit::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.4rem;
+  border-radius: 2px;
+  background: var(--amex-blue);
+  vertical-align: 0.05rem;
+}
+
 @media print {
   .wrap {
     box-shadow: none;

@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay on a future date: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay on a future date
+eyebrow: Scheduled payment
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+
+core:
+  - kind: api
+    label: POST /payments
+
+workflow:
+  - label: CreateScheduledPaymentWorkflow
+  - label: ExecuteScheduledPaymentWorkflow
+    note: on the due date
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+
+  - name: Verify
+    state: SCHEDULED
+    mode: live
+    caption: replies with the decision
+    reply: to the caller with SCHEDULED or DECLINED
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Wait
+    state: SCHEDULED
+    mode: awaiting
+    caption: a row in Oracle
+    exit:
+      state: CANCELLED
+      label: if cancelled inside the window
+
+  - name: Reverify
+    state: ACCEPTED
+    mode: background
+    caption: checked again, on the day
+    trigger:
+      kind: dispatcher
+      name: Due Date Event
+      label: the scheduled-payments dispatcher, at the market's execution time on the due date
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    systems:
+      - MR/M3
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox
+    systems:
+      - MR/M3
+      - GAR
+    exit:
+      state: RETURNED
+
+detail:
+  - step: 1
+    text: >-
+      The same insert-if-absent as an immediate payment, so a repeated request gets the original
+      back.
+  - step: 2
+    text: >-
+      Checked now, not on the day. The answer is `SCHEDULED`, and the same commit writes a
+      `SCHED_EXEC` row in the Work Tracker, due at the market's execution time on that date.
+      `SCHEDULED` is a decision, so the delete takes the payment off the account's pending list, and
+      the customer can make another payment while this one waits. Then the workflow closes.
+  - step: 3
+    text: >-
+      Until its date, one of the dates Payment Options offered the customer, the payment is a row in
+      Oracle and nothing more. The customer can update or cancel it until the market's cancellation
+      window closes, which is always before execution starts.
+  - step: 4
+    text: >-
+      At the market's execution time, that market's dispatcher claims the row, calls the Router
+      again so the payment runs with today's config, and starts `ExecuteScheduledPaymentWorkflow` on
+      the Offline cluster at the rate the governor allows. Reverify checks the payment again, the
+      mandate included where the market requires one, because an account can close or a balance can
+      move while a payment waits. Payment Options' `ReadPaymentOptions.v1` confirms the customer
+      still owes money and the option they picked still holds; if not, the payment is `DECLINED`. A
+      Statement Balance or Total Balance payment pays what the option gives that day.
+  - text: >-
+      A future-dated payment never clears in real time. It clears in batch, whichever channel it
+      came from.
+  - text: >-
+      From Execute on, the journey is [Pay my bill today](#pay-my-bill-today). The last commit marks
+      the Work Tracker row `DONE`.
+
+reference:
+  to: /docs/design/sequence-diagrams#2-scheduled-payment-created-today-and-executed-later
+  label: Sequence diagram

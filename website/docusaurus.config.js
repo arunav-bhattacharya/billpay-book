@@ -77,6 +77,8 @@ const config = {
   ],
 
   plugins: [
+    // Diagram data lives in YAML under website/diagrams; see its README.
+    './plugins/diagram-data',
     [
       '@docusaurus/plugin-client-redirects',
       {

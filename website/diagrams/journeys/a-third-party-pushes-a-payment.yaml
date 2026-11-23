@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# A third party pushes a payment: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: A third party pushes a payment
+kind: system
+
+origin:
+  actor: A third party
+  channels:
+    - A pushed payment
+
+entry:
+  - kind: function
+    label: CreateInboundPayment.v1
+  - kind: inbox
+    label: One-Data's inbox
+
+core:
+  - kind: dispatcher
+    label: Inbound dispatcher
+
+workflow:
+  - label: ProcessInboundPaymentWorkflow
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: background
+
+  - name: Verify
+    state: ACCEPTED
+    mode: background
+    caption: will Amex take it
+    exit:
+      state: DISALLOWED
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    systems:
+      - MR/M3
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox
+    systems:
+      - MR/M3
+      - GAR
+    exit:
+      state: RETURNED
+
+detail:
+  - text: >-
+      One-Data stores the payment and replies 202 straight away. The inbound dispatcher checks the
+      inbox every minute and starts the workflow through the Router at the governor's pace.
+  - step: 1
+    text: Recorded once. Third parties retry, so the idempotency check matters here.
+  - step: 2
+    text: >-
+      A payment American Express doesn't accept ends at `DISALLOWED`. That state exists only on this
+      journey.
+  - text: >-
+      Past that, it is an ordinary payment. The money is applied, every downstream system is told,
+      and it turns `PAID` once both confirmations are in.
+
+reference:
+  to: /docs/design/sequence-diagrams#9-inbound-payment
+  label: Sequence diagram

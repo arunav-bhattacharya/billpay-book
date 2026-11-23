@@ -13,12 +13,13 @@ import Lead from '@site/src/components/Lead';
 <details>
 <summary>How to read these diagrams</summary>
 
-- The group on the left is whoever starts the flow: a One-Data contract such as `CreatePayment.v3`, or One-Data's inbox when Billpay pulls the work. The light-blue group is the Billpay Platform.
-- Every payment workflow starts through the Router, and its note names the hops: admit, pin the resolved profile, then choose the run site on a cluster. The PAID drain and the missing-events check start from Schedules instead.
-- A Bright Blue band is the Online cluster, where a caller is waiting. A Deep Blue band is the Offline cluster, where dispatchers pace the work. A grey, dashed band is time when nothing runs, because the work is waiting in Oracle, in One-Data's inbox, or on a workflow's timer.
+- Every step is numbered, in order.
+- A numbered label such as **1 · Create** names each phase. Each phase's label has its own colour, so you can tell neighbouring phases apart.
+- The field behind a phase says which side runs it: pale blue for the Online side (billpay-online and its cluster, where a caller is usually waiting), pale navy for the Offline side (billpay-offline and its cluster, where dispatchers pace the work). No field means the step happens outside Billpay. The key under each diagram repeats this.
+- A grey note between phases is time when nothing runs, because the work is waiting in Oracle, in One-Data's inbox, or on a workflow's timer.
 - A pink arrow is where something outside starts or resumes the payment: an update or a signal to its running workflow, a dispatcher or a callback starting the next workflow, or the events One-Data pairs before `PAID`. [All Journeys](./journeys/all-journeys.md) marks the same steps with pink flags.
-- The participants are the workflow and its stages, such as Capture, Verify and Execute. The systems a stage calls, such as clearing and Accounts Receivable, appear in its notes rather than as participants.
-- A pale-blue chip, such as `state → ACCEPTED`, is a commit through `PaymentStore`: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
+- An arrow to `PaymentStore` is a commit: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
+- Every payment workflow starts through the Router, which admits the request and pins the resolved profile. The PAID drain and the missing-events check start from Schedules instead.
 - RTF and Raven are drawn because their timing matters. Each change is announced to RTF, and to Raven where the customer is told, after the commit that makes it. Fulfil is the exception: it tells both before it commits `PROCESSED`.
 - The wider diagrams carry an expand control in the top right, which opens a full-window view. Escape closes it.
 
@@ -37,45 +38,33 @@ config:
 sequenceDiagram
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as CreatePayment.v3
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant WF as CreateImmediate<br/>PaymentWorkflow
-    participant CAP as Capture
-    participant VER as Verify
-    participant EXE as Execute
-    participant FUL as Fulfil
-    participant PS as PaymentStore (Oracle)
-  end
-
+  participant OD as CreatePayment.v3
+  participant R as Billpay Router
+  participant WF as CreateImmediate<br/>PaymentWorkflow
+  participant CAP as Capture
+  participant VER as Verify
+  participant EXE as Execute
+  participant FUL as Fulfil
+  participant PS as PaymentStore<br/>(Oracle)
   participant RTF
   participant RAV as Raven
 
-  OD->>R: POST /payments,<br/>today, one instruction
-  Note over R: admit, pin profile, run on Online
-  R->>WF: Update-With-Start,<br/>{paymentId}-init
-
   rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster, the first workflow task: local activities only
+    Note over OD,RAV: 1 · Decide
+    OD->>R: POST /payments
+    Note over R: admit, pin profile
+    R->>WF: Update-With-Start,<br/>{paymentId}-init
     WF->>CAP: run
-    rect rgba(102,169,226,0.40)
-      CAP->>PS: state → PENDING, idempotency checked
-    end
+    CAP->>PS: PENDING, if new
     WF->>VER: run
-    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionByIdentifier.v1), and Plans<br/>for a mandate, in parallel
-    rect rgba(102,169,226,0.40)
-      VER->>PS: state → ACCEPTED or DECLINED
-    end
+    Note over VER: Instruments, Options<br/>and Plans, in parallel
+    VER->>PS: ACCEPTED or DECLINED
+    WF-->>R: update result
+    R-->>OD: ACCEPTED or DECLINED
   end
 
-  WF-->>R: update result
-  R-->>OD: ACCEPTED or DECLINED
-
   rect rgba(0,111,207,0.12)
-    Note over WF,RAV: Online cluster, after the reply
+    Note over OD,RAV: 2 · After the reply
     WF->>RTF: PENDING event
     alt DECLINED
       WF->>RTF: DECLINED event
@@ -83,25 +72,21 @@ sequenceDiagram
     else ACCEPTED
       WF->>RTF: ACCEPTED event
       WF->>EXE: run
-      Note over EXE: clearing and AR in parallel with<br/>Instruments (clear text), then OTB
-      rect rgba(102,169,226,0.40)
-        EXE->>PS: state → PROCESSING
-      end
+      Note over EXE: clearing, AR and<br/>Instruments, then OTB
+      EXE->>PS: PROCESSING
       WF->>RTF: PROCESSING event
       WF->>FUL: run
-      Note over FUL: accounting, eBNC, risk, TFNE,<br/>GPHDB and B2Notifier in parallel
+      Note over FUL: accounting, eBNC, risk,<br/>TFNE, GPHDB, B2Notifier
       FUL->>RTF: PROCESSED event
       FUL->>RAV: PROCESSED message
-      rect rgba(102,169,226,0.40)
-        FUL->>PS: state → PROCESSED
-      end
+      FUL->>PS: PROCESSED
     end
   end
 ```
 
 ## 2. Scheduled payment, created today and executed later
 
-A scheduled payment costs Temporal nothing while it waits. Intake on Online commits `SCHEDULED` together with a `SCHED_EXEC` row, replies and ends, and the row sits in Oracle until the due date. On the due date the market's dispatcher routes the payment again, with that day's config, and starts `ExecuteScheduledPaymentWorkflow` on Offline. Reverify's guarded update settles any race with a late cancel.
+A scheduled payment costs Temporal nothing while it waits. Intake on Online commits `SCHEDULED` together with a `SCHED_EXEC` row, replies and ends, and the row sits in Oracle until the due date. On the due date the market's dispatcher routes the payment again, with that day's config, and starts `ExecuteScheduledPaymentWorkflow` on Offline. Reverify reads the options again through `ReadPaymentOptions.v1`: the card still owes, the option still holds, and a balance option takes its amount again. Its guarded update settles any race with a late cancel.
 
 ```mermaid
 ---
@@ -114,71 +99,52 @@ sequenceDiagram
   %% trigger: dispatcher start
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as CreatePayment.v3
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant CW as CreateScheduled<br/>PaymentWorkflow
-    participant VER as Verify
-    participant PS as PaymentStore (Oracle)
-    participant SD as Scheduled-payments<br/>dispatcher
-    participant XW as ExecuteScheduled<br/>PaymentWorkflow
-    participant REV as Reverify
-  end
-
+  participant OD as CreatePayment.v3
+  participant R as Billpay Router
+  participant CW as CreateScheduled<br/>PaymentWorkflow
+  participant VER as Verify
+  participant PS as PaymentStore<br/>(Oracle)
+  participant SD as Scheduled-payments<br/>dispatcher
+  participant XW as ExecuteScheduled<br/>PaymentWorkflow
+  participant REV as Reverify
   participant RTF
   participant RAV as Raven
 
-  OD->>R: POST /payments,<br/>future date
-  Note over R: admit, pin profile, run on Online
-  R->>CW: Update-With-Start,<br/>{paymentId}-init
-
   rect rgba(0,111,207,0.12)
-    Note over CW,PS: Online cluster, the day it is created
-    Note over CW: Capture first: PENDING
+    Note over OD,RAV: 1 · Create
+    OD->>R: POST /payments, future date
+    Note over R: admit, pin profile
+    R->>CW: Update-With-Start,<br/>{paymentId}-init
+    CW->>PS: Capture: PENDING, if new
     CW->>VER: run
-    Note over VER: Instruments, Options by option ID<br/>(ReadPaymentOptionByIdentifier.v1), and Plans<br/>for a mandate, in parallel
-    rect rgba(102,169,226,0.40)
-      VER->>PS: state → SCHEDULED,<br/>with the SCHED_EXEC row,<br/>one commit
-    end
-  end
-
-  CW-->>R: update result
-  R-->>OD: SCHEDULED
-
-  rect rgba(0,111,207,0.12)
-    Note over CW,RAV: Online cluster, after the reply
-    CW->>RTF: PENDING event
-    CW->>RTF: SCHEDULED event
+    Note over VER: Instruments, Options<br/>and Plans, in parallel
+    VER->>PS: SCHEDULED, with a<br/>SCHED_EXEC row
+    CW-->>R: update result
+    R-->>OD: SCHEDULED
+    CW->>RTF: PENDING, SCHEDULED events
     CW->>RAV: SCHEDULED message
   end
 
-  rect rgba(83,86,90,0.14)
-    Note over CW,XW: The SCHED_EXEC row waits in Oracle until the due date. Nothing runs in Temporal
-  end
+  Note over OD,RAV: the SCHED_EXEC row waits in Oracle until the due date
 
   rect rgba(0,23,90,0.12)
-    Note over SD,RAV: Offline cluster, at the execution time of the payment's market and account type on the due date
-    SD->>PS: claim due SCHED_EXEC<br/>rows: DISPATCHING
-    SD->>R: re-route with today's config
-    Note over R: admit, pin profile, run on Offline
-    R->>XW: dispatcher start, {paymentId}-execute
-    SD->>PS: mark the row<br/>DISPATCHED
+    Note over OD,RAV: 2 · Execute on the due date
+    SD->>PS: claim due SCHED_EXEC rows
+    SD->>R: re-route, today's config
+    Note over R: admit, pin profile
+    R->>XW: dispatcher start,<br/>{paymentId}-execute
+    SD->>PS: row DISPATCHED
     XW->>REV: run
-    Note over REV: Options again (ReadPaymentOptions.v1):<br/>still owed, the option still holds,<br/>the amount taken again for a balance
-    rect rgba(102,169,226,0.40)
-      REV->>PS: state → ACCEPTED or DECLINED,<br/>guarded: only if still SCHEDULED
-    end
+    Note over REV: Options again
+    REV->>PS: ACCEPTED or DECLINED,<br/>if still SCHEDULED
     XW->>RTF: ACCEPTED or DECLINED event
-    Note over XW,REV: Execute, then Fulfil, as for pay today. The last commit marks the row DONE
+    Note over XW,REV: then Execute and Fulfil, as for pay today
   end
 ```
 
 ## 3. Corporate payment, pay today
 
-A corporate payment paid today gets its answer the way any payment does: the workflow replies once Verify commits `ACCEPTED`. After that, no workflow waits for anything. Verify's commit writes an `ALLOC_REQUEST` row due at once, and each later step starts from a row in Oracle that a dispatcher picks up: the request for the allocations, the execution once they add up, and one leg per allocation. Execute clears the parent once, at payment level. A completion check every 60 seconds moves the parent to `PROCESSED` once every leg is `PROCESSED` or `PAID`.
+A corporate payment paid today gets its answer the way any payment does: the workflow replies once Verify commits `ACCEPTED`. After that, no workflow waits for anything. Verify's commit writes an `ALLOC_REQUEST` row due at once, and each later step starts from a row in Oracle that a dispatcher picks up: the request for the allocations, the execution once they add up, and one leg per allocation. Execute clears the parent once, at payment level. There is no Reverify, since Verify passed minutes earlier, and the parent gets no Fulfil and no AR or OTB call: the legs make those. Each leg runs as its own `ExecuteSplitPaymentWorkflow` at priority 2, with the parent's ID as its fairness key: AR and OTB (OTB after the Instruments call) with no clearing, then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, the leg's RTF event and Raven message, and `PROCESSED`. A completion check every 60 seconds moves the parent to `PROCESSED` once every batch has its legs and every leg is `PROCESSED` or `PAID`.
 
 ```mermaid
 ---
@@ -190,109 +156,82 @@ sequenceDiagram
   %% Pink arrows: something outside starts or resumes the payment.
   %% trigger: start RequestAllocationsWorkflow
   %% trigger: dispatcher start
-  %% trigger: start each leg through the Router
+  %% trigger: start each leg
   %% trigger: count the parent's
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as CreatePayment.v3
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant WF as CreateImmediate<br/>PaymentWorkflow
-    participant VER as Verify
-    participant PS as PaymentStore (Oracle)
-    participant AD as Allocation<br/>dispatchers
-    participant RQ as RequestAllocations
-    participant XW as ExecuteScheduled<br/>PaymentWorkflow
-    participant EXE as Execute
-  end
-
+  participant OD as CreatePayment.v3
+  participant R as Billpay Router
+  participant WF as CreateImmediate<br/>PaymentWorkflow
+  participant VER as Verify
+  participant PS as PaymentStore<br/>(Oracle)
+  participant AD as Allocation<br/>dispatchers
+  participant RQ as RequestAllocations
+  participant XW as ExecuteScheduled<br/>PaymentWorkflow
+  participant EXE as Execute
   participant RTF
   participant RAV as Raven
 
-  OD->>R: POST /payments,<br/>corporate, today
-  Note over R: admit, pin profile, run on Online
-  R->>WF: Update-With-Start,<br/>{paymentId}-init
-
   rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster
-    Note over WF: Capture first: PENDING
+    Note over OD,RAV: 1 · Accept
+    OD->>R: POST /payments, corporate
+    Note over R: admit, pin profile
+    R->>WF: Update-With-Start,<br/>{paymentId}-init
+    WF->>PS: Capture: PENDING, if new
     WF->>VER: run
-    rect rgba(102,169,226,0.40)
-      VER->>PS: state → ACCEPTED, with an<br/>ALLOC_REQUEST row due at once
-    end
-  end
-
-  WF-->>R: update result
-  R-->>OD: ACCEPTED
-
-  rect rgba(0,111,207,0.12)
-    Note over WF,RTF: Online cluster, after the reply
-    WF->>RTF: PENDING event
-    WF->>RTF: ACCEPTED event
-    Note over WF,VER: the workflow ends here. Dispatchers start every later step
+    VER->>PS: ACCEPTED, with an<br/>ALLOC_REQUEST row
+    WF-->>R: update result
+    R-->>OD: ACCEPTED
+    WF->>RTF: PENDING, ACCEPTED events
   end
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the allocation-request dispatcher, at once
-    AD->>PS: claim the due<br/>ALLOC_REQUEST row
+    Note over OD,RAV: 2 · Request the allocations
+    AD->>PS: claim the ALLOC_REQUEST row
     AD->>R: start through the Router
-    Note over R: admit, pin profile, run on Offline
     R->>RQ: start RequestAllocationsWorkflow,<br/>{paymentId}-allocations
-    rect rgba(102,169,226,0.40)
-      RQ->>PS: state → ALLOCATING, guarded:<br/>only if still ACCEPTED
-    end
+    RQ->>PS: ALLOCATING, if still ACCEPTED
     RQ->>RTF: ALLOCATING event
-    Note over RQ: asks the allocations manager, and ends
+    Note over RQ: asks the allocations manager
   end
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the allocations manager calls back through One-Data, batch by batch (diagram 13)
-    Note over R,RQ: each batch is stored in allocation_batch, and ReceiveAllocationsWorkflow checks it and writes no legs.<br/>The batch that completes the amount commits ALLOCATED, with an ALLOC_EXEC row due at once
+    Note over OD,RAV: 3 · Receive them, batch by batch (diagram 13)
+    Note over R,RQ: the last batch commits ALLOCATED, with an ALLOC_EXEC row
   end
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the allocated-payments dispatcher, every minute
-    AD->>PS: claim the due<br/>ALLOC_EXEC row
+    Note over OD,RAV: 4 · Execute the parent
+    AD->>PS: claim the ALLOC_EXEC row
     AD->>R: start through the Router
-    Note over R: admit, pin profile, run on Offline
     R->>XW: dispatcher start,<br/>{paymentId}-execute
-    Note over XW,EXE: no Reverify: Verify passed it minutes earlier
     XW->>EXE: run
-    Note over EXE: clears once, at payment level.<br/>No AR or OTB call: the legs make those
-    rect rgba(102,169,226,0.40)
-      EXE->>PS: state → PROCESSING, legs_released_at set,<br/>the ALLOC_EXEC row DONE
-    end
+    Note over EXE: clears once,<br/>at payment level
+    EXE->>PS: PROCESSING, row DONE
     XW->>RTF: PROCESSING event
-    Note over XW,EXE: No Fulfil. The leg dispatcher completes the parent
   end
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the leg dispatcher, every minute
-    AD->>PS: write the legs of every stored batch, 1,000 rows<br/>at a time, each ACCEPTED with a SCHEDULED ALLOC_LEG row
-    AD->>PS: claim due ALLOC_LEG<br/>rows, fair across parents
+    Note over OD,RAV: 5 · Run the legs
+    AD->>PS: write each batch's legs,<br/>1,000 rows at a time
+    AD->>PS: claim due ALLOC_LEG rows
     AD->>R: start each leg through the Router
-    Note over R,XW: admit, pin profile, run on Offline: priority 2, the parent's ID as fairness key
-    Note over R,EXE: One ExecuteSplitPaymentWorkflow per leg, {paymentId}_{seq}-execute: AR and OTB (OTB after the Instruments call), no clearing, then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then the leg's RTF event and Raven message, then PROCESSED
+    Note over R,EXE: one ExecuteSplitPaymentWorkflow per leg, {paymentId}_{seq}-execute
   end
 
   rect rgba(0,23,90,0.12)
-    Note over PS,RAV: Offline cluster: the completion check, every 60 s
-    AD->>PS: count the parent's<br/>legs by status
-    Note over AD: every batch has its legs,<br/>and every leg is PROCESSED or PAID
+    Note over OD,RAV: 6 · Complete the parent, every 60 s
+    AD->>PS: count the parent's legs by status
+    Note over AD: every leg PROCESSED or PAID
     AD->>RTF: parent's PROCESSED event
     AD->>RAV: parent's PROCESSED message
-    rect rgba(102,169,226,0.40)
-      AD->>PS: parent → PROCESSED,<br/>guarded update
-    end
+    AD->>PS: parent PROCESSED
   end
 ```
 
 ## 4. Corporate payment, scheduled
 
-A scheduled corporate payment runs the same steps as one paid today, from the same kinds of row. Only the timing differs. Intake commits `SCHEDULED` with an `ALLOC_REQUEST` row due at the market's fetch time: on the due date, or a set number of hours or days before it. The request moves the payment to `ALLOCATING`, and from then on a cancel or an update gets 409. The batch that completes the amount writes the `ALLOC_EXEC` row, due at the execution time on the due date. Then Reverify checks the payment again, Execute clears it, and the legs run as they do for pay today.
+A scheduled corporate payment runs the same steps as one paid today, from the same kinds of row. Only the timing differs. Intake commits `SCHEDULED` with an `ALLOC_REQUEST` row due at the market's fetch time: on the due date, or a set number of hours or days before it. The request moves the payment to `ALLOCATING`, and from then on a cancel or an update gets 409. The batch that completes the amount writes the `ALLOC_EXEC` row, due at the execution time on the due date. Then Reverify checks the payment again, Execute clears it, and the legs run as they do for pay today. If Reverify fails, the payment is `DECLINED` and its legs are never written.
 
 ```mermaid
 ---
@@ -307,75 +246,55 @@ sequenceDiagram
   %% trigger: dispatcher start
   autonumber
 
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant PS as PaymentStore (Oracle)
-    participant AD as Allocation<br/>dispatchers
-    participant RQ as RequestAllocations
-    participant RC as ReceiveAllocations
-    participant XW as ExecuteScheduled<br/>PaymentWorkflow
-    participant REV as Reverify
-    participant EXE as Execute
-  end
-
+  participant R as Billpay Router
+  participant PS as PaymentStore<br/>(Oracle)
+  participant AD as Allocation<br/>dispatchers
+  participant RQ as RequestAllocations
+  participant RC as ReceiveAllocations
+  participant XW as ExecuteScheduled<br/>PaymentWorkflow
+  participant REV as Reverify
+  participant EXE as Execute
   participant RTF
 
-  rect rgba(83,86,90,0.14)
-    Note over R,RTF: Intake on Online committed SCHEDULED with an ALLOC_REQUEST row due at the market's fetch time.<br/>Nothing runs in Temporal until then, and a cancel or an update inside the window still lands
-  end
+  Note over R,RTF: SCHEDULED, with an ALLOC_REQUEST row, waits in Oracle until the fetch time
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the allocation-request dispatcher, at the fetch time
-    AD->>PS: claim the due<br/>ALLOC_REQUEST row
+    Note over R,RTF: 1 · Request the allocations
+    AD->>PS: claim the ALLOC_REQUEST row
     AD->>R: start through the Router
-    Note over R: admit, pin profile, run on Offline
     R->>RQ: start RequestAllocationsWorkflow,<br/>{paymentId}-allocations
-    rect rgba(102,169,226,0.40)
-      RQ->>PS: state → ALLOCATING, guarded: only if still<br/>SCHEDULED. No cancel or update from here
-    end
+    RQ->>PS: ALLOCATING, if still SCHEDULED
     RQ->>RTF: ALLOCATING event
-    Note over RQ: asks the allocations manager, and ends
+    Note over RQ: asks the allocations manager
   end
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the allocations manager calls back through One-Data, batch by batch
-    Note over R,PS: the callback API stores the batch in allocation_batch,<br/>then checks its traffic budget and starts on Offline
+    Note over R,RTF: 2 · Receive them, batch by batch
+    Note over R,PS: each batch stored in allocation_batch
     R->>RC: async start ReceiveAllocationsWorkflow,<br/>{paymentId}-allocations-{batch}, then 202
-    Note over RC: checks the batch and writes no legs
-    rect rgba(102,169,226,0.40)
-      RC->>PS: the batch that completes the amount: state → ALLOCATED,<br/>with an ALLOC_EXEC row due at the execution time
-    end
+    RC->>PS: the last batch: ALLOCATED,<br/>with an ALLOC_EXEC row
     RC->>RTF: ALLOCATED event
   end
 
-  rect rgba(83,86,90,0.14)
-    Note over R,RTF: The batches wait in allocation_batch until the due date. No leg exists yet
-  end
+  Note over R,RTF: the batches wait in allocation_batch until the due date
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the allocated-payments dispatcher, at the execution time on the due date
-    AD->>PS: claim the due<br/>ALLOC_EXEC row
-    AD->>R: re-route with today's config
-    Note over R: admit, pin profile, run on Offline
+    Note over R,RTF: 3 · Execute on the due date
+    AD->>PS: claim the ALLOC_EXEC row
+    AD->>R: re-route, today's config
     R->>XW: dispatcher start,<br/>{paymentId}-execute
     XW->>REV: run
-    rect rgba(102,169,226,0.40)
-      REV->>PS: state → ACCEPTED, guarded:<br/>only if still ALLOCATED
-    end
+    REV->>PS: ACCEPTED, if still ALLOCATED
     XW->>RTF: ACCEPTED event
-    Note over XW,REV: if Reverify fails, the payment is DECLINED, and its legs are never written
     XW->>EXE: run
-    Note over EXE: clears once, at payment level.<br/>No AR or OTB call: the legs make those
-    rect rgba(102,169,226,0.40)
-      EXE->>PS: state → PROCESSING, legs_released_at set,<br/>the ALLOC_EXEC row DONE
-    end
+    EXE->>PS: PROCESSING, row DONE
     XW->>RTF: PROCESSING event
   end
 
   rect rgba(0,23,90,0.12)
-    Note over R,RTF: Offline cluster: the leg dispatcher, every minute
-    AD->>PS: write the legs of every stored batch,<br/>1,000 rows at a time, rows SCHEDULED
-    Note over AD,RTF: then it starts each leg and completes the parent, as for pay today
+    Note over R,RTF: 4 · Run the legs
+    AD->>PS: write each batch's legs,<br/>1,000 rows at a time
+    Note over AD,RTF: then the legs and the parent, as in diagram 3
   end
 ```
 
@@ -392,42 +311,32 @@ config:
 sequenceDiagram
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as UpdatePayment.v1
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant UW as UpdatePayment<br/>Workflow
-    participant CAN as Cancel
-    participant PS as PaymentStore (Oracle)
-    participant CW as CreateScheduled<br/>PaymentWorkflow
-  end
-
+  participant OD as UpdatePayment.v1
+  participant R as Billpay Router
+  participant UW as UpdatePayment<br/>Workflow
+  participant CAN as Cancel
+  participant PS as PaymentStore<br/>(Oracle)
+  participant CW as CreateScheduled<br/>PaymentWorkflow
   participant RTF
   participant RAV as Raven
 
-  OD->>R: PUT /payments/<br/>{payment-id}
-  Note over R: admit, pin profile, run on Online
-  R->>UW: Update-With-Start,<br/>{paymentId}-update
-
   rect rgba(0,111,207,0.12)
-    Note over UW,CW: Online cluster, the child on the same cluster
-    Note over UW,CAN: checks the window and eligibility, read-only
+    OD->>R: PUT /payments/{payment-id}
+    Note over R: admit, pin profile
+    R->>UW: Update-With-Start,<br/>{paymentId}-update
+    Note over UW: checks the window, read-only
     UW->>CAN: run
     alt still SCHEDULED, inside the window
-      rect rgba(102,169,226,0.40)
-        CAN->>PS: old payment → CANCELLED,<br/>guarded, with its<br/>Work Tracker rows
-      end
+      CAN->>PS: old payment CANCELLED,<br/>with its rows
       UW->>RTF: CANCELLED event
       UW->>RAV: CANCELLED message
-      UW->>CW: child, {newId}-init, same confirmation number
-      Note over CW: Capture and Verify, as for any scheduled payment
-      CW-->>UW: the new payment's result
-      Note over PS,CW: old and new IDs mapped in ORIG_TRANS_REFER_MAP
+      UW->>CW: child, {newId}-init,<br/>same confirmation number
+      Note over CW: Capture and Verify
+      CW-->>UW: result
+      Note over PS,CW: IDs mapped in ORIG_TRANS_REFER_MAP
       UW-->>R: new payment's result
       R-->>OD: new payment's result
-    else no longer SCHEDULED, or the window has closed
+    else too late
       UW-->>R: 409
       R-->>OD: 409
     end
@@ -447,40 +356,30 @@ config:
 sequenceDiagram
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as DeletePayment.v1
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant CW as CancelPayment<br/>Workflow
-    participant CAN as Cancel
-    participant PS as PaymentStore (Oracle)
-  end
-
+  participant OD as DeletePayment.v1
+  participant R as Billpay Router
+  participant CW as CancelPayment<br/>Workflow
+  participant CAN as Cancel
+  participant PS as PaymentStore<br/>(Oracle)
   participant RTF
   participant RAV as Raven
 
-  OD->>R: DELETE /payments/<br/>{payment-id}
-  Note over R: admit, pin profile, run on Online
-  R->>CW: Update-With-Start,<br/>{paymentId}-cancel
-
   rect rgba(0,111,207,0.12)
-    Note over CW,PS: Online cluster
-    Note over CW,CAN: checks the window and eligibility, read-only
+    OD->>R: DELETE /payments/{payment-id}
+    Note over R: admit, pin profile
+    R->>CW: Update-With-Start,<br/>{paymentId}-cancel
+    Note over CW: checks the window, read-only
     CW->>CAN: run
-    alt the guarded update finds it SCHEDULED
-      rect rgba(102,169,226,0.40)
-        CAN->>PS: state → CANCELLED,<br/>Work Tracker rows<br/>cancelled, one commit
-      end
+    alt still SCHEDULED
+      CAN->>PS: CANCELLED, with its rows
       CW-->>R: CANCELLED
       R-->>OD: CANCELLED
       CW->>RTF: CANCELLED event
       CW->>RAV: CANCELLED message
-    else zero rows updated, already CANCELLED
+    else already CANCELLED
       CW-->>R: CANCELLED again
       R-->>OD: CANCELLED
-    else zero rows updated otherwise, or outside the window
+    else otherwise, or outside the window
       CW-->>R: 409
       R-->>OD: 409
     end
@@ -489,7 +388,7 @@ sequenceDiagram
 
 ## 7. Return
 
-Returns come in bursts, so none is started straight from its event. One-Data stores each return in its inbox and acknowledges it once that commit is done. The returns dispatcher pulls the oldest at the governor's rate and starts each one through the Router at priority 5. Return commits `RETURNED` on the presentment that came back. If the payment can be represented, QueueRepresentment writes the next [presentment](./payment-state-model.md#presentments) as a new row, numbered one higher, in `REPRESENTING`, with the representment date as its clearing date and a `REPRESENT` row due that day.
+Returns come in bursts, so none is started straight from its event. One-Data stores each return in its inbox and acknowledges it once that commit is done. The returns dispatcher pulls the oldest at the governor's rate and starts each one through the Router at priority 5. The workflow first checks the payment, full or split, and that the presentment that came back is `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` if it came back again. Return then commits `RETURNED` on it. If the payment can be represented, QueueRepresentment writes the next [presentment](./payment-state-model.md#presentments) as a new row, numbered one higher, in `REPRESENTING`, with the representment date as its clearing date and a `REPRESENT` row due that day.
 
 ```mermaid
 ---
@@ -514,46 +413,39 @@ sequenceDiagram
     participant WF as ProcessReturned<br/>PaymentWorkflow
     participant RET as Return
     participant QR as Queue<br/>Representment
-    participant PS as PaymentStore (Oracle)
+    participant PS as PaymentStore<br/>(Oracle)
   end
 
   participant RTF
   participant RAV as Raven
 
-  MM->>IN: return event:<br/>CreateMoneyMovementEventHandler.v1
-  rect rgba(83,86,90,0.14)
-    Note over IN: stored as a READY start request
-  end
-  IN-->>MM: acknowledged<br/>after the commit
+  Note over MM,RAV: 1 · Arrive
+  MM->>IN: return event,<br/>CreateMoneyMovementEventHandler.v1
+  Note over IN: stored READY
+  IN-->>MM: acknowledged
 
   rect rgba(0,23,90,0.12)
-    Note over RD,RAV: Offline cluster: the returns dispatcher, every minute
+    Note over MM,RAV: 2 · Return, every minute
     RD->>IN: ReadStartRequests.v1
-    IN-->>RD: the oldest<br/>READY returns
-    RD->>R: start through<br/>the Router
-    Note over R: admit, pin profile, run on Offline: priority 5
+    IN-->>RD: the oldest READY returns
+    RD->>R: start through the Router
+    Note over R: admit, pin profile,<br/>priority 5
     R->>WF: dispatcher start,<br/>{paymentId}-return-{seq}
-    RD->>IN: UpdateStartRequests.v1:<br/>DONE
-    Note over WF,QR: checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED if returned again
+    RD->>IN: UpdateStartRequests.v1: DONE
+    Note over WF,QR: checks the payment and the presentment that came back
     WF->>RET: run
-    rect rgba(102,169,226,0.40)
-      RET->>PS: this presentment's<br/>state → RETURNED
-    end
+    RET->>PS: presentment RETURNED
     WF->>RTF: RETURNED event
     WF->>RAV: RETURNED message
-    opt the release's representment block allows another presentment
-      Note over WF,RET: date: the day the return arrived, in the market's time zone, plus delayDays
+    opt representment allowed
+      Note over WF,RET: date: the return's day plus delayDays
       WF->>QR: run
-      rect rgba(102,169,226,0.40)
-        QR->>PS: insert the next presentment<br/>(seq + 1) in REPRESENTING,<br/>with a REPRESENT row<br/>due on that date
-      end
+      QR->>PS: next presentment REPRESENTING,<br/>with a REPRESENT row
       WF->>RTF: REPRESENTING event
     end
   end
 
-  rect rgba(83,86,90,0.14)
-    Note over QR,PS: The REPRESENT row waits in Oracle for its date. No direct hand-off
-  end
+  Note over QR,PS: the REPRESENT row waits in Oracle for its date
 ```
 
 ## 8. Representment
@@ -571,40 +463,30 @@ sequenceDiagram
   %% trigger: dispatcher start
   autonumber
 
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant RPD as Representment<br/>dispatcher
-    participant R as Billpay Router
-    participant WF as Process<br/>Representment<br/>Workflow
-    participant REP as Represent
-    participant PS as PaymentStore (Oracle)
-  end
-
+  participant RPD as Representment<br/>dispatcher
+  participant R as Billpay Router
+  participant WF as Process<br/>Representment<br/>Workflow
+  participant REP as Represent
+  participant PS as PaymentStore<br/>(Oracle)
   participant RTF
   participant RAV as Raven
 
-  rect rgba(83,86,90,0.14)
-    Note over RPD,PS: The REPRESENT row waits in Oracle until the representment date
-  end
+  Note over RPD,RAV: the REPRESENT row waits in Oracle until the representment date
 
   rect rgba(0,23,90,0.12)
-    Note over RPD,RAV: Offline cluster: the market's representment dispatcher, every 5 minutes (Proposed)
-    RPD->>PS: claim due REPRESENT rows: DISPATCHING
-    RPD->>R: start through<br/>the Router
-    Note over R: admit, pin profile, run on Offline: priority 4
+    RPD->>PS: claim due REPRESENT rows
+    RPD->>R: start through the Router
+    Note over R: admit, pin profile,<br/>priority 4
     R->>WF: dispatcher start,<br/>{paymentId}-represent-{seq}
-    RPD->>PS: mark the row DISPATCHED
+    RPD->>PS: row DISPATCHED
     WF->>REP: run
-    Note over REP: rechecks eligibility before anything goes to clearing
-    alt the recheck passes
-      Note over REP: sends the new presentment through clearing
-      rect rgba(102,169,226,0.40)
-        REP->>PS: state → REPRESENTED,<br/>row DONE
-      end
+    Note over REP: rechecks eligibility
+    alt passes
+      Note over REP: sends it through clearing
+      REP->>PS: REPRESENTED, row DONE
       WF->>RTF: REPRESENTED event
-    else the recheck fails
-      rect rgba(102,169,226,0.40)
-        REP->>PS: state → DECLINED,<br/>row DONE
-      end
+    else fails
+      REP->>PS: DECLINED, row DONE
       WF->>RTF: DECLINED event
       WF->>RAV: DECLINED message
     end
@@ -638,41 +520,34 @@ sequenceDiagram
     participant WF as ProcessInbound<br/>PaymentWorkflow
     participant CAP as Capture
     participant VER as Verify
-    participant PS as PaymentStore (Oracle)
+    participant PS as PaymentStore<br/>(Oracle)
   end
 
   participant RTF
 
-  TP->>IN: push:<br/>CreateInboundPayment.v1
-  rect rgba(83,86,90,0.14)
-    Note over IN: stored as a READY start request
-  end
+  Note over TP,RTF: 1 · Arrive
+  TP->>IN: push, CreateInboundPayment.v1
+  Note over IN: stored READY
   IN-->>TP: 202
 
   rect rgba(0,23,90,0.12)
-    Note over ID,RTF: Offline cluster: the inbound dispatcher, every minute
+    Note over TP,RTF: 2 · Decide, every minute
     ID->>IN: ReadStartRequests.v1
-    IN-->>ID: the oldest READY<br/>inbound payments
-    ID->>R: start through<br/>the Router
-    Note over R: admit, pin profile, run on Offline: priority 3
+    IN-->>ID: the oldest READY payments
+    ID->>R: start through the Router
+    Note over R: admit, pin profile,<br/>priority 3
     R->>WF: dispatcher start,<br/>{paymentId}-init
-    ID->>IN: UpdateStartRequests.v1: DONE,<br/>or REJECTED if not admitted
+    ID->>IN: UpdateStartRequests.v1:<br/>DONE, or REJECTED
     WF->>CAP: run
-    rect rgba(102,169,226,0.40)
-      CAP->>PS: state → PENDING
-    end
+    CAP->>PS: PENDING, if new
     WF->>RTF: PENDING event
     WF->>VER: run
     alt accepted
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED
-      end
+      VER->>PS: ACCEPTED
       WF->>RTF: ACCEPTED event
-      Note over WF,VER: then Execute, then Fulfil
+      Note over WF,VER: then Execute and Fulfil
     else not accepted
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → DISALLOWED
-      end
+      VER->>PS: DISALLOWED
       WF->>RTF: DISALLOWED event
     end
   end
@@ -680,7 +555,7 @@ sequenceDiagram
 
 ## 10. Paid events
 
-A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. A debit card payment has no clearing, so MR/M3 sends no settlement for it. Billpay creates that event itself: Execute hands it to the same handler MR/M3 uses, dated when the money moved, so its row pairs the same way. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement; how it reaches the pairing is still open (2026-11-10). One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
+A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. A debit card payment has no clearing, so MR/M3 sends no settlement for it. Billpay creates that event itself: Execute hands it to the same handler MR/M3 uses, dated when the money moved, so its row pairs the same way. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement; how it reaches the pairing is still open (2026-11-10). One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. A corporate leg's posting takes its payment's settlement, and a consumer split's leg has its own. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, with no routing, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
 
 ```mermaid
 ---
@@ -690,8 +565,8 @@ config:
 ---
 sequenceDiagram
   %% Pink arrows: something outside starts or resumes the payment.
-  %% trigger: settlement,
-  %% trigger: AR posting,
+  %% trigger: settlement
+  %% trigger: AR posting
   autonumber
 
   participant MM as MR/M3
@@ -705,39 +580,35 @@ sequenceDiagram
     participant SCH as Temporal<br/>Schedule
     participant WF as ProcessPaidEvents<br/>Workflow
     participant SET as Settle
-    participant PS as PaymentStore (Oracle)
+    participant PS as PaymentStore<br/>(Oracle)
   end
 
   participant RTF
 
-  rect rgba(83,86,90,0.14)
-    Note over MM,IN: One-Data's inbox keeps one row per payment or leg
-    MM->>IN: settlement,<br/>CreateMoneyMovementEventHandler.v1
-    Note over MM,IN: Pay with Bank Transfer and debit cards: Billpay's Execute<br/>sends the settlement to this handler instead
-    GAR->>IN: AR posting, CreateAccountsReceivable<br/>TransactionEventHandler.v1
-    Note over GAR,IN: whichever arrives second sets the row READY. A corporate leg's posting takes its payment's settlement, and a consumer split's leg has its own
-  end
+  Note over MM,RTF: 1 · Pair the two events, one inbox row per payment or leg
+  MM->>IN: settlement,<br/>CreateMoneyMovementEventHandler.v1
+  Note over MM,IN: debit card and Pay with Bank Transfer:<br/>Billpay's Execute sends it instead
+  GAR->>IN: AR posting, CreateAccounts<br/>ReceivableTransactionEventHandler.v1
+  Note over GAR,IN: the second one sets the row READY
 
   rect rgba(0,23,90,0.12)
-    Note over SCH,RTF: Offline cluster. Not routed: a Schedule starts it
-    SCH->>WF: start every 30 s,<br/>overlap SKIP
-    loop each batch, until a fetch returns fewer than 500 rows
+    Note over MM,RTF: 2 · Settle, every 30 s
+    SCH->>WF: start, overlap SKIP
+    loop until a fetch returns fewer than 500 rows
       WF->>IN: ReadPaidReadyPayments.v1
-      IN-->>WF: up to 500 of the oldest READY rows
-      WF->>SET: run, with a batch ID from<br/>Workflow.randomUUID()
-      rect rgba(102,169,226,0.40)
-        SET->>PS: state → PAID for each row,<br/>one transaction,<br/>tagged with the batch ID
-      end
-      WF->>RTF: PAID events for the batch ID's payments and legs, one call
-      WF->>IN: UpdatePaidReadyPayments.v1:<br/>DONE if PAID, otherwise UNMATCHED
-      Note over WF: waits as the governor's PAID rate asks
+      IN-->>WF: up to 500 READY rows
+      WF->>SET: run, with a batch ID
+      SET->>PS: PAID, one transaction
+      WF->>RTF: PAID events, one call
+      WF->>IN: UpdatePaidReadyPayments.v1:<br/>DONE or UNMATCHED
+      Note over WF: paced by the governor
     end
   end
 ```
 
 ## 11. Missing paid events
 
-Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing, and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. MR/M3 never settles a debit card payment, so for one the check asks GAR alone, and always hands over Billpay's own settlement event again, since Billpay can't read the inbox to see whether it has it (Proposed). M3 does report a Pay with Bank Transfer payment's settlement, so whether the check asks it about one waits on how M3's notice reaches the pairing (open). Whatever it can't find raises an alert.
+Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing (for a corporate leg, the settlement is its payment's; the posting is the leg's own), and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. MR/M3 never settles a debit card payment, so for one the check asks GAR alone, and always hands over Billpay's own settlement event again, since Billpay can't read the inbox to see whether it has it (Proposed). M3 does report a Pay with Bank Transfer payment's settlement, so whether the check asks it about one waits on how M3's notice reaches the pairing (open). Whatever it can't find raises an alert, and the inbox row shows which event is missing.
 
 ```mermaid
 ---
@@ -761,28 +632,27 @@ sequenceDiagram
   end
 
   rect rgba(0,23,90,0.12)
-    Note over IN,WF: Offline cluster
     SCH->>WF: start, hourly (Proposed)
-    Note over SCH,WF: finds payments and legs still PROCESSED after 48 hours. Split parents are skipped
+    Note over SCH,WF: still PROCESSED after 48 hours,<br/>split parents skipped
     loop each one found
-      opt not a debit card (for Pay with Bank Transfer, still open)
-        WF->>MM: asks for the settlement: its own, or for a corporate leg, its payment's
+      opt not a debit card
+        WF->>MM: ask for the settlement
         MM-->>WF: current state
       end
-      WF->>GAR: asks for the AR posting: the payment's, or the leg's own
+      WF->>GAR: ask for the AR posting
       GAR-->>WF: current state
       opt a debit card
-        WF->>IN: hands Billpay's own settlement over again,<br/>CreateMoneyMovementEventHandler.v1 (Proposed)
+        WF->>IN: Billpay's own settlement again<br/>(Proposed)
       end
-      alt an event is found
+      alt found
         WF->>IN: hands it to its One-Data handler
-        Note over IN: it reaches the inbox the one way events do
       else still missing
-        Note over SCH,WF: alert. The inbox row shows which event is missing
+        Note over SCH,WF: alert
       end
     end
-    Note over IN,WF: A row UNMATCHED for 48 hours is left for a person. One-Data's UpdateUnmatchedPayments.v1 alerts on it
   end
+
+  Note over IN,WF: a row UNMATCHED for 48 hours alerts through UpdateUnmatchedPayments.v1
 ```
 
 ## 12. Pay & Plan
@@ -798,28 +668,21 @@ config:
 sequenceDiagram
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as CreatePayment<br/>Installment.v1
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant PP as Pay #amp; Plan<br/>composite
-    participant CH as Execute and<br/>Fulfil child
-  end
-
-  OD->>R: POST<br/>/payment-installments
-  Note over R: admit, pin profile, run on Online
-  R->>PP: Update-With-Start,<br/>{paymentId}-plan
+  participant OD as CreatePayment<br/>Installment.v1
+  participant R as Billpay Router
+  participant PP as Pay #amp; Plan<br/>composite
+  participant CH as Execute and<br/>Fulfil child
 
   rect rgba(0,111,207,0.12)
-    Note over PP,CH: Online cluster. The child runs on the same cluster
-    Note over PP: Capture and Verify, as for pay today
-    Note over PP: for ACCEPTED: the Installments API and an optional Autopay update
-    PP-->>R: the decision, the plan<br/>and the Autopay update
-    R-->>OD: the reply,<br/>or PENDING at 2.5 s
-    PP->>CH: child workflow, from the decision,<br/>{paymentId}-init
-    Note over CH: Execute and Fulfil, as for pay today
+    OD->>R: POST /payment-installments
+    Note over R: admit, pin profile
+    R->>PP: Update-With-Start,<br/>{paymentId}-plan
+    Note over PP: Capture and Verify
+    Note over PP: ACCEPTED: Installments,<br/>and Autopay if asked
+    PP-->>R: decision, plan, Autopay
+    R-->>OD: the reply, or<br/>PENDING at 2.5 s
+    PP->>CH: child, {paymentId}-init
+    Note over CH: Execute and Fulfil
   end
 ```
 
@@ -838,46 +701,37 @@ sequenceDiagram
   %% trigger: async start
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant AM as Allocations<br/>manager
-    participant OD as CreatePayment<br/>Allocations.v1
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Core API<br/>and Router
-    participant PS as PaymentStore (Oracle)
-    participant RW as ReceiveAllocations<br/>Workflow
-    participant RC as ReceiveAllocations
-  end
+  participant AM as Allocations<br/>manager
+  participant OD as CreatePayment<br/>Allocations.v1
+  participant R as Core API<br/>and Router
+  participant PS as PaymentStore<br/>(Oracle)
+  participant RW as ReceiveAllocations<br/>Workflow
+  participant RC as ReceiveAllocations
 
   participant RTF
 
-  AM->>OD: one batch,<br/>numbered per payment
-  OD->>R: POST /payments/<br/>{payment-id}/allocations
-  Note over R: admit: live, and inside the class's budget
-  alt over budget
-    R-->>OD: 429 with Retry-After
-    OD-->>AM: 429, and the allocations<br/>manager retries
-  else the Offline cluster is down
-    R-->>OD: 503 with Retry-After
-    OD-->>AM: 503, and it is retried
-  else admitted
-    R->>PS: store the batch in<br/>allocation_batch
-    Note over R: pin profile, run on Offline
-    R->>RW: async start, {paymentId}-allocations-{batch},<br/>with only the payment ID and batch number
-    R-->>OD: 202, once the<br/>workflow exists
-    OD-->>AM: 202
-    rect rgba(0,23,90,0.12)
-      Note over RW,RC: Offline cluster
+  AM->>OD: one numbered batch
+  rect rgba(0,23,90,0.12)
+    OD->>R: POST /payments/<br/>{payment-id}/allocations
+    Note over R: admit: live, and<br/>inside the budget
+    alt over budget
+      R-->>OD: 429, Retry-After
+      OD-->>AM: 429, retried
+    else Offline cluster down
+      R-->>OD: 503, Retry-After
+      OD-->>AM: 503, retried
+    else admitted
+      R->>PS: store the batch in<br/>allocation_batch
+      R->>RW: async start,<br/>{paymentId}-allocations-{batch}
+      R-->>OD: 202
+      OD-->>AM: 202
       RW->>RC: run
-      Note over RC: checks the stored batch. No leg is written
-      alt this batch completes the amount
-        rect rgba(102,169,226,0.40)
-          RC->>PS: state → ALLOCATED, with the ALLOC_EXEC row: due at once<br/>for pay today, or at the execution time if scheduled
-        end
+      Note over RC: checks the batch,<br/>writes no legs
+      alt the batch completes the amount
+        RC->>PS: ALLOCATED, with an<br/>ALLOC_EXEC row
         RW->>RTF: ALLOCATED event
-      else more batches to come
-        Note over RC,PS: the batch waits in allocation_batch,<br/>and the payment stays ALLOCATING
+      else more to come
+        Note over RC,PS: stays ALLOCATING
       end
     end
   end
@@ -915,7 +769,7 @@ sequenceDiagram
   participant M3
   participant PS as PaymentStore<br/>(Oracle)
 
-  rect rgba(89,89,89,0.08)
+  rect rgba(0,111,207,0.12)
     Note over CH,PS: 1 · Create
     CH->>R: POST /payments
     R->>WF: Update-With-Start
@@ -928,7 +782,7 @@ sequenceDiagram
     R-->>CH: PENDING, with the link
   end
 
-  rect rgba(0,89,52,0.08)
+  rect rgba(0,111,207,0.12)
     Note over CH,PS: 2 · Customer back
     Note over CH,PW: the customer approves at their bank
     CH->>R: Channel Confirm Event
@@ -940,7 +794,7 @@ sequenceDiagram
     R-->>CH: 200, the status
   end
 
-  rect rgba(140,65,12,0.08)
+  rect rgba(0,111,207,0.12)
     Note over CH,PS: 3 · While pending
     loop every interval
       WF->>PW: GET /payment-status
@@ -949,7 +803,7 @@ sequenceDiagram
     WF->>PS: ACCEPTED or DECLINED
   end
 
-  rect rgba(0,23,90,0.08)
+  rect rgba(0,111,207,0.12)
     Note over CH,PS: 4 · Settle
     M3->>R: Bank Settled Event
     R->>WF: signal settled
@@ -992,46 +846,34 @@ sequenceDiagram
     participant RP as ReadPayments.v1
   end
 
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant WF as CreateImmediate<br/>PaymentWorkflow
-    participant PS as PaymentStore (Oracle)
-  end
+  participant R as Billpay Router
+  participant WF as CreateImmediate<br/>PaymentWorkflow
+  participant PS as PaymentStore<br/>(Oracle)
 
-  Note over OD: a create from a channel, today, one instruction
-
-  alt Redis is up
-    OD->>RD: one atomic call (Proposed): read the account's<br/>pending payments, and if there are none,<br/>add this one and store the create
-    RD-->>OD: another payment is PENDING,<br/>or added and stored
-  else Redis is down
+  Note over OD,PS: 1 · Pending check
+  alt Redis up
+    OD->>RD: one atomic call (Proposed):<br/>pending? if not, add and store
+    RD-->>OD: PENDING found,<br/>or added and stored
+  else Redis down
     OD->>RP: the account's payments
-    Note over RD,RP: it reads billpay-online alone, so a create<br/>not captured yet is missed (accepted)
-    RP-->>OD: a PENDING payment, or none.<br/>Nothing is stored
+    RP-->>OD: a PENDING payment, or none
   end
 
-  alt the account already has a PENDING payment
-    Note over OD,RD: 200 DECLINED, with a reason such as ANOTHER_PAYMENT_PENDING<br/>(Proposed). billpay-online is never called
-  else none is pending
-    OD->>R: POST /payments
-    Note over R: admit, pick the journey,<br/>pin profile, run on Online
-    R->>WF: Update-With-Start,<br/>{paymentId}-init
+  alt a payment is PENDING
+    Note over OD,RD: 200 DECLINED,<br/>ANOTHER_PAYMENT_PENDING (Proposed)
+  else none
     rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, as in diagram 1
-      rect rgba(102,169,226,0.40)
-        WF->>PS: Capture, then Verify:<br/>state → ACCEPTED or DECLINED
-      end
-    end
-    WF-->>R: update result
-    R-->>OD: ACCEPTED or DECLINED
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, after the reply
-      WF->>RD: DeletePendingPayment.v1, decided:<br/>the stored create and the account's entry go
+      Note over OD,PS: 2 · Create, as in diagram 1
+      OD->>R: POST /payments
+      R->>WF: Update-With-Start,<br/>{paymentId}-init
+      WF->>PS: Capture, Verify:<br/>ACCEPTED or DECLINED
+      WF-->>R: update result
+      R-->>OD: ACCEPTED or DECLINED
+      WF->>RD: DeletePendingPayment.v1
     end
   end
 
-  rect rgba(83,86,90,0.14)
-    Note over OD,PS: An entry stays only while its payment is PENDING. ACCEPTED, SCHEDULED, DECLINED or CANCELLED ends it, and the account can pay again
-  end
+  Note over OD,PS: the entry stays only while the payment is PENDING
 ```
 
 ## 16. Pay by Debit card: create, 3D Secure and authorization
@@ -1049,88 +891,63 @@ sequenceDiagram
   %% trigger: update authenticated
   autonumber
 
-  box rgba(0,23,90,0.07) Caller
-    participant OD as CreatePayment.v3
-  end
-
-  box rgba(0,111,207,0.05) Billpay Platform
-    participant R as Billpay Router
-    participant WF as CreatePaymentIntent<br/>Workflow
-    participant RQC as Request<br/>Confirmation
-    participant VER as Verify
-    participant CAN as Cancel
-    participant PS as PaymentStore (Oracle)
-  end
+  participant OD as CreatePayment.v3
+  participant R as Billpay Router
+  participant WF as CreatePaymentIntent<br/>Workflow
+  participant RQC as Request<br/>Confirmation
+  participant VER as Verify
+  participant CAN as Cancel
+  participant PS as PaymentStore<br/>(Oracle)
 
   participant CP as Card provider<br/>(3D Secure)
   participant RTF
   participant RAV as Raven
 
-  OD->>R: POST /payments,<br/>today, by debit card
-  Note over R: admit, set card authentication<br/>to Y (Proposed), pick the intent journey,<br/>pin profile, run on Online
-  R->>WF: Update-With-Start,<br/>{paymentId}-init
-
   rect rgba(0,111,207,0.12)
-    Note over WF,PS: Online cluster, the first workflow task
-    Note over WF: Capture first: PENDING
-    WF->>VER: own checks, before 3D Secure
-    Note over VER: Instruments, Options by option ID,<br/>and Plans for a mandate, in parallel
-    alt a check's rule fails
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → DECLINED,<br/>guarded on PENDING
-      end
-    else they pass: still PENDING, nothing committed
+    Note over OD,RAV: 1 · Create
+    OD->>R: POST /payments, debit card
+    Note over R: admit, card authentication Y<br/>(Proposed), pin profile
+    R->>WF: Update-With-Start,<br/>{paymentId}-init
+    WF->>PS: Capture: PENDING, if new
+    WF->>VER: own checks
+    alt a check fails
+      VER->>PS: DECLINED
+    else they pass
       WF->>RQC: run
-      RQC->>CP: start 3D Secure with the callback URL,<br/>one try
+      RQC->>CP: start 3D Secure, one try
       alt the provider answers
-        rect rgba(102,169,226,0.40)
-          RQC->>PS: the challenge link, or none,<br/>and the provider's reference, guarded on PENDING
-        end
-      else no answer: the provider is down or too slow
-        rect rgba(102,169,226,0.40)
-          RQC->>PS: state → DECLINED,<br/>guarded on PENDING
-        end
-      end
-    end
-  end
-
-  WF-->>R: update result
-  R-->>OD: PENDING with the challenge link or none,<br/>or DECLINED
-
-  rect rgba(83,86,90,0.14)
-    Note over WF,CP: The customer completes the challenge, if there is one. The workflow waits on its timer: 2 minutes and a 10-second grace
-  end
-
-  alt the provider calls back in time
-    CP->>R: POST /payments/<br/>{payment-id}/authentication,<br/>mutual TLS (both Proposed)
-    Note over R: admit, then an update<br/>to the running workflow
-    R->>WF: update authenticated,<br/>ID {paymentId}-authentication
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow
-      WF->>VER: run, with the 3D Secure result
-      Note over VER: a failed result: DECLINED, no authorization.<br/>Amex's own checks already passed at the create
-      opt the 3D Secure result passed
-        VER->>CP: authorize, with the payment ID<br/>as the idempotency key (Proposed)
-        CP-->>VER: approved and the account debited,<br/>or declined: not enough money
-      end
-      rect rgba(102,169,226,0.40)
-        VER->>PS: state → ACCEPTED or DECLINED,<br/>guarded on PENDING
+        RQC->>PS: challenge link or none
+      else no answer
+        RQC->>PS: DECLINED
       end
     end
     WF-->>R: update result
-    R-->>CP: ACCEPTED or DECLINED.<br/>409 once the workflow no longer waits
+    R-->>OD: PENDING with the link<br/>or none, or DECLINED
+  end
+
+  Note over WF,CP: the customer completes the challenge: 2 minutes and a 10 s grace
+
+  alt callback in time
     rect rgba(0,111,207,0.12)
-      Note over WF,RAV: Online cluster, after the reply
-      WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute, with no clearing call: it sends<br/>One-Data Billpay's settlement event. Then Fulfil, in the same workflow.<br/>DECLINED: the Raven message, then the workflow ends
-    end
-  else no callback before the timer fires
-    rect rgba(0,111,207,0.12)
-      Note over WF,PS: Online cluster, the same workflow. Nothing was authorized, so no money moved
-      WF->>CAN: run
-      rect rgba(102,169,226,0.40)
-        CAN->>PS: state → CANCELLED,<br/>guarded on PENDING
+      Note over OD,RAV: 2 · Authorize
+      CP->>R: POST /payments/{payment-id}/<br/>authentication (Proposed)
+      R->>WF: update authenticated,<br/>{paymentId}-authentication
+      WF->>VER: run, with the result
+      opt 3D Secure passed
+        VER->>CP: authorize, payment ID as<br/>idempotency key (Proposed)
+        CP-->>VER: approved or declined
       end
+      VER->>PS: ACCEPTED or DECLINED
+      WF-->>R: update result
+      R-->>CP: ACCEPTED or DECLINED,<br/>409 once too late
+      WF->>RTF: ACCEPTED or DECLINED event
+      Note over WF,VER: ACCEPTED: Execute, no clearing call,<br/>then Fulfil. DECLINED: Raven message
+    end
+  else no callback
+    rect rgba(0,111,207,0.12)
+      Note over OD,RAV: 2 · Time out
+      WF->>CAN: run
+      CAN->>PS: CANCELLED
       WF->>RTF: CANCELLED event
       WF->>RAV: CANCELLED message
     end

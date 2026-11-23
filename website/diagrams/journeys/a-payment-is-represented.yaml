@@ -1,0 +1,71 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# A payment is represented: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: A payment is represented
+eyebrow: Second attempt
+kind: system
+
+origin:
+  channels:
+    - REPRESENT rows due today
+
+entry:
+  - kind: schedule
+    label: Every 5 minutes, per market (Proposed)
+
+core:
+  - kind: dispatcher
+    label: Representment dispatcher
+
+workflow:
+  - label: ProcessRepresentmentWorkflow
+
+steps:
+  - name: Pick up
+    state: REPRESENTING
+    mode: background
+    caption: due today
+
+  - name: Recheck
+    mode: background
+    caption: still worth sending
+    exit:
+      state: DECLINED
+
+  - name: Represent
+    state: REPRESENTED
+    mode: background
+    caption: sent for clearing again
+    systems:
+      - MR/M3
+
+detail:
+  - text: >-
+      A representment is the next presentment of the same payment: a new row with the same payment
+      ID, numbered one higher. [A payment is returned](#a-payment-is-returned) queued it, and it has
+      waited as a Work Tracker row since.
+  - step: 1
+    text: >-
+      Each market's representment dispatcher runs every 5 minutes (Proposed), claims the `REPRESENT`
+      rows that are due and starts `ProcessRepresentmentWorkflow` through the Router.
+  - step: 2
+    text: >-
+      Eligibility is checked again before anything goes to clearing. Days may have passed since the
+      return, and the account may have changed. Represent's own checks are still to be defined, so
+      for now the recheck passes (Proposed).
+  - step: 3
+    text: >-
+      The new presentment goes to clearing, in the batch, with the idempotency key
+      `{paymentId}-represent-{seq}`, and lands at `REPRESENTED`. A failed recheck ends it at
+      `DECLINED`, and nothing is sent.
+  - text: >-
+      If this presentment comes back too, that is a new return, with its own workflow ID, and the
+      next presentment is number 3.
+
+reference:
+  to: /docs/design/sequence-diagrams#8-representment
+  label: Sequence diagram

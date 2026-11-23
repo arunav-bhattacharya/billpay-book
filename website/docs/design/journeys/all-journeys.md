@@ -92,439 +92,31 @@ How the page a customer pays on turns into one of these journeys is on [Make a P
 
 A customer picks an amount and a way to pay, and wants it to count today. The journey runs on the Online cluster, started with Update-With-Start, and the customer gets an answer the moment Verify decides. The money moves after that, with nobody waiting on it.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Immediate payment"
-  title="Pay my bill today"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-    note: 'Channels are how we describe the ways in. Billpay sees an authenticated request.',
-  }}
-  entry={[{kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments'}]}
-  workflow={{label: 'CreateImmediatePaymentWorkflow'}}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'ACCEPTED',
-      mode: 'live',
-      caption: 'replies with the decision',
-      reply: 'to the caller with ACCEPTED or DECLINED',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'at once; AMP after Instruments',
-    },
-    {
-      icon: 'broadcast',
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      trigger: {kind: 'events', name: 'Settled and Posted Events', label: "the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox"},
-      caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {text: 'One-Data checks the card account first. If another payment on it is still `PENDING`, One-Data declines this one there and then, with 200 `DECLINED` and a reason, and Billpay never sees it. Otherwise One-Data adds the payment to the account\'s pending list, stores the create and calls billpay-online.'},
-    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent. A repeated request joins the workflow that is already running, so the customer gets the original answer back and is never charged twice.'},
-    {step: 2, text: 'Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionByIdentifier.v1` confirms the payment option they picked, and Plans returns the mandate details where the market requires one. Billpay\'s verification rules check the answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller\'s update returns right there. After the reply, once Verify has decided, the workflow calls One-Data\'s delete API, `DeletePendingPayment.v1`, which takes the payment off the account\'s pending list, so the customer can pay again. A payment the customer must confirm at their bank goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does a debit card, on [Pay by Debit card](#pay-by-debit-card).'},
-    {text: 'Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF after the reply, in order.'},
-    {step: 3, text: 'Three calls go out at once: clearing with the bank, the statement balance down in Accounts Receivable, and available credit up in Authorizations. Authorizations needs the instrument\'s details in clear text, so its branch first asks Payment Instruments for them, while the other two calls are already under way. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).'},
-    {step: 4, text: 'Accounting, eBNC, risk and three notification systems are told first, in parallel: two legacy systems, the Transaction Notification Engine (TFNE) and the Payments History Database (GPHDB), and B2Notifier, which passes the news on to other downstream systems. The three use the clear-text details Execute fetched. Then the lifecycle event goes to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once everything else has worked.'},
-    {step: 5, text: 'The payment waits at `PROCESSED` for two confirmations: the bank\'s settlement and Accounts Receivable\'s posting. Both land in One-Data\'s inbox, and a periodic workflow marks the payments that have both `PAID`, in batches. [A payment is paid](#a-payment-is-paid) shows how.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#1-pay-today-one-instruction', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="pay-my-bill-today" />
 
 ### Pay on a future date
 
 The customer picks a date inside the range Payment Options gives them. Billpay checks the payment now, so the customer knows straight away whether it will be attempted, then keeps it as a row in Oracle until the day. Nothing runs in Temporal while it waits.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Scheduled payment"
-  title="Pay on a future date"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments'}]}
-  workflow={[
-    {label: 'CreateScheduledPaymentWorkflow'},
-    {label: 'ExecuteScheduledPaymentWorkflow', note: 'on the due date'},
-  ]}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'SCHEDULED',
-      mode: 'live',
-      caption: 'replies with the decision',
-      reply: 'to the caller with SCHEDULED or DECLINED',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
-    },
-    {
-      icon: 'clock',
-      name: 'Wait',
-      state: 'SCHEDULED',
-      mode: 'awaiting',
-      caption: 'a row in Oracle',
-      exit: {state: 'CANCELLED', label: 'if cancelled inside the window'},
-    },
-    {
-      icon: 'recheck',
-      name: 'Reverify',
-      state: 'ACCEPTED',
-      mode: 'background',
-      caption: 'checked again, on the day',
-      trigger: {kind: 'dispatcher', name: 'Due Date Event', label: "the scheduled-payments dispatcher, at the market's execution time on the due date"},
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'at once; AMP after Instruments',
-    },
-    {
-      icon: 'broadcast',
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      trigger: {kind: 'events', name: 'Settled and Posted Events', label: "the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox"},
-      caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {step: 1, text: 'The same insert-if-absent as an immediate payment, so a repeated request gets the original back.'},
-    {step: 2, text: 'Checked now, not on the day. The answer is `SCHEDULED`, and the same commit writes a `SCHED_EXEC` row in the Work Tracker, due at the market\'s execution time on that date. `SCHEDULED` is a decision, so the delete takes the payment off the account\'s pending list, and the customer can make another payment while this one waits. Then the workflow closes.'},
-    {step: 3, text: 'Until its date, one of the dates Payment Options offered the customer, the payment is a row in Oracle and nothing more. The customer can update or cancel it until the market\'s cancellation window closes, which is always before execution starts.'},
-    {step: 4, text: 'At the market\'s execution time, that market\'s dispatcher claims the row, calls the Router again so the payment runs with today\'s config, and starts `ExecuteScheduledPaymentWorkflow` on the Offline cluster at the rate the governor allows. Reverify checks the payment again, the mandate included where the market requires one, because an account can close or a balance can move while a payment waits. Payment Options\' `ReadPaymentOptions.v1` confirms the customer still owes money and the option they picked still holds; if not, the payment is `DECLINED`. A Statement Balance or Total Balance payment pays what the option gives that day.'},
-    {text: 'A future-dated payment never clears in real time. It clears in batch, whichever channel it came from.'},
-    {text: 'From Execute on, the journey is [Pay my bill today](#pay-my-bill-today). The last commit marks the Work Tracker row `DONE`.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#2-scheduled-payment-created-today-and-executed-later', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="pay-on-a-future-date" />
 
 ### Pay by Bank today
 
 Some markets let a customer pay straight from their bank account, confirming the payment at their bank: Pay with Bank Transfer in the UK, Plaid in the US. Billpay talks to one service for all of them, Amex Pay with Bank Transfer, which works with each market's provider. The customer starts the payment as usual, goes to their bank, and comes back. When they are back, the channel tells Billpay, which asks Amex Pay with Bank Transfer how the payment went and answers with the status: `PENDING`, `ACCEPTED` or `DECLINED`. While the answer is pending, Billpay keeps asking until it has a final one. One workflow, `CreatePaymentIntentWorkflow`, runs all of it, so the payment's whole story shows in one place in the Temporal UI.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Immediate payment, bank confirmation"
-  title="Pay by Bank today"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-    ],
-    note: 'Which payment methods need bank confirmation is a market setting, resolved per request.',
-  }}
-  entry={[
-    {kind: 'function', label: 'CreatePayment.v3'},
-    {kind: 'function', label: 'CreateConfirmPendingPayment.v1', note: 'once the customer is back; answers with the status'},
-  ]}
-  core={[
-    {kind: 'api', label: 'POST /payments'},
-    {kind: 'api', label: 'POST /payments/{payment-id}/confirm'},
-    {kind: 'api', label: 'POST /payments/{payment-id}/settlement', note: "M3's notice"},
-  ]}
-  workflow={{label: 'CreatePaymentIntentWorkflow'}}
-  steps={[
-    {name: 'Capture', state: 'PENDING', mode: 'live', arrives: 'create'},
-    {
-      name: 'Own checks',
-      state: 'PENDING',
-      mode: 'live',
-      caption: 'Amex\'s own checks, before the bank step',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      exit: {state: 'DECLINED'},
-    },
-    {
-      name: 'Redirect',
-      state: 'PENDING',
-      mode: 'live',
-      caption: 'replies PENDING with the redirect link',
-      reply: 'to the caller with PENDING and the redirect link',
-      systems: ['Amex PwBT'],
-      exit: {state: 'DECLINED', label: 'no link'},
-    },
-    {
-      name: 'Customer back',
-      state: 'PENDING',
-      mode: 'live',
-      caption: 'asks GET /payment-status once and replies with the status',
-      trigger: {kind: 'update', name: 'Channel Confirm Event', label: "the channel's call once the payer's bank routes the customer back"},
-      systems: ['Amex PwBT'],
-      reply: 'to the channel with PENDING, ACCEPTED or DECLINED',
-      exit: {state: 'DECLINED', label: 'failed'},
-    },
-    {
-      name: 'While pending',
-      state: 'ACCEPTED',
-      mode: 'background',
-      caption: 'GET /payment-status at a fixed interval until success or failure',
-      poll: {label: 'GET /payment-status', note: 'Amex Pay with Bank Transfer, asked at a fixed interval until it answers success or failure'},
-      exit: [
-        {state: 'DECLINED', label: 'failed'},
-        {state: 'CANCELLED', label: "the customer's no"},
-      ],
-    },
-    {
-      name: 'Settled',
-      state: 'ACCEPTED',
-      mode: 'awaiting',
-      caption: "M3's notice that the bank has settled the money",
-      trigger: {kind: 'signal', name: 'Bank Settled Event', label: "M3's notice that the bank has settled the money"},
-      exit: {label: 'no notice: exception list'},
-    },
-    {
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      caption: 'no clearing call',
-      systems: ['GAR', 'Payment Instruments', 'AMP'],
-    },
-    {
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      trigger: {kind: 'events', name: 'Settled and Posted Events', label: "M3's settlement and Accounts Receivable's posting"},
-      caption: 'settled and posted',
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. A repeated request joins the workflow that is already running.'},
-    {step: 2, text: 'The market\'s `requiresBankConfirmation` behavior resolves to Y for this payment method, so the Router starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before the bank step: Payment Instruments confirms the way the customer is paying, Payment Options\' `ReadPaymentOptionByIdentifier.v1` confirms the option they picked, and Plans returns the mandate details where the market requires one. A payment that fails them is `DECLINED` at once, with no redirect link.'},
-    {step: 3, text: 'RequestConfirmation asks Amex Pay with Bank Transfer for the customer\'s redirect link and stores it on the payment. Billpay never calls a market\'s provider itself. The caller gets `PENDING` with the link, and the `PENDING` event goes to RTF. If no link comes back, the payment is `DECLINED` instead.'},
-    {step: 4, text: 'The customer approves the payment at their bank, and the payer\'s bank routes them back to the channel. The channel then calls `CreateConfirmPendingPayment.v1`, which reaches billpay-online as `POST /payments/{payment-id}/confirm`, an update to the workflow: the Channel Confirm Event. Verify asks Amex Pay with Bank Transfer\'s `GET /payment-status` once and the update replies with the answer. Success commits `ACCEPTED`, and failure commits `DECLINED` with `BANK_CONFIRMATION_DECLINED` (the code is Proposed). Pending, or a call that times out or fails, is `PENDING`. The channel shows the customer that status, and its part ends there: the customer sees the final state later in their list of payments, which the channel reads through `ReadPayments.v1`. If the channel never calls, Billpay waits a fixed time and starts asking anyway.'},
-    {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
-    {step: 5, text: 'While the answer is pending, the workflow waits a fixed interval and asks again, until the answer is success or failure. The delay, the interval and the status call\'s timeout are still to be set, and so is whether anything caps the calls. The customer can still say no at any point until the payment is decided, and it ends `CANCELLED`. Until then, the payment\'s pending entry blocks the account\'s next payment.'},
-    {step: 6, text: 'An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it tells Amex; M3 intercepts that message and calls billpay-online\'s `POST /payments/{payment-id}/settlement`, which signals the workflow: the Bank Settled Event. If M3\'s notice arrives before the status says success, Billpay accepts the payment on it, stops asking, and logs it. If the notice never comes, the payment goes on the exception list with an alert; how long Billpay waits is still open.'},
-    {step: 7, text: 'Execute makes no clearing call, since the money moved at the bank. The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations waits for the instrument\'s clear-text details from Payment Instruments.'},
-    {step: 8, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 9, text: '`PAID` follows once the settlement and the AR posting are both in. M3\'s notice is this payment\'s settlement; how it reaches One-Data\'s pairing is still open.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#14-pay-by-bank-create-status-and-settlement', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="pay-by-bank-today" />
 
 ### Pay by Debit card
 
 A customer can pay with a debit card, a way to pay of its own, apart from a bank account. Every debit card payment goes through 3D Secure, the card schemes' check that the customer is the cardholder. Billpay asks the market's card provider (Checkout.com in the UK) to start it, and the provider calls Billpay back once the card is authenticated. Then Billpay authorizes the payment, and the authorization takes the money from the customer's account if it holds enough. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Immediate payment, 3D Secure"
-  title="Pay by Debit card"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-    ],
-    note: 'Every debit card needs 3D Secure. The card provider is a market setting.',
-  }}
-  entry={[
-    {kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'},
-    {kind: 'event', label: '3D Secure callback', note: 'from the card provider, not One-Data'},
-  ]}
-  core={[
-    {kind: 'api', label: 'POST /payments'},
-    {kind: 'api', label: 'POST /payments/{payment-id}/authentication'},
-  ]}
-  workflow={{label: 'CreatePaymentIntentWorkflow', note: "the card provider's callback arrives as an update"}}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
-    {
-      icon: 'shieldCheck',
-      name: 'Own checks',
-      state: 'PENDING',
-      mode: 'live',
-      caption: 'before 3D Secure',
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'card',
-      name: '3D Secure',
-      state: 'PENDING',
-      mode: 'live',
-      caption: 'replies PENDING with the challenge link',
-      reply: 'to the caller with PENDING and the challenge link, or none',
-      systems: ['Card provider'],
-      exit: {state: 'DECLINED', label: 'no answer'},
-    },
-    {
-      icon: 'user',
-      name: 'Customer authenticates',
-      state: 'PENDING',
-      mode: 'awaiting',
-      caption: '3D Secure callback, from the card provider',
-      trigger: {kind: 'update', name: 'Card Authenticated Event', label: "the card provider's 3D Secure callback"},
-      exit: {state: 'CANCELLED', label: 'none in 2 min'},
-    },
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'ACCEPTED',
-      mode: 'live',
-      caption: 'the authorization; replies to the callback',
-      reply: 'to the card provider with ACCEPTED or DECLINED',
-      systems: ['Card provider'],
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      systems: ['GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'no clearing; AMP after Instruments',
-    },
-    {
-      icon: 'broadcast',
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      trigger: {kind: 'events', name: 'Settled and Posted Events', label: "Billpay's own settlement event and Accounts Receivable's posting"},
-      caption: 'settled and posted',
-      systems: ['GAR'],
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {step: 1, text: 'Billpay writes the payment and its idempotency key in one insert-if-absent, as for any payment. The customer chose their bank from the list the channel read through `ReadBillpayInstruments.v1`.'},
-    {step: 2, text: 'The payment method is a debit card, so the Router sets card authentication to Y (Proposed) and starts `CreatePaymentIntentWorkflow`. Amex\'s own checks come first, before 3D Secure: Payment Instruments, Payment Options\' `ReadPaymentOptionByIdentifier.v1` for the option the customer picked, and Plans where the market requires a mandate. A payment that fails them is `DECLINED` at once, and 3D Secure never starts.'},
-    {step: 3, text: 'RequestConfirmation asks the market\'s card provider to start 3D Secure, and gives it Billpay\'s callback URL. When the card\'s bank wants a challenge, the provider returns the challenge link, and the caller\'s update returns `PENDING` with it. When it needs none, the caller gets `PENDING` with no link (Proposed). If the provider doesn\'t answer, the payment is `DECLINED` instead (Proposed).'},
-    {step: 4, text: 'The customer completes the challenge, such as a one-time code or a banking-app approval, while the workflow waits on its timer: 2 minutes and a short grace. If no callback comes in that time, the workflow runs Cancel itself, the payment ends `CANCELLED`, and nothing has been taken.'},
-    {step: 5, text: 'The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed) directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D Secure result is `DECLINED` with no authorization. Otherwise, since Amex\'s own checks passed at the create, Verify only authorizes the payment with the card provider (the check is Proposed): the authorization debits the customer\'s account if it holds enough money, and the card\'s bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`, and the callback\'s reply returns here. The customer learns the outcome from the channel, through the payment\'s state. Once Verify has decided, the delete takes the payment off the account\'s pending list.'},
-    {text: 'Everything after this runs with nobody waiting, in the same workflow.'},
-    {step: 6, text: 'No clearing call: the authorization has already moved the money. Billpay creates the settlement event itself, and Execute hands it to One-Data, dated when the money moved (Proposed). The statement balance goes down in Accounts Receivable and available credit up in Authorizations, at once.'},
-    {step: 7, text: 'Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven message, then `PROCESSED`.'},
-    {step: 8, text: '`PAID` follows once the settlement Billpay created and the AR posting are both in One-Data\'s inbox.'},
-    {text: 'Consumer and business travel payments can pay by debit card. A corporate payment can\'t.'},
-    {text: 'A debit card pays today only, with one instruction, never with MR Points and never through Pay & Plan. A create that breaks this, or a corporate one, gets 422 before any workflow starts.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#16-pay-by-debit-card-create-3d-secure-and-authorization', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="pay-by-debit-card" />
 
 ### Pay with multiple instructions
 
 One request, more than one instruction. To the customer, that is a bank account and MR Points together, paid today. One-Data sends one payment ID and one idempotency key for each instruction. The composite captures and verifies every instruction itself and replies with each decision, then hands each accepted instruction's Execute and Fulfil to a child, all on the Online cluster. The composite's workflow has a unique ID of its own, and each instruction's child takes it with a suffix: `{groupId}-init` and `{groupId}_{paymentId}-init` (Proposed). A request with several instructions never takes bank confirmation or a debit card: one that would need either gets 422 before any workflow starts.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Multiple instructions"
-  title="Pay with multiple instructions"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments'}]}
-  workflow={[
-    {label: 'CreatePaymentWithMultipleInstructionsWorkflow'},
-    {label: 'CreateImmediatePaymentWorkflow', via: 'runs', child: true, note: 'one per accepted instruction; Execute and Fulfil only'},
-  ]}
-  persist={false}
-  band={false}
-  steps={[
-    {
-      icon: 'shieldCheck',
-      name: 'Decide',
-      caption: 'every instruction, then the reply',
-      reply: "to the caller with every instruction's decision",
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute and Fulfil',
-      caption: 'a child for each accepted one',
-    },
-  ]}
-  detail={[
-    {step: 1, text: 'The composite captures each instruction under its own idempotency key, so each is its own payment with its own states, then verifies each and replies with every decision. The request carries one payment option ID for the whole payment. Proposed: the composite checks it once, through `ReadPaymentOptionByIdentifier.v1`, and if the option no longer holds, every instruction is declined with `PAYMENT_OPTION_INVALID`.'},
-    {step: 2, text: 'Each accepted instruction then runs Execute and Fulfil in a child on the same cluster, the same steps as [Pay my bill today](#pay-my-bill-today). How a points instruction runs inside it, with Loyalty, is still to be defined.'},
-  ]}
-/>
+<JourneyMap journey="pay-with-multiple-instructions" />
 
 ### Pay with MR Points
 
@@ -536,41 +128,7 @@ Points pay today only. Once they are ticked, the page offers no later date, and 
 
 The customer pays today and sets up a plan of future installments in the same request. One composite workflow, Create Payment & Installments, makes the decision itself and replies, then sets up the plan, on the Online cluster. It takes one instruction (Proposed).
 
-<JourneyMap
-  kind="customer"
-  title="Pay & Plan"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'CreatePaymentInstallment.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payment-installments'}]}
-  workflow={[
-    {label: 'Create Payment & Installments'},
-    {label: 'CreateImmediatePaymentWorkflow', via: 'runs', child: true, note: 'Execute and Fulfil only'},
-  ]}
-  persist={false}
-  band={false}
-  steps={[
-    {icon: 'shieldCheck', name: 'Decide', caption: 'Capture and Verify'},
-    {icon: 'calendar', name: 'Plan', caption: 'future installments', systems: ['Installments']},
-    {icon: 'recheck', name: 'Autopay', caption: 'an optional update, then the reply', reply: 'to the caller with the decision, the plan and the Autopay update'},
-    {icon: 'orchestrate', name: 'Pay', caption: 'Execute and Fulfil in a child'},
-  ]}
-  detail={[
-    {text: 'One-Data runs the same pending check as on a payment: if the card account already has a payment in `PENDING`, it declines the request there and then, and Billpay never sees it.'},
-    {step: 1, text: 'The composite captures and verifies the payment itself, as [Pay my bill today](#pay-my-bill-today) does. A child that decided would be heard only when it ended, after Execute and Fulfil.'},
-    {step: 2, text: 'For an `ACCEPTED` payment, the composite calls the Installments API to set up the plan of future installments. Billpay asks for the plan; it doesn\'t own it. A declined payment gets no plan (Proposed).'},
-    {step: 3, text: 'An optional update to the customer\'s Autopay. The Installments and Autopay calls run on the workflow\'s own queue until their owners set a rate limit (Proposed). Then the composite replies: the reply waits for the decision, the plan and the Autopay update (agreed 2026-11-07).'},
-    {step: 4, text: 'A child on the same cluster, `CreateImmediatePaymentWorkflow` started with the decision, runs the payment\'s Execute and Fulfil, as `{paymentId}-init`. Nothing about the plan changes how the money moves or settles.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#12-pay--plan', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="pay-and-plan" />
 
 ## Change a payment
 
@@ -578,115 +136,13 @@ The customer pays today and sets up a plan of future installments in the same re
 
 Nothing is edited in place. Billpay cancels the original and raises a new payment with the new details, then ties the two together so the history reads straight. The customer keeps their confirmation number throughout.
 
-<JourneyMap
-  kind="customer"
-  title="Update a payment"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'UpdatePayment.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'PUT /payments/{payment-id}'}]}
-  workflow={[
-    {label: 'UpdatePaymentWorkflow'},
-    {label: 'CreateScheduledPaymentWorkflow', via: 'starts', child: true, note: '{newId}-init'},
-  ]}
-  steps={[
-    {
-      icon: 'shieldCheck',
-      name: 'Check',
-      mode: 'live',
-      caption: 'window and eligibility',
-      exit: {label: '409 outside the window'},
-    },
-    {
-      icon: 'undo',
-      name: 'Cancel',
-      state: 'CANCELLED',
-      mode: 'live',
-      caption: 'the original, guarded',
-      exit: {label: '409 if it has left SCHEDULED'},
-    },
-    {
-      icon: 'calendar',
-      name: 'Re-create',
-      state: 'SCHEDULED',
-      mode: 'live',
-      caption: 'same confirmation number',
-      reply: "to the caller with the new payment's result",
-      systems: ['Payment Instruments', 'Payment Options', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
-    },
-    {
-      icon: 'database',
-      name: 'Link',
-      table: 'ORIG_TRANS_REFER_MAP',
-      mode: 'background',
-      caption: 'old payment to new',
-    },
-  ]}
-  detail={[
-    {step: 1, text: 'Read-only calls check the market\'s cancellation window and whether the payment can still change. Outside the window the answer is 409.'},
-    {step: 2, text: 'The original is cancelled with a guarded update, the same one [Cancel a payment](#cancel-a-payment) uses. If the payment has already left `SCHEDULED`, which a corporate payment does once its allocations are requested, no row changes and the answer is 409.'},
-    {step: 3, text: 'The new payment starts as a child, `CreateScheduledPaymentWorkflow` with the ID `{newId}-init`. It gets a new payment ID but keeps the confirmation number, so the customer sees one payment rather than two. Its result is the caller\'s answer.'},
-    {step: 4, text: 'The old and new payment IDs are mapped in `ORIG_TRANS_REFER_MAP`, so anyone can follow the chain later.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#5-update-a-scheduled-payment', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="update-a-payment" />
 
 ### Cancel a payment
 
 A payment can be pulled back while it is `SCHEDULED`, inside the market's cancellation window. Once it has left `SCHEDULED`, it can no longer be cancelled. A corporate payment can close sooner: it leaves `SCHEDULED` for `ALLOCATING` when its allocations are requested, and from then on a cancel gets 409. The same call also carries a customer's no to a payment that waits for bank confirmation, with no window check, on [Pay by Bank today](#pay-by-bank-today).
 
-<JourneyMap
-  kind="customer"
-  title="Cancel a payment"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'DeletePayment.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'DELETE /payments/{payment-id}'}]}
-  workflow={{label: 'CancelPaymentWorkflow'}}
-  steps={[
-    {
-      icon: 'shieldCheck',
-      name: 'Check',
-      mode: 'live',
-      caption: 'window and eligibility',
-      exit: {label: '409 outside the window'},
-    },
-    {
-      icon: 'undo',
-      name: 'Cancel',
-      state: 'CANCELLED',
-      mode: 'live',
-      caption: 'replies CANCELLED',
-      reply: 'to the caller with CANCELLED',
-    },
-  ]}
-  detail={[
-    {step: 1, text: 'Read-only calls check the cancellation window, which always closes before execution starts, and whether the payment is still eligible.'},
-    {step: 2, text: 'One guarded update moves the payment to `CANCELLED`, and the same commit cancels its Work Tracker rows, so no dispatcher will ever pick it up. The `CANCELLED` event and message go out after the reply.'},
-    {text: 'If the update changes nothing, the payment has moved on. When it is already `CANCELLED`, the caller gets that answer again, so cancelling twice is harmless. Otherwise the answer is 409.'},
-    {text: 'A corporate payment whose allocations have been requested is `ALLOCATING`, not `SCHEDULED`, so the update changes nothing and the answer is 409, the same as outside the window.'},
-    {text: 'There is no path from `ACCEPTED` to `CANCELLED`, so the window is the only chance to pull a payment back.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#6-cancel-a-payment', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="cancel-a-payment" />
 
 ## Refund a balance
 
@@ -694,23 +150,7 @@ A payment can be pulled back while it is `SCHEDULED`, inside the market's cancel
 
 When an account carries a credit balance, the money goes back to the customer. A refund can come from a channel or from Accounts Receivable, and the two start in different places.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Credit balance refund"
-  title="Initiate a credit balance refund"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [{icon: 'headset', label: 'Servicing rep'}],
-  }}
-  entry={[{kind: 'function', label: 'CreateCreditBalanceRefund.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /refunds'}]}
-  workflow={{label: 'CreateBalanceRefundWorkflow'}}
-  status={{
-    kind: 'tbd',
-    note: 'From a channel, the refund starts on the Online cluster with Update-With-Start. A refund that Accounts Receivable raises waits in One-Data\'s inbox, and the AR intake dispatcher starts it on the Offline cluster. Either way it follows the payment path (Capture, Verify, Execute, Fulfil), but its detailed steps are still being defined.',
-  }}
-/>
+<JourneyMap journey="initiate-a-credit-balance-refund" />
 
 ## Read payments
 
@@ -720,47 +160,13 @@ Reading touches none of the machinery above: no Router, no workflow, no state ch
 
 Everything a customer has paid on one card. This is the payment history behind the web and mobile apps.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Reads"
-  title="Read payments by card account"
-  origin={{
-    actor: 'Cardmember or servicing rep',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'ReadPayments.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'GET /payments/account/{account-id}'}]}
-  status={{
-    kind: 'read-only',
-    note: 'Lists every payment on the account, from Redis and Oracle together, so a payment shows from the moment it is made. One-Data\'s event handlers use the same function to find the payment an event doesn\'t name.',
-  }}
-/>
+<JourneyMap journey="read-payments-by-card-account" />
 
 ### Read details of a payment
 
 One payment, and every state it moved through on the way. This is what a servicing rep opens when a customer asks what happened to a particular payment.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Reads"
-  title="Read details of a payment"
-  origin={{
-    actor: 'Cardmember',
-    icon: 'user',
-    channels: [{icon: 'headset', label: 'Servicing rep'}],
-  }}
-  entry={[{kind: 'function', label: 'ReadPaymentEventsById.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'GET /payments/{payment-id}'}]}
-  status={{
-    kind: 'read-only',
-    note: 'The function lists the lifecycle states one payment has been through. They come from the payment\'s timeline in Oracle, which is written at every state change on the diagrams above and names the cluster that ran each step.',
-  }}
-/>
+<JourneyMap journey="read-details-of-a-payment" />
 
 ## Corporate payments
 
@@ -772,276 +178,19 @@ No workflow waits for the answer, and no workflow starts the next step itself. E
 
 The customer gets the same quick answer a consumer does. Behind it, the payment asks for its allocations, and only once they are all in does it clear and post its legs.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Immediate payment, corporate"
-  title="Pay a corporate bill today"
-  origin={{
-    actor: 'Corporate customer',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-    note: 'Which channels a corporate market opens is a market onboarding decision, not a Billpay one.',
-  }}
-  entry={[{kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments'}]}
-  workflow={[
-    {label: 'CreateImmediatePaymentWorkflow'},
-    {label: 'RequestAllocationsWorkflow', via: 'then'},
-    {label: 'ReceiveAllocationsWorkflow', via: 'then'},
-    {label: 'ExecuteScheduledPaymentWorkflow', via: 'then'},
-    {label: 'ExecuteSplitPaymentWorkflow', via: 'then', note: 'one per leg'},
-  ]}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'ACCEPTED',
-      mode: 'live',
-      caption: 'replies with the decision',
-      reply: 'to the caller with ACCEPTED or DECLINED',
-      systems: ['Payment Instruments', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
-    },
-    {
-      icon: 'orchestrate',
-      name: 'Request',
-      state: 'ALLOCATING',
-      mode: 'background',
-      caption: 'at once',
-      trigger: {kind: 'dispatcher', name: 'Allocation Request Event', label: 'the allocation-request dispatcher, on the row Verify wrote, due at once'},
-      systems: ['Allocations'],
-    },
-    {
-      icon: 'database',
-      name: 'Receive',
-      state: 'ALLOCATED',
-      table: 'allocation_batch',
-      mode: 'background',
-      caption: 'once the batches add up',
-      trigger: {kind: 'callback', name: 'Allocation Batch Event', label: "the allocations manager's batches"},
-    },
-    {
-      icon: 'bank',
-      name: 'Clear',
-      state: 'PROCESSING',
-      mode: 'background',
-      trigger: {kind: 'dispatcher', name: 'Allocated Payment Event', label: 'the allocated-payments dispatcher'},
-      caption: 'once, for the whole amount',
-      systems: ['MR/M3'],
-    },
-    {
-      icon: 'broadcast',
-      name: 'Run each leg',
-      state: 'PROCESSED',
-      mode: 'background',
-      caption: 'written, then a workflow each',
-      trigger: {kind: 'dispatcher', name: 'Leg Dispatch Event', label: 'the leg dispatcher, one workflow per leg'},
-      systems: ['GAR', 'Payment Instruments', 'AMP', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Complete',
-      state: 'PROCESSED',
-      mode: 'background',
-      caption: 'the parent, once every leg is done',
-      trigger: {kind: 'dispatcher', name: 'Legs Complete Event', label: "the leg dispatcher's completion check, every 60 seconds"},
-      systems: ['RTF', 'Raven'],
-    },
-  ]}
-  detail={[
-    {step: 2, text: 'The payment is checked as one amount. Verify\'s commit also writes an `ALLOC_REQUEST` Work Tracker row, due at once, and `CreateImmediatePaymentWorkflow` ends there. It starts nothing itself.'},
-    {step: 3, text: 'The allocation-request dispatcher starts `RequestAllocationsWorkflow` on the Offline cluster. It moves the payment to `ALLOCATING`, asks the allocations manager for the breakdown, and ends. No workflow sits waiting for the answer.'},
-    {step: 4, text: 'The allocations manager calls back with the batches, as [Allocations arrive by callback](#allocations-arrive-by-callback) shows. The batch that completes the amount moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row, due at once.'},
-    {step: 5, text: 'The allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow`, the same workflow a scheduled corporate payment runs, without Reverify. Execute clears the parent once, at payment level, and its commit releases the legs. Clearing never runs per allocation.'},
-    {step: 6, text: 'The leg dispatcher writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED` with a Work Tracker row of its own, then starts one `ExecuteSplitPaymentWorkflow` per leg: the statement balance and available credit for that account (available credit once Payment Instruments has returned the clear-text details), then accounting, eBNC, risk, TFNE, GPHDB and B2Notifier, then the leg\'s RTF event and Raven message. Legs run at priority 2 with the parent\'s ID as their fairness key, so one big payment can\'t starve the others.'},
-    {step: 7, text: 'Every 60 seconds the leg dispatcher counts each parent\'s legs. Once every leg is `PROCESSED` or `PAID`, it sends the parent\'s RTF event and Raven message, then moves the parent to `PROCESSED`.'},
-    {text: 'From there each leg turns `PAID` on its own, once the parent has settled and that leg has posted. The parent stays `PROCESSED`.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#3-corporate-payment-pay-today', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="pay-a-corporate-bill-today" />
 
 ### Schedule a corporate payment
 
 The same path, started by the date. The allocations are fetched on the due date or before it, and the payment executes at its execution time once they are all in.
 
-<JourneyMap
-  kind="customer"
-  eyebrow="Scheduled payment, corporate"
-  title="Schedule a corporate payment"
-  origin={{
-    actor: 'Corporate customer',
-    icon: 'user',
-    channels: [
-      {icon: 'monitor', label: 'Web'},
-      {icon: 'phone', label: 'Mobile app'},
-      {icon: 'headset', label: 'Servicing rep'},
-    ],
-  }}
-  entry={[{kind: 'function', label: 'CreatePayment.v3', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments'}]}
-  workflow={[
-    {label: 'CreateScheduledPaymentWorkflow'},
-    {label: 'RequestAllocationsWorkflow', via: 'then', note: 'at the fetch time'},
-    {label: 'ReceiveAllocationsWorkflow', via: 'then'},
-    {label: 'ExecuteScheduledPaymentWorkflow', via: 'then', note: 'at the execution time'},
-  ]}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'live'},
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'SCHEDULED',
-      mode: 'live',
-      caption: 'replies with the decision',
-      reply: 'to the caller with SCHEDULED or DECLINED',
-      systems: ['Payment Instruments', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-      handoffAfter: true,
-    },
-    {
-      icon: 'clock',
-      name: 'Wait',
-      state: 'SCHEDULED',
-      mode: 'awaiting',
-      caption: 'until the fetch time',
-      exit: {state: 'CANCELLED', label: 'inside the window'},
-    },
-    {
-      icon: 'orchestrate',
-      name: 'Request',
-      state: 'ALLOCATING',
-      mode: 'background',
-      caption: 'at the market\'s fetch time',
-      trigger: {kind: 'dispatcher', name: 'Allocation Request Event', label: "the allocation-request dispatcher, at the market's fetch time"},
-      systems: ['Allocations'],
-    },
-    {
-      icon: 'database',
-      name: 'Receive',
-      state: 'ALLOCATED',
-      table: 'allocation_batch',
-      mode: 'background',
-      caption: 'once the batches add up',
-      trigger: {kind: 'callback', name: 'Allocation Batch Event', label: "the allocations manager's batches"},
-    },
-    {
-      icon: 'recheck',
-      name: 'Reverify',
-      state: 'ACCEPTED',
-      mode: 'background',
-      caption: 'at the execution time',
-      trigger: {kind: 'dispatcher', name: 'Allocated Payment Event', label: 'the allocated-payments dispatcher, at the execution time'},
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'bank',
-      name: 'Clear',
-      state: 'PROCESSING',
-      mode: 'background',
-      caption: 'once, for the whole amount',
-      systems: ['MR/M3'],
-    },
-    {
-      icon: 'broadcast',
-      name: 'Legs, then parent',
-      state: 'PROCESSED',
-      mode: 'background',
-      caption: 'a workflow per leg',
-      trigger: {kind: 'dispatcher', name: 'Leg Dispatch Event', label: 'the leg dispatcher, one workflow per leg'},
-      systems: ['GAR', 'Payment Instruments', 'AMP', 'Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier'],
-    },
-  ]}
-  detail={[
-    {text: 'The shape is [Pay a corporate bill today](#pay-a-corporate-bill-today), started by the date instead of at once.'},
-    {step: 2, text: '`SCHEDULED`, as for a consumer payment. The same commit writes an `ALLOC_REQUEST` Work Tracker row, due at the market\'s fetch time, and no `SCHED_EXEC` row: the execution row comes once the payment is `ALLOCATED`.'},
-    {step: 3, text: 'Nothing runs while the payment waits. The customer can update or cancel it inside the window while it is `SCHEDULED`.'},
-    {step: 4, text: 'The fetch time is a market setting: on the due date, or a set number of hours or days before it. The allocation-request dispatcher starts `RequestAllocationsWorkflow`, which moves the payment to `ALLOCATING`. From here an update or a cancel gets 409.'},
-    {step: 5, text: 'The batch that completes the amount moves the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row, due at the execution time on the due date.'},
-    {step: 6, text: 'At the execution time the allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow` through the Router, with today\'s config. Reverify checks the payment again: `ACCEPTED`, or `DECLINED`, in which case no leg is ever written.'},
-    {step: 7, text: 'Execute clears the parent once, at payment level, and releases its legs.'},
-    {step: 8, text: 'From here it runs as [Pay a corporate bill today](#pay-a-corporate-bill-today) does: the leg dispatcher writes and runs the legs, and its completion check moves the parent to `PROCESSED`. If the allocations are late, the payment waits in `ALLOCATING`, an alert fires at the market\'s alert point, and it executes as soon as the last batch arrives.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#4-corporate-payment-scheduled', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="schedule-a-corporate-payment" />
 
 ### Allocations arrive by callback
 
 The breakdown itself. Billpay asks for it and then stops: no workflow waits for the answer. The allocations manager calls back, once or several times, and the batch that completes the amount makes the payment `ALLOCATED`.
 
-<JourneyMap
-  kind="system"
-  eyebrow="Corporate allocations"
-  title="Allocations arrive by callback"
-  topLayer="Partner system"
-  origin={{
-    actor: 'Allocations manager',
-    icon: 'orchestrate',
-    channelsLabel: null,
-    channels: [{icon: 'inbox', label: 'Batches, numbered per payment'}],
-  }}
-  entry={[{kind: 'function', label: 'CreatePaymentAllocations.v1', logo: 'oneData'}]}
-  core={[{kind: 'api', label: 'POST /payments/{payment-id}/allocations'}]}
-  workflow={[
-    {label: 'ReceiveAllocationsWorkflow'},
-    {label: 'ExecuteScheduledPaymentWorkflow', via: 'then', note: 'from the allocated-payments dispatcher'},
-  ]}
-  band={false}
-  steps={[
-    {
-      icon: 'database',
-      name: 'Store',
-      table: 'allocation_batch',
-      mode: 'live',
-      caption: 'before any workflow starts',
-    },
-    {
-      icon: 'orchestrate',
-      name: 'Start',
-      mode: 'live',
-      caption: 'async start, then 202',
-      reply: 'to the allocations manager with 202',
-      exit: {label: '429 over budget, 503 if Offline is down'},
-    },
-    {
-      icon: 'shieldCheck',
-      name: 'Check',
-      mode: 'background',
-      caption: 'no legs written yet',
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Allocated',
-      state: 'ALLOCATED',
-      mode: 'background',
-      caption: 'once the batches add up',
-    },
-    {
-      icon: 'clock',
-      name: 'Execution row',
-      mode: 'background',
-      caption: 'at once, or at the execution time',
-    },
-  ]}
-  detail={[
-    {text: 'Billpay doesn\'t work the breakdown out for itself. The allocations manager owns the breakdown, and it sends it back in numbered batches.'},
-    {step: 1, text: 'The API stores the batch in `allocation_batch` first. A batch can hold thousands of allocations, and keeping them out of the workflow\'s input keeps its history small.'},
-    {step: 2, text: 'Then it starts `ReceiveAllocationsWorkflow` with only the payment ID and the batch number, and replies 202. Over its traffic budget the callback gets 429 with `Retry-After`, and while the Offline cluster is down, 503. The allocations manager retries both.'},
-    {step: 3, text: 'The workflow checks the batch against the payment. It writes no legs: every batch waits in `allocation_batch` until the payment executes.'},
-    {step: 4, text: 'The batch that completes the amount moves the payment from `ALLOCATING` to `ALLOCATED`, in one guarded commit.'},
-    {step: 5, text: 'The same commit writes the `ALLOC_EXEC` row: due at once for a payment made today, or at the execution time on the due date for a scheduled one. The allocated-payments dispatcher picks it up from there.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#13-allocations-callback', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="allocations-arrive-by-callback" />
 
 ## After execution
 
@@ -1049,157 +198,19 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
 
 This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. How it reaches the pairing is still open.
 
-<JourneyMap
-  kind="system"
-  eyebrow="Settlement and posting"
-  title="A payment is paid"
-  topLayer="Events from other systems"
-  origin={{
-    channelsLabel: 'Sources',
-    brandLogo: false,
-    channels: [
-      {icon: 'bank', label: 'MR/M3 settled'},
-      {icon: 'database', label: 'GAR posted'},
-    ],
-  }}
-  entry={[
-    {kind: 'event', label: 'Event handlers'},
-    {kind: 'inbox', label: 'One-Data\'s inbox'},
-  ]}
-  core={[{kind: 'schedule', label: 'Every 30 seconds'}]}
-  workflow={{label: 'ProcessPaidEventsWorkflow'}}
-  persist={false}
-  steps={[
-    {icon: 'inbox', name: 'Fetch', mode: 'background', caption: 'up to 500 READY rows'},
-    {icon: 'bank', name: 'Settle', state: 'PAID', mode: 'background', caption: 'one Oracle transaction'},
-    {icon: 'broadcast', name: 'Announce', mode: 'background', caption: 'the PAID events', systems: ['RTF']},
-    {icon: 'doubleCheck', name: 'Mark', mode: 'background', caption: 'DONE or UNMATCHED'},
-  ]}
-  detail={[
-    {text: 'A payment reaches this point `PROCESSED`: the money has gone to the bank and every system has been told. Two confirmations are still owed. The bank says the money settled, and Accounts Receivable says the payment posted. For a debit card payment, the settlement is the one Billpay created in Execute; for Pay with Bank Transfer, it is M3\'s settled notice.'},
-    {text: 'Both arrive as events, sometimes 1,000 a second, and neither touches Billpay directly. One-Data\'s event handlers store each one in its inbox, a Postgres database of its own, and whichever arrives second marks the payment\'s row `READY`.'},
-    {step: 1, text: 'A Schedule starts `ProcessPaidEventsWorkflow` every 30 seconds, and only one run is ever active. Each batch fetches up to 500 `READY` rows through a One-Data function.'},
-    {step: 2, text: 'Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a guarded update, and tags each `PAID` timeline row with the batch\'s ID. A retried Settle finds the payments it already moved by that ID.'},
-    {step: 3, text: 'The `PAID` events go to RTF.'},
-    {step: 4, text: 'Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data\'s own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row is `DONE` only once its event has gone out.'},
-    {text: 'A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its settlement is in. A corporate leg takes its parent\'s settlement, and a consumer split\'s leg settles on its own. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split.'},
-    {text: 'The drain is the last thing the governor gives budget to, so a burst of events waits in the inbox rather than competing with execution. If a confirmation never arrives, `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3 and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn\'t ask MR/M3 about a debit card payment, which MR/M3 never settles: it asks GAR alone, and always hands over Billpay\'s own settlement event again, since Billpay can\'t read the inbox (Proposed). For Pay with Bank Transfer, M3\'s notice is the settlement, and how it reaches the pairing is open.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#10-paid-events', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="a-payment-is-paid" />
 
 ### A payment is returned
 
 Days after a payment looks finished, the bank can send the money back. Billpay reverses the payment, then decides whether it is worth presenting again. This journey ends by queueing that second attempt, not by making it.
 
-<JourneyMap
-  kind="system"
-  title="A payment is returned"
-  topLayer=""
-  origin={{
-    actor: 'Bank',
-    icon: 'bank',
-    channelsLabel: null,
-    channels: [{icon: 'undo', label: 'MR/M3 returned'}],
-  }}
-  entry={[
-    {kind: 'event', label: 'Money movement handler'},
-    {kind: 'inbox', label: 'One-Data\'s inbox'},
-  ]}
-  core={[{kind: 'dispatcher', label: 'Returns dispatcher'}]}
-  workflow={{label: 'ProcessReturnedPaymentWorkflow'}}
-  steps={[
-    {
-      icon: 'shieldCheck',
-      name: 'Check',
-      mode: 'background',
-      caption: 'can this be returned',
-      exit: {label: 'not in a returnable state'},
-    },
-    {
-      icon: 'undo',
-      name: 'Return',
-      state: 'RETURNED',
-      mode: 'background',
-      caption: 'the money came back',
-    },
-    {
-      icon: 'recheck',
-      name: 'Judge',
-      mode: 'background',
-      caption: 'worth another try',
-      exit: {label: 'not eligible, so it stays returned'},
-    },
-    {
-      icon: 'calendar',
-      name: 'Queue',
-      state: 'REPRESENTING',
-      mode: 'background',
-      caption: 'the next presentment',
-    },
-  ]}
-  detail={[
-    {text: 'Returns come in bursts, up to 100 a second and 100K a day. One-Data keeps each one in its inbox, and the returns dispatcher starts them through the Router at the governor\'s pace, at priority 5, the lowest priority level.'},
-    {step: 1, text: 'Only a payment that got far enough can come back. The workflow checks the payment, whole or a leg, and its status: `PROCESSING`, `PROCESSED`, `PAID`, or `REPRESENTED` for a payment returned again.'},
-    {step: 2, text: 'The presentment that came back moves to `RETURNED`, and its row stays there.'},
-    {step: 3, text: 'Not every return is worth another try. The market\'s release holds its representment rules: which return reasons can be represented, how many times a payment can be, and how many days after the return it goes again (agreed 2026-11-07). A return that fails either test stays `RETURNED`, and so does a leg\'s, since only a whole payment is represented. The representment date is the day the return arrived, in the market\'s time zone, plus those days.'},
-    {step: 4, text: 'QueueRepresentment writes the next presentment as a new row, numbered one higher, in `REPRESENTING`, with that date as its clearing date and a `REPRESENT` Work Tracker row due at its start, so a same-day representment is due at once (Proposed). A return never starts the representment itself; the date does.'},
-    {text: 'What happens on that date is [A payment is represented](#a-payment-is-represented).'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#7-return', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="a-payment-is-returned" />
 
 ### A payment is represented
 
 The second attempt queued by a return, run on the day it falls due. Billpay checks the representment still makes sense before anything goes to clearing, because the reason a payment came back can outlive the return.
 
-<JourneyMap
-  kind="system"
-  eyebrow="Second attempt"
-  title="A payment is represented"
-  topLayer="Started on a date"
-  origin={{
-    channelsLabel: 'Source',
-    brandLogo: false,
-    channels: [{icon: 'calendar', label: 'REPRESENT rows due today'}],
-  }}
-  entry={[{kind: 'schedule', label: 'Every 5 minutes, per market (Proposed)'}]}
-  core={[{kind: 'dispatcher', label: 'Representment dispatcher'}]}
-  workflow={{label: 'ProcessRepresentmentWorkflow'}}
-  band={false}
-  steps={[
-    {
-      icon: 'clock',
-      name: 'Pick up',
-      state: 'REPRESENTING',
-      mode: 'background',
-      caption: 'due today',
-    },
-    {
-      icon: 'recheck',
-      name: 'Recheck',
-      mode: 'background',
-      caption: 'still worth sending',
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'bank',
-      name: 'Represent',
-      state: 'REPRESENTED',
-      mode: 'background',
-      caption: 'sent for clearing again',
-      systems: ['MR/M3'],
-    },
-  ]}
-  detail={[
-    {text: 'A representment is the next presentment of the same payment: a new row with the same payment ID, numbered one higher. [A payment is returned](#a-payment-is-returned) queued it, and it has waited as a Work Tracker row since.'},
-    {step: 1, text: 'Each market\'s representment dispatcher runs every 5 minutes (Proposed), claims the `REPRESENT` rows that are due and starts `ProcessRepresentmentWorkflow` through the Router.'},
-    {step: 2, text: 'Eligibility is checked again before anything goes to clearing. Days may have passed since the return, and the account may have changed. Represent\'s own checks are still to be defined, so for now the recheck passes (Proposed).'},
-    {step: 3, text: 'The new presentment goes to clearing, in the batch, with the idempotency key `{paymentId}-represent-{seq}`, and lands at `REPRESENTED`. A failed recheck ends it at `DECLINED`, and nothing is sent.'},
-    {text: 'If this presentment comes back too, that is a new return, with its own workflow ID, and the next presentment is number 3.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#8-representment', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="a-payment-is-represented" />
 
 ## Other Payments
 
@@ -1207,155 +218,13 @@ The second attempt queued by a return, run on the day it falls due. Billpay chec
 
 Someone other than the cardmember pushes money at the account. Amex didn't ask for it, so the first question is whether it will be accepted at all.
 
-<JourneyMap
-  kind="system"
-  title="A third party pushes a payment"
-  topLayer=""
-  origin={{
-    actor: 'A third party',
-    icon: 'inbox',
-    channelsLabel: null,
-    channels: [{icon: 'inbox', label: 'A pushed payment'}],
-  }}
-  entry={[
-    {kind: 'function', label: 'CreateInboundPayment.v1', logo: 'oneData'},
-    {kind: 'inbox', label: 'One-Data\'s inbox'},
-  ]}
-  core={[{kind: 'dispatcher', label: 'Inbound dispatcher'}]}
-  workflow={{label: 'ProcessInboundPaymentWorkflow'}}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'background'},
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'ACCEPTED',
-      mode: 'background',
-      caption: 'will Amex take it',
-      exit: {state: 'DISALLOWED'},
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'at once; AMP after Instruments',
-    },
-    {
-      icon: 'broadcast',
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      trigger: {kind: 'events', name: 'Settled and Posted Events', label: "the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox"},
-      caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {text: 'One-Data stores the payment and replies 202 straight away. The inbound dispatcher checks the inbox every minute and starts the workflow through the Router at the governor\'s pace.'},
-    {step: 1, text: 'Recorded once. Third parties retry, so the idempotency check matters here.'},
-    {step: 2, text: 'A payment American Express doesn\'t accept ends at `DISALLOWED`. That state exists only on this journey.'},
-    {text: 'Past that, it is an ordinary payment. The money is applied, every downstream system is told, and it turns `PAID` once both confirmations are in.'},
-  ]}
-  reference={{to: '/docs/design/sequence-diagrams#9-inbound-payment', label: 'Sequence diagram'}}
-/>
+<JourneyMap journey="a-third-party-pushes-a-payment" />
 
 ### Accounts Receivable initiates a payment
 
 Some payments start inside Amex. Accounts Receivable raises them on the customer's behalf, in bulk, and they run as scheduled payments with nobody on the line. One dated today is scheduled too, and executes the same day (agreed 2026-11-07).
 
-<JourneyMap
-  kind="system"
-  title="Accounts Receivable initiates a payment"
-  topLayer={null}
-  origin={{
-    actor: 'Accounts Receivable',
-    icon: 'database',
-    channelsLabel: null,
-    channels: [{icon: 'inbox', label: 'Payments and refunds, in bulk'}],
-  }}
-  entry={[
-    {kind: 'function', label: 'CreateBillpayTransactionFromAccountsReceivable.v1', logo: 'oneData'},
-    {kind: 'inbox', label: 'One-Data\'s inbox'},
-  ]}
-  core={[{kind: 'dispatcher', label: 'AR intake dispatcher'}]}
-  workflow={[
-    {label: 'CreateScheduledPaymentWorkflow'},
-    {label: 'ExecuteScheduledPaymentWorkflow', note: 'on the due date'},
-  ]}
-  steps={[
-    {icon: 'fingerprint', name: 'Capture', state: 'PENDING', mode: 'background'},
-    {
-      icon: 'shieldCheck',
-      name: 'Verify',
-      state: 'SCHEDULED',
-      mode: 'background',
-      systems: ['Payment Instruments', 'Plans'],
-      parallel: true,
-      fanNote: 'at once; Plans for a mandate',
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'clock',
-      name: 'Wait',
-      state: 'SCHEDULED',
-      mode: 'awaiting',
-      caption: 'a row in Oracle',
-    },
-    {
-      icon: 'recheck',
-      name: 'Reverify',
-      state: 'ACCEPTED',
-      mode: 'background',
-      caption: 'checked again, on the day',
-      trigger: {kind: 'dispatcher', name: 'Due Date Event', label: "the scheduled-payments dispatcher, at the market's execution time on the due date"},
-      exit: {state: 'DECLINED'},
-    },
-    {
-      icon: 'parallelArrows',
-      name: 'Execute',
-      state: 'PROCESSING',
-      mode: 'background',
-      systems: ['MR/M3', 'GAR', 'Payment Instruments', 'AMP'],
-      parallel: true,
-      fanNote: 'at once; AMP after Instruments',
-    },
-    {
-      icon: 'broadcast',
-      name: 'Fulfil',
-      state: 'PROCESSED',
-      mode: 'background',
-      systems: ['Accounting', 'eBNC', 'Risk', 'TFNE', 'GPHDB', 'B2Notifier', 'RTF', 'Raven'],
-    },
-    {
-      icon: 'doubleCheck',
-      name: 'Paid',
-      state: 'PAID',
-      mode: 'awaiting',
-      trigger: {kind: 'events', name: 'Settled and Posted Events', label: "the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox"},
-      caption: 'settled and posted',
-      systems: ['MR/M3', 'GAR'],
-      exit: {state: 'RETURNED'},
-    },
-  ]}
-  detail={[
-    {text: 'Accounts Receivable sends payments in bulk, up to a million at 100 a second. One-Data stores each one and answers 202 as soon as it is stored. The AR intake dispatcher pulls them every minute and starts them at the governor\'s pace, at priority 1, the same level as scheduled execution.'},
-    {step: 2, text: 'Checked and parked exactly like a customer\'s scheduled payment, with the same `SCHED_EXEC` row. It always clears in batch.'},
-    {step: 4, text: 'On the due date the scheduled-payments dispatcher starts it, and Reverify checks it again before any money moves.'},
-    {text: 'There is no customer on the line, so no step is marked as waiting, and both workflows run on the Offline cluster. Accounts Receivable learns the outcome from the `SCHEDULED` and `DECLINED` notifications and lifecycle events, or from `GET /payments/{payment-id}`.'},
-    {text: 'Accounts Receivable raises credit balance refunds through the same function. Those start `CreateBalanceRefundWorkflow` on the Offline cluster.'},
-    {text: 'A request the Router can\'t admit, because nothing live matches its market, account type or API, is marked `REJECTED` in the inbox and operations get an alert. Accounts Receivable isn\'t told.'},
-  ]}
-/>
+<JourneyMap journey="accounts-receivable-initiates-a-payment" />
 
 ## Where to go deeper
 

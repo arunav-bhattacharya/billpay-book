@@ -19,7 +19,7 @@ The site has nine sections: Vision, Architecture, Design, Market Onboarding, Bui
 ## Design system
 - Docusaurus, latest stable
 - Light mode default, dark mode supported, gradients via CSS custom properties (not hardcoded per-component)
-- Palette: the Amex design language (DLS) colours only. Bright Blue `#006FCF` for actions, links and badges, Deep Blue `#00175A` for headings, the brand bar, banners and table heads, Light Blue `#66A9E2` as a small accent, and the DLS greys. No gold, violet or cyan. One exception, chosen by the user (2026-11-15): a pink, `--amex-trigger`, for anything that starts or resumes a payment from outside (an update, a signal, a callback, a dispatcher, the paired events), and for nothing else. A second, chosen by the user (2026-11-22): four muted hues, `--amex-phase-1` to `-4` (DLS grey, the DLS status set's deep green and deep orange, Deep Blue), for a sequence diagram's numbered phases only, never flashy. All are `--amex-*` tokens in `website/src/css/custom.css`. Theme-independent brand values sit in the palette block at the top; anything that changes between light and dark belongs in the two theme blocks, as a pair. Components never hardcode a colour.
+- Palette: the Amex design language (DLS) colours only. Bright Blue `#006FCF` for actions, links and badges, Deep Blue `#00175A` for headings, the brand bar, banners and table heads, Light Blue `#66A9E2` as a small accent, and the DLS greys. No gold, violet or cyan. One exception, chosen by the user (2026-11-15): a pink, `--amex-trigger`, for anything that starts or resumes a payment from outside (an update, a signal, a callback, a dispatcher, the paired events), and for nothing else. A sequence diagram's numbered phase labels all take Deep Blue, `--amex-phase` (chosen by the user, 2026-11-22); the field behind a phase is the Online or Offline tint. All are `--amex-*` tokens in `website/src/css/custom.css`. Theme-independent brand values sit in the palette block at the top; anything that changes between light and dark belongs in the two theme blocks, as a pair. Components never hardcode a colour.
 - The "Blue Box" look: the square from the Amex logo is the one shape. Numbers are badges (white digits in a blue box, corner `--amex-badge-radius`), each h2 opens on a small blue box, and a section break is three of them. Structure comes from fills, tints and soft shadows, not from ruled lines: no rule under headings, no outline on cards, no edge on the sidebar or contents rail.
 - The sidebar is a quiet index and the one exception to number badges. Section names are small tracked capitals, pages rest at Regular weight, and section numbers are plain grey numerals. Only the section you are in fills its number with the Bright Blue box, and only the current page is blue, on the pill. Resting link colour flows through `--ifm-menu-color`, set on the sidebar and reset on each section row, instead of through `color` rules that would compete.
 - Every doc page opens on the page banner: a solid Deep Blue block with the section number and name, beside the H1 and Lead on a pale field (the dark card surface in dark mode). It is CSS in `custom.css` (section 12) over MDX's own `<header><h1>` and the Lead's global `doc-lead` class, fed two custom properties from `src/theme/DocItem/Layout`. The homepage hero holds the nine sections as a board.
@@ -27,7 +27,7 @@ The site has nine sections: Vision, Architecture, Design, Market Onboarding, Bui
 ## Diagrams
 Four kinds, in the order to reach for them. Authoring guide: `DIAGRAMS.md`.
 - **Mermaid** fenced blocks for sequence, state and flowchart diagrams. Theming in `website/src/css/mermaid.css`, expand control in `website/src/theme/Mermaid/`. A UML class diagram uses `ClassMap` instead.
-- **Components that take data as props**: `LayerStack`, `JourneyMap`, `CompositionMap`, `RouteMap`, `WorkerSplit`, `ClassMap`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
+- **Components that take data as props**: `LayerStack`, `JourneyMap` (its data in YAML under `website/diagrams/journeys/`, see `website/diagrams/README.md`), `CompositionMap`, `RouteMap`, `WorkerSplit`, `ClassMap`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
 - **CSS box diagrams** for grouped boxes and short connectors, as in `LandscapeMap`.
 - **Coordinate SVG** for dense wiring that needs pan, zoom and layer spotlight, as in `LegacyEstateMap` and `HADiagram`, or for one fixed picture that scales with the column, as in `PacingFlow`, `RowLifecycle` and `ProfileToStages`.
 
@@ -86,6 +86,9 @@ Every doc page under `website/docs/`:
 /DIAGRAMS.md                  # diagram authoring guide
 /CLAUDE.md
 /website/                     # Docusaurus project root
+  diagrams/                   # diagram content as YAML, with schemas and an editor's guide
+  plugins/diagram-data/       # loads and checks the diagram YAML at build time
+  scripts/                    # check-diagrams.js (npm run check:diagrams)
   docs/                       # the pages, one folder per section
   src/
     components/               # one folder per component, each importable from MDX

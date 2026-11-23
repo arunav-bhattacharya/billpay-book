@@ -1,0 +1,533 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "billpay-journey",
+  "title": "A journey on the All Journeys page",
+  "description": "One payment journey, drawn by JourneyMap. Each file is one journey.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "kind"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "Title",
+      "description": "The journey's name, shown at the top of the diagram."
+    },
+    "eyebrow": {
+      "type": "string",
+      "title": "Eyebrow",
+      "description": "The small line above the title, such as \"Immediate payment\"."
+    },
+    "kind": {
+      "type": "string",
+      "title": "Kind",
+      "description": "Who starts the journey.",
+      "enum": [
+        "customer",
+        "system"
+      ],
+      "enumDescriptions": [
+        "A customer asks and waits for the answer",
+        "An event, a callback or a date starts it, with nobody waiting"
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "title": "From",
+      "description": "Who the journey starts with.",
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "type": "string",
+          "title": "Who",
+          "description": "Such as Cardmember."
+        },
+        "channels": {
+          "type": "array",
+          "title": "Channels",
+          "description": "The ways in, such as Web or Mobile app.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string",
+          "title": "Note",
+          "description": "Shown when you hover over the origin."
+        }
+      }
+    },
+    "entry": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "What kind of entry point this is. It sets the tooltip and the colour of the chip.",
+            "enum": [
+              "function",
+              "api",
+              "event",
+              "inbox",
+              "schedule",
+              "dispatcher"
+            ],
+            "enumDescriptions": [
+              "A One-Data function",
+              "A Billpay core API",
+              "An inbound event",
+              "Held in One-Data's inbox until Billpay pulls it",
+              "A Temporal Schedule",
+              "A dispatcher, which starts work at the rate the governor sets"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name as it appears, such as CreatePayment.v3 or POST /payments."
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "A short note shown beside it."
+          }
+        }
+      },
+      "title": "Through",
+      "description": "The One-Data functions, inbox or events the request comes in through."
+    },
+    "core": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "What kind of Billpay endpoint this is. It sets the tooltip and the colour of the chip.",
+            "enum": [
+              "function",
+              "api",
+              "event",
+              "inbox",
+              "schedule",
+              "dispatcher"
+            ],
+            "enumDescriptions": [
+              "A One-Data function",
+              "A Billpay core API",
+              "An inbound event",
+              "Held in One-Data's inbox until Billpay pulls it",
+              "A Temporal Schedule",
+              "A dispatcher, which starts work at the rate the governor sets"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name as it appears, such as CreatePayment.v3 or POST /payments."
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "A short note shown beside it."
+          }
+        }
+      },
+      "title": "Billpay",
+      "description": "The Billpay core APIs, Schedules or dispatchers that receive it."
+    },
+    "workflow": {
+      "type": "array",
+      "title": "Runs as",
+      "description": "The Temporal workflows that run the journey, in order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Workflow",
+            "description": "The workflow's name."
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "Such as \"on the due date\"."
+          },
+          "child": {
+            "type": "boolean",
+            "title": "Child workflow",
+            "description": "true if a parent workflow starts this one."
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "title": "Steps",
+      "description": "The steps, left to right. Leave this out for a journey that has no steps to draw, and give a status instead.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Step name",
+            "description": "Short, such as Capture or Customer back."
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "description": "The payment's lifecycle state once this step is done. Use the state's name in capitals, as on the State Model page.",
+            "enum": [
+              "INPUT",
+              "PENDING",
+              "SCHEDULED",
+              "ACCEPTED",
+              "ALLOCATING",
+              "ALLOCATED",
+              "REPRESENTING",
+              "PROCESSING",
+              "PROCESSED",
+              "PAID",
+              "REPRESENTED",
+              "DECLINED",
+              "CANCELLED",
+              "DISALLOWED",
+              "RETURNED"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "title": "Who waits",
+            "description": "Whether a caller is waiting while this step runs.",
+            "enum": [
+              "live",
+              "background",
+              "awaiting"
+            ],
+            "enumDescriptions": [
+              "A caller waits for this step (drawn in the Sync box)",
+              "Nobody waits; it runs in the background",
+              "The step waits for something from outside before it runs"
+            ]
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "description": "One line shown when you hover over the step."
+          },
+          "reply": {
+            "type": "string",
+            "title": "Reply",
+            "description": "Where the workflow answers its caller, such as \"to the caller with ACCEPTED or DECLINED\"."
+          },
+          "systems": {
+            "type": "array",
+            "title": "Calls",
+            "description": "The systems this step calls.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Payment Instruments",
+                "Payment Options",
+                "Plans",
+                "MR/M3",
+                "GAR",
+                "AR",
+                "AMP",
+                "Accounting",
+                "eBNC",
+                "Risk",
+                "TFNE",
+                "GPHDB",
+                "B2Notifier",
+                "RTF",
+                "Raven",
+                "Amex PwBT",
+                "Card provider",
+                "Installments",
+                "Globestar",
+                "Allocations"
+              ],
+              "enumDescriptions": [
+                "Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need",
+                "Payment Options, which resolves the amount a customer chose",
+                "Plans, which checks the payment's mandate where the market requires one",
+                "MultiRail / M3, which clears the payment with the bank",
+                "Accounts Receivable (GAR), which holds the statement balance",
+                "Accounts Receivable, which holds the statement balance",
+                "Authorizations (AMP), which holds available credit",
+                "Accounting, which matches the payment across Amex platforms",
+                "Balance and Control (eBNC), which audits that no payment is missed",
+                "Risk platform, kept current with payment activity",
+                "Transaction Notification Engine (TFNE), a legacy system told when a payment is processed",
+                "The legacy Payments History Database (GPHDB), told when a payment is processed",
+                "B2Notifier, which tells other downstream systems when a payment is processed",
+                "RTF, which carries lifecycle events to the systems that consume them",
+                "Raven, customer communications",
+                "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
+                "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
+                "Installments, which owns the instalment plan",
+                "Globestar, which holds the instalment plan",
+                "Allocations Manager, which returns a corporate breakdown"
+              ]
+            }
+          },
+          "trigger": {
+            "type": "object",
+            "title": "Trigger",
+            "description": "Something from outside that starts or resumes this step. Drawn in pink.",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "title": "How it arrives",
+                "enum": [
+                  "update",
+                  "signal",
+                  "callback",
+                  "dispatcher",
+                  "events"
+                ],
+                "enumDescriptions": [
+                  "A Temporal update to the running workflow, which answers its sender",
+                  "A Temporal signal to the running workflow, with no answer back",
+                  "A partner system calls Billpay back",
+                  "A dispatcher picks up a due row",
+                  "Events from other systems, paired in One-Data's inbox"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "title": "Event name",
+                "description": "The name shown in the lane, such as Channel Confirm Event."
+              },
+              "label": {
+                "type": "string",
+                "title": "What it is",
+                "description": "One line shown on hover."
+              }
+            }
+          },
+          "poll": {
+            "type": "object",
+            "title": "Repeated call",
+            "description": "A call made again and again until it has an answer.",
+            "additionalProperties": false,
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "title": "Call",
+                "description": "Such as GET /payment-status."
+              },
+              "note": {
+                "type": "string",
+                "title": "Note",
+                "description": "Shown on hover."
+              }
+            }
+          },
+          "exit": {
+            "title": "Ends",
+            "description": "Where the payment can leave the journey at this step. One end, or a list of them.",
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "title": "State",
+                    "description": "The state the payment ends in if it leaves here. Leave it out for an end that is not a state, such as an exception list.",
+                    "enum": [
+                      "INPUT",
+                      "PENDING",
+                      "SCHEDULED",
+                      "ACCEPTED",
+                      "ALLOCATING",
+                      "ALLOCATED",
+                      "REPRESENTING",
+                      "PROCESSING",
+                      "PROCESSED",
+                      "PAID",
+                      "REPRESENTED",
+                      "DECLINED",
+                      "CANCELLED",
+                      "DISALLOWED",
+                      "RETURNED"
+                    ]
+                  },
+                  "label": {
+                    "type": "string",
+                    "title": "Why",
+                    "description": "A few words on why it ends here, such as \"no link\" or \"failed\"."
+                  }
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "title": "State",
+                      "description": "The state the payment ends in if it leaves here. Leave it out for an end that is not a state, such as an exception list.",
+                      "enum": [
+                        "INPUT",
+                        "PENDING",
+                        "SCHEDULED",
+                        "ACCEPTED",
+                        "ALLOCATING",
+                        "ALLOCATED",
+                        "REPRESENTING",
+                        "PROCESSING",
+                        "PROCESSED",
+                        "PAID",
+                        "REPRESENTED",
+                        "DECLINED",
+                        "CANCELLED",
+                        "DISALLOWED",
+                        "RETURNED"
+                      ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "title": "Why",
+                      "description": "A few words on why it ends here, such as \"no link\" or \"failed\"."
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "arrives": {
+            "type": "string",
+            "title": "Arrives as",
+            "description": "The word on the first step's arrow, such as \"create\". Defaults to \"request\" or \"start\"."
+          },
+          "table": {
+            "type": "string",
+            "title": "Table",
+            "description": "A table this step works in, such as allocation_batch."
+          },
+          "waiting": {
+            "type": "boolean",
+            "title": "Waiting",
+            "description": "Forces the pale waiting look. Normally \"mode: awaiting\" does this."
+          }
+        }
+      }
+    },
+    "detail": {
+      "type": "array",
+      "title": "Notes",
+      "description": "The numbered notes under the diagram. Use **bold**, `code` and [links](#anchor) as on any page.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Step",
+            "description": "The step number this note explains. Leave it out for a note between steps."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        }
+      }
+    },
+    "detailLabel": {
+      "type": "string",
+      "title": "Notes heading",
+      "description": "Defaults to \"How this works, step by step\"."
+    },
+    "detailOpen": {
+      "type": "boolean",
+      "title": "Notes open",
+      "description": "true to show the notes open."
+    },
+    "reference": {
+      "type": "object",
+      "title": "Sequence diagram link",
+      "additionalProperties": false,
+      "required": [
+        "to"
+      ],
+      "properties": {
+        "to": {
+          "type": "string",
+          "title": "Link",
+          "description": "Such as /docs/design/sequence-diagrams#1-pay-today-one-instruction."
+        },
+        "label": {
+          "type": "string",
+          "title": "Link text",
+          "description": "Defaults to \"Sequence diagram\"."
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "title": "Status",
+      "description": "For a journey with no steps: why there is nothing to draw.",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "note"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "tbd",
+            "unmapped",
+            "read-only"
+          ],
+          "enumDescriptions": [
+            "Still being defined",
+            "Not yet mapped in the spec",
+            "Read-only, no workflow"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

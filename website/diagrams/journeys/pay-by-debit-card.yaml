@@ -1,0 +1,178 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay by Debit card: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay by Debit card
+eyebrow: Immediate payment, 3D Secure
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+  note: Every debit card needs 3D Secure. The card provider is a market setting.
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+  - kind: event
+    label: 3D Secure callback
+    note: from the card provider, not One-Data
+
+core:
+  - kind: api
+    label: POST /payments
+  - kind: api
+    label: POST /payments/{payment-id}/authentication
+
+workflow:
+  - label: CreatePaymentIntentWorkflow
+    note: the card provider's callback arrives as an update
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+
+  - name: Own checks
+    state: PENDING
+    mode: live
+    caption: before 3D Secure
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: 3D Secure
+    state: PENDING
+    mode: live
+    caption: replies PENDING with the challenge link
+    reply: to the caller with PENDING and the challenge link, or none
+    systems:
+      - Card provider
+    exit:
+      state: DECLINED
+      label: no answer
+
+  - name: Customer authenticates
+    state: PENDING
+    mode: awaiting
+    caption: 3D Secure callback, from the card provider
+    trigger:
+      kind: update
+      name: Card Authenticated Event
+      label: the card provider's 3D Secure callback
+    exit:
+      state: CANCELLED
+      label: none in 2 min
+
+  - name: Verify
+    state: ACCEPTED
+    mode: live
+    caption: the authorization; replies to the callback
+    reply: to the card provider with ACCEPTED or DECLINED
+    systems:
+      - Card provider
+    exit:
+      state: DECLINED
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    systems:
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: Billpay's own settlement event and Accounts Receivable's posting
+    systems:
+      - GAR
+    exit:
+      state: RETURNED
+
+detail:
+  - step: 1
+    text: >-
+      Billpay writes the payment and its idempotency key in one insert-if-absent, as for any
+      payment. The customer chose their bank from the list the channel read through
+      `ReadBillpayInstruments.v1`.
+  - step: 2
+    text: >-
+      The payment method is a debit card, so the Router sets card authentication to Y (Proposed) and
+      starts `CreatePaymentIntentWorkflow`. Amex's own checks come first, before 3D Secure: Payment
+      Instruments, Payment Options' `ReadPaymentOptionByIdentifier.v1` for the option the customer
+      picked, and Plans where the market requires a mandate. A payment that fails them is `DECLINED`
+      at once, and 3D Secure never starts.
+  - step: 3
+    text: >-
+      RequestConfirmation asks the market's card provider to start 3D Secure, and gives it Billpay's
+      callback URL. When the card's bank wants a challenge, the provider returns the challenge link,
+      and the caller's update returns `PENDING` with it. When it needs none, the caller gets
+      `PENDING` with no link (Proposed). If the provider doesn't answer, the payment is `DECLINED`
+      instead (Proposed).
+  - step: 4
+    text: >-
+      The customer completes the challenge, such as a one-time code or a banking-app approval, while
+      the workflow waits on its timer: 2 minutes and a short grace. If no callback comes in that
+      time, the workflow runs Cancel itself, the payment ends `CANCELLED`, and nothing has been
+      taken.
+  - step: 5
+    text: >-
+      The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed)
+      directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D
+      Secure result is `DECLINED` with no authorization. Otherwise, since Amex's own checks passed
+      at the create, Verify only authorizes the payment with the card provider (the check is
+      Proposed): the authorization debits the customer's account if it holds enough money, and the
+      card's bank declines it if not. Verify commits `ACCEPTED` or `DECLINED`, guarded on `PENDING`,
+      and the callback's reply returns here. The customer learns the outcome from the channel,
+      through the payment's state. Once Verify has decided, the delete takes the payment off the
+      account's pending list.
+  - text: Everything after this runs with nobody waiting, in the same workflow.
+  - step: 6
+    text: >-
+      No clearing call: the authorization has already moved the money. Billpay creates the
+      settlement event itself, and Execute hands it to One-Data, dated when the money moved
+      (Proposed). The statement balance goes down in Accounts Receivable and available credit up in
+      Authorizations, at once.
+  - step: 7
+    text: >-
+      Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven
+      message, then `PROCESSED`.
+  - step: 8
+    text: >-
+      `PAID` follows once the settlement Billpay created and the AR posting are both in One-Data's
+      inbox.
+  - text: Consumer and business travel payments can pay by debit card. A corporate payment can't.
+  - text: >-
+      A debit card pays today only, with one instruction, never with MR Points and never through Pay
+      & Plan. A create that breaks this, or a corporate one, gets 422 before any workflow starts.
+
+reference:
+  to: /docs/design/sequence-diagrams#16-pay-by-debit-card-create-3d-secure-and-authorization
+  label: Sequence diagram

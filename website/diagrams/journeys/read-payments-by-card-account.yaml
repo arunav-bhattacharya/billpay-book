@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Read payments by card account: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Read payments by card account
+eyebrow: Reads
+kind: customer
+
+origin:
+  actor: Cardmember or servicing rep
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: ReadPayments.v1
+
+core:
+  - kind: api
+    label: GET /payments/account/{account-id}
+
+status:
+  kind: read-only
+  note: >-
+    Lists every payment on the account, from Redis and Oracle together, so a payment shows from the
+    moment it is made. One-Data's event handlers use the same function to find the payment an event
+    doesn't name.

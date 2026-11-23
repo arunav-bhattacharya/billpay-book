@@ -1,0 +1,133 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay my bill today: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay my bill today
+eyebrow: Immediate payment
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+  note: Channels are how we describe the ways in. Billpay sees an authenticated request.
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+
+core:
+  - kind: api
+    label: POST /payments
+
+workflow:
+  - label: CreateImmediatePaymentWorkflow
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+
+  - name: Verify
+    state: ACCEPTED
+    mode: live
+    caption: replies with the decision
+    reply: to the caller with ACCEPTED or DECLINED
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    systems:
+      - MR/M3
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox
+    systems:
+      - MR/M3
+      - GAR
+    exit:
+      state: RETURNED
+
+detail:
+  - text: >-
+      One-Data checks the card account first. If another payment on it is still `PENDING`, One-Data
+      declines this one there and then, with 200 `DECLINED` and a reason, and Billpay never sees it.
+      Otherwise One-Data adds the payment to the account's pending list, stores the create and calls
+      billpay-online.
+  - step: 1
+    text: >-
+      Billpay writes the payment and its idempotency key in one insert-if-absent. A repeated request
+      joins the workflow that is already running, so the customer gets the original answer back and
+      is never charged twice.
+  - step: 2
+    text: >-
+      Payment Instruments confirms the way the customer is paying, Payment Options'
+      `ReadPaymentOptionByIdentifier.v1` confirms the payment option they picked, and Plans returns
+      the mandate details where the market requires one. Billpay's verification rules check the
+      answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller's
+      update returns right there. After the reply, once Verify has decided, the workflow calls
+      One-Data's delete API, `DeletePendingPayment.v1`, which takes the payment off the account's
+      pending list, so the customer can pay again. A payment the customer must confirm at their bank
+      goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does a debit card, on
+      [Pay by Debit card](#pay-by-debit-card).
+  - text: >-
+      Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF
+      after the reply, in order.
+  - step: 3
+    text: >-
+      Three calls go out at once: clearing with the bank, the statement balance down in Accounts
+      Receivable, and available credit up in Authorizations. Authorizations needs the instrument's
+      details in clear text, so its branch first asks Payment Instruments for them, while the other
+      two calls are already under way. A corporate payment never gets this far in this workflow: it
+      stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill
+      today](#pay-a-corporate-bill-today).
+  - step: 4
+    text: >-
+      Accounting, eBNC, risk and three notification systems are told first, in parallel: two legacy
+      systems, the Transaction Notification Engine (TFNE) and the Payments History Database (GPHDB),
+      and B2Notifier, which passes the news on to other downstream systems. The three use the
+      clear-text details Execute fetched. Then the lifecycle event goes to RTF and the confirmation
+      to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once
+      everything else has worked.
+  - step: 5
+    text: >-
+      The payment waits at `PROCESSED` for two confirmations: the bank's settlement and Accounts
+      Receivable's posting. Both land in One-Data's inbox, and a periodic workflow marks the
+      payments that have both `PAID`, in batches. [A payment is paid](#a-payment-is-paid) shows how.
+
+reference:
+  to: /docs/design/sequence-diagrams#1-pay-today-one-instruction
+  label: Sequence diagram

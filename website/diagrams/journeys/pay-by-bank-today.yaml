@@ -1,0 +1,201 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay by Bank today: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay by Bank today
+eyebrow: Immediate payment, bank confirmation
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+  note: Which payment methods need bank confirmation is a market setting, resolved per request.
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+  - kind: function
+    label: CreateConfirmPendingPayment.v1
+    note: once the customer is back; answers with the status
+
+core:
+  - kind: api
+    label: POST /payments
+  - kind: api
+    label: POST /payments/{payment-id}/confirm
+  - kind: api
+    label: POST /payments/{payment-id}/settlement
+    note: M3's notice
+
+workflow:
+  - label: CreatePaymentIntentWorkflow
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+    arrives: create
+
+  - name: Own checks
+    state: PENDING
+    mode: live
+    caption: Amex's own checks, before the bank step
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Redirect
+    state: PENDING
+    mode: live
+    caption: replies PENDING with the redirect link
+    reply: to the caller with PENDING and the redirect link
+    systems:
+      - Amex PwBT
+    exit:
+      state: DECLINED
+      label: no link
+
+  - name: Customer back
+    state: PENDING
+    mode: live
+    caption: asks GET /payment-status once and replies with the status
+    trigger:
+      kind: update
+      name: Channel Confirm Event
+      label: the channel's call once the payer's bank routes the customer back
+    reply: to the channel with PENDING, ACCEPTED or DECLINED
+    systems:
+      - Amex PwBT
+    exit:
+      state: DECLINED
+      label: failed
+
+  - name: While pending
+    state: ACCEPTED
+    mode: background
+    caption: GET /payment-status at a fixed interval until success or failure
+    poll:
+      label: GET /payment-status
+      note: Amex Pay with Bank Transfer, asked at a fixed interval until it answers success or failure
+    exit:
+      - state: DECLINED
+        label: failed
+      - state: CANCELLED
+        label: the customer's no
+
+  - name: Settled
+    state: ACCEPTED
+    mode: awaiting
+    caption: M3's notice that the bank has settled the money
+    trigger:
+      kind: signal
+      name: Bank Settled Event
+      label: M3's notice that the bank has settled the money
+    exit:
+      label: "no notice: exception list"
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    caption: no clearing call
+    systems:
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: M3's settlement and Accounts Receivable's posting
+    exit:
+      state: RETURNED
+
+detail:
+  - step: 1
+    text: >-
+      Billpay writes the payment and its idempotency key in one insert-if-absent, as for any
+      payment. A repeated request joins the workflow that is already running.
+  - step: 2
+    text: >-
+      The market's `requiresBankConfirmation` behavior resolves to Y for this payment method, so the
+      Router starts `CreatePaymentIntentWorkflow`. Amex's own checks come first, before the bank
+      step: Payment Instruments confirms the way the customer is paying, Payment Options'
+      `ReadPaymentOptionByIdentifier.v1` confirms the option they picked, and Plans returns the
+      mandate details where the market requires one. A payment that fails them is `DECLINED` at
+      once, with no redirect link.
+  - step: 3
+    text: >-
+      RequestConfirmation asks Amex Pay with Bank Transfer for the customer's redirect link and
+      stores it on the payment. Billpay never calls a market's provider itself. The caller gets
+      `PENDING` with the link, and the `PENDING` event goes to RTF. If no link comes back, the
+      payment is `DECLINED` instead.
+  - step: 4
+    text: >-
+      The customer approves the payment at their bank, and the payer's bank routes them back to the
+      channel. The channel then calls `CreateConfirmPendingPayment.v1`, which reaches billpay-online
+      as `POST /payments/{payment-id}/confirm`, an update to the workflow: the Channel Confirm
+      Event. Verify asks Amex Pay with Bank Transfer's `GET /payment-status` once and the update
+      replies with the answer. Success commits `ACCEPTED`, and failure commits `DECLINED` with
+      `BANK_CONFIRMATION_DECLINED` (the code is Proposed). Pending, or a call that times out or
+      fails, is `PENDING`. The channel shows the customer that status, and its part ends there: the
+      customer sees the final state later in their list of payments, which the channel reads through
+      `ReadPayments.v1`. If the channel never calls, Billpay waits a fixed time and starts asking
+      anyway.
+  - text: Everything after this runs with nobody waiting, in the same workflow.
+  - step: 5
+    text: >-
+      While the answer is pending, the workflow waits a fixed interval and asks again, until the
+      answer is success or failure. The delay, the interval and the status call's timeout are still
+      to be set, and so is whether anything caps the calls. The customer can still say no at any
+      point until the payment is decided, and it ends `CANCELLED`. Until then, the payment's pending
+      entry blocks the account's next payment.
+  - step: 6
+    text: >-
+      An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it
+      tells Amex; M3 intercepts that message and calls billpay-online's `POST
+      /payments/{payment-id}/settlement`, which signals the workflow: the Bank Settled Event. If
+      M3's notice arrives before the status says success, Billpay accepts the payment on it, stops
+      asking, and logs it. If the notice never comes, the payment goes on the exception list with an
+      alert; how long Billpay waits is still open.
+  - step: 7
+    text: >-
+      Execute makes no clearing call, since the money moved at the bank. The statement balance goes
+      down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations
+      waits for the instrument's clear-text details from Payment Instruments.
+  - step: 8
+    text: >-
+      Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven
+      message, then `PROCESSED`.
+  - step: 9
+    text: >-
+      `PAID` follows once the settlement and the AR posting are both in. M3's notice is this
+      payment's settlement; how it reaches One-Data's pairing is still open.
+
+reference:
+  to: /docs/design/sequence-diagrams#14-pay-by-bank-create-status-and-settlement
+  label: Sequence diagram

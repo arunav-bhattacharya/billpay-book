@@ -1,6 +1,8 @@
 import React from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import journeySchema from '@site/diagrams/schemas/journey.schema.json';
 import {links} from '../../lib/inlineMarkup';
 import styles from './styles.module.css';
 import {TRIGGER_KIND as TRIGGERS} from '../../lib/triggers';
@@ -33,7 +35,25 @@ import {TRIGGER_KIND as TRIGGERS} from '../../lib/triggers';
  *
  * Passing no `steps` renders the compact form: the route only, with a panel
  * saying why there is no journey to draw.
+ *
+ * A journey's content lives in its own YAML file under website/diagrams/
+ * journeys, checked against diagrams/schemas/journey.schema.json, and a page
+ * names it: <JourneyMap journey="pay-by-bank-today" />. The figure then links
+ * to that file on GitHub, so anyone can edit it without touching code.
  */
+
+/* Every journey file, bundled at build time. Each was checked on the way in
+   by plugins/diagram-data, so a mistake stops the build with a plain message. */
+const JOURNEYS = require.context('@site/diagrams/journeys', false, /\.ya?ml$/);
+
+function loadJourney(name) {
+  const key = JOURNEYS.keys().find((k) => k === `./${name}.yaml` || k === `./${name}.yml`);
+  if (!key) {
+    throw new Error(`JourneyMap: there is no file diagrams/journeys/${name}.yaml. Check the name in the page.`);
+  }
+  const mod = JOURNEYS(key);
+  return {data: mod.default || mod, file: `website/diagrams/journeys/${key.slice(2)}`};
+}
 
 /* How a state's field is filled. Anything still in flight is a blue tint that
    deepens as the payment moves on; the payoff is solid; an end that is not a
@@ -57,29 +77,11 @@ const STATE_TONE = {
 };
 const toneFor = (state) => STATE_TONE[state] || 'flight';
 
-/* Short names in the lane, full names on hover. */
-const SYSTEMS = {
-  GAR: 'Accounts Receivable (GAR), which holds the statement balance',
-  AR: 'Accounts Receivable, which holds the statement balance',
-  AMP: 'Authorizations (AMP), which holds available credit',
-  'MR/M3': 'MultiRail / M3, which clears the payment with the bank',
-  Raven: 'Raven, customer communications',
-  RTF: 'RTF, which carries lifecycle events to the systems that consume them',
-  eBNC: 'Balance and Control (eBNC), which audits that no payment is missed',
-  Accounting: 'Accounting, which matches the payment across Amex platforms',
-  Risk: 'Risk platform, kept current with payment activity',
-  TFNE: 'Transaction Notification Engine (TFNE), a legacy system told when a payment is processed',
-  GPHDB: 'The legacy Payments History Database (GPHDB), told when a payment is processed',
-  B2Notifier: 'B2Notifier, which tells other downstream systems when a payment is processed',
-  'Payment Instruments': 'Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need',
-  'Payment Options': 'Payment Options, which resolves the amount a customer chose',
-  Plans: "Plans, which checks the payment's mandate where the market requires one",
-  Installments: 'Installments, which owns the instalment plan',
-  Globestar: 'Globestar, which holds the instalment plan',
-  Allocations: 'Allocations Manager, which returns a corporate breakdown',
-  'Amex PwBT': "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
-  'Card provider': "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
-};
+/* Short names in the lane, full names on hover. The list of systems, and each
+   one's full name, live in the journey schema, so the editor's suggestions and
+   the diagram's tooltips come from the same place. */
+const SYSTEM_LIST = journeySchema.properties.steps.items.properties.systems.items;
+const SYSTEMS = Object.fromEntries(SYSTEM_LIST.enum.map((name, i) => [name, SYSTEM_LIST.enumDescriptions[i]]));
 const SHORT = {
   'Payment Instruments': 'Instruments',
   'Payment Options': 'Options',
@@ -238,7 +240,7 @@ function Route({origin, entry, core, workflows}) {
       label: 'From',
       items: [
         {
-          text: [origin.actor, (origin.channels || []).map((c) => c.label).join(', ')].filter(Boolean).join(' · '),
+          text: [origin.actor, (origin.channels || []).map((c) => (typeof c === 'string' ? c : c.label)).join(', ')].filter(Boolean).join(' · '),
           title: origin.note,
           tone: 'origin',
         },
@@ -490,7 +492,8 @@ function describe(title, steps) {
     .join('. ')}.`;
 }
 
-export default function JourneyMap({
+function Journey({
+  editFile,
   eyebrow,
   title,
   kind,
@@ -506,6 +509,8 @@ export default function JourneyMap({
   status,
 }) {
   const hasSteps = Array.isArray(steps) && steps.length > 0;
+  const {siteConfig} = useDocusaurusContext();
+  const editUrl = editFile && `https://github.com/${siteConfig.organizationName}/${siteConfig.projectName}/edit/main/${editFile}`;
   const workflows = workflow ? (Array.isArray(workflow) ? workflow : [workflow]) : [];
 
   return (
@@ -539,7 +544,7 @@ export default function JourneyMap({
         </div>
       )}
 
-      {(detail || reference) && (
+      {(detail || reference || editUrl) && (
         <figcaption className={styles.foot}>
           {detail && detail.length > 0 && (
             <details className={styles.detail} open={detailOpen}>
@@ -558,13 +563,30 @@ export default function JourneyMap({
               </ul>
             </details>
           )}
-          {reference && (
-            <Link className={styles.reference} to={reference.to}>
-              {reference.label || 'Sequence diagram'} →
-            </Link>
+          {(reference || editUrl) && (
+            <div className={styles.links}>
+              {reference && (
+                <Link className={styles.reference} to={reference.to}>
+                  {reference.label || 'Sequence diagram'} →
+                </Link>
+              )}
+              {editUrl && (
+                <a className={styles.edit} href={editUrl} target="_blank" rel="noopener noreferrer">
+                  Edit this diagram
+                </a>
+              )}
+            </div>
           )}
         </figcaption>
       )}
     </figure>
   );
+}
+
+export default function JourneyMap({journey, ...props}) {
+  if (!journey) {
+    return <Journey {...props} />;
+  }
+  const {data, file} = loadJourney(journey);
+  return <Journey {...data} {...props} editFile={file} />;
 }

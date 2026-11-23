@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay & Plan: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay & Plan
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: CreatePaymentInstallment.v1
+
+core:
+  - kind: api
+    label: POST /payment-installments
+
+workflow:
+  - label: Create Payment & Installments
+  - label: CreateImmediatePaymentWorkflow
+    note: Execute and Fulfil only
+    child: true
+
+steps:
+  - name: Decide
+    caption: Capture and Verify
+
+  - name: Plan
+    caption: future installments
+    systems:
+      - Installments
+
+  - name: Autopay
+    caption: an optional update, then the reply
+    reply: to the caller with the decision, the plan and the Autopay update
+
+  - name: Pay
+    caption: Execute and Fulfil in a child
+
+detail:
+  - text: >-
+      One-Data runs the same pending check as on a payment: if the card account already has a
+      payment in `PENDING`, it declines the request there and then, and Billpay never sees it.
+  - step: 1
+    text: >-
+      The composite captures and verifies the payment itself, as [Pay my bill
+      today](#pay-my-bill-today) does. A child that decided would be heard only when it ended, after
+      Execute and Fulfil.
+  - step: 2
+    text: >-
+      For an `ACCEPTED` payment, the composite calls the Installments API to set up the plan of
+      future installments. Billpay asks for the plan; it doesn't own it. A declined payment gets no
+      plan (Proposed).
+  - step: 3
+    text: >-
+      An optional update to the customer's Autopay. The Installments and Autopay calls run on the
+      workflow's own queue until their owners set a rate limit (Proposed). Then the composite
+      replies: the reply waits for the decision, the plan and the Autopay update (agreed
+      2026-11-07).
+  - step: 4
+    text: >-
+      A child on the same cluster, `CreateImmediatePaymentWorkflow` started with the decision, runs
+      the payment's Execute and Fulfil, as `{paymentId}-init`. Nothing about the plan changes how
+      the money moves or settles.
+
+reference:
+  to: /docs/design/sequence-diagrams#12-pay--plan
+  label: Sequence diagram

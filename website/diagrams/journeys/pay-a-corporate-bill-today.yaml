@@ -1,0 +1,155 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay a corporate bill today: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay a corporate bill today
+eyebrow: Immediate payment, corporate
+kind: customer
+
+origin:
+  actor: Corporate customer
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+  note: Which channels a corporate market opens is a market onboarding decision, not a Billpay one.
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+
+core:
+  - kind: api
+    label: POST /payments
+
+workflow:
+  - label: CreateImmediatePaymentWorkflow
+  - label: RequestAllocationsWorkflow
+  - label: ReceiveAllocationsWorkflow
+  - label: ExecuteScheduledPaymentWorkflow
+  - label: ExecuteSplitPaymentWorkflow
+    note: one per leg
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+
+  - name: Verify
+    state: ACCEPTED
+    mode: live
+    caption: replies with the decision
+    reply: to the caller with ACCEPTED or DECLINED
+    systems:
+      - Payment Instruments
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Request
+    state: ALLOCATING
+    mode: background
+    caption: at once
+    trigger:
+      kind: dispatcher
+      name: Allocation Request Event
+      label: the allocation-request dispatcher, on the row Verify wrote, due at once
+    systems:
+      - Allocations
+
+  - name: Receive
+    state: ALLOCATED
+    mode: background
+    caption: once the batches add up
+    trigger:
+      kind: callback
+      name: Allocation Batch Event
+      label: the allocations manager's batches
+    table: allocation_batch
+
+  - name: Clear
+    state: PROCESSING
+    mode: background
+    caption: once, for the whole amount
+    trigger:
+      kind: dispatcher
+      name: Allocated Payment Event
+      label: the allocated-payments dispatcher
+    systems:
+      - MR/M3
+
+  - name: Run each leg
+    state: PROCESSED
+    mode: background
+    caption: written, then a workflow each
+    trigger:
+      kind: dispatcher
+      name: Leg Dispatch Event
+      label: the leg dispatcher, one workflow per leg
+    systems:
+      - GAR
+      - Payment Instruments
+      - AMP
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+
+  - name: Complete
+    state: PROCESSED
+    mode: background
+    caption: the parent, once every leg is done
+    trigger:
+      kind: dispatcher
+      name: Legs Complete Event
+      label: the leg dispatcher's completion check, every 60 seconds
+    systems:
+      - RTF
+      - Raven
+
+detail:
+  - step: 2
+    text: >-
+      The payment is checked as one amount. Verify's commit also writes an `ALLOC_REQUEST` Work
+      Tracker row, due at once, and `CreateImmediatePaymentWorkflow` ends there. It starts nothing
+      itself.
+  - step: 3
+    text: >-
+      The allocation-request dispatcher starts `RequestAllocationsWorkflow` on the Offline cluster.
+      It moves the payment to `ALLOCATING`, asks the allocations manager for the breakdown, and
+      ends. No workflow sits waiting for the answer.
+  - step: 4
+    text: >-
+      The allocations manager calls back with the batches, as [Allocations arrive by
+      callback](#allocations-arrive-by-callback) shows. The batch that completes the amount moves
+      the payment to `ALLOCATED` and writes its `ALLOC_EXEC` row, due at once.
+  - step: 5
+    text: >-
+      The allocated-payments dispatcher starts `ExecuteScheduledPaymentWorkflow`, the same workflow
+      a scheduled corporate payment runs, without Reverify. Execute clears the parent once, at
+      payment level, and its commit releases the legs. Clearing never runs per allocation.
+  - step: 6
+    text: >-
+      The leg dispatcher writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED` with a
+      Work Tracker row of its own, then starts one `ExecuteSplitPaymentWorkflow` per leg: the
+      statement balance and available credit for that account (available credit once Payment
+      Instruments has returned the clear-text details), then accounting, eBNC, risk, TFNE, GPHDB and
+      B2Notifier, then the leg's RTF event and Raven message. Legs run at priority 2 with the
+      parent's ID as their fairness key, so one big payment can't starve the others.
+  - step: 7
+    text: >-
+      Every 60 seconds the leg dispatcher counts each parent's legs. Once every leg is `PROCESSED`
+      or `PAID`, it sends the parent's RTF event and Raven message, then moves the parent to
+      `PROCESSED`.
+  - text: >-
+      From there each leg turns `PAID` on its own, once the parent has settled and that leg has
+      posted. The parent stays `PROCESSED`.
+
+reference:
+  to: /docs/design/sequence-diagrams#3-corporate-payment-pay-today
+  label: Sequence diagram

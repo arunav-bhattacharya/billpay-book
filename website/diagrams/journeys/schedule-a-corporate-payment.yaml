@@ -1,0 +1,155 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Schedule a corporate payment: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Schedule a corporate payment
+eyebrow: Scheduled payment, corporate
+kind: customer
+
+origin:
+  actor: Corporate customer
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+
+core:
+  - kind: api
+    label: POST /payments
+
+workflow:
+  - label: CreateScheduledPaymentWorkflow
+  - label: RequestAllocationsWorkflow
+    note: at the fetch time
+  - label: ReceiveAllocationsWorkflow
+  - label: ExecuteScheduledPaymentWorkflow
+    note: at the execution time
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+
+  - name: Verify
+    state: SCHEDULED
+    mode: live
+    caption: replies with the decision
+    reply: to the caller with SCHEDULED or DECLINED
+    systems:
+      - Payment Instruments
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Wait
+    state: SCHEDULED
+    mode: awaiting
+    caption: until the fetch time
+    exit:
+      state: CANCELLED
+      label: inside the window
+
+  - name: Request
+    state: ALLOCATING
+    mode: background
+    caption: at the market's fetch time
+    trigger:
+      kind: dispatcher
+      name: Allocation Request Event
+      label: the allocation-request dispatcher, at the market's fetch time
+    systems:
+      - Allocations
+
+  - name: Receive
+    state: ALLOCATED
+    mode: background
+    caption: once the batches add up
+    trigger:
+      kind: callback
+      name: Allocation Batch Event
+      label: the allocations manager's batches
+    table: allocation_batch
+
+  - name: Reverify
+    state: ACCEPTED
+    mode: background
+    caption: at the execution time
+    trigger:
+      kind: dispatcher
+      name: Allocated Payment Event
+      label: the allocated-payments dispatcher, at the execution time
+    exit:
+      state: DECLINED
+
+  - name: Clear
+    state: PROCESSING
+    mode: background
+    caption: once, for the whole amount
+    systems:
+      - MR/M3
+
+  - name: Legs, then parent
+    state: PROCESSED
+    mode: background
+    caption: a workflow per leg
+    trigger:
+      kind: dispatcher
+      name: Leg Dispatch Event
+      label: the leg dispatcher, one workflow per leg
+    systems:
+      - GAR
+      - Payment Instruments
+      - AMP
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+
+detail:
+  - text: >-
+      The shape is [Pay a corporate bill today](#pay-a-corporate-bill-today), started by the date
+      instead of at once.
+  - step: 2
+    text: >-
+      `SCHEDULED`, as for a consumer payment. The same commit writes an `ALLOC_REQUEST` Work Tracker
+      row, due at the market's fetch time, and no `SCHED_EXEC` row: the execution row comes once the
+      payment is `ALLOCATED`.
+  - step: 3
+    text: >-
+      Nothing runs while the payment waits. The customer can update or cancel it inside the window
+      while it is `SCHEDULED`.
+  - step: 4
+    text: >-
+      The fetch time is a market setting: on the due date, or a set number of hours or days before
+      it. The allocation-request dispatcher starts `RequestAllocationsWorkflow`, which moves the
+      payment to `ALLOCATING`. From here an update or a cancel gets 409.
+  - step: 5
+    text: >-
+      The batch that completes the amount moves the payment to `ALLOCATED` and writes its
+      `ALLOC_EXEC` row, due at the execution time on the due date.
+  - step: 6
+    text: >-
+      At the execution time the allocated-payments dispatcher starts
+      `ExecuteScheduledPaymentWorkflow` through the Router, with today's config. Reverify checks the
+      payment again: `ACCEPTED`, or `DECLINED`, in which case no leg is ever written.
+  - step: 7
+    text: Execute clears the parent once, at payment level, and releases its legs.
+  - step: 8
+    text: >-
+      From here it runs as [Pay a corporate bill today](#pay-a-corporate-bill-today) does: the leg
+      dispatcher writes and runs the legs, and its completion check moves the parent to `PROCESSED`.
+      If the allocations are late, the payment waits in `ALLOCATING`, an alert fires at the market's
+      alert point, and it executes as soon as the last batch arrives.
+
+reference:
+  to: /docs/design/sequence-diagrams#4-corporate-payment-scheduled
+  label: Sequence diagram

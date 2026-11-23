@@ -127,3 +127,32 @@
   composes: iconButton;
   background: var(--amex-panel);
 }
+
+/* The key under a sequence diagram. Swatches repeat the diagram's own fields:
+   the Online and Offline sides, and the trigger pink as a short bar. */
+.legend {
+  composes: legendRow from '../../css/recipes.module.css';
+  --legend-gap: 0.35rem 1.2rem;
+  margin-top: 0.55rem;
+}
+.legendItem {
+  composes: legendItem from '../../css/recipes.module.css';
+  --legend-fs: 0.78rem;
+}
+.legendSwatch {
+  composes: legendSwatch from '../../css/recipes.module.css';
+  --swatch-bw: 0;
+}
+.swatch_online {
+  --swatch-fill: color-mix(in srgb, var(--amex-worker-online) 12%, var(--amex-panel));
+}
+.swatch_offline {
+  --swatch-fill: color-mix(in srgb, var(--amex-worker-offline) 13%, var(--amex-panel));
+}
+.triggerBar {
+  flex: none;
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--amex-trigger);
+}

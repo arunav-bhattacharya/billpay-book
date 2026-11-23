@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Read details of a payment: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Read details of a payment
+eyebrow: Reads
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: ReadPaymentEventsById.v1
+
+core:
+  - kind: api
+    label: GET /payments/{payment-id}
+
+status:
+  kind: read-only
+  note: >-
+    The function lists the lifecycle states one payment has been through. They come from the
+    payment's timeline in Oracle, which is written at every state change on the diagrams above and
+    names the cluster that ran each step.

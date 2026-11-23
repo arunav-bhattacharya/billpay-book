@@ -28,7 +28,11 @@ Thumbs.db
 
 # IDE / editor
 .idea/
-.vscode/
+# Shared VS Code settings are kept: they give the diagram files their
+# schema hints and suggest the YAML extension.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.iml
 *.swp
 

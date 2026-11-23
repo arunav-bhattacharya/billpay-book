@@ -8,7 +8,8 @@
     "start": "docusaurus start --port 3100",
     "build": "docusaurus build",
     "clear": "docusaurus clear",
-    "serve": "docusaurus serve --port 3101"
+    "serve": "docusaurus serve --port 3101",
+    "check:diagrams": "node scripts/check-diagrams.js"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
@@ -25,7 +26,9 @@
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.10.2",
-    "@docusaurus/types": "3.10.2"
+    "@docusaurus/types": "3.10.2",
+    "ajv": "^8.20.0",
+    "js-yaml": "^4.3.1"
   },
   "//overrides": "Force-patch transitive deps flagged by npm audit, without downgrading Docusaurus. brace-expansion is only patched on its 5.x line, while minimatch@3 (via serve-handler, which backs `npm run serve`) asks for ^1.1.7, so the fix has to be forced across majors. Verified: build, serve, and Mermaid rendering all still work.",
   "overrides": {

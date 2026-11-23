@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay with multiple instructions: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay with multiple instructions
+eyebrow: Multiple instructions
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+
+core:
+  - kind: api
+    label: POST /payments
+
+workflow:
+  - label: CreatePaymentWithMultipleInstructionsWorkflow
+  - label: CreateImmediatePaymentWorkflow
+    note: one per accepted instruction; Execute and Fulfil only
+    child: true
+
+steps:
+  - name: Decide
+    caption: every instruction, then the reply
+    reply: to the caller with every instruction's decision
+
+  - name: Execute and Fulfil
+    caption: a child for each accepted one
+
+detail:
+  - step: 1
+    text: >-
+      The composite captures each instruction under its own idempotency key, so each is its own
+      payment with its own states, then verifies each and replies with every decision. The request
+      carries one payment option ID for the whole payment. Proposed: the composite checks it once,
+      through `ReadPaymentOptionByIdentifier.v1`, and if the option no longer holds, every
+      instruction is declined with `PAYMENT_OPTION_INVALID`.
+  - step: 2
+    text: >-
+      Each accepted instruction then runs Execute and Fulfil in a child on the same cluster, the
+      same steps as [Pay my bill today](#pay-my-bill-today). How a points instruction runs inside
+      it, with Loyalty, is still to be defined.

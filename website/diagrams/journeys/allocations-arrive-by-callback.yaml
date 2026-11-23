@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Allocations arrive by callback: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Allocations arrive by callback
+eyebrow: Corporate allocations
+kind: system
+
+origin:
+  actor: Allocations manager
+  channels:
+    - Batches, numbered per payment
+
+entry:
+  - kind: function
+    label: CreatePaymentAllocations.v1
+
+core:
+  - kind: api
+    label: POST /payments/{payment-id}/allocations
+
+workflow:
+  - label: ReceiveAllocationsWorkflow
+  - label: ExecuteScheduledPaymentWorkflow
+    note: from the allocated-payments dispatcher
+
+steps:
+  - name: Store
+    mode: live
+    caption: before any workflow starts
+    table: allocation_batch
+
+  - name: Start
+    mode: live
+    caption: async start, then 202
+    reply: to the allocations manager with 202
+    exit:
+      label: 429 over budget, 503 if Offline is down
+
+  - name: Check
+    mode: background
+    caption: no legs written yet
+
+  - name: Allocated
+    state: ALLOCATED
+    mode: background
+    caption: once the batches add up
+
+  - name: Execution row
+    mode: background
+    caption: at once, or at the execution time
+
+detail:
+  - text: >-
+      Billpay doesn't work the breakdown out for itself. The allocations manager owns the breakdown,
+      and it sends it back in numbered batches.
+  - step: 1
+    text: >-
+      The API stores the batch in `allocation_batch` first. A batch can hold thousands of
+      allocations, and keeping them out of the workflow's input keeps its history small.
+  - step: 2
+    text: >-
+      Then it starts `ReceiveAllocationsWorkflow` with only the payment ID and the batch number, and
+      replies 202. Over its traffic budget the callback gets 429 with `Retry-After`, and while the
+      Offline cluster is down, 503. The allocations manager retries both.
+  - step: 3
+    text: >-
+      The workflow checks the batch against the payment. It writes no legs: every batch waits in
+      `allocation_batch` until the payment executes.
+  - step: 4
+    text: >-
+      The batch that completes the amount moves the payment from `ALLOCATING` to `ALLOCATED`, in one
+      guarded commit.
+  - step: 5
+    text: >-
+      The same commit writes the `ALLOC_EXEC` row: due at once for a payment made today, or at the
+      execution time on the due date for a scheduled one. The allocated-payments dispatcher picks it
+      up from there.
+
+reference:
+  to: /docs/design/sequence-diagrams#13-allocations-callback
+  label: Sequence diagram

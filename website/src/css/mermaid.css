@@ -357,7 +357,7 @@
  * a sentinel: the rules below match it exactly and repaint it from the theme
  * tokens, so one source reads right in both themes. Match the whole value,
  * not a prefix, because two roles can share an RGB triple at different
- * alphas (the caller group and the Offline cluster are both Deep Blue).
+ * alphas (the caller group and the Offline side are both Deep Blue).
  *
  * Every fill is opaque, a token mixed into the panel colour. Mermaid paints
  * regions back to front, so translucent fills would composite differently
@@ -365,98 +365,59 @@
  * every region before the lifelines, actors, arrows and labels, so nothing
  * readable sits underneath one.
  *
- * Two things carry meaning. Which cluster runs a span: Bright Blue for
- * Online and Deep Blue for Offline, the cluster tokens WorkerChip uses. And
- * whether anything runs at all: a grey, dashed span is time the work waits in
- * Oracle or in One-Data's inbox, with nothing in Temporal. A Light Blue chip
- * is a commit through PaymentStore.
+ * One thing carries meaning: which side runs a phase. A calm Bright Blue
+ * field is the Online side (billpay-online and its cluster), a calm Deep Blue
+ * one the Offline side, the cluster tokens WorkerChip uses. No field means
+ * outside Billpay. A phase's number and name sit in its label, which
+ * src/theme/Mermaid finds; a wait is a plain note between phases.
  *
  * Sentinel key, exact values as written in the markdown:
  *   rgba(0,23,90,0.07)      caller or One-Data group
  *   rgba(0,111,207,0.05)    Billpay Platform group
- *   rgba(0,111,207,0.12)    Online cluster
- *   rgba(0,23,90,0.12)      Offline cluster
- *   rgba(83,86,90,0.14)     waiting, nothing running
- *   rgba(102,169,226,0.40)  a PaymentStore commit
- *   rgba(89,89,89,0.08)     phase 1 of a diagram whose phases take hues
- *   rgba(0,89,52,0.08)      phase 2
- *   rgba(140,65,12,0.08)    phase 3
- *   rgba(0,23,90,0.08)      phase 4
+ *   rgba(0,111,207,0.12)    Online side
+ *   rgba(0,23,90,0.12)      Offline side
  * ------------------------------------------------------------------------ */
 
-/* The two participant groups. Mermaid outlines them in its default grey. */
+/* The two participant groups, as plain tints with no outline. */
 .docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.07)'],
 .docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.05)'] {
   rx: 10px !important;
   ry: 10px !important;
-  stroke: color-mix(in srgb, var(--amex-blue) 28%, transparent) !important;
-  stroke-width: 1px !important;
+  stroke: none !important;
 }
 .docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.07)'] {
-  fill: color-mix(in srgb, var(--amex-txt-strong) 6%, var(--amex-panel)) !important;
+  fill: color-mix(in srgb, var(--amex-txt-strong) 5%, var(--amex-panel)) !important;
 }
 .docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.05)'] {
-  fill: color-mix(in srgb, var(--amex-worker-online) 5%, var(--amex-panel)) !important;
+  fill: color-mix(in srgb, var(--amex-worker-online) 4%, var(--amex-panel)) !important;
 }
 
-/* The cluster spans, and the waits between them. */
+/* The two sides. */
 .docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.12)'],
-.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.12)'],
-.docusaurus-mermaid-container rect[fill='rgba(83,86,90,0.14)'] {
-  rx: 8px !important;
-  ry: 8px !important;
-  stroke-width: 1.6px !important;
-}
-.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.12)'] {
-  fill: color-mix(in srgb, var(--amex-worker-online) 12%, var(--amex-panel)) !important;
-  stroke: var(--amex-worker-online) !important;
-}
 .docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.12)'] {
-  fill: color-mix(in srgb, var(--amex-worker-offline) 12%, var(--amex-panel)) !important;
-  stroke: var(--amex-worker-offline) !important;
-}
-.docusaurus-mermaid-container rect[fill='rgba(83,86,90,0.14)'] {
-  fill: color-mix(in srgb, var(--amex-platinum) 12%, var(--amex-panel)) !important;
-  stroke: var(--amex-line-strong) !important;
-  stroke-dasharray: 6 4 !important;
-}
-
-/* Commit chips: one colour for every state change, because the chip already
-   spells the state out (state -> ACCEPTED). */
-.docusaurus-mermaid-container rect[fill='rgba(102,169,226,0.40)'] {
-  fill: color-mix(in srgb, var(--amex-sky) 40%, var(--amex-panel)) !important;
-  stroke: color-mix(in srgb, var(--amex-sky) 70%, transparent) !important;
-  stroke-width: 1px !important;
-  rx: 6px !important;
-  ry: 6px !important;
-}
-
-/* Phases in their own hues. Each phase is a calm field in one muted hue; the
-   note that names it (its first, "1 · Create") takes a stronger tint of the
-   same hue, and src/theme/Mermaid finds that note and tags it. In a diagram
-   with these phases the other notes go grey, so the only strong blue left is
-   the participants. The :root and attribute in front of the note rules out-
-   rank the dark theme's blue notes above, by specificity, not by order. */
-.docusaurus-mermaid-container rect[fill='rgba(89,89,89,0.08)'] { --phase: var(--amex-phase-1); }
-.docusaurus-mermaid-container rect[fill='rgba(0,89,52,0.08)'] { --phase: var(--amex-phase-2); }
-.docusaurus-mermaid-container rect[fill='rgba(140,65,12,0.08)'] { --phase: var(--amex-phase-3); }
-.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.08)'] { --phase: var(--amex-phase-4); }
-.docusaurus-mermaid-container rect[fill='rgba(89,89,89,0.08)'],
-.docusaurus-mermaid-container rect[fill='rgba(0,89,52,0.08)'],
-.docusaurus-mermaid-container rect[fill='rgba(140,65,12,0.08)'],
-.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.08)'] {
-  fill: color-mix(in srgb, var(--phase) 7%, var(--amex-panel)) !important;
-  stroke: none !important;
   rx: 10px !important;
   ry: 10px !important;
+  stroke: none !important;
 }
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(89,89,89,0.08)'],
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(0,89,52,0.08)'],
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(140,65,12,0.08)'],
-[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.08)'] {
-  fill: color-mix(in srgb, var(--phase) 12%, var(--amex-panel)) !important;
+.docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.12)'] {
+  fill: color-mix(in srgb, var(--amex-worker-online) 8%, var(--amex-panel)) !important;
+}
+.docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.12)'] {
+  fill: color-mix(in srgb, var(--amex-worker-offline) 9%, var(--amex-panel)) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(0,111,207,0.12)'] {
+  fill: color-mix(in srgb, var(--amex-worker-online) 13%, var(--amex-panel)) !important;
+}
+[data-theme='dark'] .docusaurus-mermaid-container rect[fill='rgba(0,23,90,0.12)'] {
+  fill: color-mix(in srgb, var(--amex-worker-offline) 11%, var(--amex-panel)) !important;
 }
 
+/* Notes and phase labels. Every sequence diagram's notes are grey, so the only
+   strong blue left is the participants; a phase label ("1 · Create") takes a
+   solid Deep Blue bar with white text, the same for every phase, like the
+   page banner. The :root and attribute
+   in front out-rank the dark theme's blue notes above, by specificity, not
+   by order. */
 :root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] rect.note {
   fill: color-mix(in srgb, var(--amex-grey-600) 10%, var(--amex-panel)) !important;
   stroke: none !important;
@@ -465,15 +426,11 @@
 :root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText > tspan {
   fill: var(--amex-txt) !important;
 }
-:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-1 { --phase: var(--amex-phase-1); }
-:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-2 { --phase: var(--amex-phase-2); }
-:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-3 { --phase: var(--amex-phase-3); }
-:root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] .bp-phase-4 { --phase: var(--amex-phase-4); }
 :root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] rect.note.bp-phase-label {
-  fill: color-mix(in srgb, var(--phase) 16%, var(--amex-panel)) !important;
+  fill: var(--amex-phase) !important;
 }
 :root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText.bp-phase-label,
 :root .docusaurus-mermaid-container svg.bp-phased[aria-roledescription='sequence'] text.noteText.bp-phase-label > tspan {
-  fill: var(--phase) !important;
+  fill: var(--amex-phase-ink) !important;
   font-weight: 700 !important;
 }

@@ -1,0 +1,121 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Accounts Receivable initiates a payment: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Accounts Receivable initiates a payment
+kind: system
+
+origin:
+  actor: Accounts Receivable
+  channels:
+    - Payments and refunds, in bulk
+
+entry:
+  - kind: function
+    label: CreateBillpayTransactionFromAccountsReceivable.v1
+  - kind: inbox
+    label: One-Data's inbox
+
+core:
+  - kind: dispatcher
+    label: AR intake dispatcher
+
+workflow:
+  - label: CreateScheduledPaymentWorkflow
+  - label: ExecuteScheduledPaymentWorkflow
+    note: on the due date
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: background
+
+  - name: Verify
+    state: SCHEDULED
+    mode: background
+    systems:
+      - Payment Instruments
+      - Plans
+    exit:
+      state: DECLINED
+
+  - name: Wait
+    state: SCHEDULED
+    mode: awaiting
+    caption: a row in Oracle
+
+  - name: Reverify
+    state: ACCEPTED
+    mode: background
+    caption: checked again, on the day
+    trigger:
+      kind: dispatcher
+      name: Due Date Event
+      label: the scheduled-payments dispatcher, at the market's execution time on the due date
+    exit:
+      state: DECLINED
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    systems:
+      - MR/M3
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox
+    systems:
+      - MR/M3
+      - GAR
+    exit:
+      state: RETURNED
+
+detail:
+  - text: >-
+      Accounts Receivable sends payments in bulk, up to a million at 100 a second. One-Data stores
+      each one and answers 202 as soon as it is stored. The AR intake dispatcher pulls them every
+      minute and starts them at the governor's pace, at priority 1, the same level as scheduled
+      execution.
+  - step: 2
+    text: >-
+      Checked and parked exactly like a customer's scheduled payment, with the same `SCHED_EXEC`
+      row. It always clears in batch.
+  - step: 4
+    text: >-
+      On the due date the scheduled-payments dispatcher starts it, and Reverify checks it again
+      before any money moves.
+  - text: >-
+      There is no customer on the line, so no step is marked as waiting, and both workflows run on
+      the Offline cluster. Accounts Receivable learns the outcome from the `SCHEDULED` and
+      `DECLINED` notifications and lifecycle events, or from `GET /payments/{payment-id}`.
+  - text: >-
+      Accounts Receivable raises credit balance refunds through the same function. Those start
+      `CreateBalanceRefundWorkflow` on the Offline cluster.
+  - text: >-
+      A request the Router can't admit, because nothing live matches its market, account type or
+      API, is marked `REJECTED` in the inbox and operations get an alert. Accounts Receivable isn't
+      told.
