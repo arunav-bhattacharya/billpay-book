@@ -39,7 +39,8 @@ import {TRIGGER_KIND as TRIGGERS} from '../../lib/triggers';
  * A journey's content lives in its own YAML file under website/diagrams/
  * journeys, checked against diagrams/schemas/journey.schema.json, and a page
  * names it: <JourneyMap journey="pay-by-bank-today" />. The figure then links
- * to that file on GitHub, so anyone can edit it without touching code.
+ * to that file on GitHub from its top right corner, so anyone can edit it
+ * without touching code.
  */
 
 /* Every journey file, bundled at build time. Each was checked on the way in
@@ -520,10 +521,19 @@ function Journey({
           {eyebrow && <p className={styles.eyebrow}>{eyebrow}</p>}
           <h3 className={styles.title}>{title}</h3>
         </div>
-        {JOURNEY_KIND[kind] && (
-          <span className={styles.kind} data-kind={kind}>
-            {JOURNEY_KIND[kind]}
-          </span>
+        {(JOURNEY_KIND[kind] || editUrl) && (
+          <div className={styles.headSide}>
+            {JOURNEY_KIND[kind] && (
+              <span className={styles.kind} data-kind={kind}>
+                {JOURNEY_KIND[kind]}
+              </span>
+            )}
+            {editUrl && (
+              <a className={styles.edit} href={editUrl} target="_blank" rel="noopener noreferrer">
+                Edit this diagram
+              </a>
+            )}
+          </div>
         )}
       </header>
 
@@ -544,7 +554,7 @@ function Journey({
         </div>
       )}
 
-      {(detail || reference || editUrl) && (
+      {(detail || reference) && (
         <figcaption className={styles.foot}>
           {detail && detail.length > 0 && (
             <details className={styles.detail} open={detailOpen}>
@@ -563,19 +573,10 @@ function Journey({
               </ul>
             </details>
           )}
-          {(reference || editUrl) && (
-            <div className={styles.links}>
-              {reference && (
-                <Link className={styles.reference} to={reference.to}>
-                  {reference.label || 'Sequence diagram'} →
-                </Link>
-              )}
-              {editUrl && (
-                <a className={styles.edit} href={editUrl} target="_blank" rel="noopener noreferrer">
-                  Edit this diagram
-                </a>
-              )}
-            </div>
+          {reference && (
+            <Link className={styles.reference} to={reference.to}>
+              {reference.label || 'Sequence diagram'}
+            </Link>
           )}
         </figcaption>
       )}

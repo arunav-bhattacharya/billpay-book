@@ -96,6 +96,13 @@
   font-weight: 700;
   color: var(--amex-txt-strong);
 }
+.headSide {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
 .kind {
   flex: none;
   padding: 0.22rem 0.6rem;
@@ -110,6 +117,9 @@
   .head {
     flex-direction: column;
     gap: 0.5rem;
+  }
+  .headSide {
+    align-items: flex-start;
   }
 }
 
@@ -718,15 +728,10 @@
   color: var(--jm-reply);
 }
 
-/* The sequence diagram link and the edit link, on one row. */
-.links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 1.2rem;
-}
+/* The edit link, at the top right under the kind. */
 .edit {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
   color: var(--amex-mut);
 }
 .edit::before {

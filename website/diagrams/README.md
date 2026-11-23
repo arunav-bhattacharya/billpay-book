@@ -6,7 +6,7 @@ For now this covers the 19 journeys on **Design > Journeys > All Journeys**, in 
 
 ## Change a journey from your browser
 
-1. Open the journey on the site and click **Edit this diagram** under it. GitHub opens the file, ready to edit.
+1. Open the journey on the site and click **Edit this diagram** at its top right. GitHub opens the file, ready to edit.
 2. Change the words after the colons. Keep the spaces at the start of each line as they are.
 3. Click **Commit changes**, choose **Create a new branch and start a pull request**, and click **Propose changes**.
 4. The pull request runs a check. If something is wrong, the check says which file, which step, and what to write instead. Fix it in the same pull request.
