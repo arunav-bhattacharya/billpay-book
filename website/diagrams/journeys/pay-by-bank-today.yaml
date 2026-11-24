@@ -49,9 +49,7 @@ steps:
     mode: live
     caption: Amex's own checks, before the bank step
     systems:
-      - Payment Instruments
       - Payment Options
-      - Plans
     exit:
       state: DECLINED
 
@@ -119,6 +117,7 @@ steps:
     systems:
       - GAR
       - CAS
+      - Payment Instruments
 
   - name: Fulfil
     state: PROCESSED
