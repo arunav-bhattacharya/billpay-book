@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=schemas/theme.schema.json
+# $schema: schemas/theme.schema.json
+#
+# The colours of every journey diagram, one per kind of part. Each value
+# is a colour name from the Amex palette, and the site draws it in both
+# light and dark. Which names each part can take, and what each means:
+# website/diagrams/README.md
+
+journeys:
+  live-step: bright-blue
+  background-step: deep-blue
+  awaiting-step: pale-deep
+  trigger: pink
+  call: pale-blue
+  link: deep-400

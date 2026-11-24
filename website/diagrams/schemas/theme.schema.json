@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "billpay-theme",
+  "title": "The colours of the diagrams",
+  "description": "One colour per kind of part, by its name in the Amex palette. The site draws each name in both light and dark.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "journeys"
+  ],
+  "properties": {
+    "journeys": {
+      "type": "object",
+      "title": "Journeys",
+      "description": "The colours of every journey on All Journeys.",
+      "additionalProperties": false,
+      "required": [
+        "live-step",
+        "background-step",
+        "awaiting-step",
+        "trigger",
+        "call",
+        "link"
+      ],
+      "properties": {
+        "live-step": {
+          "type": "string",
+          "title": "Steps a caller waits on",
+          "description": "Steps a caller waits on. The site's own is bright-blue.",
+          "enum": [
+            "bright-blue",
+            "deep-blue",
+            "deep-400",
+            "light-blue",
+            "grey"
+          ],
+          "enumDescriptions": [
+            "Bright Blue",
+            "Deep Blue",
+            "Deep Blue 400",
+            "Light Blue",
+            "Grey"
+          ]
+        },
+        "background-step": {
+          "type": "string",
+          "title": "Steps nobody waits on",
+          "description": "Steps nobody waits on. The site's own is deep-blue.",
+          "enum": [
+            "bright-blue",
+            "deep-blue",
+            "deep-400",
+            "light-blue",
+            "grey"
+          ],
+          "enumDescriptions": [
+            "Bright Blue",
+            "Deep Blue",
+            "Deep Blue 400",
+            "Light Blue",
+            "Grey"
+          ]
+        },
+        "awaiting-step": {
+          "type": "string",
+          "title": "Steps that wait on something outside",
+          "description": "Steps that wait on something outside. The site's own is pale-deep.",
+          "enum": [
+            "pale-blue",
+            "pale-deep",
+            "pale-grey",
+            "bright-blue",
+            "deep-blue",
+            "deep-400",
+            "light-blue",
+            "grey"
+          ],
+          "enumDescriptions": [
+            "Pale Bright Blue",
+            "Pale Deep Blue",
+            "Pale Grey",
+            "Bright Blue",
+            "Deep Blue",
+            "Deep Blue 400",
+            "Light Blue",
+            "Grey"
+          ]
+        },
+        "trigger": {
+          "type": "string",
+          "title": "Events from outside",
+          "description": "Events from outside. The site's own is pink.",
+          "enum": [
+            "pink",
+            "bright-blue",
+            "deep-blue",
+            "deep-400",
+            "light-blue",
+            "grey"
+          ],
+          "enumDescriptions": [
+            "Trigger pink, for events from outside only",
+            "Bright Blue",
+            "Deep Blue",
+            "Deep Blue 400",
+            "Light Blue",
+            "Grey"
+          ]
+        },
+        "call": {
+          "type": "string",
+          "title": "Calls to other systems",
+          "description": "Calls to other systems. The site's own is pale-blue.",
+          "enum": [
+            "pale-blue",
+            "pale-deep",
+            "pale-grey"
+          ],
+          "enumDescriptions": [
+            "Pale Bright Blue",
+            "Pale Deep Blue",
+            "Pale Grey"
+          ]
+        },
+        "link": {
+          "type": "string",
+          "title": "Links between steps",
+          "description": "Links between steps. The site's own is deep-400.",
+          "enum": [
+            "bright-blue",
+            "deep-blue",
+            "deep-400",
+            "light-blue",
+            "grey"
+          ],
+          "enumDescriptions": [
+            "Bright Blue",
+            "Deep Blue",
+            "Deep Blue 400",
+            "Light Blue",
+            "Grey"
+          ]
+        }
+      }
+    }
+  }
+}

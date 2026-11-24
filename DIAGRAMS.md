@@ -192,7 +192,7 @@ Pass the array, get the component.
 | `SectionIndex` | `items: [{term, to, desc}]` | The contents block on a section landing page. |
 | `JourneyIndex` | `groups`, `accent` | Index of journeys, grouped by intent. |
 | `LayerStack` | `groups: [{label, accent, layers}]`, `aside` | A vertical layered architecture map. |
-| `JourneyMap` | `journey`, the name of a file in `website/diagrams/journeys/` that holds the rest. Or, inline: `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, name, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`, and `name` the event the lane shows, such as `Channel Confirm Event`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems` and `table` | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals named as events), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends. Each run of steps a caller waits on sits in one tinted box tagged Sync. A wait is three dots; a repeated call is a row of small squares ending in a solid one; `exit` can be a list. Under 540px of its own width it folds into a list. |
+| `JourneyMap` | `journey`, the name of a file in `website/diagrams/journeys/` that holds the rest. Or, inline: `title`, `kind`, `origin`, `entry`, `core`, `workflow`, `steps`, `detail`, and more. A step can carry `reply` (where the workflow answers its caller), `trigger` (`{kind, name, label}`, with kind `update`, `signal`, `callback`, `dispatcher` or `events`, and `name` the event the lane shows, such as `Channel Confirm Event`), `poll` (`{label, note}`, a call repeated until it has an answer), `exit`, `systems`, `table` and `links` (`{to, label}`, a line to another step by its name) | One payment journey as five lanes in aligned columns: Outside (the request, the reply, and pink arrivals named as events), Step (a numbered square, Bright Blue while a caller waits, Deep Blue once nobody does, pale while it waits on something outside), State (one tinted field per run of a state), Calls and Ends, and a sixth, Links, when a step links to another. Each run of steps a caller waits on sits in one tinted box tagged Sync. A wait is three dots; a repeated call is a row of small squares ending in a solid one; `exit` can be a list. Under 540px of its own width it folds into a list. |
 | `CompositionMap` | `apis`, `behaviors`, `settings`, `steps` | Onboarding, then each step down to a running workflow, as numbered bands. |
 | `RouteMap` | `triggers: [{term, routes: [{desc, flow, fork?, note?, across?}]}]` | The trigger-to-workflow fork tree: each step in `flow` is `{via, detail?, name, cluster, caption?}`, where `via` is how it starts (`uws`, `async`, `inbox`, `row`, `child`, or `update` or `signal` to a running workflow; every one but `uws` and `child` draws its line in the trigger pink) and `caption` is a line or two under the workflow. A `fork` branch is `{term, via, detail?, flow, notes?}`, or `{term, self: [captions]}` for a payment the workflow runs itself. |
 | `WorkerSplit` | `workers: [{name, tone, waiting, desc, items}]` | Online and offline worker split. |
@@ -209,7 +209,7 @@ Two of these are worth a second look before you build anything new.
 picture. It is already written and it takes your data.
 
 **`JourneyMap`** is the most reused diagram on the site: one page,
-[design/journeys](website/docs/design/journeys/index.md), draws 19 of them from data, all in the
+[design/journeys](website/docs/design/journeys/index.md), draws 20 of them from data, all in the
 same five lanes, so a reader who learns one journey can read them all. If
 your diagram is a process with steps, states and side calls, start here rather than
 from scratch.
@@ -217,20 +217,33 @@ from scratch.
 Its content lives in YAML, one file per journey, in
 [`website/diagrams/journeys/`](website/diagrams/journeys), and the page names the file:
 `<JourneyMap journey="pay-by-bank-today" />`. That lets someone who doesn't write React
-change a journey, in GitHub, VS Code or IntelliJ, and the figure links to its own file
-("Edit this diagram"). Three pieces make that safe:
+change a journey in the Diagram Studio, GitHub, VS Code or IntelliJ. The figure's "Edit
+this diagram" opens the Studio on it. These pieces make that safe:
 
 - [`diagrams/schemas/journey.schema.json`](website/diagrams/schemas/journey.schema.json)
   is the rulebook: every field, its allowed values and a line on each. Editors read it
   for suggestions and red underlines, through the two comment lines at the top of each
-  file (one for VS Code's YAML extension, one for IntelliJ). The list of systems a step
-  can call, with each one's full name, lives here too, and JourneyMap reads its tooltips
-  from it.
+  file (one for VS Code's YAML extension, one for IntelliJ).
+- [`diagrams/systems.yaml`](website/diagrams/systems.yaml) is the list of systems a step
+  can call, with each one's full name, and JourneyMap reads its tooltips from it. A
+  journey writes a system's name as free text, so adding one needs only this file.
+- [`diagrams/theme.yaml`](website/diagrams/theme.yaml) gives every journey its colours, one
+  per kind of part, by swatch name. `src/lib/journeyTheme.js` lists which swatches each
+  part may take, and JourneyMap's stylesheet turns a name into its token pair for light
+  and dark, so the file never holds a colour value.
 - [`plugins/diagram-data`](website/plugins/diagram-data) loads the YAML at build time and
-  checks it against the schema. A mistake stops the build with a plain message that
-  names the file, the step and what to write instead. `npm run check:diagrams` runs the
-  same check in a second, and every pull request runs it too
-  ([`.github/workflows/check.yml`](.github/workflows/check.yml)).
+  checks it against its schema, then checks what a schema can't: every system a journey
+  calls is in `systems.yaml`, no two steps share a name, and every link points to another
+  step. A mistake stops the build with a plain message that names the file, the step and
+  what to write instead. `npm run check:diagrams` runs the same check in a second, and
+  every pull request runs it too ([`.github/workflows/check.yml`](.github/workflows/check.yml)).
+  The plugin also adds the Studio's route, `/studio`, and hands it the text of every
+  diagram file, so the Studio can show an edit against the file as written.
+- [`src/studio`](website/src/studio) is the Diagram Studio. It draws with JourneyMap
+  itself, passing `edit`, so what you edit is what the site shows. In edit mode every part
+  of the figure carries a `data-key` (`step:3`, `link:2:0`, `gap:4`) that the Studio
+  listens for. Saving writes each changed file in the repository's own layout
+  (`src/studio/emit.js`), and a file with no edits comes out exactly as it went in.
 - [`diagrams/README.md`](website/diagrams/README.md) is the editor's guide.
 
 Other data-driven diagrams can move the same way: a folder under `website/diagrams`, a

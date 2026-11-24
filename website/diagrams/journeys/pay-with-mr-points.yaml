@@ -74,7 +74,9 @@ steps:
     trigger:
       kind: events
       name: Settled and Posted Events
-      label: the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's inbox
+      label: >-
+        the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's
+        inbox
     systems:
       - GAR
     exit:
@@ -83,8 +85,8 @@ steps:
 detail:
   - text: >-
       Next to the way to pay, the customer ticks Pay with MR Points. When the points are the only
-      instruction, the Router sets points redemption to Y and starts the same workflow as
-      any payment today. There is no composite and no child workflow.
+      instruction, the Router sets points redemption to Y and starts the same workflow as any
+      payment today. There is no composite and no child workflow.
   - step: 1
     text: >-
       Billpay writes the payment and its idempotency key in one insert-if-absent, as for any
@@ -108,8 +110,9 @@ detail:
       message, then `PROCESSED`.
   - step: 5
     text: >-
-      Billpay creates the settlement event itself and hands it to One-Data, as for a debit card,
-      so the payment turns `PAID` once that event and the AR posting are both in.
+      Billpay creates the settlement event itself and hands it to One-Data, as for a debit card, so
+      the payment turns `PAID` once that event and the AR posting are both in.
   - text: >-
-      Points pay today only, and never with a debit card. With a bank account as well, the payment is
-      two instructions, and runs as [Pay with multiple instructions](#pay-with-multiple-instructions).
+      Points pay today only, and never with a debit card. With a bank account as well, the payment
+      is two instructions, and runs as [Pay with multiple
+      instructions](#pay-with-multiple-instructions).

@@ -244,55 +244,11 @@
           "systems": {
             "type": "array",
             "title": "Calls",
-            "description": "The systems this step calls.",
+            "description": "The systems this step calls, by their names in diagrams/systems.yaml. The check on a pull request makes sure each one is on that list.",
             "items": {
               "type": "string",
-              "enum": [
-                "Payment Instruments",
-                "Payment Options",
-                "Plans",
-                "MR/M3",
-                "GAR",
-                "AR",
-                "AMP",
-                "Accounting",
-                "eBNC",
-                "Risk",
-                "TFNE",
-                "GPHDB",
-                "B2Notifier",
-                "RTF",
-                "Raven",
-                "Amex PwBT",
-                "Card provider",
-                "Installments",
-                "Globestar",
-                "Allocations",
-                "Loyalty"
-              ],
-              "enumDescriptions": [
-                "Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need",
-                "Payment Options, which resolves the amount a customer chose",
-                "Plans, which checks the payment's mandate where the market requires one",
-                "MultiRail / M3, which clears the payment with the bank",
-                "Accounts Receivable (GAR), which holds the statement balance",
-                "Accounts Receivable, which holds the statement balance",
-                "Authorizations (AMP), which holds available credit",
-                "Accounting, which matches the payment across Amex platforms",
-                "Balance and Control (eBNC), which audits that no payment is missed",
-                "Risk platform, kept current with payment activity",
-                "Transaction Notification Engine (TFNE), a legacy system told when a payment is processed",
-                "The legacy Payments History Database (GPHDB), told when a payment is processed",
-                "B2Notifier, which tells other downstream systems when a payment is processed",
-                "RTF, which carries lifecycle events to the systems that consume them",
-                "Raven, customer communications",
-                "Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them",
-                "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
-                "Installments, which owns the instalment plan",
-                "Globestar, which holds the instalment plan",
-                "Allocations Manager, which returns a corporate breakdown",
-                "Loyalty, which redeems a customer's Membership Rewards points"
-              ]
+              "title": "System",
+              "description": "A system's name exactly as diagrams/systems.yaml writes it, such as Payment Instruments or GAR."
             }
           },
           "trigger": {
@@ -445,6 +401,31 @@
             "type": "boolean",
             "title": "Waiting",
             "description": "Forces the pale waiting look. Normally \"mode: awaiting\" does this."
+          },
+          "links": {
+            "type": "array",
+            "title": "Links",
+            "description": "Lines from this step to other steps in the same journey, such as a retry or a skip. Drawn in the Links lane under the diagram.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "to",
+                "label"
+              ],
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "title": "To",
+                  "description": "The name of the step the line goes to, written exactly as that step's name."
+                },
+                "label": {
+                  "type": "string",
+                  "title": "Why",
+                  "description": "A few words shown on the line, such as retry."
+                }
+              }
+            }
           }
         }
       }

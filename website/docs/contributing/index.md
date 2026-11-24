@@ -1,6 +1,6 @@
 ---
 title: Contributing
-description: 'Two pages cover everything you need: how to run the site on your machine, and how a change gets published.'
+description: 'How to run the site on your machine, how a change gets published, and how to change a diagram without touching code.'
 ---
 
 import Lead from '@site/src/components/Lead';
@@ -8,7 +8,7 @@ import SectionIndex from '@site/src/components/SectionIndex';
 
 # Contributing to these docs
 
-<Lead>Two pages cover everything you need: how to run the site on your machine, and how a change gets published.</Lead>
+<Lead>How to run the site on your machine, how a change gets published, and how to change a diagram without touching code.</Lead>
 
 ## In this section
 
@@ -23,6 +23,11 @@ import SectionIndex from '@site/src/components/SectionIndex';
       term: 'Publish',
       to: '/docs/contributing/publish',
       desc: <>How a push to <code>main</code> becomes the live site.</>,
+    },
+    {
+      term: 'Diagram Studio',
+      to: '/studio',
+      desc: `Change a journey diagram by clicking on it, then propose the change on GitHub. Every journey's "Edit this diagram" opens it too.`,
     },
   ]}
 />

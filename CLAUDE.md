@@ -27,7 +27,7 @@ The site has nine sections: Vision, Architecture, Design, Market Onboarding, Bui
 ## Diagrams
 Four kinds, in the order to reach for them. Authoring guide: `DIAGRAMS.md`.
 - **Mermaid** fenced blocks for sequence, state and flowchart diagrams. Theming in `website/src/css/mermaid.css`, expand control in `website/src/theme/Mermaid/`. A UML class diagram uses `ClassMap` instead.
-- **Components that take data as props**: `LayerStack`, `JourneyMap` (its data in YAML under `website/diagrams/journeys/`, see `website/diagrams/README.md`), `CompositionMap`, `RouteMap`, `WorkerSplit`, `ClassMap`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
+- **Components that take data as props**: `LayerStack`, `JourneyMap` (its data in YAML under `website/diagrams/journeys/`, its systems in `diagrams/systems.yaml`, its colours by swatch name in `diagrams/theme.yaml`, all edited in the Diagram Studio at `/studio`; see `website/diagrams/README.md`), `CompositionMap`, `RouteMap`, `WorkerSplit`, `ClassMap`, plus the table set (`ApiTable`, `ActivityTable`, `ScheduleTable`, `CompareTable`) built on `DataTable`. Plain markdown tables already get the house shell, so no component is needed for those.
 - **CSS box diagrams** for grouped boxes and short connectors, as in `LandscapeMap`.
 - **Coordinate SVG** for dense wiring that needs pan, zoom and layer spotlight, as in `LegacyEstateMap` and `HADiagram`, or for one fixed picture that scales with the column, as in `PacingFlow`, `RowLifecycle` and `ProfileToStages`.
 
@@ -87,7 +87,7 @@ Every doc page under `website/docs/`:
 /CLAUDE.md
 /website/                     # Docusaurus project root
   diagrams/                   # diagram content as YAML, with schemas and an editor's guide
-  plugins/diagram-data/       # loads and checks the diagram YAML at build time
+  plugins/diagram-data/       # loads and checks the diagram YAML at build time, adds /studio
   scripts/                    # check-diagrams.js (npm run check:diagrams)
   docs/                       # the pages, one folder per section
   src/
@@ -96,5 +96,6 @@ Every doc page under `website/docs/`:
     css/recipes.module.css    # the shapes components compose
     css/mermaid.css           # diagram theming, kept apart for its !important weight
     lib/                      # shared hooks and helpers, not MDX-facing
+    studio/                   # the Diagram Studio page, not MDX-facing
     theme/                    # swizzles
 ```

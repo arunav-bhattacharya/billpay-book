@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "billpay-systems",
+  "title": "The systems a journey step can call",
+  "description": "One entry per system. Journeys name a system by its name, and the check on a pull request makes sure every name they use is here.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "name",
+      "full"
+    ],
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "description": "What a journey file writes under systems, and what the lane shows, such as GAR."
+      },
+      "short": {
+        "type": "string",
+        "title": "Short name",
+        "description": "Shown in the lane instead of the name, for a long name, such as Instruments for Payment Instruments."
+      },
+      "full": {
+        "type": "string",
+        "title": "Full name",
+        "description": "Shown when you hover over the call: the system's full name and what it does."
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=schemas/systems.schema.json
+# $schema: schemas/systems.schema.json
+#
+# The systems a journey step can call. A journey names a system by its
+# name; the lane shows the short name if there is one, and the full name
+# shows on hover. Add a new system at the end, with the same indenting.
+# How to edit: website/diagrams/README.md
+
+- name: Payment Instruments
+  short: Instruments
+  full: Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need
+- name: Payment Options
+  short: Options
+  full: Payment Options, which resolves the amount a customer chose
+- name: Plans
+  full: Plans, which checks the payment's mandate where the market requires one
+- name: MR/M3
+  full: MultiRail / M3, which clears the payment with the bank
+- name: GAR
+  full: Accounts Receivable (GAR), which holds the statement balance
+- name: AR
+  full: Accounts Receivable, which holds the statement balance
+- name: AMP
+  full: Authorizations (AMP), which holds available credit
+- name: Accounting
+  full: Accounting, which matches the payment across Amex platforms
+- name: eBNC
+  full: Balance and Control (eBNC), which audits that no payment is missed
+- name: Risk
+  full: Risk platform, kept current with payment activity
+- name: TFNE
+  full: Transaction Notification Engine (TFNE), a legacy system told when a payment is processed
+- name: GPHDB
+  full: The legacy Payments History Database (GPHDB), told when a payment is processed
+- name: B2Notifier
+  full: B2Notifier, which tells other downstream systems when a payment is processed
+- name: RTF
+  full: RTF, which carries lifecycle events to the systems that consume them
+- name: Raven
+  full: Raven, customer communications
+- name: Amex PwBT
+  full: Amex Pay with Bank Transfer, the one bank-transfer service Billpay calls; it works with each market's provider, Plaid in the US among them
+- name: Card provider
+  full: "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK"
+- name: Installments
+  full: Installments, which owns the instalment plan
+- name: Globestar
+  full: Globestar, which holds the instalment plan
+- name: Allocations
+  full: Allocations Manager, which returns a corporate breakdown
+- name: Loyalty
+  full: Loyalty, which redeems a customer's Membership Rewards points

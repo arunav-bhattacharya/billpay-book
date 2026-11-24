@@ -1,0 +1,728 @@
+/* The Diagram Studio. A short brief, a tool bar that stays in view, and the
+   journey itself as the canvas. Editing happens in a small box that opens
+   beside what you click. Every colour is a site token; the error colour is
+   Infima's danger, which the site already sets for both themes. */
+
+/* The Studio's own shorthands, on the page and on the edit box, which opens
+   outside the page so no scrolling container can clip it. */
+.tokens {
+  --st-r: 10px;
+  --st-sq: var(--amex-badge-radius);
+  --st-soft: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+  --st-field: color-mix(in srgb, var(--amex-txt) 6%, transparent);
+  --st-err: var(--ifm-color-danger);
+  --st-err-soft: color-mix(in srgb, var(--ifm-color-danger) 12%, transparent);
+}
+
+.page {
+  composes: tokens;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+.loading {
+  color: var(--amex-mut);
+}
+
+/* ---- brief ------------------------------------------------------------- */
+
+.intro {
+  max-width: 52rem;
+  margin-bottom: 1.1rem;
+}
+.eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+}
+.h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  color: var(--amex-txt-strong);
+}
+.lead {
+  margin: 0 0 0.9rem;
+  color: var(--amex-txt);
+}
+.tries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.triesLabel {
+  margin-right: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amex-mut);
+}
+.try {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.7rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: var(--amex-tint);
+  color: var(--amex-tint-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.try::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 2px;
+  background: var(--ifm-color-primary);
+}
+.try:hover,
+.try:focus-visible {
+  background: var(--amex-pill);
+}
+
+/* ---- tool bar ---------------------------------------------------------- */
+
+.bar {
+  position: sticky;
+  top: var(--ifm-navbar-height);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 -1.5rem 1rem;
+  padding: 0.6rem 1.5rem;
+  background: var(--amex-bg);
+  box-shadow: var(--amex-sh-sm);
+}
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--amex-mut);
+}
+.pick .input {
+  width: auto;
+  min-width: 15rem;
+  font-weight: 600;
+}
+.fileLink {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.grow {
+  flex: 1;
+}
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: var(--st-sq);
+  background: var(--ifm-color-primary);
+  color: var(--amex-white);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+:global([data-theme='dark']) .count {
+  color: var(--amex-navy);
+}
+
+/* ---- buttons ----------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 2.2rem;
+  padding: 0.35rem 0.85rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: var(--st-field);
+  color: var(--amex-txt-strong);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--st-soft);
+  color: var(--amex-txt-strong);
+  text-decoration: none;
+}
+.btn:focus-visible,
+.input:focus-visible,
+.chip:focus-visible,
+.sw:focus-visible,
+.try:focus-visible,
+.seg button:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn:disabled:hover {
+  background: var(--st-field);
+}
+.small {
+  min-height: 1.9rem;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.8rem;
+}
+.icon {
+  width: 2.2rem;
+  padding: 0;
+}
+.icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.primary,
+.primary:hover {
+  background: var(--amex-grad-btn);
+  color: var(--amex-white);
+}
+.primary:hover {
+  background: var(--amex-grad-btn-hover);
+}
+.danger {
+  color: var(--st-err);
+}
+.danger:hover {
+  background: var(--st-err-soft);
+  color: var(--st-err);
+}
+.fix {
+  background: var(--st-err-soft);
+  color: var(--st-err);
+}
+.linkBtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ifm-color-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---- notices ----------------------------------------------------------- */
+
+.switch,
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--st-r);
+  background: var(--st-err-soft);
+  color: var(--amex-txt);
+  font-size: 0.88rem;
+}
+.notice {
+  background: var(--amex-tint);
+}
+
+/* ---- the canvas -------------------------------------------------------- */
+
+.stage {
+  position: relative;
+}
+.stage figure {
+  margin-top: 0;
+}
+.noSteps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: -1.2rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--st-r);
+  background: var(--amex-tint);
+}
+.noSteps p {
+  flex: 1 1 22rem;
+  margin: 0;
+  color: var(--amex-txt);
+}
+
+/* ---- the edit box ------------------------------------------------------ */
+
+.pop {
+  composes: tokens;
+  position: fixed;
+  z-index: 60;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  border-radius: var(--st-r);
+  background: var(--amex-card);
+  color: var(--amex-txt);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--amex-black) 28%, transparent), var(--amex-sh);
+  font-size: 0.9rem;
+}
+@media (max-width: 640px) {
+  .pop {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    top: auto;
+    width: 100%;
+    max-height: 60vh;
+    border-radius: var(--st-r) var(--st-r) 0 0;
+  }
+}
+.popHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.9rem 0.5rem;
+  background: var(--amex-card);
+  color: var(--amex-txt-strong);
+  font-size: 1rem;
+}
+.x {
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: transparent;
+  color: var(--amex-mut);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.x:hover {
+  background: var(--st-field);
+}
+.popBody {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.2rem 0.9rem 0.95rem;
+}
+.f {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+}
+.fLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--amex-mut);
+}
+.input {
+  width: 100%;
+  min-height: 2.2rem;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: var(--st-field);
+  color: var(--amex-txt-strong);
+  font: inherit;
+  font-size: 0.9rem;
+}
+textarea.input {
+  min-height: 7rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+.hint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--amex-mut);
+}
+.errs {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--st-sq);
+  background: var(--st-err-soft);
+  color: var(--st-err);
+  font-size: 0.82rem;
+}
+.seg {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: calc(var(--st-sq) + 2px);
+  background: var(--st-field);
+}
+.seg button {
+  flex: 1;
+  min-height: 1.9rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: transparent;
+  color: var(--amex-txt);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg button[aria-pressed='true'] {
+  background: var(--amex-grad-btn);
+  color: var(--amex-white);
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.check input {
+  margin-top: 0.2rem;
+  accent-color: var(--ifm-color-primary);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sub {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--st-sq);
+  background: var(--amex-tint);
+}
+.confirm {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--st-sq);
+  background: var(--st-err-soft);
+  font-size: 0.84rem;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.chip {
+  padding: 0.2rem 0.55rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: var(--st-field);
+  color: var(--amex-txt);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.chip[aria-pressed='true'] {
+  background: var(--amex-grad-btn);
+  color: var(--amex-white);
+  font-weight: 600;
+}
+.newSys > summary {
+  font-size: 0.84rem;
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+}
+.newSys .sub {
+  margin-top: 0.5rem;
+}
+.endRow {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr 1.8rem;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.endRow .input {
+  min-width: 0;
+}
+.rm {
+  border: 0;
+  border-radius: var(--st-sq);
+  background: transparent;
+  color: var(--amex-mut);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.rm:hover {
+  background: var(--st-err-soft);
+  color: var(--st-err);
+}
+
+/* The colour of a kind of part: a row of the swatches theme.yaml allows. */
+.colour {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  padding-top: 0.75rem;
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--amex-txt) 8%, transparent);
+}
+.colourHead {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+}
+.colourHead span {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 400;
+  color: var(--amex-mut);
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.sw {
+  position: relative;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: var(--c);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amex-txt) 12%, transparent);
+}
+.sw[aria-checked='true'] {
+  box-shadow: 0 0 0 2px var(--amex-card), 0 0 0 4px var(--ifm-color-primary);
+}
+.sw[aria-checked='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0.6rem;
+  border-radius: 2px;
+  background: var(--ci);
+}
+.swName {
+  font-size: 0.78rem;
+  color: var(--amex-mut);
+}
+
+/* ---- the hint bar and the toast, at the foot of the window ------------- */
+
+.hintBar,
+.toast {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 50%;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.7rem 0.6rem 1rem;
+  border-radius: var(--st-r);
+  transform: translateX(-50%);
+  font-size: 0.88rem;
+  box-shadow: var(--amex-sh);
+}
+.hintBar {
+  background: var(--amex-deep-400);
+  color: var(--amex-white);
+}
+.toast {
+  background: var(--amex-midnight);
+  color: var(--amex-white);
+}
+:global([data-theme='dark']) .toast,
+:global([data-theme='dark']) .hintBar {
+  background: var(--amex-deep-100);
+  color: var(--amex-navy);
+}
+.hintBar button,
+.toast button {
+  padding: 0.25rem 0.65rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: color-mix(in srgb, var(--amex-white) 18%, transparent);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+:global([data-theme='dark']) .hintBar button,
+:global([data-theme='dark']) .toast button {
+  background: color-mix(in srgb, var(--amex-navy) 12%, transparent);
+}
+
+/* ---- the changes drawer and the save dialog ---------------------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  /* Above the site's navbar, which Infima puts at --ifm-z-index-fixed. */
+  z-index: calc(var(--ifm-z-index-fixed) + 10);
+  background: color-mix(in srgb, var(--amex-navy) 45%, transparent);
+}
+.drawer,
+.modal {
+  position: fixed;
+  z-index: calc(var(--ifm-z-index-fixed) + 20);
+  overflow: auto;
+  background: var(--amex-card);
+  color: var(--amex-txt);
+  box-shadow: var(--amex-sh);
+}
+.drawer {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100vw);
+  padding: 1.2rem 1.3rem;
+}
+.modal {
+  top: 50%;
+  left: 50%;
+  width: min(760px, calc(100vw - 2rem));
+  max-height: calc(100vh - 3rem);
+  padding: 1.3rem 1.5rem 1.5rem;
+  border-radius: var(--st-r);
+  transform: translate(-50%, -50%);
+}
+.dHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+.dHead h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--amex-txt-strong);
+}
+.log {
+  flex: 1;
+  margin: 0;
+  padding-left: 1.3rem;
+  font-size: 0.88rem;
+}
+.log li {
+  margin-bottom: 0.35rem;
+}
+.dFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+.empty,
+.note {
+  font-size: 0.88rem;
+  color: var(--amex-mut);
+}
+.note {
+  margin: 0.6rem 0;
+}
+.fileCard {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+  margin: 0.9rem 0;
+  padding: 0.9rem 1rem;
+  border-radius: var(--st-r);
+  background: var(--st-field);
+}
+.fileCard > * {
+  min-width: 0;
+}
+.fileName {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--amex-txt-strong);
+  overflow-wrap: anywhere;
+}
+.fileCard summary {
+  font-size: 0.86rem;
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+}
+.diff {
+  max-height: 18rem;
+  margin-top: 0.5rem;
+  overflow: auto;
+  padding: 0.5rem 0;
+  border-radius: var(--st-sq);
+  background: var(--amex-card);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+.diff > div {
+  padding: 0 0.7rem;
+}
+.add {
+  background: var(--st-soft);
+}
+.del {
+  background: var(--st-err-soft);
+}
+.skip {
+  color: var(--amex-mut);
+}
+.steps {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.3rem;
+  font-size: 0.88rem;
+}
+.steps kbd {
+  font-size: 0.75rem;
+}
+.copyBox {
+  width: 100%;
+  min-height: 8rem;
+  border: 0;
+  border-radius: var(--st-sq);
+  background: var(--amex-card);
+  color: var(--amex-txt);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.74rem;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 1.2rem 1rem 3rem;
+  }
+  .bar {
+    margin: 0 -1rem 1rem;
+    padding: 0.5rem 1rem;
+  }
+  .pick .input {
+    min-width: 0;
+    max-width: 60vw;
+  }
+  .fileLink {
+    display: none;
+  }
+}

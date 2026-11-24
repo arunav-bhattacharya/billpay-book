@@ -67,7 +67,9 @@ steps:
     trigger:
       kind: events
       name: Settled and Posted Events
-      label: the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's inbox
+      label: >-
+        the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's
+        inbox
     systems:
       - GAR
     exit:
@@ -93,8 +95,8 @@ detail:
       takes. A corporate one gets its split from the allocations manager, as a [corporate
       payment](#pay-a-corporate-bill-today) does, and its parent only releases the legs.
   - text: >-
-      Past that, it is an ordinary payment. Every downstream system is told, and it turns `PAID` once
-      both confirmations are in.
+      Past that, it is an ordinary payment. Every downstream system is told, and it turns `PAID`
+      once both confirmations are in.
 
 reference:
   to: /docs/design/sequence-diagrams#9-inbound-payment

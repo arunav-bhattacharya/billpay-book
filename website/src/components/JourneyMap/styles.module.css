@@ -1,26 +1,72 @@
-/* JourneyMap: a payment journey as five lanes.
+/* JourneyMap: a payment journey as five lanes, and a sixth for links.
    One shape, the square, carries every meaning through its fill. Structure
    comes from tinted fields and alignment, never from ruled lines. Every
    colour is a token, set twice: once for light, once for dark. */
 
+/* The swatches diagrams/theme.yaml can name, each a token pair per theme.
+   The figure carries them, and so does the Studio's colour picker, which is
+   why they sit on a class of their own. */
+.swatchScope {
+  --jm-sw-bright-blue: var(--amex-blue);
+  --jm-sw-bright-blue-ink: var(--amex-white);
+  --jm-sw-deep-blue: var(--amex-midnight);
+  --jm-sw-deep-blue-ink: var(--amex-white);
+  --jm-sw-deep-400: var(--amex-deep-400);
+  --jm-sw-deep-400-ink: var(--amex-white);
+  --jm-sw-light-blue: var(--amex-sky);
+  --jm-sw-light-blue-ink: var(--amex-midnight);
+  --jm-sw-grey: var(--amex-grey-700);
+  --jm-sw-grey-ink: var(--amex-white);
+  --jm-sw-pink: var(--amex-trigger);
+  --jm-sw-pink-ink: var(--amex-trigger-ink);
+  --jm-sw-pale-blue: var(--amex-call-other);
+  --jm-sw-pale-blue-ink: var(--amex-call-other-ink);
+  --jm-sw-pale-deep: var(--amex-deep-100);
+  --jm-sw-pale-deep-ink: var(--amex-midnight);
+  --jm-sw-pale-grey: var(--amex-grey-300);
+  --jm-sw-pale-grey-ink: var(--amex-grey-900);
+}
+:global([data-theme='dark']) .swatchScope {
+  --jm-sw-bright-blue: var(--amex-blue-bright);
+  --jm-sw-bright-blue-ink: var(--amex-navy);
+  --jm-sw-deep-blue: var(--amex-deep-200);
+  --jm-sw-deep-blue-ink: var(--amex-navy);
+  --jm-sw-deep-400: var(--amex-deep-300);
+  --jm-sw-deep-400-ink: var(--amex-navy);
+  --jm-sw-light-blue: var(--amex-blue-300);
+  --jm-sw-light-blue-ink: var(--amex-navy);
+  --jm-sw-grey: var(--amex-grey-400);
+  --jm-sw-grey-ink: var(--amex-navy);
+  --jm-sw-pale-deep: color-mix(in srgb, var(--amex-deep-200) 20%, transparent);
+  --jm-sw-pale-deep-ink: var(--amex-deep-100);
+  --jm-sw-pale-grey: color-mix(in srgb, var(--amex-grey-400) 14%, transparent);
+  --jm-sw-pale-grey-ink: var(--amex-grey-300);
+}
+
 .wrap {
   composes: panel from '../../css/recipes.module.css';
+  composes: swatchScope;
   /* The narrow form keys off this element's width, not the viewport, because
      collapsing the page TOC widens it without the viewport changing at all. */
   container-type: inline-size;
   margin: 1.5rem 0 2.6rem;
   padding: 1.25rem 1.35rem 1rem;
 
-  /* The step square, by pace. */
-  --jm-live: var(--amex-blue);
-  --jm-live-ink: var(--amex-white);
-  --jm-background: var(--amex-midnight);
-  --jm-background-ink: var(--amex-white);
-  --jm-await: var(--amex-deep-100);
-  --jm-await-ink: var(--amex-midnight);
+  /* The six colours diagrams/theme.yaml sets, by kind of part. The figure's
+     inline style points each at the swatch the file names; these are the
+     site's own choices, for a figure drawn without one. */
+  --jm-live: var(--jm-sw-bright-blue);
+  --jm-live-ink: var(--jm-sw-bright-blue-ink);
+  --jm-background: var(--jm-sw-deep-blue);
+  --jm-background-ink: var(--jm-sw-deep-blue-ink);
+  --jm-await: var(--jm-sw-pale-deep);
+  --jm-await-ink: var(--jm-sw-pale-deep-ink);
+  --jm-trigger: var(--jm-sw-pink);
+  --jm-call: var(--jm-sw-pale-blue);
+  --jm-call-ink: var(--jm-sw-pale-blue-ink);
+  --jm-link: var(--jm-sw-deep-400);
+  --jm-link-ink: var(--jm-sw-deep-400-ink);
 
-  /* Something arriving from outside: the one pink. */
-  --jm-trigger: var(--amex-trigger);
   /* The request that starts the journey, and the reply that goes back. */
   --jm-request: var(--amex-midnight);
   --jm-reply: var(--amex-blue);
@@ -33,9 +79,6 @@
   --jm-done-ink: var(--amex-white);
   --jm-state-ink: var(--amex-txt-strong);
 
-  /* Calls the step makes: pale tints, the things it reaches out to. */
-  --jm-call: var(--amex-call-other);
-  --jm-call-ink: var(--amex-call-other-ink);
   --jm-end: var(--amex-grey-400);
   --jm-quiet: var(--amex-mut);
   --jm-field: color-mix(in srgb, var(--amex-deep-200) 14%, transparent);
@@ -44,21 +87,17 @@
   --jm-sync: color-mix(in srgb, var(--amex-blue) 7%, transparent);
   --jm-sync-ink: var(--amex-blue);
 
-  /* The grid. */
+  /* The grid. A link level is one row; its line runs --jm-link-y down it. */
   --jm-label: 50px;
   --jm-col: 64px;
   --jm-col-max: 130px;
   --jm-wait: 14px;
   --jm-sq: 26px;
+  --jm-link-row: 26px;
+  --jm-link-y: 16px;
 }
 :global([data-theme='dark']) .wrap {
   background: var(--amex-panel);
-  --jm-live: var(--amex-blue-bright);
-  --jm-live-ink: var(--amex-navy);
-  --jm-background: var(--amex-deep-200);
-  --jm-background-ink: var(--amex-navy);
-  --jm-await: color-mix(in srgb, var(--amex-deep-200) 20%, transparent);
-  --jm-await-ink: var(--amex-deep-100);
   --jm-request: var(--amex-deep-100);
   --jm-reply: var(--amex-blue-bright);
   --jm-held: color-mix(in srgb, var(--amex-deep-200) 14%, transparent);
@@ -568,6 +607,369 @@
 }
 
 /* ==================================================================== *
+ * Links: one level per link, under the Ends lane
+ * ==================================================================== */
+
+/* The line down from a step to its link's level, and back up at the other
+   end. A small square marks where it leaves, an arrow where it lands. The
+   two ends sit 6px either side of the column's centre, so a step that a
+   link leaves and another reaches keeps both lines apart. */
+.linkRise {
+  position: relative;
+  pointer-events: none;
+}
+.linkRise::before,
+.linkRise::after {
+  content: '';
+  position: absolute;
+  background: var(--jm-link);
+}
+.linkRise::before {
+  top: 0;
+  bottom: calc(var(--jm-link-row) - var(--jm-link-y) - 0.8px);
+  width: 1.6px;
+}
+.linkFrom::before {
+  left: calc(50% - 6.8px);
+}
+.linkTo::before {
+  top: 5px;
+  left: calc(50% + 5.2px);
+}
+.linkFrom::after {
+  top: 0;
+  left: calc(50% - 10px);
+  width: 8px;
+  height: 8px;
+  border-radius: 1.5px;
+}
+.linkTo::after {
+  top: 0;
+  left: calc(50% + 1.5px);
+  width: 9px;
+  height: 8px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* The level's line, one column at a time, so it needs no measuring. */
+.linkRun {
+  position: relative;
+  height: var(--jm-link-row);
+  pointer-events: none;
+}
+.linkRun::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--jm-link-y) - 0.8px);
+  left: var(--run-from);
+  right: var(--run-to);
+  height: 1.6px;
+  background: var(--jm-link);
+}
+
+/* The words, on the line, centred between the two steps. */
+.linkLabel {
+  z-index: 1;
+  align-self: start;
+  justify-self: center;
+  max-width: 100%;
+  margin-top: calc(var(--jm-link-y) - 0.5rem);
+  padding: 0 0.4rem;
+  overflow: hidden;
+  border-radius: var(--amex-badge-radius);
+  background: var(--jm-link);
+  color: var(--jm-link-ink);
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A link to a step that isn't there, shown only in the Studio. */
+.linkLost {
+  justify-self: start;
+  background: transparent;
+  color: var(--ifm-color-danger);
+  box-shadow: inset 0 0 0 1.5px var(--ifm-color-danger);
+}
+.linkKey {
+  display: inline-flex;
+  align-items: center;
+}
+.linkKey > b {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background: var(--jm-link);
+}
+.linkKey > i {
+  width: 20px;
+  height: 1.6px;
+  background: var(--jm-link);
+}
+.linkItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  color: var(--amex-txt);
+}
+.linkItem > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background: var(--jm-link);
+}
+
+/* ==================================================================== *
+ * Edit mode: the Diagram Studio draws with this component
+ * ==================================================================== */
+
+/* A part the Studio can open: a soft ring under the pointer, a firm one when
+   its box is open, and the error colour when the check would stop on it. */
+.hit {
+  position: relative;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.hit:hover {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ifm-color-primary) 35%, transparent);
+}
+.hit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ifm-color-primary);
+}
+.hit.sel {
+  box-shadow: 0 0 0 2px var(--ifm-color-primary);
+}
+.hit.bad {
+  box-shadow: 0 0 0 2px var(--ifm-color-danger);
+}
+.hit.bad::after {
+  content: '!';
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: var(--amex-badge-radius);
+  background: var(--ifm-color-danger);
+  color: var(--amex-white);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+.stateField.hit,
+.linkLabel.hit {
+  border-radius: var(--amex-badge-radius);
+}
+.linkLabel.hit {
+  overflow: visible;
+}
+
+/* An empty name, and what an empty lane can take. */
+.ph {
+  color: var(--ifm-color-danger);
+  font-style: italic;
+  font-weight: 500;
+}
+.ghost {
+  visibility: hidden;
+  font-size: 0.6rem;
+  color: var(--jm-quiet);
+}
+.hit:hover .ghost,
+.hit:focus-visible .ghost,
+.hit.sel .ghost {
+  visibility: visible;
+}
+.editing .outside,
+.editing .calls,
+.editing .ends {
+  margin: 0 2px;
+}
+.editing .calls,
+.editing .ends {
+  min-height: 2rem;
+}
+.editing .head {
+  margin: -0.3rem -0.4rem 0;
+  padding: 0.3rem 0.4rem;
+}
+.editing .routeItem {
+  padding: 0.05rem 0.35rem;
+}
+.editing .step {
+  margin: 0 2px;
+  cursor: grab;
+}
+.editing .syncBox {
+  pointer-events: none;
+}
+.editing .lanes {
+  position: relative;
+  padding: 0.5rem 0.3rem 0.3rem 0;
+}
+
+.addMini,
+.addNote {
+  border: 0;
+  border-radius: var(--amex-badge-radius);
+  background: transparent;
+  color: var(--ifm-color-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.addMini {
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 0.85rem;
+  opacity: 0.55;
+}
+.addMini:hover,
+.addMini:focus-visible,
+.addNote:hover,
+.addNote:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+}
+.addNote {
+  margin: 0 0 0.8rem 0.95rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+}
+.detailHead {
+  margin: 0;
+  padding: 0.6rem 0.9rem 0.3rem;
+  font-size: 0.95rem;
+  color: var(--jm-reply);
+}
+.editing .detail > ul li {
+  margin: 0 0 0.2rem;
+  padding: 0.2rem 0.35rem;
+}
+.legend li.legendHint {
+  font-style: italic;
+}
+.editing .legend li[role='button'] {
+  padding: 0.15rem 0.4rem;
+}
+
+/* Linking: the handle on a step starts a link; every step is then a target. */
+.linkHandle {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 4;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--amex-badge-radius);
+  background: var(--jm-link);
+  color: var(--jm-link-ink);
+  cursor: pointer;
+}
+.linkHandle svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.step:hover .linkHandle,
+.step.sel .linkHandle,
+.linkHandle:focus-visible {
+  display: grid;
+}
+.linking .step {
+  cursor: crosshair;
+}
+.linking .step:hover,
+.linking .linkSource {
+  box-shadow: 0 0 0 2px var(--jm-link);
+}
+.linking .linkHandle {
+  display: none;
+}
+
+/* The gaps between steps: where a step is added, or a dragged one dropped.
+   Each spans the lanes and puts its plus on the step lane, through a
+   subgrid, so it sits level with the squares wherever the rows land. */
+.gap {
+  z-index: 3;
+  display: grid;
+  grid-template-rows: subgrid;
+  width: 20px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.gap::before {
+  content: '';
+  grid-row: 1 / -1;
+  grid-column: 1;
+  justify-self: center;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ifm-color-primary);
+}
+.gap_start {
+  justify-self: start;
+  margin-left: -11px;
+}
+.gap_end {
+  justify-self: end;
+  margin-right: -11px;
+}
+.gap_centre {
+  justify-self: center;
+}
+.plus {
+  grid-row: 2;
+  grid-column: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 0.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--amex-badge-radius);
+  background: var(--ifm-color-primary);
+  color: var(--amex-white);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+:global([data-theme='dark']) .plus {
+  color: var(--amex-navy);
+}
+.gap:hover,
+.gap:focus-within,
+.gapSel {
+  opacity: 1;
+}
+.dragging .gap {
+  opacity: 0.35;
+}
+.dragging .gapOver {
+  opacity: 1;
+}
+
+/* ==================================================================== *
  * The narrow form: a list, one step per row
  * ==================================================================== */
 
@@ -646,6 +1048,10 @@
   }
   .list {
     display: block;
+  }
+  /* The Studio keeps the lanes at any width, and scrolls them. */
+  .editing .lanes {
+    display: grid;
   }
 }
 
