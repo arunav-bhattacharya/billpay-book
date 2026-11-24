@@ -62,8 +62,8 @@
   --jm-await: var(--jm-sw-pale-deep);
   --jm-await-ink: var(--jm-sw-pale-deep-ink);
   --jm-trigger: var(--jm-sw-pink);
-  --jm-call: var(--jm-sw-pale-blue);
-  --jm-call-ink: var(--jm-sw-pale-blue-ink);
+  --jm-call: var(--jm-sw-pale-grey);
+  --jm-call-ink: var(--jm-sw-pale-grey-ink);
   --jm-link: var(--jm-sw-deep-400);
   --jm-link-ink: var(--jm-sw-deep-400-ink);
 

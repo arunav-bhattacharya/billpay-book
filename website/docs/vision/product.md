@@ -128,11 +128,11 @@ Validation comes first. A payment that fails it is declined, and nothing else ru
 
 - Clearing sends the payment to the customer's bank so the funds actually move, in real time or in a batch.
 - Accounts Receivable (AR) posting reduces the cardmember's statement balance, the amount they owe on the card.
-- Authorization restores the customer's *Open-To-Buy*, the room left to spend on the card. Paying the bill frees it up again.
-- Accounting, balance and control (eBNC) and risk are told about the payment, and so are three notification systems: two legacy ones, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB), and B2Notifier, which passes the news on to other downstream systems.
+- CAS restores the customer's *Open-To-Buy*, the room left to spend on the card. Paying the bill frees it up again.
+- Accounting, balance and control (eBNC), risk and Authorizations (AMP) are told about the payment, and so are three notification systems: two legacy ones, the Transaction Notification Engine (TFNE) and the legacy Payments History Database (GPHDB), and B2Notifier, which passes the news on to other downstream systems.
 - Last, the customer is told through Raven, the messaging platform, and the lifecycle event other Amex systems listen for goes out through RTF (the Reliable Transaction Framework).
 
-All of these have to succeed before a payment counts as `PROCESSED`. The customer hears last, so a confirmation never goes out while an earlier step is still unfinished.
+All of these have to succeed before a payment counts as `PROCESSED`. The customer hears last, so a confirmation never goes out while an earlier step is still unfinished. A payment confirmed at the customer's bank, or made by debit card, takes a shorter path: no clearing, since the money has already moved, fewer systems told, and no message or lifecycle event for `PROCESSED`.
 
 A payment reaches `PAID` only once **both** confirmations have come back: that the bank settled the funds, and that AR has confirmed the posting. They arrive separately, in either order and often in bursts, so One-Data, the gateway in front of Billpay, holds them and marks the payment ready when the second one lands. Billpay picks up ready payments in batches, at a pace it sets, and marks them `PAID`.
 

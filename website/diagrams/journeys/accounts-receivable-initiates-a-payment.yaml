@@ -65,7 +65,7 @@ steps:
       - MR/M3
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
 
   - name: Fulfil
     state: PROCESSED
@@ -77,6 +77,7 @@ steps:
       - TFNE
       - GPHDB
       - B2Notifier
+      - AMP
       - RTF
       - Raven
 

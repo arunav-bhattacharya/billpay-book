@@ -45,7 +45,7 @@ steps:
     systems:
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
 
   - name: Fulfil
     state: PROCESSED
@@ -57,6 +57,7 @@ steps:
       - TFNE
       - GPHDB
       - B2Notifier
+      - AMP
       - RTF
       - Raven
 
@@ -66,10 +67,10 @@ steps:
     caption: settled and posted
     trigger:
       kind: events
-      name: Settled and Posted Events
+      name: Posted Event from GAR
       label: >-
-        the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's
-        inbox
+        Accounts Receivable's posting, paired in One-Data's inbox with the settlement event Billpay
+        creates
     systems:
       - GAR
     exit:
@@ -87,8 +88,8 @@ detail:
       journey.
   - step: 3
     text: >-
-      An inbound payment makes no clearing call. Execute applies it in Accounts Receivable and
-      Authorizations, and hands One-Data the settlement event Billpay creates, as for a debit card.
+      An inbound payment makes no clearing call. Execute applies it in Accounts Receivable and CAS,
+      and hands One-Data the settlement event Billpay creates, as for a debit card.
   - text: >-
       One inbound payment can be split across several card accounts, each leg running
       `ExecuteSplitPaymentWorkflow`. A consumer's request names the card accounts and how much each

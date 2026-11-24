@@ -135,13 +135,13 @@ Five checks exist today. Each is a class, and each says where it applies:
 
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
-| `InstrumentCheck` | `INSTRUMENT` | Everywhere | Payment Instruments, about the payment's instrument |
+| `InstrumentCheck` | `INSTRUMENT` | Bank confirmation N: every payment but Pay with Bank Transfer (agreed 2026-11-23) | Payment Instruments, about the payment's instrument |
 | `OptionsCheck` | `OPTIONS` | Everywhere, and it runs where the create carries an option ID (agreed 2026-11-06). Proposed: an option ID isn't part of the profile, so the check makes no call for a payment without one | Payment Options. In Verify, `ReadPaymentOptionByIdentifier.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
-| `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
+| `MandateCheck` | `MANDATE` | Mandate authorization Y, which the Router resolves to N for a bank or a debit card. It makes no call for a payment initiated as part of a plan, which carries `PlanInfo` (agreed 2026-11-23; how, Proposed) | Plans, for the mandate details |
 | `CardAuthorizationCheck` | `CARD_AUTHORIZATION` | Card authentication Y | The card provider, to authorize a debit card payment with its 3D Secure result. Approved, it debits the customer's account, so it runs after the other checks' rules pass (Proposed) |
 | `PointsRedemptionCheck` | `POINTS_REDEMPTION` | Points redemption Y | Loyalty, to redeem the customer's MR Points in one call. It takes the points, so it runs last, after the other checks' rules pass, like the card authorization (agreed 2026-11-23) |
 
-Bank confirmation adds no check class. Verify calls Amex Pay with Bank Transfer's `GET /payment-status` once the customer is back, asking again while it says pending, with a gap that doubles from 2 to 30 minutes, until the market's wait of 24 to 48 hours ends, and the `BANK_CONFIRMED` rule reads the status. The token check and GB's funds check are gone (2026-11-10; the status call 2026-11-22).
+Bank confirmation adds no check class, and takes one away: `InstrumentCheck` doesn't apply to it. Verify calls Amex Pay with Bank Transfer's `GET /payment-status` once the customer is back, asking again while it says pending, with a gap that doubles from 2 to 30 minutes, until the market's wait of 24 to 48 hours ends, and the `BANK_CONFIRMED` rule reads the status. The token check and GB's funds check are gone (2026-11-10; the status call 2026-11-22).
 
 In code, a check is this small:
 
@@ -162,7 +162,9 @@ class MandateCheck : Check {
     override val appliesTo =
         AppliesTo(on = setOf(MANDATE_AUTHORIZATION))
 
-    // starts the call; the stage waits for every check
+    // starts the call; the stage waits for every check. A payment
+    // initiated as part of a plan carries PlanInfo, and the call
+    // returns at once with no mandate to read (Proposed)
     override fun fetch(ctx: StageContext, paymentId: String) =
         Async.function(
             ctx.stubs.plans::mandateDetails, paymentId)
@@ -226,7 +228,7 @@ class DefaultPaymentVerifyStage(
 
 *(A sketch.)*
 
-A payment that waits for its customer runs Verify in two parts. Amex's own checks, `InstrumentCheck`, `OptionsCheck` and `MandateCheck`, run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. For a bank, Verify calls `GET /payment-status` and a rule reads the status (2026-11-22). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
+A payment that waits for its customer runs Verify in two parts. Amex's own checks run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06): `OptionsCheck` alone for a bank, and `InstrumentCheck` and `OptionsCheck` for a debit card (agreed 2026-11-23). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. For a bank, Verify calls `GET /payment-status` and a rule reads the status (2026-11-22). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
 
 The stage never asks which market it is in or which behaviors are on. It asks the registries for its checks and its rules and runs the same flow every time, so there is no `if` on a behavior anywhere in Verify.
 
@@ -248,7 +250,7 @@ A UK customer pays their bill by debit card. The Router pins the resolved profil
 4. The answers become one set of facts. The rule registry picks the payment's rules the same way it picked the checks: the authorization rule names card authentication, as its check does, and it runs because an authorization answer is among the facts. If the card's bank declines the authorization, the rule fails and the payment is `DECLINED`.
 5. One guarded commit writes the decision and the timeline row, with the ID of the rule that failed.
 
-A consumer whose profile requires mandate authorization goes through the same stage and gets the Instrument, Options and Mandate checks. Nothing in the code names a market.
+A consumer whose profile requires mandate authorization goes through the same stage and gets the Instrument, Options and Mandate checks, unless the payment was initiated as part of a plan. Nothing in the code names a market.
 
 ### Every combination
 
@@ -256,13 +258,12 @@ A test writes what every combination gets, and the result is checked in. This is
 
 ```text
 VERIFY  mandate=N bank=N card=N  Instrument, Options
-VERIFY  mandate=N bank=Y card=N  Instrument, Options
+VERIFY  mandate=N bank=Y card=N  Options
 VERIFY  mandate=N bank=N card=Y  Instrument, Options, CardAuthorization
 VERIFY  mandate=Y bank=N card=N  Instrument, Options, Mandate
-VERIFY  mandate=Y bank=Y card=N  Instrument, Options, Mandate
 ```
 
-One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: the status call and the rule that reads it serve every market. A payment that needs both a mandate and a debit card would get every check that applies to it, with no class written for that combination.
+One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: the status call and the rule that reads it serve every market. No row has mandate authorization Y beside bank confirmation or card authentication, because the Router resolves it to N for both (Proposed, 2026-11-23).
 
 :::info[Placeholder: Represent's checks]
 Represent's rows in the report list no checks yet. Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules are classes like these, listing Represent among their steps, and the report shows them on its rows.

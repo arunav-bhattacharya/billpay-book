@@ -106,13 +106,14 @@ steps:
     systems:
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
       - Accounting
       - eBNC
       - Risk
       - TFNE
       - GPHDB
       - B2Notifier
+      - AMP
 
 detail:
   - text: >-

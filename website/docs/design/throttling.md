@@ -16,7 +16,7 @@ Billpay calls clearing, Accounts Receivable and several other systems for every 
 
 Every downstream endpoint with an agreed rate gets its own activity task queue on the Offline cluster, and the Online cluster has the same queues, under the same names, for the downstreams Execute and Fulfil call and, Proposed, for Raven (all but `ds-allocations`):
 
-`ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms` and `ds-allocations`.
+`ds-clearing`, `ds-receivables`, `ds-cas`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms` and `ds-allocations`. The name `ds-cas`, for CAS's open-to-buy call, is Proposed.
 
 Every external call made after a payment is accepted can be rate-limited by how available its downstream is, and that includes the Online cluster's Execute and Fulfil calls (agreed 2026-11-07). They always run on Online's own `ds-*` queues, so Online is throttled all the time, not only during a SEPA run. Raven's calls run on `ds-comms` on both clusters too, including the announcements made at Verify's decision (Proposed, 2026-11-07).
 
@@ -69,7 +69,7 @@ Worker slots follow the limit, not the other way round. A queue needs roughly it
 
 ## Calls that must succeed
 
-Clearing, Accounts Receivable, open-to-buy, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB), B2Notifier and Raven must all succeed before a payment is `PROCESSED`. None of them is skipped or deferred. A failed call retries within its activity's schedule-to-close limit; after that the Work Tracker row goes `FAILED` and the payment goes onto the exception list in its last state. RTF and Raven are the exception: they get a long limit, so an outage of either pauses payments where they are.
+Clearing, Accounts Receivable, open-to-buy in CAS, accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB), B2Notifier, Authorizations (AMP) and Raven must all succeed before a payment is `PROCESSED`. None of them is skipped or deferred. A Pay with Bank Transfer or debit card payment makes fewer calls: no clearing, no eBNC, risk or B2Notifier, and no Raven message or RTF event for `PROCESSED`. A failed call retries within its activity's schedule-to-close limit; after that the Work Tracker row goes `FAILED` and the payment goes onto the exception list in its last state. RTF and Raven are the exception: they get a long limit, so an outage of either pauses payments where they are.
 
 - Raven is throttled like the rest. `ds-comms` carries its offline share, and a 429 waits out `Retry-After`.
 - RTF has no limit to respect, because RTF guarantees delivery once it has an event. Its calls run on the workflow's own queue, and each workflow announces one state change at a time, so a payment's events reach RTF in order.
@@ -104,7 +104,7 @@ One Offline namespace serves every market, with market as a fairness key, so eac
 | --- | --- | --- |
 | `offline-wf` | Workflow tasks, and unthrottled activities run eagerly | Workflow workers |
 | `ctl-sched`, `ctl-alloc`, `ctl-allocated`, `ctl-leg`, `ctl-repr`, `ctl-intake`, `ctl-return`, `ctl-inbound`, `ctl-governor`, `ctl-onboard` | One control queue per dispatcher kind, plus the governor and market onboarding | Control workers in billpay-offline |
-| `ds-clearing`, `ds-receivables`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in billpay-offline, its slots sized to the queue's limit through `billpay.offline.ds.{queue}.slots`, such as `billpay.offline.ds.clearing.slots` (Proposed) |
+| `ds-clearing`, `ds-receivables`, `ds-cas`, `ds-authorization`, `ds-accounting`, `ds-ebnc`, `ds-risk`, `ds-tfne`, `ds-gphdb`, `ds-b2notifier`, `ds-comms`, `ds-allocations` | One downstream each, rate-limited | A worker per downstream in billpay-offline, its slots sized to the queue's limit through `billpay.offline.ds.{queue}.slots`, such as `billpay.offline.ds.clearing.slots` (Proposed) |
 
 Queues that carry legs also get `--fairness-key-rps-limit-default`. Every other fairness key carries a large weight, so that default only limits corporate parents.
 

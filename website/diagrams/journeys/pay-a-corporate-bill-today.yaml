@@ -92,13 +92,14 @@ steps:
     systems:
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
       - Accounting
       - eBNC
       - Risk
       - TFNE
       - GPHDB
       - B2Notifier
+      - AMP
 
   - name: Complete
     state: PROCESSED
@@ -137,10 +138,10 @@ detail:
     text: >-
       The leg dispatcher writes each allocation as a leg, `{paymentId}_{seq}`, in `ACCEPTED` with a
       Work Tracker row of its own, then starts one `ExecuteSplitPaymentWorkflow` per leg: the
-      statement balance and available credit for that account (available credit once Payment
-      Instruments has returned the clear-text details), then accounting, eBNC, risk, TFNE, GPHDB and
-      B2Notifier, then the leg's RTF event and Raven message. Legs run at priority 2 with the
-      parent's ID as their fairness key, so one big payment can't starve the others.
+      statement balance and available credit for that account (available credit in CAS, once Payment
+      Instruments has returned the clear-text details), then accounting, eBNC, risk, TFNE, GPHDB,
+      B2Notifier and AMP, then the leg's RTF event and Raven message. Legs run at priority 2 with
+      the parent's ID as their fairness key, so one big payment can't starve the others.
   - step: 7
     text: >-
       Every 60 seconds the leg dispatcher counts each parent's legs. Once every leg is `PROCESSED`

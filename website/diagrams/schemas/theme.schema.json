@@ -110,7 +110,7 @@
         "call": {
           "type": "string",
           "title": "Calls to other systems",
-          "description": "Calls to other systems. The site's own is pale-blue.",
+          "description": "Calls to other systems. The site's own is pale-grey.",
           "enum": [
             "pale-blue",
             "pale-deep",

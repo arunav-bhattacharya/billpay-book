@@ -135,7 +135,7 @@ steps:
     trigger:
       kind: events
       name: Posted Event from GAR
-      label: M3's settlement and Accounts Receivable's posting
+      label: Accounts Receivable's posting, which One-Data pairs with M3's settlement
     exit:
       state: RETURNED
 
@@ -147,11 +147,10 @@ detail:
   - step: 2
     text: >-
       The market's `requiresBankConfirmation` behavior resolves to Y for this payment method, so the
-      Router starts `CreatePaymentIntentWorkflow`. Amex's own checks come first, before the bank
-      step: Payment Instruments confirms the way the customer is paying, Payment Options'
-      `ReadPaymentOptionByIdentifier.v1` confirms the option they picked, and Plans returns the
-      mandate details where the market requires one. A payment that fails them is `DECLINED` at
-      once, with no redirect link.
+      Router starts `CreatePaymentIntentWorkflow`. Amex's own check comes first, before the bank
+      step: Payment Options' `ReadPaymentOptionByIdentifier.v1` confirms the option the customer
+      picked. A bank payment makes no call to Payment Instruments or Plans here. A payment that
+      fails the check is `DECLINED` at once, with no redirect link.
   - step: 3
     text: >-
       RequestConfirmation asks Amex Pay with Bank Transfer for the customer's redirect link and
@@ -185,25 +184,27 @@ detail:
       An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it
       tells Amex; M3 intercepts that message and calls One-Data's `CreateBillpaySettlementEvent.v1`,
       and One-Data calls billpay-online's `POST /payments/{payment-id}/settlement`, which signals
-      the workflow: the Bank Settled Event. If M3's notice arrives before the status says success,
-      Billpay accepts the payment on it, stops asking, and logs it. If the notice never comes, the
-      payment goes on the exception list with an alert; how long Billpay waits is still TBD. If M3
-      says the settlement failed, because Amex never received the money from the payer's bank, the
-      payment stays `ACCEPTED`, nothing executes, and a manual exception process moves it later.
+      the workflow: the Bank Settled Event via M3. If M3's notice arrives before the status says
+      success, Billpay accepts the payment on it, stops asking, and logs it. If the notice never
+      comes, the payment goes on the exception list with an alert; how long Billpay waits is still
+      TBD. If M3 says the settlement failed, because Amex never received the money from the payer's
+      bank, the payment stays `ACCEPTED`, nothing executes, and a manual exception process moves it
+      later.
   - step: 7
     text: >-
       Execute makes no clearing call, since the money moved at the bank. The statement balance goes
-      down in Accounts Receivable and available credit up in Authorizations, at once. Authorizations
-      waits for the instrument's clear-text details from Payment Instruments.
+      down in Accounts Receivable and available credit up in CAS, at once. CAS waits for the
+      instrument's clear-text details from Payment Instruments.
   - step: 8
     text: >-
-      Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven
-      message, then `PROCESSED`.
+      Accounting, TFNE, GPHDB and AMP, which hears that the payment has executed, then `PROCESSED`.
+      A bank payment makes no eBNC, risk or B2Notifier call here, and sends no RTF event or Raven
+      message for `PROCESSED`.
   - step: 9
     text: >-
-      `PAID` follows once the settlement and the AR posting are both in. M3's notice is this
-      payment's settlement, and One-Data keeps it for the pairing when it passes the notice on
-      (Proposed).
+      `PAID` follows with the Posted Event from GAR, Accounts Receivable's posting. M3's notice, in
+      since step 6, is this payment's settlement, and One-Data keeps it for the pairing when it
+      passes the notice on (Proposed).
 
 reference:
   to: /docs/design/sequence-diagrams#14-pay-by-bank-create-status-and-settlement

@@ -45,7 +45,6 @@ steps:
     systems:
       - Payment Instruments
       - Payment Options
-      - Plans
     exit:
       state: DECLINED
 
@@ -88,20 +87,16 @@ steps:
     systems:
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
 
   - name: Fulfil
     state: PROCESSED
     mode: background
     systems:
       - Accounting
-      - eBNC
-      - Risk
       - TFNE
       - GPHDB
-      - B2Notifier
-      - RTF
-      - Raven
+      - AMP
 
   - name: Paid
     state: PAID
@@ -109,8 +104,8 @@ steps:
     caption: settled and posted
     trigger:
       kind: events
-      name: Settled and Posted Events
-      label: Billpay's own settlement event and Accounts Receivable's posting
+      name: Posted Event from GAR
+      label: Accounts Receivable's posting, which One-Data pairs with Billpay's own settlement event
     systems:
       - GAR
     exit:
@@ -126,9 +121,9 @@ detail:
     text: >-
       The payment method is a debit card, so the Router sets card authentication to Y and starts
       `CreatePaymentIntentWorkflow`. Amex's own checks come first, before 3D Secure: Payment
-      Instruments, Payment Options' `ReadPaymentOptionByIdentifier.v1` for the option the customer
-      picked, and Plans where the market requires a mandate. A payment that fails them is `DECLINED`
-      at once, and 3D Secure never starts.
+      Instruments, and Payment Options' `ReadPaymentOptionByIdentifier.v1` for the option the
+      customer picked. A debit card makes no Plans call. A payment that fails them is `DECLINED` at
+      once, and 3D Secure never starts.
   - step: 3
     text: >-
       RequestConfirmation asks the market's card provider to start 3D Secure, and gives it Billpay's
@@ -159,15 +154,16 @@ detail:
       No clearing call: the authorization has already moved the money. Billpay creates the
       settlement event itself, and Execute hands it to One-Data, dated when the money moved
       (Proposed). The statement balance goes down in Accounts Receivable and available credit up in
-      Authorizations, at once.
+      CAS, at once. CAS waits for the instrument's clear-text details from Payment Instruments.
   - step: 7
     text: >-
-      Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven
-      message, then `PROCESSED`.
+      Accounting, TFNE, GPHDB and AMP, which hears that the payment has executed, then `PROCESSED`.
+      A debit card payment makes no eBNC, risk or B2Notifier call here, and sends no RTF event or
+      Raven message for `PROCESSED`.
   - step: 8
     text: >-
-      `PAID` follows once the settlement Billpay created and the AR posting are both in One-Data's
-      inbox.
+      `PAID` follows with the Posted Event from GAR, once Accounts Receivable's posting joins the
+      settlement Billpay created in One-Data's inbox.
   - text: Consumer and business travel payments can pay by debit card. A corporate payment can't.
   - text: >-
       A debit card pays today only, with one instruction, never with MR Points and never through Pay

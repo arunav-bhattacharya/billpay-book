@@ -392,7 +392,7 @@ function Outside({api, i}) {
         {t && (
           <Sub>
             <Field label="Event name" hint="Shown in the lane.">
-              <Text id="st-tname" value={t.name} placeholder="Such as Bank Settled Event" onChange={(v) => ((t.name = v), api.commit(`${label}: event is now "${v}"`, `trig-${i}-name`))} />
+              <Text id="st-tname" value={t.name} placeholder="Such as Bank Settled Event via M3" onChange={(v) => ((t.name = v), api.commit(`${label}: event is now "${v}"`, `trig-${i}-name`))} />
             </Field>
             <Field label="How it arrives">
               <Select id="st-tkind" value={t.kind} options={triggerOptions} onChange={(v) => ((t.kind = v), api.commit(`${label}: event now arrives as a ${TRIGGERS[v].word.toLowerCase()}`))} />

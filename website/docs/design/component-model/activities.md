@@ -18,7 +18,7 @@ export const ACTIVITIES = [
     name: 'InstrumentActivities',
     system: 'Payment Instruments',
     queue: "Verify's calls on the Online cluster: a local activity. Otherwise the workflow's queue: Payment Instruments has no rate limit",
-    calledBy: "Verify, Reverify; Execute, for the instrument's clear-text data, before the open-to-buy call",
+    calledBy: "Verify, except for Pay with Bank Transfer; Reverify; Execute, for the instrument's clear-text data, before CAS's open-to-buy call",
   },
   {
     name: 'OptionsActivities',
@@ -30,7 +30,7 @@ export const ACTIVITIES = [
     name: 'PlansActivities',
     system: "Plans, which holds the payment's mandate details; the verification rules check them where the profile requires mandate authorization",
     queue: "Like Payment Instruments and Payment Options: a local activity in Verify on the Online cluster, otherwise the workflow's queue",
-    calledBy: "Verify and Reverify",
+    calledBy: "Verify and Reverify, but never for a payment initiated as part of a plan, Pay with Bank Transfer or a debit card",
   },
   {
     name: 'ClearingActivities',
@@ -45,10 +45,16 @@ export const ACTIVITIES = [
     calledBy: "Execute, except a corporate parent's, and every leg; `ProcessMissingPaidEventsWorkflow`, for a payment's state",
   },
   {
+    name: 'OpenToBuyActivities',
+    system: 'CAS, which raises open-to-buy. The name and its queue are Proposed',
+    queue: 'ds-cas',
+    calledBy: "Execute, except a corporate parent's, and every leg, once the Instruments call has returned the clear-text details",
+  },
+  {
     name: 'AuthorizationActivities',
-    system: 'Authorizations (AMP), open-to-buy',
+    system: 'Authorizations (AMP), told that the payment has executed',
     queue: 'ds-authorization',
-    calledBy: "Execute, except a corporate parent's, and every leg",
+    calledBy: 'Fulfil, and every leg',
   },
   {
     name: 'AccountingActivities',
@@ -60,19 +66,19 @@ export const ACTIVITIES = [
     name: 'BalanceControlActivities',
     system: 'eBNC (Balance & Control)',
     queue: 'ds-ebnc',
-    calledBy: 'Fulfil, and every leg',
+    calledBy: 'Fulfil, except for Pay with Bank Transfer and a debit card, and every leg',
   },
   {
     name: 'RiskActivities',
     system: 'Risk',
     queue: 'ds-risk',
-    calledBy: 'Fulfil, and every leg',
+    calledBy: 'Fulfil, except for Pay with Bank Transfer and a debit card, and every leg',
   },
   {
     name: 'TransactionNotificationActivities',
     system: 'Three systems told when a payment is processed: TFNE, the Transaction Notification Engine; GPHDB, the legacy Payments History Database; and B2Notifier, which tells other downstream systems',
     queue: 'ds-tfne, ds-gphdb and ds-b2notifier, one per system',
-    calledBy: 'Fulfil, and every leg',
+    calledBy: 'Fulfil, and every leg. Pay with Bank Transfer and a debit card tell TFNE and GPHDB only, not B2Notifier',
   },
   {
     name: 'AllocationActivities',
@@ -102,13 +108,13 @@ export const ACTIVITIES = [
     name: 'LifecycleEventActivities',
     system: "RTF: Billpay's lifecycle events, which other systems subscribe to",
     queue: "The workflow's own queue",
-    calledBy: "Every stage's announcement; Fulfil and the corporate completion check, before their commit; the PAID events after Settle",
+    calledBy: "Every stage's announcement; Fulfil, except for Pay with Bank Transfer and a debit card, and the corporate completion check, before their commit; the PAID events after Settle",
   },
   {
     name: 'CommunicationActivities',
     system: 'Raven, customer messages',
     queue: 'ds-comms, on both clusters, the announcements at Verify\'s decision included (Proposed)',
-    calledBy: 'Announcements the customer is told about; Fulfil and the corporate completion check, before their commit',
+    calledBy: 'Announcements the customer is told about; Fulfil, except for Pay with Bank Transfer and a debit card, and the corporate completion check, before their commit',
   },
 ];
 

@@ -104,9 +104,9 @@ class CreateImmediatePaymentWorkflowImpl(
         if (profile.accountType == AccountType.CORPORATE) return
 
         // Data from Options and Instruments travels on in the workflow, encrypted in history by the payload codec.
-        val executed = stages.execute.run(paymentId, verified)  // PROCESSING: clearing, AR, and the Instruments call, then OTB
+        val executed = stages.execute.run(paymentId, verified)  // PROCESSING: clearing, AR, and the Instruments call, then OTB (CAS)
         stages.execute.announce(paymentId)             // the PROCESSING event
-        stages.fulfil.run(paymentId, executed)         // accounting, eBNC, risk, TFNE, GPHDB, B2Notifier; then RTF and Raven; then PROCESSED
+        stages.fulfil.run(paymentId, executed)         // accounting, eBNC, risk, TFNE, GPHDB, B2Notifier, AMP; then RTF and Raven; then PROCESSED
     }
 
     override fun decision(): PaymentDecision {
@@ -143,7 +143,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         val stages = stageResolver.resolve(profile)
         val paymentId = request.paymentId
         stages.capture.run(request)                              // PENDING: the request
-        val own = stages.verify.ownChecks(paymentId)             // Amex's checks first: Instrument, Options, Mandate
+        val own = stages.verify.ownChecks(paymentId)             // Amex's checks first: Options for a bank, Instrument and Options for a card
         decided = if (own.decision == PaymentDecision.DECLINED) own.decision   // DECLINED, with no link
                   else stages.requestConfirmation.run(paymentId)  // PENDING with Amex PwBT's link or the card's
                                                                   // challenge link (or none), or DECLINED
@@ -217,10 +217,10 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 - For a bank, the channel's call, `POST /payments/{payment-id}/confirm`, sends `returned`, and Verify calls Amex Pay with Bank Transfer's `GET /payment-status` at once. Success is `ACCEPTED` and failure `DECLINED` with `BANK_CONFIRMATION_DECLINED` (Proposed). Pending, a timeout or a 5xx is `PENDING`. The update replies with that status, and the channel's part ends there (agreed 2026-11-22). While it is pending, Billpay asks again after a gap that starts at 2 minutes and doubles up to 30 minutes, until the status is final. With no call from the channel, the first ask comes after 2 minutes, still TBD. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED` (agreed 2026-11-23). The status call's timeout is still to be set.
 - When a debit card's timer fires with no callback, the workflow cancels the payment itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer handled late, because the Online cluster or its workers were down, ends the wait like any other: a bank payment then asks for the status, and a debit card payment is cancelled.
-- Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. After a debit card's callback, Verify runs only the card authorization (agreed 2026-11-06). For a bank, it calls `GET /payment-status`, and a rule reads the status, with no token check and no funds check (agreed 2026-11-22). How Verify splits its checks is Proposed: each check says whether it needs the bank step, and the first part's facts are carried in the workflow.
+- Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. A bank payment runs the Options check alone, and a debit card the Instrument and Options checks; neither runs the Mandate check (agreed 2026-11-23). After a debit card's callback, Verify runs only the card authorization (agreed 2026-11-06). For a bank, it calls `GET /payment-status`, and a rule reads the status, with no token check and no funds check (agreed 2026-11-22). How Verify splits its checks is Proposed: each check says whether it needs the bank step, and the first part's facts are carried in the workflow.
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a no or a callback away.
 - The workflow calls One-Data's delete once, when the payment is decided: by the status, M3's notice, the callback, the no or the timer, or at the create when it is declined there. Until then its entry stays in One-Data's Redis and blocks the account's next payment (agreed 2026-11-08).
-- For Pay with Bank Transfer and a debit card, Execute makes no clearing call. For a debit card, its clearing method creates the payment's settlement event and hands it to One-Data's money movement handler instead, dated when the money moved (Proposed). For Pay with Bank Transfer, M3's notice is the settlement, and Billpay creates none (agreed 2026-11-10).
+- For Pay with Bank Transfer and a debit card, Execute makes no clearing call, and Fulfil tells accounting, TFNE, GPHDB and AMP only, with no RTF event or Raven message for `PROCESSED` (agreed 2026-11-23). For a debit card, its clearing method creates the payment's settlement event and hands it to One-Data's money movement handler instead, dated when the money moved (Proposed). For Pay with Bank Transfer, M3's notice is the settlement, and Billpay creates none (agreed 2026-11-10).
 
 ## Which cluster runs it
 

@@ -63,7 +63,7 @@ A link names its step by the step's name, so every step in a journey needs its o
   | `background-step`, steps nobody waits on | the same five | `deep-blue` |
   | `awaiting-step`, steps that wait on something outside | `pale-blue`, `pale-deep`, `pale-grey`, or one of the five | `pale-deep` |
   | `trigger`, events from outside | `pink`, or one of the five | `pink` |
-  | `call`, calls to other systems | `pale-blue`, `pale-deep`, `pale-grey` | `pale-blue` |
+  | `call`, calls to other systems | `pale-blue`, `pale-deep`, `pale-grey` | `pale-grey` |
   | `link`, links between steps | the five | `deep-400` |
 
   Pink is for events from outside only, as everywhere on the site.

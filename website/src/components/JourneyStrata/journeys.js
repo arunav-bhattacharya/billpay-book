@@ -33,7 +33,8 @@ const PAID_SEGMENT = {
    reports its settlement (2026-11-10). */
 const PAID_BILLPAY_SETTLEMENT = {
   ...PAID_SEGMENT,
-  oneData: [{c: 'inbox', s: 'the settlement Billpay created in Execute, and the AR posting from GAR. READY when both are in', at: 'Settle'}],
+  phase: ['Posted', 'the Posted Event from GAR'],
+  oneData: [{c: 'inbox', s: 'the AR posting from GAR, paired with the settlement Billpay created in Execute. READY once the posting is in', at: 'Settle'}],
 };
 
 const paidAfter = (ruler) => (ruler ? {...PAID_SEGMENT, ruler: [{t: 'the next 30-second run', at: 'Settle'}]} : PAID_SEGMENT);
@@ -125,7 +126,7 @@ export const GROUPS = [
           },
           {
             phase: ['At the bank', 'until the customer is back'],
-            wait: "The workflow waits for the channel's call, or a fixed time if none comes. The customer's no cancels the payment at any point until it is decided. Until then its pending entry blocks the account.",
+            wait: "The workflow waits for the channel's call, or 2 minutes (TBD) if none comes. The customer's no cancels the payment at any point until it is decided. Until then its pending entry blocks the account.",
             customer: [{t: 'Approves at the bank', s: 'through Amex Pay with Bank Transfer', m: 'choice'}],
           },
           {
@@ -139,19 +140,20 @@ export const GROUPS = [
               {c: 'CreateConfirmPendingPayment.v1', s: 'the customer is back; answered with the status', at: 'Verify'},
               {c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'},
             ],
-            after: "Verify asks Amex Pay with Bank Transfer's GET /payment-status at once, and the channel gets the status: success is ACCEPTED, failure DECLINED, and anything else PENDING. The channel's part ends there. While it is pending, Billpay asks again after a fixed interval. No token check and no funds check. An ACCEPTED payment then waits for M3.",
+            after: "Verify asks Amex Pay with Bank Transfer's GET /payment-status at once, and the channel gets the status: success is ACCEPTED, failure DECLINED, and anything else PENDING. The channel's part ends there. While it is pending, Billpay asks again, with a gap that doubles from 2 to 30 minutes. No token check and no funds check. An ACCEPTED payment then waits for M3.",
           },
           {
-            phase: ['Settled', "M3's notice, straight to billpay-online"],
+            phase: ['Settled', "M3's notice, through One-Data"],
             road: 'settled',
             customer: [
-              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
+              {t: 'Not told PROCESSED', s: 'a bank payment sends no Raven message for it; the list of payments shows it', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
             ],
-            after: "The bank tells Amex the payment has settled, and M3 passes it on as a signal. Execute makes no clearing call: M3's notice is the settlement. If the notice comes before the status says success, Billpay accepts the payment on it and stops asking. If it never comes, the payment goes on the exception list with an alert.",
+            after: "The bank tells Amex the payment has settled. M3 sends the notice to One-Data, which passes it on, and it reaches the workflow as a signal: the Bank Settled Event via M3. Execute makes no clearing call: M3's notice is the settlement. Fulfil tells accounting, TFNE, GPHDB and AMP only. If the notice comes before the status says success, Billpay accepts the payment on it and stops asking. If it never comes, the payment goes on the exception list with an alert.",
           },
           {
             ...PAID_SEGMENT,
-            oneData: [{c: 'inbox', s: "the AR posting from GAR, and M3's settlement; how M3's notice reaches the pairing is still open", at: 'Settle'}],
+            phase: ['Posted', 'the Posted Event from GAR'],
+            oneData: [{c: 'inbox', s: "the AR posting from GAR, paired with M3's settlement, which One-Data kept when it passed the notice on (Proposed)", at: 'Settle'}],
           },
         ],
       },
@@ -181,7 +183,7 @@ export const GROUPS = [
             road: 'authenticated',
             customer: [
               {t: 'Sees the result', s: "ACCEPTED, or DECLINED when the account can't cover it", st: 'ACCEPTED', m: 'on', at: 'Verify'},
-              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'on', at: 'Fulfil'},
+              {t: 'Not told PROCESSED', s: 'a debit card payment sends no Raven message for it', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
             ],
             oneData: [{c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'}],
             after: "The authorization in Verify debits the customer's account, so Execute makes no clearing call. It hands One-Data the settlement event Billpay creates, dated when the money moved.",
@@ -215,19 +217,17 @@ export const GROUPS = [
         meta: ['customer initiated', 'Online', 'today only'],
         segments: [
           {
-            phase: ['The request', 'the customer waits'],
-            card: {
-              name: 'Pay with MR Points',
-              composite: true,
-              cluster: 'Online',
-              id: '{paymentId}-points',
-              tbd: 'A composite across Billpay and Loyalty. Its steps and its calls to Loyalty are still to be defined.',
-            },
-            entry: {c: 'POST /payments', s: 'Online · Update-With-Start'},
+            phase: ['The request', 'the customer waits, 2.5 s at most'],
+            road: 'points',
             waiting: true,
-            customer: [{t: 'Pays with points only', s: 'today', m: 'on'}],
-            oneData: [{...CREATE}],
+            customer: [
+              {t: 'Pays with points only', s: 'today', st: 'PENDING', m: 'on', at: 'Capture'},
+              {t: 'Sees the answer', s: 'the points are redeemed before it', st: 'ACCEPTED', m: 'on', at: 'Verify'},
+              {t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
+            ],
+            oneData: [{...CREATE, at: 'Capture'}, DELETE_END],
           },
+          PAID_BILLPAY_SETTLEMENT,
         ],
       },
       {

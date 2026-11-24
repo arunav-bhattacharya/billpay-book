@@ -217,7 +217,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
       routes: [{desc: "PENDING, the debit card authenticated; from the card provider, not One-Data", flow: [{via: 'update', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
     },
     {
-      term: "M3's settled notice: Bank Settled Event",
+      term: "M3's settled notice: Bank Settled Event via M3",
       routes: [{desc: 'A Pay with Bank Transfer payment, ACCEPTED or still PENDING; from M3, not One-Data', flow: [{via: 'signal', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
     },
     {

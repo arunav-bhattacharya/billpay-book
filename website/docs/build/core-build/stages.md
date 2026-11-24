@@ -59,7 +59,7 @@ class DefaultPaymentExecuteStage(
         val details =
             Async.function(s.instruments::clearTextDetails, paymentId)
         val openToBuy = details.thenCompose { d ->
-            Async.function(s.authorization::raiseOpenToBuy, paymentId, d)
+            Async.function(s.openToBuy::raiseOpenToBuy, paymentId, d)  // CAS
         }
         Promise.allOf(
             clearing.clear(ctx, paymentId),

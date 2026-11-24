@@ -74,8 +74,8 @@ Once a parent is released, the leg dispatcher writes the legs of every stored ba
 
 The leg dispatcher then starts one `ExecuteSplitPaymentWorkflow` per leg on the Offline cluster, apart from the parent's clearing. Each leg runs four steps:
 
-1. Updates the AR balance and open-to-buy in parallel (open-to-buy once Payment Instruments has returned the instrument's clear-text details).
-2. Tells accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB) and B2Notifier.
+1. Updates the AR balance and open-to-buy in parallel (open-to-buy in CAS, once Payment Instruments has returned the instrument's clear-text details).
+2. Tells accounting, eBNC, risk, the Transaction Notification Engine (TFNE), the legacy Payments History Database (GPHDB), B2Notifier and Authorizations (AMP).
 3. Sends its RTF event and Raven message.
 4. Commits `PROCESSED`.
 

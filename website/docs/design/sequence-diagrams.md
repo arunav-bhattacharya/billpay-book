@@ -20,7 +20,7 @@ import Lead from '@site/src/components/Lead';
 - A pink arrow is where something outside starts or resumes the payment: an update or a signal to its running workflow, a dispatcher or a callback starting the next workflow, or the events One-Data pairs before `PAID`. [All Journeys](./journeys/all-journeys.md) marks the same steps with pink flags.
 - An arrow to `PaymentStore` is a commit: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
 - Every payment workflow starts through the Router, which admits the request and pins the resolved profile. The PAID drain and the missing-events check start from Schedules instead.
-- RTF and Raven are drawn because their timing matters. Each change is announced to RTF, and to Raven where the customer is told, after the commit that makes it. Fulfil is the exception: it tells both before it commits `PROCESSED`.
+- RTF and Raven are drawn because their timing matters. Each change is announced to RTF, and to Raven where the customer is told, after the commit that makes it. Fulfil is the exception: it tells both before it commits `PROCESSED`, except for a Pay with Bank Transfer or debit card payment, whose `PROCESSED` goes to neither.
 - The wider diagrams carry an expand control in the top right, which opens a full-window view. Escape closes it.
 
 </details>
@@ -72,11 +72,11 @@ sequenceDiagram
     else ACCEPTED
       WF->>RTF: ACCEPTED event
       WF->>EXE: run
-      Note over EXE: clearing, AR and<br/>Instruments, then OTB
+      Note over EXE: clearing, AR and<br/>Instruments, then CAS
       EXE->>PS: PROCESSING
       WF->>RTF: PROCESSING event
       WF->>FUL: run
-      Note over FUL: accounting, eBNC, risk,<br/>TFNE, GPHDB, B2Notifier
+      Note over FUL: accounting, eBNC, risk, TFNE,<br/>GPHDB, B2Notifier, AMP
       FUL->>RTF: PROCESSED event
       FUL->>RAV: PROCESSED message
       FUL->>PS: PROCESSED
@@ -741,9 +741,9 @@ sequenceDiagram
 
 Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in three phases. The first two are sync: the channel waits for the reply.
 
-1. **Create a payment intent.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own checks run next (Payment Instruments, Payment Options, and Plans for a mandate), then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
+1. **Create a payment intent.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own check runs next, Payment Options for the option the customer picked, then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
 2. **Channel confirm.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/confirm`, the Channel Confirm Event. Billpay asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
-3. **Async process.** Nobody waits from here on. While the status is pending, Billpay asks again with a gap that starts at 2 minutes and doubles up to 30, until the answer is success or failure. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`. Then M3's notice that the bank has settled the money, the Bank Settled Event, lets Execute and Fulfil run, with no clearing call. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data passes it on to billpay-online's `POST /payments/{payment-id}/settlement`.
+3. **Async process.** Nobody waits from here on. While the status is pending, Billpay asks again with a gap that starts at 2 minutes and doubles up to 30, until the answer is success or failure. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`. Then M3's notice that the bank has settled the money, the Bank Settled Event via M3, lets Execute and Fulfil run, with no clearing call. Fulfil tells accounting, TFNE, GPHDB and AMP, and sends nothing to RTF or Raven for `PROCESSED`. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data passes it on to billpay-online's `POST /payments/{payment-id}/settlement`.
 
 Pink arrows are the events and Temporal messages that reach the waiting workflow from outside.
 
@@ -758,7 +758,7 @@ sequenceDiagram
   %% Pink arrows: something outside resumes the payment.
   %% trigger: Channel Confirm Event
   %% trigger: update returned
-  %% trigger: Bank Settled Event
+  %% trigger: Bank Settled Event via M3
   %% trigger: signal settled
 
   participant CH as Channel,<br/>through One-Data
@@ -801,7 +801,7 @@ sequenceDiagram
       PW-->>WF: status
     end
     WF->>PS: ACCEPTED or DECLINED
-    M3->>OD: Bank Settled Event
+    M3->>OD: Bank Settled Event via M3
     OD->>R: POST /settlement
     R->>WF: signal settled
     R-->>OD: 202
@@ -814,7 +814,7 @@ What the picture leaves out, so it stays readable:
 
 - **Declines at the create.** A failed own check, or no link from Amex Pay with Bank Transfer, makes the payment `DECLINED` in one commit guarded on `PENDING`, and the channel gets `DECLINED` with no link.
 - **A failed status call.** If the call during the channel's confirm times out or gets a 5xx, the reply is `PENDING`, and Billpay asks again after the next gap.
-- **After the reply.** The customer sees the payment's final state later in their list of payments, which the channel reads through `ReadPayments.v1`. RTF gets every state change as an event, and Raven sends the customer the market's messages.
+- **After the reply.** The customer sees the payment's final state later in their list of payments, which the channel reads through `ReadPayments.v1`. RTF gets every state change as an event but `PROCESSED`, and Raven sends the customer the market's messages, none for `PROCESSED`.
 - **No call from the channel.** The workflow waits 2 minutes and starts asking anyway. The 2 minutes is still TBD, and so is the status call's timeout.
 - **The market's wait ends.** If the status is still pending 24 to 48 hours after the create, the payment is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`, and the asking stops.
 - **A repeated confirm.** It attaches to the same update and gets the same answer.
@@ -877,7 +877,7 @@ sequenceDiagram
 
 ## 16. Pay by Debit card: create, 3D Secure and authorization
 
-A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-online directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS. Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
+A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, on the instrument and the payment option, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-online directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS. Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
 
 ```mermaid
 ---
@@ -940,7 +940,7 @@ sequenceDiagram
       WF-->>R: update result
       R-->>CP: ACCEPTED or DECLINED,<br/>409 once too late
       WF->>RTF: ACCEPTED or DECLINED event
-      Note over WF,VER: ACCEPTED: Execute, no clearing call,<br/>then Fulfil. DECLINED: Raven message
+      Note over WF,VER: ACCEPTED: Execute, no clearing call, then<br/>Fulfil, with no RTF or Raven. DECLINED: Raven message
     end
   else no callback
     rect rgba(0,111,207,0.12)

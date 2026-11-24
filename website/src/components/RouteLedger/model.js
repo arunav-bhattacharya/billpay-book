@@ -87,7 +87,7 @@ export const IFACES = [
     fails: 'mandate',
     queue: "the workflow's queue; local in Verify on Online",
     at: ['Verify', 'Reverify'],
-    note: 'only where the profile requires mandate authorization',
+    note: 'only where the profile requires mandate authorization: never for a payment initiated as part of a plan, Pay with Bank Transfer or a debit card',
   },
   {
     name: 'ClearingActivities',
@@ -108,13 +108,21 @@ export const IFACES = [
     note: 'a corporate parent leaves it to its legs',
   },
   {
+    name: 'OpenToBuyActivities',
+    system: 'CAS',
+    long: 'CAS, for open-to-buy',
+    fails: 'must',
+    queue: 'ds-cas',
+    at: ['Execute'],
+    note: 'a corporate parent leaves it to its legs; the name and the queue are Proposed',
+  },
+  {
     name: 'AuthorizationActivities',
     system: 'AMP',
-    long: 'AMP, for open-to-buy',
+    long: 'AMP, Authorizations, told that the payment has executed',
     fails: 'must',
     queue: 'ds-authorization',
-    at: ['Execute'],
-    note: 'a corporate parent leaves it to its legs',
+    at: ['Fulfil'],
   },
   {name: 'AccountingActivities', system: 'Accounting', fails: 'must', queue: 'ds-accounting', at: ['Fulfil']},
   {
@@ -151,6 +159,14 @@ export const IFACES = [
     queue: 'local activity',
     at: ['RequestConfirmation', 'Verify'],
     note: 'only for a debit card; the authorization carries the payment ID as its idempotency key',
+  },
+  {
+    name: 'LoyaltyActivities',
+    system: 'Loyalty',
+    long: 'Loyalty, which redeems MR Points',
+    queue: 'local activity',
+    at: ['Verify'],
+    note: 'only for MR Points; the redemption carries the payment ID as its idempotency key',
   },
   {
     name: 'InboxActivities',
@@ -228,14 +244,22 @@ export const BANDS = [
           },
           {
             id: 'points',
-            wf: 'Pay with MR Points',
-            plain: true,
-            full: 'Pay with MR Points, a composite workflow, PayWithMrPointsWorkflow (Proposed)',
+            wf: 'CreateImmediatePayment',
+            tag: 'MR Points',
+            points: true,
             lead: 'Pay today with MR Points alone.',
+            stages: CVEF,
             journey: 'Create payment, today, MR Points as the one instruction',
-            wfId: '{paymentId}-points',
-            behave: 'Its steps are still to be defined, so there are no example values yet.',
-            tbd: 'A composite across Billpay and Loyalty, today only. Its steps and its calls to Loyalty are still to be defined.',
+            wfId: '{paymentId}-init',
+            answer: 'once Verify decides, with the points already redeemed',
+            chips: five('CONSUMER', 'Y', 'N'),
+            behave: 'Example values. The Router sets points redemption to Y when MR Points are the one instruction. There is no composite and no child workflow.',
+            notes: {
+              Verify: "Its checks and rules run first. Only once they pass does Loyalty redeem the points, in one call, so no later rule can decline a payment whose points are gone. A failed redemption is DECLINED with POINTS_REDEMPTION_FAILED.",
+              Execute: 'No clearing call: redeeming the points paid the bill. The AR balance and the open-to-buy call to CAS go out, and One-Data gets the settlement event Billpay creates.',
+            },
+            exc: {'Execute|ClearingActivities': {kind: 'skip', note: 'redeeming the points paid the bill'}},
+            then: [{to: 'paid', text: 'PAID with the Posted Event from GAR, once the GAR posting joins the settlement Billpay created'}],
           },
           {
             id: 'scheduled',
@@ -259,6 +283,10 @@ export const BANDS = [
             stages: ['Capture', 'Verify'],
             own: ['RequestConfirmation'],
             move: {Verify: 'PENDING, unchanged; DECLINED with no link'},
+            exc: {
+              'Verify|InstrumentActivities': {kind: 'skip', note: 'a bank payment makes no Instrument check'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'a bank payment makes no Mandate check'},
+            },
             journey: 'Create payment, today, one instruction, with bank confirmation: a payment that waits for the customer',
             wfId: '{paymentId}-init',
             answer: "with PENDING and the redirect link; DECLINED when Amex's own checks fail, or when no link comes",
@@ -267,13 +295,13 @@ export const BANDS = [
               'Example values. A BOTH turns bank confirmation to Y when the payment method needs the customer to confirm at their bank. It is on for consumer payments made today; business travel can be turned on later.',
             notes: {
               Verify:
-                "Amex's own checks, before the bank step: the Instrument, Options and Mandate checks that apply, as local activities. A payment that fails them is DECLINED, with no link. One that passes stays PENDING, and nothing is committed.",
+                "Amex's own check, before the bank step: the Options check alone, as a local activity. A bank payment makes no Instrument or Mandate check. A payment that fails it is DECLINED, with no link. One that passes stays PENDING, and nothing is committed.",
               RequestConfirmation:
                 "It runs once Verify's own checks have passed. It asks Amex Pay with Bank Transfer for the redirect link, with one try, and stores it on the payment, guarded on PENDING. Billpay calls no market's provider directly. The caller gets PENDING with the link, and the PENDING event goes out. With no link, the payment is DECLINED instead.",
             },
             stop: {
               title: 'The workflow waits here.',
-              text: "Until the channel says the customer is back from their bank, with an update to this same workflow that Billpay answers with the status, or a fixed time passes with none. While the status is pending, Billpay asks Amex Pay with Bank Transfer's GET /payment-status again at a fixed interval. Until it is decided, its pending entry blocks the account.",
+              text: "Until the channel says the customer is back from their bank, with an update to this same workflow that Billpay answers with the status, or 2 minutes pass with none. While the status is pending, Billpay asks Amex Pay with Bank Transfer's GET /payment-status again, with a gap that doubles from 2 to 30 minutes. Until it is decided, its pending entry blocks the account.",
             },
             then: [
               {to: 'confirm', text: 'the channel says the customer is back, with the same payment ID'},
@@ -290,7 +318,10 @@ export const BANDS = [
             stages: ['Capture', 'Verify'],
             own: ['RequestConfirmation'],
             move: {Verify: 'PENDING, unchanged; DECLINED before 3D Secure'},
-            exc: {'Verify|CardActivities': {kind: 'skip', note: 'the authorization waits for the callback'}},
+            exc: {
+              'Verify|CardActivities': {kind: 'skip', note: 'the authorization waits for the callback'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'a debit card makes no Mandate check'},
+            },
             journey: 'Create payment, today, one instruction, by debit card: a payment that waits for 3D Secure',
             wfId: '{paymentId}-init',
             answer: "with PENDING and the challenge link, or none; DECLINED when Amex's own checks fail, or when the provider gives no answer",
@@ -299,7 +330,7 @@ export const BANDS = [
               'Example values. Card authentication is Y: the Router sets it for every debit card, and no market chooses it. A debit card pays today only, with one instruction and no MR Points.',
             notes: {
               Verify:
-                "Amex's own checks, before 3D Secure: the Instrument, Options and Mandate checks that apply, as local activities. A payment that fails them is DECLINED, and 3D Secure never starts. One that passes stays PENDING, and nothing is committed.",
+                "Amex's own checks, before 3D Secure: the Instrument and Options checks, as local activities. A debit card makes no Mandate check. A payment that fails them is DECLINED, and 3D Secure never starts. One that passes stays PENDING, and nothing is committed.",
               RequestConfirmation:
                 "Once Verify's own checks have passed, it asks the market's card provider to start 3D Secure, with Billpay's callback URL, one try, and stores the challenge link, or none when the card's bank needs no challenge (Proposed), guarded on PENDING. The caller gets PENDING. With no answer from the provider, the payment is DECLINED instead (Proposed).",
             },
@@ -410,13 +441,13 @@ export const BANDS = [
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "Calls GET /payment-status at once, and the update replies with the answer. Success commits ACCEPTED and failure DECLINED, guarded on PENDING. Pending, a timeout or a 5xx replies PENDING, and Billpay asks again after a fixed interval, with nobody waiting, until the status is final. No token check and no funds check. If the channel never calls, the same calls start after a fixed time.",
+                "Calls GET /payment-status at once, and the update replies with the answer. Success commits ACCEPTED and failure DECLINED, guarded on PENDING. Pending, a timeout or a 5xx replies PENDING, and Billpay asks again, with nobody waiting, after a gap that doubles from 2 to 30 minutes, until the status is final or the market's wait of 24 to 48 hours ends it. No token check and no funds check. If the channel never calls, the same calls start after 2 minutes.",
             },
             exc: {
-              'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
+              'Verify|InstrumentActivities': {kind: 'skip', note: 'a bank payment makes no Instrument check'},
               'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-              'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-              'Verify|BankConfirmationActivities': {kind: 'call', note: 'GET /payment-status once for the reply, then again at a fixed interval while it says pending'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'a bank payment makes no Mandate check'},
+              'Verify|BankConfirmationActivities': {kind: 'call', note: 'GET /payment-status once for the reply, then again while it says pending, with a gap that doubles from 2 to 30 minutes'},
             },
             stop: {
               title: 'An ACCEPTED payment waits here.',
@@ -427,11 +458,10 @@ export const BANDS = [
         ],
       },
       {
-        fn: ['M3|settled notice'],
+        fn: ['CreateBillpay|SettlementEvent.v1'],
         from: 'M3',
         calls: 'M3 calls',
-        direct: true,
-        does: 'tell Billpay the bank has settled a Pay with Bank Transfer payment in real time',
+        does: "tell Billpay the bank has settled a Pay with Bank Transfer payment in real time. One-Data passes the notice on, and keeps it for the PAID pairing (Proposed)",
         api: ['POST', '/payments/{payment-id}/settlement'],
         roads: [
           {
@@ -454,12 +484,17 @@ export const BANDS = [
               Execute: "No clearing call: the money moved at the bank, and M3's notice is the settlement. The AR balance and open-to-buy calls go out.",
             },
             exc: {
-              'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
+              'Verify|InstrumentActivities': {kind: 'skip', note: 'a bank payment makes no Instrument check'},
               'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
-              'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before the bank step'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'a bank payment makes no Mandate check'},
               'Execute|ClearingActivities': {kind: 'skip', note: "the money moved at the bank; M3's notice is the settlement"},
+              'Fulfil|BalanceControlActivities': {kind: 'skip', note: 'a bank payment makes no eBNC call'},
+              'Fulfil|RiskActivities': {kind: 'skip', note: 'a bank payment makes no risk call'},
+              'Fulfil|TransactionNotificationActivities': {kind: 'call', note: 'TFNE and GPHDB only, not B2Notifier', systems: 'TFNE, GPHDB'},
+              'Fulfil|LifecycleEventActivities': {kind: 'skip', note: 'a bank payment sends no RTF event for PROCESSED'},
+              'Fulfil|CommunicationActivities': {kind: 'skip', note: 'a bank payment sends no Raven message for PROCESSED'},
             },
-            then: [{to: 'paid', text: "PAID, once the settlement and the GAR posting are both in; how M3's notice reaches One-Data's pairing is open"}],
+            then: [{to: 'paid', text: "PAID with the Posted Event from GAR: the GAR posting, which One-Data pairs with M3's notice (Proposed)"}],
           },
         ],
       },
@@ -494,10 +529,15 @@ export const BANDS = [
             exc: {
               'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
               'Verify|OptionsActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
-              'Verify|PlansActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
+              'Verify|PlansActivities': {kind: 'skip', note: 'a debit card makes no Mandate check'},
               'Execute|ClearingActivities': {kind: 'skip', note: 'the authorization moved the money'},
+              'Fulfil|BalanceControlActivities': {kind: 'skip', note: 'a debit card payment makes no eBNC call'},
+              'Fulfil|RiskActivities': {kind: 'skip', note: 'a debit card payment makes no risk call'},
+              'Fulfil|TransactionNotificationActivities': {kind: 'call', note: 'TFNE and GPHDB only, not B2Notifier', systems: 'TFNE, GPHDB'},
+              'Fulfil|LifecycleEventActivities': {kind: 'skip', note: 'a debit card payment sends no RTF event for PROCESSED'},
+              'Fulfil|CommunicationActivities': {kind: 'skip', note: 'a debit card payment sends no Raven message for PROCESSED'},
             },
-            then: [{to: 'paid', text: 'PAID, once One-Data has the settlement Billpay created and the GAR posting'}],
+            then: [{to: 'paid', text: 'PAID with the Posted Event from GAR, once the GAR posting joins the settlement Billpay created'}],
           },
         ],
       },
@@ -779,7 +819,7 @@ export const BANDS = [
             exc: {
               'Execute|ClearingActivities': {kind: 'call', note: 'once, for the parent'},
               'Execute|ReceivablesActivities': {kind: 'skip', note: 'per leg instead'},
-              'Execute|AuthorizationActivities': {kind: 'skip', note: 'per leg instead'},
+              'Execute|OpenToBuyActivities': {kind: 'skip', note: 'per leg instead'},
               'Execute|InstrumentActivities': {kind: 'skip', note: 'per leg instead, before open-to-buy'},
             },
             stop: {
@@ -1056,6 +1096,11 @@ export function calls(j, f) {
     const child = j.child.includes(s);
     const sometimes = Boolean(j.cond[s]);
     const base = child ? 'child' : 'call';
+    const x = j.exc[`${s}|${f.name}`];
+    if (x) {
+      out[s] = x;
+      return;
+    }
     if (f.rail) {
       if (f.name === 'LifecycleEventActivities') {
         if (s === 'RequestConfirmation') return;
@@ -1075,14 +1120,10 @@ export function calls(j, f) {
       out[s] = {kind: sometimes ? 'cond' : base};
       return;
     }
-    const x = j.exc[`${s}|${f.name}`];
-    if (x) {
-      out[s] = x;
-      return;
-    }
     if (!(f.at || []).includes(s)) return;
     if (f.name === 'BankConfirmationActivities' && (s !== 'RequestConfirmation' || j.card)) return;
     if (f.name === 'CardActivities' && !j.card) return;
+    if (f.name === 'LoyaltyActivities' && !j.points) return;
     let kind = sometimes ? 'cond' : base;
     let note;
     if (f.name === 'CommunicationActivities') {
@@ -1102,6 +1143,7 @@ export function calls(j, f) {
     }
     if (f.name === 'BankConfirmationActivities') note = 'for the redirect link';
     if (f.name === 'CardActivities') note = s === 'Verify' ? 'last: the authorization, which debits the account' : "to start 3D Secure, with Billpay's callback URL";
+    if (f.name === 'LoyaltyActivities') note = "last: the redemption, once the other checks' rules pass";
     if (f.name === 'PlansActivities') {
       note = 'only where the profile requires mandate authorization';
       if (kind === 'call') kind = 'cond';
@@ -1118,7 +1160,7 @@ export function calls(j, f) {
       }
     }
     if (f.name === 'InstrumentActivities' && s === 'Execute') {
-      note = 'first, for the clear-text details open-to-buy and the notifications need';
+      note = "first, for the clear-text details CAS's open-to-buy call and the notifications need";
     }
     out[s] = note ? {kind, note} : {kind};
   });

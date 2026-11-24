@@ -63,8 +63,8 @@ const JOURNEYS = {
     text: 'The reply is PENDING with the redirect link. Once the customer is back, the channel calls again, and Billpay answers with the status. While it is pending, Billpay keeps asking, then waits for M3 before Execute.',
     after: [
       {name: 'CreateConfirmPendingPayment.v1', who: 'channel', trigger: 'update', event: 'Channel Confirm Event', note: "once the payer's bank routes the customer back. Billpay asks for the status once and replies PENDING, ACCEPTED or DECLINED; the channel's part ends there"},
-      {name: 'GET /payment-status', who: 'billpay', repeat: true, note: 'Billpay asks Amex Pay with Bank Transfer again at a fixed interval while it says pending, with nobody waiting'},
-      {name: 'POST /payments/{payment-id}/settlement', who: 'other', trigger: 'signal', event: 'Bank Settled Event', note: "M3's notice that the money settled"},
+      {name: 'GET /payment-status', who: 'billpay', repeat: true, note: 'Billpay asks Amex Pay with Bank Transfer again while it says pending, with a gap that doubles from 2 to 30 minutes, and nobody waiting'},
+      {name: 'POST /payments/{payment-id}/settlement', who: 'other', trigger: 'signal', event: 'Bank Settled Event via M3', note: "M3's notice that the money settled"},
     ],
   },
   card: {

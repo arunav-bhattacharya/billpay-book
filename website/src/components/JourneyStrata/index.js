@@ -55,6 +55,7 @@ function states(j, s) {
 }
 
 /* the systems a stage calls on this road, Raven last, rails left out */
+const LIFECYCLE = IFACES.find((f) => f.name === 'LifecycleEventActivities');
 const CALL_ORDER = [
   ...IFACES.filter((f) => !f.rail && f.name !== 'CommunicationActivities'),
   ...IFACES.filter((f) => f.name === 'CommunicationActivities'),
@@ -64,7 +65,7 @@ function systemsAt(j, s) {
   CALL_ORDER.forEach((f) => {
     const c = calls(j, f)[s];
     if (!c || c.kind === 'skip') return;
-    f.system.split(', ').forEach((name) => out.push({name, kind: c.kind}));
+    (c.systems || f.system).split(', ').forEach((name) => out.push({name, kind: c.kind}));
   });
   return out;
 }
@@ -386,6 +387,8 @@ function Board({journey}) {
   const columns = ['var(--js-label)', ...segs.map((s) => `minmax(0, ${s.weight}fr)`)].join(' ');
   const width = designWidth(segs);
   const system = journey.kind === 'system';
+  /* bank and debit card payments send no RTF event for PROCESSED */
+  const quietRtf = segs.some((s) => s.kind === 'run' && calls(s.j, LIFECYCLE).Fulfil?.kind === 'skip');
   const strata = [
     {key: 'customer', term: 'Customer', desc: system ? 'nobody waits' : 'what they do and see', Comp: CustomerCell},
     {key: 'onedata', term: 'One-Data', desc: 'the edge', Comp: OneDataCell},
@@ -424,7 +427,9 @@ function Board({journey}) {
             {rails && (
               <div className={styles.rails} style={{gridColumn: `${runs[0] + 2} / ${runs[runs.length - 1] + 3}`}}>
                 <span className={styles.rail}>PaymentStore → Oracle · every stage commits once</span>
-                <span className={clsx(styles.rail, styles.railSoft)}>LifecycleEventActivities → RTF · every state change</span>
+                <span className={clsx(styles.rail, styles.railSoft)}>
+                  LifecycleEventActivities → RTF · every state change{quietRtf ? ' but PROCESSED' : ''}
+                </span>
               </div>
             )}
             {segs.map((s, i) => (

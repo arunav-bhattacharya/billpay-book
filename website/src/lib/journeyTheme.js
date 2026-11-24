@@ -31,7 +31,7 @@ export const KINDS = {
   'background-step': {label: 'Steps nobody waits on', def: 'deep-blue', set: SOLID, prop: '--jm-background'},
   'awaiting-step': {label: 'Steps that wait on something outside', def: 'pale-deep', set: [...PALE, ...SOLID], prop: '--jm-await'},
   trigger: {label: 'Events from outside', def: 'pink', set: ['pink', ...SOLID], prop: '--jm-trigger'},
-  call: {label: 'Calls to other systems', def: 'pale-blue', set: PALE, prop: '--jm-call'},
+  call: {label: 'Calls to other systems', def: 'pale-grey', set: PALE, prop: '--jm-call'},
   link: {label: 'Links between steps', def: 'deep-400', set: SOLID, prop: '--jm-link'},
 };
 

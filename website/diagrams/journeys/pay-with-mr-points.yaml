@@ -52,7 +52,7 @@ steps:
     systems:
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
 
   - name: Fulfil
     state: PROCESSED
@@ -64,6 +64,7 @@ steps:
       - TFNE
       - GPHDB
       - B2Notifier
+      - AMP
       - RTF
       - Raven
 
@@ -73,10 +74,10 @@ steps:
     caption: settled and posted
     trigger:
       kind: events
-      name: Settled and Posted Events
+      name: Posted Event from GAR
       label: >-
-        the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's
-        inbox
+        Accounts Receivable's posting, paired in One-Data's inbox with the settlement event Billpay
+        creates
     systems:
       - GAR
     exit:
@@ -102,16 +103,15 @@ detail:
   - step: 3
     text: >-
       Execute makes no clearing call, since redeeming the points paid the bill. The statement
-      balance goes down in Accounts Receivable and available credit up in Authorizations, as for any
-      payment.
+      balance goes down in Accounts Receivable and available credit up in CAS, as for any payment.
   - step: 4
     text: >-
-      Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven
-      message, then `PROCESSED`.
+      Accounting, eBNC, risk, TFNE, GPHDB, B2Notifier and AMP first, then the RTF event and the
+      Raven message, then `PROCESSED`.
   - step: 5
     text: >-
       Billpay creates the settlement event itself and hands it to One-Data, as for a debit card, so
-      the payment turns `PAID` once that event and the AR posting are both in.
+      the payment turns `PAID` with the Posted Event from GAR, once the AR posting joins that event.
   - text: >-
       Points pay today only, and never with a debit card. With a bank account as well, the payment
       is two instructions, and runs as [Pay with multiple

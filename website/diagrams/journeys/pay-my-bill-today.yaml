@@ -52,7 +52,7 @@ steps:
       - MR/M3
       - GAR
       - Payment Instruments
-      - AMP
+      - CAS
 
   - name: Fulfil
     state: PROCESSED
@@ -64,6 +64,7 @@ steps:
       - TFNE
       - GPHDB
       - B2Notifier
+      - AMP
       - RTF
       - Raven
 
@@ -96,32 +97,32 @@ detail:
     text: >-
       Payment Instruments confirms the way the customer is paying, Payment Options'
       `ReadPaymentOptionByIdentifier.v1` confirms the payment option they picked, and Plans returns
-      the mandate details where the market requires one. Billpay's verification rules check the
-      answers, then Verify commits `ACCEPTED` or `DECLINED` in one guarded update, and the caller's
-      update returns right there. After the reply, once Verify has decided, the workflow calls
-      One-Data's delete API, `DeletePendingPayment.v1`, which takes the payment off the account's
-      pending list, so the customer can pay again. A payment the customer must confirm at their bank
-      goes another way, on [Pay by Bank today](#pay-by-bank-today), and so does a debit card, on
-      [Pay by Debit card](#pay-by-debit-card).
+      the mandate details where the market requires one, unless the payment comes as part of a plan.
+      Billpay's verification rules check the answers, then Verify commits `ACCEPTED` or `DECLINED`
+      in one guarded update, and the caller's update returns right there. After the reply, once
+      Verify has decided, the workflow calls One-Data's delete API, `DeletePendingPayment.v1`, which
+      takes the payment off the account's pending list, so the customer can pay again. A payment the
+      customer must confirm at their bank goes another way, on [Pay by Bank
+      today](#pay-by-bank-today), and so does a debit card, on [Pay by Debit
+      card](#pay-by-debit-card).
   - text: >-
       Everything after this runs with nobody waiting. The `PENDING` event and the decision go to RTF
       after the reply, in order.
   - step: 3
     text: >-
       Three calls go out at once: clearing with the bank, the statement balance down in Accounts
-      Receivable, and available credit up in Authorizations. Authorizations needs the instrument's
-      details in clear text, so its branch first asks Payment Instruments for them, while the other
-      two calls are already under way. A corporate payment never gets this far in this workflow: it
-      stops at `ACCEPTED` and asks for its allocations, on [Pay a corporate bill
-      today](#pay-a-corporate-bill-today).
+      Receivable, and available credit up in CAS. CAS needs the instrument's details in clear text,
+      so its branch first asks Payment Instruments for them, while the other two calls are already
+      under way. A corporate payment never gets this far in this workflow: it stops at `ACCEPTED`
+      and asks for its allocations, on [Pay a corporate bill today](#pay-a-corporate-bill-today).
   - step: 4
     text: >-
-      Accounting, eBNC, risk and three notification systems are told first, in parallel: two legacy
-      systems, the Transaction Notification Engine (TFNE) and the Payments History Database (GPHDB),
-      and B2Notifier, which passes the news on to other downstream systems. The three use the
-      clear-text details Execute fetched. Then the lifecycle event goes to RTF and the confirmation
-      to Raven, and only then does the payment commit `PROCESSED`. The customer hears last, once
-      everything else has worked.
+      Accounting, eBNC, risk, Authorizations (AMP) and three notification systems are told first, in
+      parallel: two legacy systems, the Transaction Notification Engine (TFNE) and the Payments
+      History Database (GPHDB), and B2Notifier, which passes the news on to other downstream
+      systems. The three use the clear-text details Execute fetched. Then the lifecycle event goes
+      to RTF and the confirmation to Raven, and only then does the payment commit `PROCESSED`. The
+      customer hears last, once everything else has worked.
   - step: 5
     text: >-
       The payment waits at `PROCESSED` for two confirmations: the bank's settlement and Accounts

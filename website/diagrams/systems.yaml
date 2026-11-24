@@ -21,7 +21,7 @@
 - name: AR
   full: Accounts Receivable, which holds the statement balance
 - name: AMP
-  full: Authorizations (AMP), which holds available credit
+  full: Authorizations (AMP), told once a payment has executed
 - name: Accounting
   full: Accounting, which matches the payment across Amex platforms
 - name: eBNC
@@ -51,4 +51,4 @@
 - name: Loyalty
   full: Loyalty, which redeems a customer's Membership Rewards points
 - name: CAS
-  full: CAS
+  full: CAS, which raises the customer's available credit (open-to-buy) when a payment executes
