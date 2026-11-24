@@ -16,7 +16,7 @@ import styles from "./styles.module.css";
  * `trigger` marks a call that starts or resumes a waiting payment, with the
  * mechanism as its value (`update`, `signal`, ...): a pink TriggerTag follows
  * the chip, the same mark the journeys and sequence diagrams use. `event`
- * names it the way the journeys do ("Channel Confirm Event"), in place of
+ * names it the way the journeys do ("Channel Submission Event"), in place of
  * the mechanism, which stays on hover.
  */
 const SAYS = {

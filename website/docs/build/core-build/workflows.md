@@ -22,8 +22,8 @@ The same goes for stages, which run inside the workflow and reach the outside wo
 - Never `abstract`. Variation comes from the stages, checks and methods the stage resolver picks, per the [composition rules](../../design/principles.md#composition-not-inheritance). A per-market `if` in workflow code is in the wrong layer; the branch belongs in a stage.
 - Call stages, activities and, on the workflow's own cluster, child workflows. Nothing else: no client, no outside system and nothing on the other cluster. The [four layers](../../design/principles.md#the-four-layers) have the full call rules.
 - Keep what the workflow carries light, but don't drop a detail a later step must have, and don't add a database read that slows the run (agreed 2026-11-08). A workflow that creates a payment takes the request itself as its start input, and Capture writes it to Oracle, so nothing is written before the workflow starts and the caller's path has no extra database call. A workflow that a Work Tracker row starts takes the payment ID. An activity may take the small value it needs, such as the money movement, instead of loading it again by ID. And data from Payment Options and Payment Instruments, clear text included, travels on in the workflow to the later stages that need it, with the payload codec keeping it encrypted in history.
-- Set search attributes once, at start. Use no queries on the hot path, and a signal only where nobody needs an answer. What a caller sends a running workflow and waits on, such as the no, goes in as an update. The channel's call once the customer is back from their bank, and M3's settled notice, are signals.
-- Never wait for a date. Work due later is a Work Tracker row in Oracle, written in the same commit as the state change, and a dispatcher starts the next workflow when it falls due. Nothing waits on a Temporal timer until then. The one exception is a payment waiting for its customer: `CreatePaymentIntentWorkflow` waits on its own timers: up to 2 minutes for a debit card's 3D Secure, and for a bank the fixed time and the intervals between its status calls.
+- Set search attributes once, at start. Use no queries on the hot path, and a signal only where nobody needs an answer. What a caller sends a running workflow and waits on, such as the no or the channel's call once the customer is back from their bank, goes in as an update. Amex Pay with Bank Transfer's confirmation and M3's settled notice are signals.
+- Never wait for a date. Work due later is a Work Tracker row in Oracle, written in the same commit as the state change, and a dispatcher starts the next workflow when it falls due. Nothing waits on a Temporal timer until then. The one exception is a payment waiting for its customer: `CreatePaymentIntentWorkflow` waits on its own timers: up to 2 minutes for a debit card's 3D Secure, and for a bank the 2 minutes before its fallback status calls, the intervals between them, and the market's wait of 24 to 48 hours.
 
 ## How a workflow finds its stages
 
@@ -51,7 +51,7 @@ A child always runs on its parent's cluster. These journeys use them:
 - Update Payment starts the replacement payment as a child `CreateScheduledPaymentWorkflow`.
 - Each leg of a consumer split payment runs `ExecuteSplitPaymentWorkflow` as a child, and the parent stays `ACCEPTED` while its legs move on.
 
-A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a debit card's 3D Secure starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the callback and the no as updates and the channel's call as a signal, asks Amex Pay with Bank Transfer for a bank payment's status, and cancels a debit card payment on its own timer if no callback comes.
+A corporate payment starts no child at all. It can have 100K legs, so its allocation request, its execution and each of its legs start from a Work Tracker row that a dispatcher picks up. [Corporate Allocations](../../design/corporate-allocations.md) walks through it. A payment that waits for bank confirmation or a debit card's 3D Secure starts no child either: `CreatePaymentIntentWorkflow` holds the wait itself, takes the callback, the no and the channel's call as updates and Amex Pay with Bank Transfer's confirmation as a signal, submits a bank payment to Amex Pay with Bank Transfer, and cancels a debit card payment on its own timer if no callback comes.
 
 ## Versioning
 
@@ -131,11 +131,12 @@ A payment that waits for its customer keeps one workflow from the create to its 
 ```kotlin
 class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) : CreatePaymentIntentWorkflow {
     private var decided: PaymentDecision? = null     // the create's answer
-    private var back = false                         // the channel's call: the customer is back, so ask now
-    private var asks = 0                             // status calls that answered pending
+    private var submitted = false                    // the channel's call: the customer is back, so submit now
+    private var asks = 0                             // calls that answered pending
+    private var confirmation: ConfirmationNotice? = null   // Amex PwBT's own answer, whether or not the channel called
     private var no = false                           // the customer's no
     private var authentication: AuthenticationResult? = null   // a debit card's 3D Secure result
-    private var settlement: SettlementNotice? = null // M3's notice, which can come before any status answer
+    private var settlement: SettlementNotice? = null // M3's notice, which can come before Amex PwBT's answer
     private var result: PaymentDecision? = null      // the decision the no and the callback get back
     private var waiting = false
 
@@ -166,24 +167,27 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         Workflow.await { Workflow.isEveryHandlerFinished() }   // no update left without its reply
     }
 
-    // A bank: wait for the channel's call or 2 minutes, then ask until the status is final or the wait ends.
+    // A bank: wait for the channel's call, Amex PwBT's confirmation or 2 minutes; then, as the fallback,
+    // ask for the status until it is final or the wait ends.
     private fun bank(stages: Stages, paymentId: String, own: OwnChecks, profile: ResolvedProfile): Decision {
         val paid = { settlement?.settled == true }
+        val wake = { submitted || confirmation != null || no || paid() }
         val end = Workflow.currentTimeMillis() + checkNotNull(profile.confirmationWindow).toMillis()  // 24 to 48 h
         var gap = profile.statusCheckInterval                                // 2 minutes, doubling up to 30
-        Workflow.await(profile.statusCheckDelay) { back || no || paid() }   // 2 minutes, still TBD
+        Workflow.await(profile.statusCheckDelay, wake)                       // 2 minutes, still TBD
         while (true) {
             if (no) return stages.cancel.run(paymentId)                      // CANCELLED
+            confirmation?.let { return stages.verify.bankStatus(paymentId, own, it.status) }  // Amex PwBT's own answer
             if (paid()) return stages.verify.accept(paymentId, own)          // M3 first: logged
-            back = false
-            val status = stages.verify.paymentStatus(paymentId)              // GET /payment-status, one try;
-                                                                             // a timeout or a 5xx counts as PENDING
+            val status = if (submitted) stages.verify.submit(paymentId)      // PaymentSubmission, one try
+                         else stages.verify.paymentStatus(paymentId)         // the fallback: GET /payment-status;
+            submitted = false                                                // a timeout or a 5xx counts as PENDING
             if (status != BankStatus.PENDING) return stages.verify.bankStatus(paymentId, own, status)
             asks++                                                           // a waiting channel's call gets PENDING
             val left = Duration.ofMillis(end - Workflow.currentTimeMillis())
             if (left <= Duration.ZERO) return stages.verify.notReceived(paymentId, own)  // CONFIRMATION_NOT_RECEIVED
-            Workflow.await(minOf(gap, left)) { back || no || paid() }        // pending: ask again after the gap,
-            gap = minOf(gap.multipliedBy(2), profile.statusCheckMaxInterval) // or at once on the channel's call
+            Workflow.await(minOf(gap, left), wake)                           // pending: ask again after the gap,
+            gap = minOf(gap.multipliedBy(2), profile.statusCheckMaxInterval) // or at once on an answer or a call
         }
     }
 
@@ -197,12 +201,15 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         }
     }
 
-    override fun returned(): PaymentDecision {                             // the channel's call, update {paymentId}-returned
+    override fun submit(): PaymentDecision {                               // the channel's call, update {paymentId}-submission
         result?.let { return it }                                          // decided already: its state
         val before = asks
-        back = true                                                        // the loop asks at once
-        Workflow.await { asks > before || result != null }                 // the next status answer
+        submitted = true                                                   // the loop submits at once
+        Workflow.await { asks > before || result != null }                 // PaymentSubmission's answer
         return result ?: PaymentDecision.PENDING                           // PENDING, ACCEPTED or DECLINED
+    }
+    override fun confirmed(answer: ConfirmationNotice) {                     // Amex PwBT's, via One-Data; ignored
+        if (waiting && result == null && confirmation == null) confirmation = answer   // once decided
     }
     override fun settled(notice: SettlementNotice) { if (settlement == null) settlement = notice }   // M3's, via One-Data
     // decision() answers the create, as in Create Immediate Payment; decline() and authenticated(result), the
@@ -212,14 +219,14 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 
 *(GRACE is 10 seconds.)*
 
-- The no, the 3D Secure callback and the channel's call are updates with fixed IDs, `{paymentId}-no`, `{paymentId}-authentication` and `{paymentId}-returned` (Proposed), so a repeat whose reply was lost attaches to the same update and gets the same answer.
-- One call is a signal, since it needs no answer from the workflow. M3's settled notice reaches One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data calls `POST /payments/{payment-id}/settlement`, which sends `settled`: it lets Execute run for an `ACCEPTED` bank payment, and accepts one whose status hasn't said success yet (agreed 2026-11-10; through One-Data 2026-11-23). It gets 202. A notice that the settlement failed leaves the payment `ACCEPTED`, on the exception list, for a manual exception process (agreed 2026-11-23).
-- For a bank, the channel's call, `POST /payments/{payment-id}/confirm`, sends `returned`, and Verify calls Amex Pay with Bank Transfer's `GET /payment-status` at once. Success is `ACCEPTED` and failure `DECLINED` with `BANK_CONFIRMATION_DECLINED` (Proposed). Pending, a timeout or a 5xx is `PENDING`. The update replies with that status, and the channel's part ends there (agreed 2026-11-22). While it is pending, Billpay asks again after a gap that starts at 2 minutes and doubles up to 30 minutes, until the status is final. With no call from the channel, the first ask comes after 2 minutes, still TBD. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED` (agreed 2026-11-23). The status call's timeout is still to be set.
+- The no, the 3D Secure callback and the channel's call are updates with fixed IDs, `{paymentId}-no`, `{paymentId}-authentication` and `{paymentId}-submission` (Proposed), so a repeat whose reply was lost attaches to the same update and gets the same answer.
+- Two calls are signals, since they need no answer from the workflow. Amex Pay with Bank Transfer's own answer reaches One-Data's `UpdatePaymentConfirmation.v1`, and One-Data calls `POST /payments/{payment-id}/confirmation`, which sends `confirmed`: it decides a payment still `PENDING` and is ignored once the payment is `ACCEPTED` (agreed 2026-11-24). M3's settled notice reaches One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data calls `POST /payments/{payment-id}/settlement`, which sends `settled`: it lets Execute run for an `ACCEPTED` bank payment, and accepts one that Amex Pay with Bank Transfer hasn't said success for yet (agreed 2026-11-10; through One-Data 2026-11-23). Both get 202. A notice that the settlement failed leaves the payment `ACCEPTED`, on the exception list, for a manual exception process (agreed 2026-11-23).
+- For a bank, the channel's call, `POST /payments/{payment-id}/submission`, sends `submit`, and Verify submits the payment through Amex Pay with Bank Transfer's `PaymentSubmission` at once. Success is `ACCEPTED` and failure `DECLINED` with `BANK_CONFIRMATION_DECLINED` (Proposed). Pending, a timeout or a 5xx is `PENDING`. The update replies with that status, and the channel's part ends there (agreed 2026-11-24). While no answer has come, Billpay asks `GET /payment-status` itself as the fallback, after a gap that starts at 2 minutes and doubles up to 30 minutes, until the status is final. The first ask comes after 2 minutes, still TBD. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED` (agreed 2026-11-23). The timeouts of `PaymentSubmission` and the status call are still to be set.
 - When a debit card's timer fires with no callback, the workflow cancels the payment itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer handled late, because the Online cluster or its workers were down, ends the wait like any other: a bank payment then asks for the status, and a debit card payment is cancelled.
-- Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. A bank payment runs the Options check alone, and a debit card the Instrument and Options checks; neither runs the Mandate check (agreed 2026-11-23). After a debit card's callback, Verify runs only the card authorization (agreed 2026-11-06). For a bank, it calls `GET /payment-status`, and a rule reads the status, with no token check and no funds check (agreed 2026-11-22). How Verify splits its checks is Proposed: each check says whether it needs the bank step, and the first part's facts are carried in the workflow.
+- Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. A bank payment runs the Options check alone, and a debit card the Instrument and Options checks; neither runs the Mandate check (agreed 2026-11-23). After a debit card's callback, Verify runs only the card authorization (agreed 2026-11-06). For a bank, it takes Amex Pay with Bank Transfer's answer, to `PaymentSubmission`, in its confirmation or to the fallback `GET /payment-status`, and a rule reads it, with no token check and no funds check (agreed 2026-11-24). How Verify splits its checks is Proposed: each check says whether it needs the bank step, and the first part's facts are carried in the workflow.
 - The workflow opens for answers the moment it decides to wait, before it announces anything, so an RTF outage that holds up the announcement can't turn a no or a callback away.
-- The workflow calls One-Data's delete once, when the payment is decided: by the status, M3's notice, the callback, the no or the timer, or at the create when it is declined there. Until then its entry stays in One-Data's Redis and blocks the account's next payment (agreed 2026-11-08).
+- The workflow calls One-Data's delete once, when the payment is decided: by Amex Pay with Bank Transfer's answer, M3's notice, the callback, the no or the timer, or at the create when it is declined there. Until then its entry stays in One-Data's Redis and blocks the account's next payment (agreed 2026-11-08).
 - For Pay with Bank Transfer and a debit card, Execute makes no clearing call, and Fulfil tells accounting, TFNE, GPHDB and AMP only, with no RTF event or Raven message for `PROCESSED` (agreed 2026-11-23). For a debit card, its clearing method creates the payment's settlement event and hands it to One-Data's money movement handler instead, dated when the money moved (Proposed). For Pay with Bank Transfer, M3's notice is the settlement, and Billpay creates none (agreed 2026-11-10).
 
 ## Which cluster runs it

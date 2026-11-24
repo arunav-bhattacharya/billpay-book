@@ -737,13 +737,13 @@ sequenceDiagram
   end
 ```
 
-## 14. Pay by bank: create, status and settlement
+## 14. Pay by bank: create, submission, confirmation and settlement
 
 Some payments wait for the customer to approve the payment at their bank. Billpay talks to one service for that, Amex Pay with Bank Transfer, which works with each market's provider, Plaid in the US among them. One workflow, `CreatePaymentIntentWorkflow`, holds the payment from the create to its end, in three phases. The first two are sync: the channel waits for the reply.
 
-1. **Create a payment intent.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own check runs next, Payment Options for the option the customer picked, then RequestConfirmation asks Amex Pay with Bank Transfer for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
-2. **Channel confirm.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/confirm`, the Channel Confirm Event. Billpay asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
-3. **Async process.** Nobody waits from here on. While the status is pending, Billpay asks again with a gap that starts at 2 minutes and doubles up to 30, until the answer is success or failure. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`. Then M3's notice that the bank has settled the money, the Bank Settled Event via M3, lets Execute and Fulfil run, with no clearing call. Fulfil tells accounting, TFNE, GPHDB and AMP, and sends nothing to RTF or Raven for `PROCESSED`. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data passes it on to billpay-online's `POST /payments/{payment-id}/settlement`.
+1. **Create a payment intent.** Capture writes the payment to the PaymentStore as `PENDING`, only if its ID is new, which is the idempotency check. Amex's own check runs next, Payment Options for the option the customer picked, then RequestConfirmation calls Amex Pay with Bank Transfer's `initiatePayment` for the redirect link and stores it on the payment. The channel gets `PENDING` with the link.
+2. **Channel submission.** Once the payer's bank routes the customer back, the channel calls `POST /payments/{payment-id}/submission`, the Channel Submission Event. Billpay submits the payment through Amex Pay with Bank Transfer's `PaymentSubmission` once, and replies with its answer: `PENDING`, `ACCEPTED` or `DECLINED`. The channel shows the customer that status, and its part ends there.
+3. **Async process.** Nobody waits from here on. If the channel never called, Amex Pay with Bank Transfer sends its own answer, the PwBT Confirmation Event: it calls One-Data's `UpdatePaymentConfirmation.v1`, and One-Data passes it on to billpay-online's `POST /payments/{payment-id}/confirmation`. While neither answer has come, Billpay asks `GET /payment-status` itself as the fallback, with a gap that starts at 2 minutes and doubles up to 30, until the answer is success or failure. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`. Then M3's notice that the bank has settled the money, the Bank Settled Event via M3, lets Execute and Fulfil run, with no clearing call. Fulfil tells accounting, TFNE, GPHDB and AMP, and sends nothing to RTF or Raven for `PROCESSED`. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data passes it on to billpay-online's `POST /payments/{payment-id}/settlement`.
 
 Pink arrows are the events and Temporal messages that reach the waiting workflow from outside.
 
@@ -756,8 +756,10 @@ config:
 sequenceDiagram
   autonumber
   %% Pink arrows: something outside resumes the payment.
-  %% trigger: Channel Confirm Event
-  %% trigger: update returned
+  %% trigger: Channel Submission Event
+  %% trigger: update submit
+  %% trigger: PwBT Confirmation Event
+  %% trigger: signal confirmed
   %% trigger: Bank Settled Event via M3
   %% trigger: signal settled
 
@@ -775,20 +777,20 @@ sequenceDiagram
     R->>WF: Update-With-Start
     WF->>PS: Capture: PENDING, if new
     Note over WF: own checks
-    WF->>PW: redirect link
-    PW-->>WF: link
+    WF->>PW: initiatePayment
+    PW-->>WF: redirect link
     WF->>PS: the link
     WF-->>R: PENDING, with the link
     R-->>CH: PENDING, with the link
   end
 
   rect rgba(0,111,207,0.12)
-    Note over CH,PS: 2 · Channel confirm
+    Note over CH,PS: 2 · Channel submission
     Note over CH,PW: the customer approves at their bank
-    CH->>R: Channel Confirm Event
-    R->>WF: update returned
-    WF->>PW: GET /payment-status
-    PW-->>WF: status
+    CH->>R: Channel Submission Event
+    R->>WF: update submit
+    WF->>PW: PaymentSubmission
+    PW-->>WF: confirmed, declined or pending
     WF->>PS: ACCEPTED or DECLINED, if final
     WF-->>R: status
     R-->>CH: 200, the status
@@ -796,9 +798,16 @@ sequenceDiagram
 
   rect rgba(0,111,207,0.12)
     Note over CH,PS: 3 · Async process
-    loop gap 2 to 30 min
-      WF->>PW: GET /payment-status
-      PW-->>WF: status
+    alt the channel never called
+      PW->>OD: PwBT Confirmation Event
+      OD->>R: POST /confirmation
+      R->>WF: signal confirmed
+      R-->>OD: 202
+    else no answer yet: the fallback
+      loop gap 2 to 30 min
+        WF->>PW: GET /payment-status
+        PW-->>WF: status
+      end
     end
     WF->>PS: ACCEPTED or DECLINED
     M3->>OD: Bank Settled Event via M3
@@ -813,12 +822,13 @@ sequenceDiagram
 What the picture leaves out, so it stays readable:
 
 - **Declines at the create.** A failed own check, or no link from Amex Pay with Bank Transfer, makes the payment `DECLINED` in one commit guarded on `PENDING`, and the channel gets `DECLINED` with no link.
-- **A failed status call.** If the call during the channel's confirm times out or gets a 5xx, the reply is `PENDING`, and Billpay asks again after the next gap.
+- **A failed submission.** If `PaymentSubmission` times out or gets a 5xx, the reply is `PENDING`, and Amex Pay with Bank Transfer's confirmation or the fallback status calls decide the payment later.
 - **After the reply.** The customer sees the payment's final state later in their list of payments, which the channel reads through `ReadPayments.v1`. RTF gets every state change as an event but `PROCESSED`, and Raven sends the customer the market's messages, none for `PROCESSED`.
-- **No call from the channel.** The workflow waits 2 minutes and starts asking anyway. The 2 minutes is still TBD, and so is the status call's timeout.
-- **The market's wait ends.** If the status is still pending 24 to 48 hours after the create, the payment is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`, and the asking stops.
-- **A repeated confirm.** It attaches to the same update and gets the same answer.
-- **M3 first.** If M3's notice comes before the status says success, it accepts the payment on its own, the calls stop, and Billpay logs it.
+- **A late confirmation.** Amex Pay with Bank Transfer sends its answer whether or not the channel called, so a payment already `ACCEPTED` ignores it. A confirmed answer on a payment already `DECLINED` or `CANCELLED` goes on the exception list with an alert (Proposed).
+- **No answer at all.** The fallback status calls start 2 minutes after the create. The 2 minutes is still TBD, and so are the timeouts of `PaymentSubmission` and the status call.
+- **The market's wait ends.** If the answer is still pending 24 to 48 hours after the create, the payment is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`, and the asking stops.
+- **A repeated submission.** It attaches to the same update and gets the same answer.
+- **M3 first.** If M3's notice comes while the payment is still `PENDING`, it accepts the payment on its own, the calls stop, Billpay logs it, and Execute moves it to `PROCESSING`.
 - **No notice.** An `ACCEPTED` payment whose notice never comes goes on the exception list, with an alert. How long it waits is still TBD.
 - **A failed settlement.** M3's notice can say Amex never received the money from the payer's bank. The payment stays `ACCEPTED`, nothing executes, and a manual exception process moves it later.
 - **The customer's no.** It cancels the payment at any point until it is decided, as in [Cancel a payment](./journeys/all-journeys.md#cancel-a-payment).

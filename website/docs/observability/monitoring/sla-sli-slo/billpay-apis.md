@@ -92,9 +92,15 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 ## Customer Back From the Bank
 
-**Billpay Core API** · `POST /payments/{payment-id}/confirm` · SLA availability: **99.95%**
+**Billpay Core API** · `POST /payments/{payment-id}/submission` (path Proposed) · SLA availability: **99.95%**
 
-**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It is an update to the payment's waiting workflow, which calls Amex Pay with Bank Transfer's `GET /payment-status` once and answers with the status, so its latency includes that call. The targets are still to be set, together with the status call's timeout (2026-11-22). **Error budget:** 0.05% / 30-day window.
+**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It is an update to the payment's waiting workflow, which submits the payment through Amex Pay with Bank Transfer's `PaymentSubmission` once and answers with the status, so its latency includes that call. The targets are still to be set, together with that call's timeout (2026-11-24). **Error budget:** 0.05% / 30-day window.
+
+## Amex Pay with Bank Transfer's Confirmation
+
+**Billpay Core API** · `POST /payments/{payment-id}/confirmation` (path Proposed) · SLA availability: not set yet
+
+**SLI:** latency to the 202 once the payment's waiting workflow has the signal. Amex Pay with Bank Transfer sends its answer to One-Data's `UpdatePaymentConfirmation.v1`, and One-Data calls this endpoint. Its targets are still to come.
 
 ## M3's Settled Notice
 

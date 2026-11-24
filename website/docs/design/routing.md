@@ -73,9 +73,9 @@ How a workflow starts depends on who is waiting for it.
 
 Update-With-Start is what keeps the online journeys fast. It starts the workflow and sends it an update in one call, and the request itself rides in the start, so nothing is written to Oracle before the workflow begins. The update returns as soon as there is an answer, such as Verify's decision on a new payment or `CANCELLED` for a cancel, and the rest of the workflow carries on without the caller. Temporal calls this the early-return pattern. On the Online cluster, the decision's calls also run as local activities, inside the worker, so Capture, Verify and its commit all happen in the workflow's first task and the caller's answer comes back with it.
 
-- `PENDING` in a reply means the payment is captured but not yet decided. The API waits at most 2.5 seconds for the decision, so its answer reaches One-Data inside One-Data's own 3 seconds; a payment not decided by then is answered `PENDING` and finishes on its own. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with Amex Pay with Bank Transfer's redirect link, and the channel's call once the customer is back answers with the status: `PENDING`, `ACCEPTED` or `DECLINED`. The channel's part ends there, and the customer sees the final state in their list of payments, through `ReadPayments.v1`. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A debit card payment comes back `PENDING` with the 3D Secure challenge link, or with none when the card's bank needs no challenge (Proposed), and the card provider's callback brings the decision.
+- `PENDING` in a reply means the payment is captured but not yet decided. The API waits at most 2.5 seconds for the decision, so its answer reaches One-Data inside One-Data's own 3 seconds; a payment not decided by then is answered `PENDING` and finishes on its own. The caller learns the outcome from notifications, lifecycle events or `GET /payments/{payment-id}`. For a payment that needs bank confirmation, `PENDING` comes with Amex Pay with Bank Transfer's redirect link, and the channel's call once the customer is back submits the payment to Amex Pay with Bank Transfer and answers with the status: `PENDING`, `ACCEPTED` or `DECLINED`. The channel's part ends there, and the customer sees the final state in their list of payments, through `ReadPayments.v1`. A caller that loses the link gets it again from a repeated create or from `GET /payments/{payment-id}`, while the payment waits. A debit card payment comes back `PENDING` with the 3D Secure challenge link, or with none when the card's bank needs no challenge (Proposed), and the card provider's callback brings the decision.
 - A create repeated after its `{paymentId}-init` run has closed starts a new run under the default reuse policy, and Capture's idempotency check decides whether it carries on ([Creates that arrive late or twice](./component-model/workflows/core.md#creates-that-arrive-late-or-twice)).
-- A payment that waits for the customer stays in one workflow, `CreatePaymentIntentWorkflow`, from the create to its end. The card provider's callback, the customer's no and the channel's call once the customer is back from their bank reach it as updates, so their replies carry an answer. M3's settled notice, which One-Data passes on, reaches it as a signal. For a bank, the channel's call asks Amex Pay with Bank Transfer's `GET /payment-status` once and replies with the status, and Billpay asks again while it is pending, with a gap that doubles from 2 to 30 minutes, until it is success or failure or the market's wait of 24 to 48 hours ends in `DECLINED`. A debit card's timer cancels the payment after 2 minutes.
+- A payment that waits for the customer stays in one workflow, `CreatePaymentIntentWorkflow`, from the create to its end. The card provider's callback, the customer's no and the channel's call once the customer is back from their bank reach it as updates, so their replies carry an answer. Amex Pay with Bank Transfer's confirmation and M3's settled notice, which One-Data passes on, reach it as signals. For a bank, the channel's call submits the payment through Amex Pay with Bank Transfer's `PaymentSubmission` once and replies with its answer. If the channel never calls, Amex Pay with Bank Transfer's own confirmation decides it. While neither has come, Billpay asks `GET /payment-status` as the fallback, with a gap that doubles from 2 to 30 minutes, until it is success or failure or the market's wait of 24 to 48 hours ends in `DECLINED`. A debit card's timer cancels the payment after 2 minutes.
 - Eager workflow start isn't used: the server refuses it with Update-With-Start. Online latency comes from Update-With-Start and local activities instead.
 - For pulled work and async starts, the workflow ID comes from the request: the payment ID in its idempotency key, or for a return, the returned payment and its sequence number. A repeated request finds the same workflow. A start that fails as already started counts as done, and reuse policy `REJECT_DUPLICATE` stops a second run after the first one closes.
 
@@ -115,10 +115,10 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
               via: 'uws',
               name: 'CreatePaymentIntent',
               cluster: 'Online',
-              caption: ['Capture, Verify\'s own checks, RequestConfirmation for a bank or a card, then the wait', 'After the answer: Verify on Amex Pay with Bank Transfer\'s status, or the card authorization; then Execute and Fulfil, for a bank once M3 says the money settled'],
+              caption: ['Capture, Verify\'s own checks, RequestConfirmation for a bank or a card, then the wait', 'After the answer: Verify on Amex Pay with Bank Transfer\'s answer, or the card authorization; then Execute and Fulfil, for a bank once M3 says the money settled'],
             },
           ],
-          note: "The no and the 3D Secure callback arrive as updates; the channel's call after the bank, and M3's settled notice, as signals. A bank payment is decided by GET /payment-status, asked until it is final; a debit card with no callback in 2 minutes is cancelled.",
+          note: "The no, the 3D Secure callback and the channel's call after the bank arrive as updates; Amex Pay with Bank Transfer's confirmation and M3's settled notice as signals. A bank payment is decided by Amex Pay with Bank Transfer's answer to the submission, its own confirmation, or the fallback status calls; a debit card with no callback in 2 minutes is cancelled.",
         },
         {
           desc: 'Today, several instructions',
@@ -209,8 +209,12 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
       ],
     },
     {
-      term: 'Customer back from the bank: Channel Confirm Event',
-      routes: [{desc: 'PENDING, waiting for bank confirmation; Billpay asks for the status and answers with it', flow: [{via: 'update', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
+      term: 'Customer back from the bank: Channel Submission Event',
+      routes: [{desc: 'PENDING, waiting for bank confirmation; Billpay submits the payment to Amex Pay with Bank Transfer and answers with the status', flow: [{via: 'update', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
+    },
+    {
+      term: "Amex Pay with Bank Transfer's answer: PwBT Confirmation Event",
+      routes: [{desc: 'A Pay with Bank Transfer payment still PENDING, whether or not the channel called; ignored once ACCEPTED; through One-Data', flow: [{via: 'signal', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
     },
     {
       term: '3D Secure callback: Card Authenticated Event',
@@ -218,7 +222,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
     },
     {
       term: "M3's settled notice: Bank Settled Event via M3",
-      routes: [{desc: 'A Pay with Bank Transfer payment, ACCEPTED or still PENDING; from M3, not One-Data', flow: [{via: 'signal', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
+      routes: [{desc: 'A Pay with Bank Transfer payment, ACCEPTED or still PENDING; from M3, through One-Data', flow: [{via: 'signal', name: 'CreatePaymentIntent', cluster: 'Online'}]}],
     },
     {
       term: 'Credit balance refund',
@@ -280,7 +284,7 @@ The behaviors pick the branch at each fork: `accountType` for consumer and corpo
 - A consumer split runs one `ExecuteSplitPaymentWorkflow` per leg, as children of the parent, on the parent's cluster. Verify's `ACCEPTED` commit writes the legs. The parent stays `ACCEPTED`, and each leg moves through `PROCESSING` and `PROCESSED` on its own. Splits are rare: [When a consumer payment splits](./component-model/workflows/core.md#when-a-consumer-payment-splits) lists the cases.
 - A corporate payment starts no child at all. Verify's commit writes an `ALLOC_REQUEST` row, and every later step is a Work Tracker row that a dispatcher picks up: `RequestAllocationsWorkflow` asks for the breakdown, `ReceiveAllocationsWorkflow` takes each batch, and the batch that completes the amount writes the `ALLOC_EXEC` row. The allocated-payments dispatcher then starts `ExecuteScheduledPaymentWorkflow`, which clears the parent and releases its legs, and the leg dispatcher starts one `ExecuteSplitPaymentWorkflow` per leg, because one payment can have 100K of them. [Corporate Allocations](./corporate-allocations.md) has the whole flow.
 - A request with several instructions never takes bank confirmation or a debit card, and neither does Pay & Plan or a corporate payment: one that would need either gets 422 before any workflow starts.
-- A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` runs Verify's own checks first, and declines a payment that fails them with no link. Otherwise it replies `PENDING` with Amex Pay with Bank Transfer's redirect link, or the 3D Secure challenge link for a debit card, and waits. The card provider's callback, the customer's no and the channel's call once the customer is back are updates to that same workflow; M3's settled notice is a signal. For a bank, the channel's call makes Verify ask Amex Pay with Bank Transfer's `GET /payment-status` at once and answers with the status, and Billpay keeps asking while it is pending, until it is success or failure, and Execute and Fulfil wait for M3's notice; after a callback, Verify authorizes the card, and Execute and Fulfil follow at once. A debit card with no callback in time is cancelled. No corporate payment waits here: corporate payments take neither bank confirmation nor a debit card.
+- A payment that waits for the customer starts no child either. `CreatePaymentIntentWorkflow` runs Verify's own checks first, and declines a payment that fails them with no link. Otherwise it replies `PENDING` with Amex Pay with Bank Transfer's redirect link, or the 3D Secure challenge link for a debit card, and waits. The card provider's callback, the customer's no and the channel's call once the customer is back are updates to that same workflow; Amex Pay with Bank Transfer's confirmation and M3's settled notice are signals. For a bank, the channel's call makes Verify submit the payment through Amex Pay with Bank Transfer's `PaymentSubmission` at once and answers with the status. Amex Pay with Bank Transfer's own confirmation decides it when the channel never calls, and the status calls are the fallback until it is success or failure. Execute and Fulfil wait for M3's notice; after a callback, Verify authorizes the card, and Execute and Fulfil follow at once. A debit card with no callback in time is cancelled. No corporate payment waits here: corporate payments take neither bank confirmation nor a debit card.
 
 No child workflow ever crosses clusters. A scheduled payment created on the Online cluster reaches the Offline cluster as a Work Tracker row in Oracle, written in the same commit as `SCHEDULED`.
 
@@ -308,6 +312,6 @@ The payment ID is a ULID, and every workflow ID is the payment ID plus a suffix,
 | Governor | `governor`, plus its Schedule's trigger time |
 | Market onboarding | `onboard-{market}-{accountType}-v{N}` |
 
-The channel's call and the no are not workflows. Both are updates to the waiting payment's `{paymentId}-init`, with the update IDs `{paymentId}-no` and `{paymentId}-returned`, so the whole wait and its answer show in one history.
+The channel's call and the no are not workflows. Both are updates to the waiting payment's `{paymentId}-init`, with the update IDs `{paymentId}-no` and `{paymentId}-submission`, so the whole wait and its answer show in one history.
 
 On returns and representments, `{seq}` is the [presentment](./payment-state-model.md#presentments) sequence. A return's is the presentment that came back, and a representment's is the new one it sends, so a payment returned twice runs `-return-1`, `-represent-2`, `-return-2` and `-represent-3`.

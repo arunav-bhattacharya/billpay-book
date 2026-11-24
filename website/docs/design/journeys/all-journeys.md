@@ -102,7 +102,7 @@ The customer picks a date inside the range Payment Options gives them. Billpay c
 
 ### Pay by Bank today
 
-Some markets let a customer pay straight from their bank account, confirming the payment at their bank: Pay with Bank Transfer in the UK, Plaid in the US. Billpay talks to one service for all of them, Amex Pay with Bank Transfer, which works with each market's provider. The customer starts the payment as usual, goes to their bank, and comes back. When they are back, the channel tells Billpay, which asks Amex Pay with Bank Transfer how the payment went and answers with the status: `PENDING`, `ACCEPTED` or `DECLINED`. While the answer is pending, Billpay keeps asking until it has a final one. One workflow, `CreatePaymentIntentWorkflow`, runs all of it, so the payment's whole story shows in one place in the Temporal UI.
+Some markets let a customer pay straight from their bank account, confirming the payment at their bank: Pay with Bank Transfer in the UK, Plaid in the US. Billpay talks to one service for all of them, Amex Pay with Bank Transfer, which works with each market's provider. The customer starts the payment as usual, goes to their bank, and comes back. When they are back, the channel tells Billpay, which submits the payment to Amex Pay with Bank Transfer and answers with the status: `PENDING`, `ACCEPTED` or `DECLINED`. If the channel never calls, Amex Pay with Bank Transfer sends its own answer, and until an answer comes, Billpay asks for the status itself as the fallback. One workflow, `CreatePaymentIntentWorkflow`, runs all of it, so the payment's whole story shows in one place in the Temporal UI.
 
 <JourneyMap journey="pay-by-bank-today" />
 

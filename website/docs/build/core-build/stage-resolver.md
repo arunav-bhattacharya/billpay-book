@@ -141,7 +141,7 @@ Five checks exist today. Each is a class, and each says where it applies:
 | `CardAuthorizationCheck` | `CARD_AUTHORIZATION` | Card authentication Y | The card provider, to authorize a debit card payment with its 3D Secure result. Approved, it debits the customer's account, so it runs after the other checks' rules pass (Proposed) |
 | `PointsRedemptionCheck` | `POINTS_REDEMPTION` | Points redemption Y | Loyalty, to redeem the customer's MR Points in one call. It takes the points, so it runs last, after the other checks' rules pass, like the card authorization (agreed 2026-11-23) |
 
-Bank confirmation adds no check class, and takes one away: `InstrumentCheck` doesn't apply to it. Verify calls Amex Pay with Bank Transfer's `GET /payment-status` once the customer is back, asking again while it says pending, with a gap that doubles from 2 to 30 minutes, until the market's wait of 24 to 48 hours ends, and the `BANK_CONFIRMED` rule reads the status. The token check and GB's funds check are gone (2026-11-10; the status call 2026-11-22).
+Bank confirmation adds no check class, and takes one away: `InstrumentCheck` doesn't apply to it. Verify takes Amex Pay with Bank Transfer's answer: to `PaymentSubmission` once the customer is back, in its own confirmation when the channel never calls, or, as the fallback, to `GET /payment-status`, asked with a gap that doubles from 2 to 30 minutes until the market's wait of 24 to 48 hours ends. The `BANK_CONFIRMED` rule reads the answer, whichever brought it. The token check and GB's funds check are gone (2026-11-10; the submission and the confirmation 2026-11-24).
 
 In code, a check is this small:
 
@@ -228,7 +228,7 @@ class DefaultPaymentVerifyStage(
 
 *(A sketch.)*
 
-A payment that waits for its customer runs Verify in two parts. Amex's own checks run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06): `OptionsCheck` alone for a bank, and `InstrumentCheck` and `OptionsCheck` for a debit card (agreed 2026-11-23). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. For a bank, Verify calls `GET /payment-status` and a rule reads the status (2026-11-22). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
+A payment that waits for its customer runs Verify in two parts. Amex's own checks run at the create, before the bank step or 3D Secure, and can only decline the payment (agreed 2026-11-06): `OptionsCheck` alone for a bank, and `InstrumentCheck` and `OptionsCheck` for a debit card (agreed 2026-11-23). The one check that needs the customer's bank step, `CardAuthorizationCheck`, runs after the callback. For a bank, Verify calls `PaymentSubmission`, takes Amex Pay with Bank Transfer's confirmation or calls the fallback `GET /payment-status`, and a rule reads the answer (2026-11-24). Proposed: each check says whether it needs the bank step, Verify splits its checks on that, and the first part's facts travel in the workflow, so the rules run once more over all of them before the one commit.
 
 The stage never asks which market it is in or which behaviors are on. It asks the registries for its checks and its rules and runs the same flow every time, so there is no `if` on a behavior anywhere in Verify.
 
@@ -263,7 +263,7 @@ VERIFY  mandate=N bank=N card=Y  Instrument, Options, CardAuthorization
 VERIFY  mandate=Y bank=N card=N  Instrument, Options, Mandate
 ```
 
-One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: the status call and the rule that reads it serve every market. No row has mandate authorization Y beside bank confirmation or card authentication, because the Router resolves it to N for both (Proposed, 2026-11-23).
+One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: Amex Pay with Bank Transfer's calls and the rule that reads their answer serve every market. No row has mandate authorization Y beside bank confirmation or card authentication, because the Router resolves it to N for both (Proposed, 2026-11-23).
 
 :::info[Placeholder: Represent's checks]
 Represent's rows in the report list no checks yet. Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules are classes like these, listing Represent among their steps, and the report shows them on its rows.

@@ -14,7 +14,7 @@ Without it, two kinds of code would start payments, the API handlers and the dis
 
 ## Who calls it
 
-- The core APIs, for every write a caller waits on: `POST /payments`, `PUT` and `DELETE /payments/{payment-id}`, `POST /payments/{payment-id}/confirm`, `POST /refunds` and `POST /payment-installments`.
+- The core APIs, for every write a caller waits on: `POST /payments`, `PUT` and `DELETE /payments/{payment-id}`, `POST /payments/{payment-id}/submission`, `POST /refunds` and `POST /payment-installments`.
 - The 3D Secure callback, `POST /payments/{payment-id}/authentication`, which the market's card provider calls directly. It carries no market, so it skips the profile check (agreed 2026-11-07), then goes as an update to the waiting workflow.
 - The allocations callback, `POST /payments/{payment-id}/allocations`, once it has stored the batch. billpay-offline serves it. It needs neither the market nor the account type: its payment already exists, and the payment's workflows keep the config version they started on. So it starts with no resolved profile, and its workflow has no `Market`, `ConfigVersion` or `DueDate` search attribute (`DueDate` agreed 2026-11-07, the rest Proposed).
 - The dispatchers, in billpay-offline, once for each Work Tracker row or inbox request they release.
@@ -159,7 +159,7 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 The request's payment method comes from the instrument type One-Data passes for each instruction, so the Router knows before anything starts whether a way to pay needs bank confirmation (Pay with Bank Transfer, Plaid), is a debit card (3D Secure) or is MR Points (agreed 2026-11-07).
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait, takes the channel's call and the no as updates, and asks Amex Pay with Bank Transfer for the status. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has no rule of its own: it takes `CREATE_IMMEDIATE`, and the Router sets points redemption to Y in the resolved profile, so Verify redeems the points last (agreed 2026-11-23).
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait, takes the channel's call and the no as updates and Amex Pay with Bank Transfer's confirmation as a signal, and submits the payment to Amex Pay with Bank Transfer at the channel's call. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has no rule of its own: it takes `CREATE_IMMEDIATE`, and the Router sets points redemption to Y in the resolved profile, so Verify redeems the points last (agreed 2026-11-23).
 
 No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-online ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
@@ -329,8 +329,8 @@ fun ask(paymentId: String, name: String, id: String): PaymentDecision {
     }
 }
 
-// The customer is back from their bank: Billpay asks for the status once, and the reply carries it.
-val status = ask(paymentId, "returned", "$paymentId-returned")  // PENDING, ACCEPTED or DECLINED
+// The customer is back from their bank: Billpay submits the payment once, and the reply carries the answer.
+val status = ask(paymentId, "submit", "$paymentId-submission")  // PENDING, ACCEPTED or DECLINED
 
 // The customer's no: answered with the decision.
 val reply = ask(paymentId, "decline", "$paymentId-no")          // CANCELLED
@@ -338,7 +338,7 @@ val reply = ask(paymentId, "decline", "$paymentId-no")          // CANCELLED
 
 *(A sketch: the API names are the Java SDK's, the rest illustrative.)*
 
-The workflow's validator turns away a no that comes once the workflow no longer waits, before anything is written to its history. A repeated channel's call attaches to the same `returned` update and gets the same answer.
+The workflow's validator turns away a no that comes once the workflow no longer waits, before anything is written to its history. A repeated channel's call attaches to the same `submit` update and gets the same answer.
 
 Neither cluster uses eager workflow start: the server refuses it with Update-With-Start (`RequestEagerExecution is not supported`), and online latency comes from Update-With-Start and local activities instead. On the Online cluster, Verify's calls run as local activities, so the whole decision happens in the workflow's first task.
 

@@ -282,7 +282,7 @@
               "name": {
                 "type": "string",
                 "title": "Event name",
-                "description": "The name shown in the lane, such as Channel Confirm Event."
+                "description": "The name shown in the lane, such as Channel Submission Event."
               },
               "label": {
                 "type": "string",

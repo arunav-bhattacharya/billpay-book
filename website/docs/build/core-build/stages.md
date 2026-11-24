@@ -230,7 +230,7 @@ The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INS
 | `PAYMENT_DATE_IN_RANGE`: the date sits inside Payment Options' range (agreed 2026-11-23) | `PAYMENT_DATE_OUT_OF_RANGE` |
 | `OPTION_VALID`, at Reverify (agreed 2026-11-07) | `PAYMENT_OPTION_INVALID` |
 | `BALANCE_OWED`, at Reverify (agreed 2026-11-07) | `NO_BALANCE_OWED` |
-| `BANK_CONFIRMED`, on Amex Pay with Bank Transfer's status (Proposed) | `BANK_CONFIRMATION_DECLINED` |
+| `BANK_CONFIRMED`, on Amex Pay with Bank Transfer's answer: to the submission, in its confirmation or to a status call (Proposed) | `BANK_CONFIRMATION_DECLINED` |
 | `CONFIRMATION_RECEIVED`, once the market's wait of 24 to 48 hours ends with no final status (agreed 2026-11-23) | `CONFIRMATION_NOT_RECEIVED` |
 | `CARD_AUTHENTICATED` (Proposed) | `CARD_AUTHENTICATION_FAILED` |
 | `CARD_AUTHORIZED` (Proposed) | `CARD_AUTHORIZATION_DECLINED` |

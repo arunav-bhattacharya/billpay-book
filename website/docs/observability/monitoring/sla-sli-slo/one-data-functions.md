@@ -88,11 +88,11 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 **SLI:** end-to-end latency at the function edge, covering the composite's own decision, the installment plan, and the optional Autopay update. **Error budget:** 0.1% / 30-day window.
 
-## Confirm Pending Payment
+## Create Payment Submission
 
-**One-Data Function** · `CreateConfirmPendingPayment.v1` · SLA availability: **99.95%**
+**One-Data Function** · `CreatePaymentSubmission.v1` · SLA availability: **99.95%**
 
-**SLI:** caller-observed latency for the channel's call once the customer is back from their bank, until billpay-online answers with the payment's status, which includes Billpay's one call to Amex Pay with Bank Transfer. One-Data doesn't hold it for RTF: if billpay-online doesn't answer within 3 seconds, or answers with a 5xx, the channel gets 503 and calls again (agreed 2026-11-08). The targets are still to be set (2026-11-22). **Error budget:** 0.05% / 30-day window.
+**SLI:** caller-observed latency for the channel's call once the customer is back from their bank, until billpay-online answers with the payment's status, which includes Billpay's one call to Amex Pay with Bank Transfer's `PaymentSubmission`. One-Data doesn't hold it for RTF: if billpay-online doesn't answer within 3 seconds, or answers with a 5xx, the channel gets 503 and calls again (agreed 2026-11-08). The targets are still to be set (2026-11-24). **Error budget:** 0.05% / 30-day window.
 
 ## Create Payment Allocations
 

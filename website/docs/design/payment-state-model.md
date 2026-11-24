@@ -118,7 +118,7 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PAID` | Settled with the bank and posted to Accounts Receivable. For a debit card payment, the settlement is the event Billpay created in Execute; for Pay with Bank Transfer, M3's settled notice. | Yes, unless a return arrives |
 | `RETURNED` | The presentment did not settle; the customer's bank sent the funds back. | Yes. A representment is a new row |
 | `REPRESENTED` | The next presentment of a returned payment, sent to the bank. | Yes, unless it is returned again |
-| `DECLINED` | Failed validation, or a representment failed its recheck; or Amex Pay with Bank Transfer gave no redirect link, or the card provider gave no answer; or Amex Pay with Bank Transfer's `GET /payment-status` said the payment failed; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
+| `DECLINED` | Failed validation, or a representment failed its recheck; or Amex Pay with Bank Transfer gave no redirect link, or the card provider gave no answer; or Amex Pay with Bank Transfer said the payment failed, at the channel's submission, in its own confirmation or to a status call; or the card's bank declined the authorization; or a held create arrived after its market was taken out of service. | Yes |
 | `CANCELLED` | Withdrawn while `SCHEDULED`, inside the market's cancellation window; or a debit card payment whose 3D Secure callback didn't come within 2 minutes; or the customer said no to a payment waiting for bank confirmation. | Yes |
 | `DISALLOWED` | A push payment (an inbound payment a third party sends) that American Express did not accept. Only push payments end here. | Yes |
 
@@ -132,9 +132,9 @@ There is no path from `ACCEPTED` to `CANCELLED`. Once a payment has left `SCHEDU
 | `PENDING` | `ACCEPTED`, `SCHEDULED` or `DECLINED` | Verify |
 | `PENDING` (inbound: a push payment) | `ACCEPTED` or `DISALLOWED` | Verify |
 | `PENDING` (bank confirmation or 3D Secure) | `DECLINED` | RequestConfirmation, when Amex Pay with Bank Transfer gives no redirect link, or the card provider gives no answer (Proposed) |
-| `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify. For a bank, on Amex Pay with Bank Transfer's `GET /payment-status`: success or failure, asked once at the channel's call, which gets the status as its reply, and again while it says pending. For a debit card, once the card provider calls back, and `ACCEPTED` means the authorization has debited the customer's account |
-| `PENDING` (bank confirmation) | `ACCEPTED` | Verify, on M3's settled notice when the status hasn't said success yet. Billpay logs it |
-| `PENDING` (bank confirmation) | `DECLINED` | Verify, when `GET /payment-status` says the payment failed, with `BANK_CONFIRMATION_DECLINED` (Proposed) |
+| `PENDING` (bank confirmation or 3D Secure) | `ACCEPTED` or `DECLINED` | Verify. For a bank, on Amex Pay with Bank Transfer's answer, success or failure: to `PaymentSubmission` at the channel's call, which gets the status as its reply; in its own confirmation, `UpdatePaymentConfirmation.v1`, when the channel doesn't call; or, as the fallback, to `GET /payment-status`, asked again while it says pending. For a debit card, once the card provider calls back, and `ACCEPTED` means the authorization has debited the customer's account |
+| `PENDING` (bank confirmation) | `ACCEPTED` | Verify, on M3's settled notice when Amex Pay with Bank Transfer hasn't said success yet. Billpay logs it, and Execute follows at once |
+| `PENDING` (bank confirmation) | `DECLINED` | Verify, when Amex Pay with Bank Transfer says the payment failed, in any of its three answers, with `BANK_CONFIRMATION_DECLINED` (Proposed) |
 | `PENDING` (bank confirmation or 3D Secure) | `CANCELLED` | Cancel, on the customer's no, or once a debit card's 2-minute authentication window closes with no callback |
 | `PENDING` (a held create whose market was taken out of service) | `DECLINED` | Verify, in a workflow that only captures and declines, with `MARKET_OUT_OF_SERVICE` (Proposed) |
 | `SCHEDULED` | `ACCEPTED` or `DECLINED` | Reverify, on the due date; a corporate payment goes through `ALLOCATED` first |
@@ -181,7 +181,7 @@ UPDATE trans_dtl SET status = 'CANCELLED'
 
 A payment that has been represented has a row per presentment, so Return's guard names the presentment too. When two writers race, one updates the row and the other sees zero rows updated. At the edge of the cancellation window either Cancel or Reverify wins, never both. A cancel that loses gets 409, or its earlier answer again if the payment is already `CANCELLED`. The loser backs off, and nothing has to be undone.
 
-A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A bank payment's status doesn't race M3's notice or a no from another tab in the database: the payment's own workflow takes one answer. A repeated call from the channel changes nothing, and a no that comes too late gets 409. Its commits are still guarded on `PENDING`, like every other.
+A corporate payment's allocation request races a cancel the same way. Both are guarded on `SCHEDULED`, so a payment is either cancelled or asked for its allocations, never both. A bank payment's answers don't race each other in the database: the channel's submission, Amex Pay with Bank Transfer's confirmation, M3's notice and a no from another tab all reach the payment's own workflow, which takes the first. A repeated call from the channel changes nothing, and a no that comes too late gets 409. Its commits are still guarded on `PENDING`, like every other.
 
 ## Split payments
 
