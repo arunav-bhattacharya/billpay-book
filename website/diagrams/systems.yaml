@@ -50,3 +50,5 @@
   full: Allocations Manager, which returns a corporate breakdown
 - name: Loyalty
   full: Loyalty, which redeems a customer's Membership Rewards points
+- name: CAS
+  full: CAS
