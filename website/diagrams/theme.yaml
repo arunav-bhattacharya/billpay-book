@@ -11,5 +11,5 @@ journeys:
   background-step: deep-blue
   awaiting-step: pale-deep
   trigger: pink
-  call: pale-blue
+  call: pale-grey
   link: deep-400
