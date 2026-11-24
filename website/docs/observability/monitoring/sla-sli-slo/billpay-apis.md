@@ -100,7 +100,7 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **Billpay Core API** · `POST /payments/{payment-id}/settlement` (path Proposed) · SLA availability: not set yet
 
-**SLI:** latency to the 202 once the payment's waiting workflow has the signal. Its targets are still to come.
+**SLI:** latency to the 202 once the payment's waiting workflow has the signal. M3 sends the notice to One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data calls this endpoint. Its targets are still to come.
 
 ## 3D Secure Callback
 

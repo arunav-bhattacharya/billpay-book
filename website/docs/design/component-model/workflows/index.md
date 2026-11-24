@@ -85,7 +85,7 @@ Each cluster has its own app too. billpay-online runs the Online cluster's worke
 ## Four kinds of workflow
 
 - Core workflows run one business journey each, such as paying today, executing a scheduled payment or processing a return.
-- Composite workflows are a parent that makes the decision itself and runs each payment's Execute and Fulfil as a child, sometimes across domains: Pay & Plan (Billpay and GAR), Pay with MR Points (Billpay and Loyalty), and payments with several instructions. They run on the Online cluster, with their children on the same cluster.
+- Composite workflows are a parent that makes the decision itself and runs each payment's Execute and Fulfil as a child, sometimes across domains: Pay & Plan (Billpay and GAR), and payments with several instructions. Pay with MR Points has none: Verify redeems the points through one call to Loyalty. They run on the Online cluster, with their children on the same cluster.
 - Periodic workflows are jobs that Temporal Schedules start on the Offline cluster.
 - Control workflows are the dispatchers, the governor and market onboarding. They pace and configure payment work; they aren't payment journeys themselves.
 

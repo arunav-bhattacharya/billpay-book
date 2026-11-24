@@ -11,7 +11,7 @@ import WorkflowMeta from '@site/src/components/WorkflowMeta';
 
 <Lead>A composite workflow makes the decision for a request the customer sees as one payment, then hands each payment's Execute and Fulfil to a child. Composites start on the Online cluster with Update-With-Start, and their children always run on the same cluster.</Lead>
 
-A composite exists because the customer asked for one thing. Paying now and setting up a plan, or paying with several instructions at once, is one request to them, so it gets one answer and one workflow that owns it. Pay with MR Points, which spans Billpay and Loyalty, is the third composite the design names, as `PayWithMrPointsWorkflow` (Proposed, 2026-11-07), with the workflow ID `{paymentId}-points` (agreed 2026-11-07); its steps are still to be described.
+A composite exists because the customer asked for one thing. Paying now and setting up a plan, or paying with several instructions at once, is one request to them, so it gets one answer and one workflow that owns it. Pay with MR Points needs no composite (agreed 2026-11-23). Redeeming points is one call to Loyalty, which Verify makes last, inside the decision, so points alone run as an ordinary payment today in `CreateImmediatePaymentWorkflow`, with no child workflow.
 
 ## Why the composite decides
 

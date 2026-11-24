@@ -115,7 +115,7 @@ The workflow ID comes from the request: the payment ID in its idempotency key, o
 
 The activity reads the dispatcher's row in `rate_allocation` every few seconds. The governor writes that row every 15 seconds, so a new rate reaches a running tick within seconds, with no signal and no extra workflow history.
 
-Operators override the governor through the ops API: pause, resume, or a maximum rate. An override is a row in `rate_allocation` too, and it always wins over the governor's. If the governor itself stops, its rows go stale, and once a row is 5 minutes old the dispatchers fall back to their floors instead of running on a rate nobody is watching.
+Operators override the governor through the ops API: pause, resume, or a maximum rate. An override is a row in `rate_allocation` too, and it always wins over the governor's. If the governor itself stops, its rows go stale, and once a row is 5 minutes old the dispatchers fall back to their floors instead of running on a rate nobody is watching. A row's age comes from the database clock: the governor stamps it with the database's time, and the dispatcher compares that with the database's time too, so pods whose clocks drift a few seconds still agree (agreed 2026-11-23).
 
 ## The leg dispatcher's two extra jobs
 
@@ -148,11 +148,20 @@ The decision is plain code inside the activity, and it should read like the rule
 
 1. Read the five signals. The worst one decides: raise, hold or cut.
 2. Raise the budget by 5%, but only after two calm checks in a row, because the metrics lag about 30 seconds. Cut it by multiplying by 0.8. Offline Aurora CPU over 70%, or online p99 over its SLO, halves it instead.
-3. Keep the budget in Temporal writes per second, never above the ceiling the load test measured, and charge each class its cost per workflow.
-4. Hand it out in order: online first, then the SEPA cutoff floor, the US floor, AR intake, and the rest by priority up to their demand. Cap every class by its downstreams' offline share.
+3. Keep the budget in Temporal writes per second, never above the ceiling the load test measured, and charge each class its cost per workflow. A corporate parent's execution costs 20 writes, since its legs carry their own cost. Until the load test, the ceiling of 2,000 writes a second, the starting budget of 500 and the latency baselines are Proposed.
+4. Hand it out in order: online first, then the SEPA cutoff floor, the US floor, AR intake, and the rest by priority up to their demand. Cap every class by its downstreams' offline share. A downstream that is out gives the work that calls it no rate, floors included.
 5. Write the rates to `rate_allocation`, change an Offline downstream queue's limit through the task queue config API only when it moves, write Online's limits, a SEPA run's cap included, to `downstream_limit` for billpay-online to apply, and record the inputs and outputs in a `governor_decision` row, so any rate can be explained later.
 
 Missing metrics mean hold. Still missing after 5 minutes, the governor drops every class to its floor. Overrides always win, here as in the dispatchers.
+
+Four details the build settled in round 8 (agreed 2026-11-23):
+
+| Detail | What the governor does |
+| --- | --- |
+| Cutoffs and floors | It reads two release keys: `executionCutoff`, an ISO duration from the run's start, and `executionFloorTps`. A market with a cutoff is a cutoff market; a market with several releases takes the earliest cutoff and the highest floor |
+| Demand at a rate of zero | A dispatcher's demand is what its last fetch found, so at zero it would never fetch again. Each inbox dispatcher gets a standing demand of one start a second, and the PAID drain one batch a second |
+| The even corporate split | One leg rate for every market. The leg dispatcher takes rows from each parent in turn, and the per-key limit keeps one parent from taking over a queue. Each parent's share goes into `governor_decision` |
+| Floors in an outage | No rate for work whose downstream is out, a floor included. A SEPA run waits for clearing, and the cutoff alert fires |
 
 ## Sizing
 

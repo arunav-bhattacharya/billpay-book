@@ -11,7 +11,7 @@ import Lead from '@site/src/components/Lead';
 
 ## Finding a payment's workflows
 
-Every workflow ID is the payment ID plus a suffix: `{paymentId}-init` for the create, `{paymentId}-execute` for a scheduled execution, `{paymentId}_{seq}-execute` for a leg, `{paymentId}-plan` or `{paymentId}-points` for a Pay & Plan or MR Points composite, and so on. [Workflow IDs](../../design/routing.md#workflow-ids) lists them all. So with a payment ID and the cluster, you can open the workflow directly, without searching.
+Every workflow ID is the payment ID plus a suffix: `{paymentId}-init` for the create, `{paymentId}-execute` for a scheduled execution, `{paymentId}_{seq}-execute` for a leg, `{paymentId}-plan` for a Pay & Plan composite, and so on. [Workflow IDs](../../design/routing.md#workflow-ids) lists them all. So with a payment ID and the cluster, you can open the workflow directly, without searching.
 
 A payment that waits for its customer, for their bank or to authenticate their debit card, has one workflow from the create to its end: `{paymentId}-init` on the Online cluster. For a bank, the history shows the channel's call as a `returned` update with the ID `{paymentId}-returned`, the `GET /payment-status` call it made and the status it answered with, then each later call, with a timer between them while the answer is pending, until the status is success or failure. M3's settled notice shows as a `settled` signal, and Execute follows it. The customer's no shows as an update with the ID `{paymentId}-no`, and the card provider's 3D Secure callback as `{paymentId}-authentication`. When a debit card's timer fires first, the history shows the cancel that followed.
 

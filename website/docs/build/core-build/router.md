@@ -40,7 +40,8 @@ data class ResolvedProfile(
     val requiresRealtimeClearing: Boolean,        // Y or N, never BOTH
     val requiresMandateAuthorization: Boolean,
     val requiresBankConfirmation: Boolean,
-    val cardAuthentication: Boolean,              // Y for a debit card: every one needs 3D Secure (Proposed)
+    val cardAuthentication: Boolean,              // Y for a debit card: every one needs 3D Secure
+    val pointsRedemption: Boolean,                // Y for MR Points: Verify redeems them last
     val configVersion: Int,                       // the market config version they came from
     val ruleSettings: RuleSettings,               // the verification rules' thresholds, from that version
     val confirmationWindow: Duration? = null,     // for a payment that waits for the customer; 2 minutes for a debit card
@@ -139,8 +140,7 @@ object CreateJourneys {
         JourneyRule(Journey.CREATE_INTENT, "Waits for the customer: bank confirmation or a debit card") { r, v -> r.waitsForCustomer(v) },
         JourneyRule(Journey.CREATE_SCHEDULED, "Future-dated") { r, _ -> r.isFutureDated },
         JourneyRule(Journey.MULTIPLE_INSTRUCTIONS, "Today, several instructions") { r, _ -> r.instructions.size > 1 },
-        JourneyRule(Journey.PAY_WITH_MR_POINTS, "Today, MR Points alone") { r, _ -> r.instructions.single().isMrPoints },
-        JourneyRule(Journey.CREATE_IMMEDIATE, "Today, one instruction") { _, _ -> true },
+        JourneyRule(Journey.CREATE_IMMEDIATE, "Today, one instruction, MR Points included") { _, _ -> true },
     )
 
     fun pick(r: CreatePayment, v: MarketVersion): Journey = rules.first { it.matches(r, v) }.journey
@@ -159,7 +159,7 @@ The rules are a plain list in one file, not beans that Quarkus collects the way 
 
 The request's payment method comes from the instrument type One-Data passes for each instruction, so the Router knows before anything starts whether a way to pay needs bank confirmation (Pay with Bank Transfer, Plaid), is a debit card (3D Secure) or is MR Points (agreed 2026-11-07).
 
-A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait, takes the channel's call and the no as updates, and asks Amex Pay with Bank Transfer for the status. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has its own rule, after several instructions (its place in the order is Proposed).
+A create that waits for its customer takes a journey of its own, `CREATE_INTENT`, whose workflow holds the wait, takes the channel's call and the no as updates, and asks Amex Pay with Bank Transfer for the status. `waitsForCustomer` is true when the market's bank-confirmation behavior resolves to Y for the request's payment method, or when the payment method is a debit card. It is the first rule because a payment that waits has to run in the one workflow that can wait for its customer. A request with several instructions, or a Pay & Plan request, that would need bank confirmation gets 422 instead, and so does a debit card create that is future-dated, has several instructions or carries MR Points, a corporate create that pays by debit card or needs bank confirmation, and a Pay & Plan request that pays by debit card. Pay with MR Points alone has no rule of its own: it takes `CREATE_IMMEDIATE`, and the Router sets points redemption to Y in the resolved profile, so Verify redeems the points last (agreed 2026-11-23).
 
 No rule here looks at the account's other payments. A create on an account that already has a payment in `PENDING` never reaches the Router: One-Data declines it with 200 `DECLINED` before it calls billpay-online ([Stored creates and the pending check](../api-spec/one-data.md#stored-creates-and-the-pending-check)).
 
@@ -169,7 +169,8 @@ Each behavior in the market's version is Y, N or BOTH, and a workflow must only 
 
 - For most behaviors the rule lists the journeys that get Y. Realtime clearing is the usual example: only a pay-today payment from a channel gets it. A scheduled execution always resolves it to N, even where the release sets `requiresRealtimeClearing` to Y, because a future-dated payment never clears in real time (agreed 2026-11-08). For now a corporate payment resolves it to N in every journey too, pay today included, whatever the release sets; how a corporate payment would opt into a realtime rail later isn't defined yet (agreed 2026-11-08).
 - For bank confirmation the rule lists payment methods instead. A method that needs the customer to confirm at their bank gets Y. Bank confirmation takes only payments made today. Which account types can take it is configurable: consumer for now, and business travel can be turned on later. Until then, a business travel request whose method needs it is refused with 422 (Proposed). A corporate payment whose method would need it is refused with 422. A future-dated request, or one with several instructions, that would need it is refused with 422: Pay with Bank Transfer and a payment confirmed through Plaid pay today only.
-- Card authentication is never BOTH, because no market chooses it: the Router sets it to Y whenever the payment method is a debit card (Proposed).
+- Card authentication is never BOTH, because no market chooses it: the Router sets it to Y whenever the payment method is a debit card (agreed 2026-11-23).
+- Points redemption works the same way: the Router sets it to Y when the instruction pays by MR Points, and Verify and Execute pick their strategies from it (agreed 2026-11-23).
 
 ```kotlin
 fun resolveFlag(rule: BehaviorRule, journey: Journey, method: PaymentMethod?): Boolean =

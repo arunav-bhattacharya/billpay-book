@@ -120,9 +120,11 @@ One request, more than one instruction. To the customer, that is a bank account 
 
 ### Pay with MR Points
 
-Next to the way to pay, the customer can tick Pay with MR Points, to pay with their Membership Rewards points. When the points are the only instruction, the payment runs as a composite workflow of its own, Pay with MR Points, on the Online cluster, across Billpay and Loyalty. With a bank account as well, it is two instructions, and runs as [Pay with multiple instructions](#pay-with-multiple-instructions).
+Next to the way to pay, the customer can tick Pay with MR Points, to pay with their Membership Rewards points. Redeeming them is one call to Loyalty, and it belongs to the decision the customer waits for. So when the points are the only instruction, the payment runs as an ordinary payment today, in `CreateImmediatePaymentWorkflow`: Verify redeems the points last, once every other rule has passed, and a failed redemption declines the payment. There is no composite and no child workflow. With a bank account as well, it is two instructions, and runs as [Pay with multiple instructions](#pay-with-multiple-instructions).
 
-Points pay today only. Once they are ticked, the page offers no later date, and a future-dated create with points is turned away with 422 (Proposed). A market offers points only where its Pay with MR Points setting is on (Proposed). The composite's steps and its calls to Loyalty aren't in the design yet, so this journey has no diagram.
+Points pay today only. Once they are ticked, the page offers no later date, and a future-dated create with points is turned away with 422 (Proposed). A market offers points only where its Pay with MR Points setting is on (Proposed).
+
+<JourneyMap journey="pay-with-mr-points" />
 
 ### Pay & Plan
 
@@ -196,7 +198,7 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
 
 ### A payment is paid
 
-This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. How it reaches the pairing is still open.
+This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, which records it for the pairing (Proposed). MR Points and inbound payments have no clearing either, and Billpay creates their settlement events as it does a debit card's (agreed 2026-11-23).
 
 <JourneyMap journey="a-payment-is-paid" />
 

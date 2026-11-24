@@ -35,7 +35,7 @@ For each SEPA market in its window, the view shows two lines:
 - The projected finish: now, plus the work remaining divided by the current rate.
 - The cutoff floor: the work remaining divided by the time left less 30 minutes. The governor holds the run at or above it, so the run finishes 30 minutes before its cutoff.
 
-The cutoff alert fires when the projected finish passes the cutoff minus 15 minutes, or when the floor no longer fits the budget. The US run has no cutoff, so it shows its 50 TPS floor instead.
+The cutoff alert fires when the projected finish passes the cutoff minus 15 minutes, or when the floor no longer fits the budget. The US run has no cutoff, so it shows its 50 TPS floor instead. Both come from the market's release, `executionCutoff` and `executionFloorTps`. A run whose downstream is out gets no rate, floor included, so during an outage the line drops to zero and the cutoff alert is the signal to watch.
 
 ## Downstream limits
 

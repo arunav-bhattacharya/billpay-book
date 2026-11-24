@@ -131,7 +131,7 @@ Verify decides whether a payment can go ahead. Its flow never changes: it makes 
 
 ### The checks
 
-Four checks exist today. Each is a class, and each says where it applies:
+Five checks exist today. Each is a class, and each says where it applies:
 
 | Check | Key | `appliesTo` | What it asks |
 | --- | --- | --- | --- |
@@ -139,8 +139,9 @@ Four checks exist today. Each is a class, and each says where it applies:
 | `OptionsCheck` | `OPTIONS` | Everywhere, and it runs where the create carries an option ID (agreed 2026-11-06). Proposed: an option ID isn't part of the profile, so the check makes no call for a payment without one | Payment Options. In Verify, `ReadPaymentOptionByIdentifier.v1` validates the option the customer chose; in Reverify, `ReadPaymentOptions.v1` confirms the customer still owes and the option still holds |
 | `MandateCheck` | `MANDATE` | Mandate authorization Y | Plans, for the mandate details |
 | `CardAuthorizationCheck` | `CARD_AUTHORIZATION` | Card authentication Y | The card provider, to authorize a debit card payment with its 3D Secure result. Approved, it debits the customer's account, so it runs after the other checks' rules pass (Proposed) |
+| `PointsRedemptionCheck` | `POINTS_REDEMPTION` | Points redemption Y | Loyalty, to redeem the customer's MR Points in one call. It takes the points, so it runs last, after the other checks' rules pass, like the card authorization (agreed 2026-11-23) |
 
-Bank confirmation adds no check class. Verify calls Amex Pay with Bank Transfer's `GET /payment-status` once the customer is back, asking again at a fixed interval while it says pending, and the `BANK_CONFIRMED` rule reads the status. The token check and GB's funds check are gone (2026-11-10; the status call 2026-11-22).
+Bank confirmation adds no check class. Verify calls Amex Pay with Bank Transfer's `GET /payment-status` once the customer is back, asking again while it says pending, with a gap that doubles from 2 to 30 minutes, until the market's wait of 24 to 48 hours ends, and the `BANK_CONFIRMED` rule reads the status. The token check and GB's funds check are gone (2026-11-10; the status call 2026-11-22).
 
 In code, a check is this small:
 
@@ -307,7 +308,7 @@ class CardSettlement : ClearingMethod {
 }
 ```
 
-`BankTransferSettlement` names `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`, and creates no event. A US payment confirmed through Plaid is Pay with Bank Transfer too, so it names no market. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
+`BankTransferSettlement` names `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`, and creates no event, since M3's notice, which reaches One-Data through `CreateBillpaySettlementEvent.v1`, is the settlement. `PointsSettlement` names `POINTS_REDEMPTION`, and creates the event as `CardSettlement` does (agreed 2026-11-23). A US payment confirmed through Plaid is Pay with Bank Transfer too, so it names no market. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
 
 ## How the registry decides
 

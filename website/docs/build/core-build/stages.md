@@ -217,7 +217,7 @@ object DeclineCodes {
 
 *(A sketch: the table below has every rule and its placeholder code.)*
 
-The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INSTRUMENT_OPEN` and `MANDATE_ACTIVE`; a rule that the payment option is still valid, for the Options check; and rules on the market's rule settings: the largest payment, the instrument types the market takes and the scheduling horizon. Each rule's decline code is a placeholder until product sends the codes, an UPPERCASE enum with its words joined by underscores (agreed 2026-11-07):
+The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INSTRUMENT_OPEN` and `MANDATE_ACTIVE`; a rule that the payment option is still valid, for the Options check; and rules on the market's rule settings: the largest payment and the instrument types the market takes. A scheduled create's date must sit inside the range Payment Options gives the customer, up to 30 days ahead, so there is no separate horizon rule (agreed 2026-11-23). Each rule's decline code is a placeholder until product sends the codes, an UPPERCASE enum with its words joined by underscores (agreed 2026-11-07):
 
 | Rule | Placeholder decline code |
 | --- | --- |
@@ -227,14 +227,15 @@ The first rules the build ships (agreed 2026-11-07) are `INSTRUMENT_FOUND`, `INS
 | The payment option is still valid | `PAYMENT_OPTION_INVALID` |
 | The largest payment | `AMOUNT_ABOVE_MAXIMUM` |
 | The instrument types the market takes | `INSTRUMENT_TYPE_NOT_ACCEPTED` |
-| The scheduling horizon | `DATE_BEYOND_SCHEDULING_HORIZON` |
+| `PAYMENT_DATE_IN_RANGE`: the date sits inside Payment Options' range (agreed 2026-11-23) | `PAYMENT_DATE_OUT_OF_RANGE` |
 | `OPTION_VALID`, at Reverify (agreed 2026-11-07) | `PAYMENT_OPTION_INVALID` |
 | `BALANCE_OWED`, at Reverify (agreed 2026-11-07) | `NO_BALANCE_OWED` |
 | `BANK_CONFIRMED`, on Amex Pay with Bank Transfer's status (Proposed) | `BANK_CONFIRMATION_DECLINED` |
-| `CONFIRMATION_RECEIVED`, unused while nothing caps the status calls (Proposed) | `CONFIRMATION_NOT_RECEIVED` |
+| `CONFIRMATION_RECEIVED`, once the market's wait of 24 to 48 hours ends with no final status (agreed 2026-11-23) | `CONFIRMATION_NOT_RECEIVED` |
 | `CARD_AUTHENTICATED` (Proposed) | `CARD_AUTHENTICATION_FAILED` |
 | `CARD_AUTHORIZED` (Proposed) | `CARD_AUTHORIZATION_DECLINED` |
 | `CONFIRMATION_AVAILABLE` (Proposed) | `CONFIRMATION_UNAVAILABLE` |
+| `POINTS_REDEEMED`, on Loyalty's answer (agreed 2026-11-23) | `POINTS_REDEMPTION_FAILED` |
 
 On the due date, Reverify runs two rules against `ReadPaymentOptions.v1` (agreed 2026-11-07): `BALANCE_OWED`, for a customer who no longer owes money, and `OPTION_VALID`, for an option that no longer holds. Proposed: `BALANCE_OWED` comes first, at priority 360 against 350, and a customer owes money when some option today has an amount above 0. The names of the balance options are placeholders.
 
@@ -246,6 +247,7 @@ A test asks the rule registry for every rule it holds and fails if `DeclineCodes
 
 
 - There is one Verify stage. A payment that needs no mandate never gets `MandateCheck` or `MANDATE_ACTIVE`, so it gathers no mandate details and runs no mandate rule.
+- `INSTRUMENT_OPEN` takes the statuses it accepts from the market's `enrolledInstrumentStatuses` for the payment's journey context, `ACTIVE` by default, so a market can accept another status later with no code change (agreed 2026-11-23).
 - `runsWhen` replaces any list of rule dependencies. `INSTRUMENT_OPEN` only makes sense once the instrument was found, so after "instrument not found" it is skipped, not failed, and the decision carries `INSTRUMENT_FOUND`'s code.
 - A rule keeps one decline code. Specifications combine inside a rule only when one code fits the whole condition; otherwise they are two rules.
 - The rule registry picks rules the way the stage registries pick checks: for each rule ID, the most specific rule that applies wins. A market adds a rule in its own module with `market = M` in its `appliesTo`, or replaces a shared rule by reusing its ID. No market has a rule of its own today. MX's split lives in `market/mx/`, with its numbers as rule settings in MX's release (Proposed, 2026-11-07), but it shapes the legs Verify's `ACCEPTED` commit writes rather than passing or declining the payment; [When a consumer payment splits](../../design/component-model/workflows/core.md#when-a-consumer-payment-splits) lists them.

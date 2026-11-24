@@ -43,12 +43,12 @@ Two traits narrow what a class has to hold.
 
 Every class from `SCHEDULED` to `REPRESENTED`, `ALLOCATING` and `ALLOCATED` included, is a `VerifiedPayment`. It has a `TokenizedAccount`, an amount that isn't null, a `VerifiedPaymentOption`, a `VerifiedInstrument` and an `ExecutableTimeline`. Nothing moves money until Verify has resolved all five, and the types enforce it: there's no way to hand an unverified instrument to a class that needs a verified one.
 
-`RETURNED`, `REPRESENTING` and `REPRESENTED` are also a `RepresentmentPayment`, which means they carry `returnedInfo`: when the return took effect, why, where it came from, and which payment, presentment and date it returned. Which of those fields are required is still being confirmed.
+`RETURNED`, `REPRESENTING` and `REPRESENTED` are also a `RepresentmentPayment`, which means they carry `returnedInfo`: when the return took effect, why, where it came from, and which payment, presentment and date it returned. Which of those fields are required follows the return event's contract, so they are placeholders until the company's repo supplies it.
 
 `PENDING`, `CANCELLED`, `DECLINED` and `DISALLOWED` carry neither trait.
 
 - A pending payment may not know its amount yet, so `PendingFullPayment` checks the amount when it's built. If the customer named the amount (an other amount, or an initial payment amount) or the option is already verified, the amount must be there. For any other option it must be empty, because Verify works the amount out.
-- A pending payment that waits for the customer's bank also holds `bankConfirmation`, with Amex Pay with Bank Transfer's reference, `providerReference`, and the redirect link, `redirectLink`.
+- A pending payment that waits for its customer also holds `confirmation`, a `CustomerConfirmation`, the same type for a bank and a debit card: `method` (`BANK` or `CARD`), the provider's reference, `providerReference`, and the link the customer follows, `confirmationUrl`, which is the redirect link or the challenge link, or empty when a card's bank needs no challenge (agreed 2026-11-23; the names Proposed).
 - A cancelled payment, like a declined one, may have no amount and only a plain `Timeline`, because a payment cancelled while `PENDING` was never verified.
 - A declined payment carries a `declineCode` and has no confirmation code. A leg is never declined.
 - Only a push payment, one a third party sends in, can end `DISALLOWED`.
@@ -68,7 +68,7 @@ The 32 functions, grouped by the class they start from. Leg classes mirror the f
 | From | Functions |
 | --- | --- |
 | `PendingFullPayment` | `toAcceptedFullPayment(account, amount, timeline, option, instrument)`, `toScheduledFullPayment(...)` with a `ScheduledTimeline`, `toDeclinedFullPayment(option, instrument, declineCode)`, `toCancelledFullPayment()` on the customer's no or when a debit card's window closes, and for a push payment Verify doesn't accept, `toDisallowedFullPayment(...)` |
-| `ScheduledFullPayment` | `toAcceptedFullPayment()`, `toDeclinedFullPayment(declineCode)`, `toCancelledFullPayment()`, and for a corporate payment at its fetch time, `toAllocatingFullPayment()` |
+| `ScheduledFullPayment` | `toAcceptedFullPayment(amount)`, with the amount Reverify read, `toDeclinedFullPayment(declineCode)`, `toCancelledFullPayment()`, and for a corporate payment at its fetch time, `toAllocatingFullPayment()` |
 | `AcceptedFullPayment` | `toProcessingFullPayment()`, `toAcceptedSplitPayment(splitSlice)`, and for a corporate payment paid today, `toAllocatingFullPayment()` |
 | `AllocatingFullPayment` | `toAllocatedFullPayment()`, once the batches add up |
 | `AllocatedFullPayment` | `toProcessingFullPayment()` for a payment paid today; for a scheduled one, Reverify's `toAcceptedFullPayment()` or `toDeclinedFullPayment(declineCode)` |
@@ -99,13 +99,15 @@ These were agreed on 2026-10-17 and aren't in the supplied Kotlin yet. The build
 1. `PROCESSING` → `RETURNED`, for a payment and a leg: `toReturnedFullPayment(returnedInfo)` and `toReturnedSplitPayment(returnedInfo)`.
 2. The corporate states: `AllocatingPayment` and `AllocatedPayment`, their two full classes, the six moves into and out of them, and the two status values.
 3. `PENDING` → `CANCELLED`, for a payment the customer said no to, or a debit card whose 3D Secure callback never came, with `CancelledFullPayment` accepting a missing amount and a plain `Timeline`.
-4. `bankConfirmation` on `PendingFullPayment`, holding `providerReference` and `redirectLink`.
+4. `confirmation` on `PendingFullPayment`, a `CustomerConfirmation` for a bank or a debit card alike, holding `method`, `providerReference` and `confirmationUrl` (agreed 2026-11-23; it was a bank-only `bankConfirmation`).
 5. `DisallowedFullPayment`, for push payments only.
 6. A second return's details: `RepresentedFullPayment.toReturnedFullPayment(returnedInfo)`. Today that move keeps the first return's.
 7. The next presentment: `toRepresentingFullPayment(representmentDate)` numbers it one higher and gives it the representment date as its clearing date. Today it copies the returned presentment's number and timeline.
 8. A representment that fails its recheck turns the new presentment's row `DECLINED`: `RepresentingFullPayment.toDeclinedFullPayment(declineCode)`. The supplied code's moves from `REPRESENTING` back to `RETURNED` go.
 9. `SplitSlice` gains `splitPaymentId` and `account`, and a leg takes its ID and card account from the slice. Today the code builds the ID with `paymentId.withSplit(seq)` and copies the parent's account.
 10. The leg's representment classes go, since only a whole payment is represented: `RepresentingSplitPayment` and `RepresentedSplitPayment`, with `ReturnedSplitPayment.toRepresentingSplitPayment()`, `RepresentingSplitPayment.toRepresentedSplitPayment()` and `RepresentedSplitPayment.toReturnedSplitPayment()` (agreed 2026-11-08). `RepresentingSplitPayment.toReturnedSplitPayment()` goes under change 8. A leg gets no declined class: the supplied code has none, and none is added.
+11. Reverify's new amount: `ScheduledFullPayment.toAcceptedFullPayment(amount)` takes the amount Reverify read, so a Statement Balance or Total Balance payment pays that day's amount (agreed 2026-11-23).
+12. The payment option ID travels as the `id` a `PaymentOptionReference` already has, and Verify's answer turns the reference into a `VerifiedPaymentOption` (agreed 2026-11-23).
 
 ## Still open
 

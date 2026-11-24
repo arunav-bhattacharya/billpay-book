@@ -44,7 +44,7 @@ The release failed onboarding alert fires when `MarketOnboardingWorkflow` stops 
 
 The SEPA cutoff at risk alert fires when the projected finish (now, plus the work remaining divided by the current rate) passes the cutoff minus 15 minutes, or when the cutoff floor no longer fits the governor's budget.
 
-The governor is already holding the run at or above its floor, and Online's response time can't push it below that. If Online would leave the run too little of a downstream, Online is already capped on it until the cutoff.
+The governor is already holding the run at or above its floor, and Online's response time can't push it below that. The one exception is an outage: while a downstream the run calls is out, the run gets no rate at all and waits for it. If Online would leave the run too little of a downstream, Online is already capped on it until the cutoff.
 
 1. Open the [pacing view](../observability/monitoring/pacing.md) and find what is holding the run: a downstream at its limit, the Offline database (the governor cutting on CPU or persistence latency), or slow calls filling the in-flight cap.
 2. If it is a downstream, agree a higher limit with its owner and raise it.

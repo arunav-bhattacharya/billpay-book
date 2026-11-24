@@ -89,7 +89,7 @@ Every table has one [Exposed](./tech-stack/orm.md) `Table` object, and those obj
 
 The production DDL stays as it is. What the design adds goes to the DBAs as one list:
 
-- New columns on `trans_dtl`: `legs_released_at`, `stlmt_ts`, `ar_pstd_ts`, `bank_cnfrm_ref` and `bank_cnfrm_url`, plus `pymt_optn_id`, the payment option ID the create carried (Proposed, 2026-11-08). On `split_trans_dtl`: `stlmt_ts` and `ar_pstd_ts`. On both timelines: `cluster_nm` and `batch_id`.
+- New columns on `trans_dtl`: `legs_released_at`, `stlmt_ts`, `ar_pstd_ts`, `cnfrm_ref` and `cnfrm_url`, which hold a bank's or a debit card's confirmation alike (agreed 2026-11-23; they were `bank_cnfrm_ref` and `bank_cnfrm_url`), plus `pymt_optn_id`, the payment option ID the create carried (Proposed, 2026-11-08). On `split_trans_dtl`: `stlmt_ts` and `ar_pstd_ts`. On both timelines: `cluster_nm` and `batch_id`.
 - New indexes: the batch-ID index on each timeline, and the indexes for the corporate completion check, the late-allocations check and the 48-hour check (Proposed).
 - New tables: `work_tracker`, `allocation_batch`, `exception_list`, `market_config_version`, `market_config_active` (with `in_service_in`, Proposed), `dispatch_run`, `rate_allocation`, `downstream_limit` and `governor_decision`.
 - New values: `ALLOCATING` and `ALLOCATED` in `trans_sta_cd`.

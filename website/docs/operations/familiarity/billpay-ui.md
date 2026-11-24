@@ -16,14 +16,14 @@ import Lead from '@site/src/components/Lead';
 The Operations step holds the settings that drive a market at runtime:
 
 - its time zone and execution time
-- its cancellation window and its cutoff
+- its cancellation window, its cutoff and its floor
 - when corporate allocations are fetched, and when a late one raises an alert
 - its representment rules
 - which status changes send a Raven message
-- its bank-confirmation timing, once it is set, and the instrument statuses each journey context offers
+- its bank-confirmation timing and the instrument statuses each journey context offers
 - its card provider and authentication window, for debit cards
 - its verification rule settings, such as the largest payment and the instrument types it takes
-- its scheduling horizon and whether it offers Pay with MR Points (both Proposed)
+- whether it offers Pay with MR Points (Proposed)
 - its expected volumes
 - its BOTH rules
 

@@ -78,13 +78,14 @@ The sweep's name, `DeleteStalePendingPayments.v1`, is Proposed.
 
 ## Event handlers
 
-Event handlers take events from other platforms. None of them starts or waits on a workflow: the money movement and AR handlers store what arrives in One-Data's inbox, and call Billpay only to find a payment an event doesn't name.
+Event handlers take events from other platforms. None of them starts or waits on a workflow: the money movement, AR and settlement handlers store what arrives in One-Data's inbox, and call Billpay to find a payment an event doesn't name, and, for the settlement handler, to tell a waiting payment.
 
 | Handler | What it takes |
 | --- | --- |
-| `CreateMoneyMovementEventHandler.v1` | Money movement events from MR/M3, the clearing system. A return is stored in the inbox for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment. For a debit card payment, which MR/M3 never settles, Billpay's Execute sends the settlement event here itself, dated when the money moved (Proposed). For Pay with Bank Transfer, M3's notice is the settlement; how it reaches the pairing is open (2026-11-10). |
+| `CreateMoneyMovementEventHandler.v1` | Money movement events from MR/M3, the clearing system. A return is stored in the inbox for the returns dispatcher. A settlement is recorded in the inbox against its payment and presentment. For a debit card payment, which MR/M3 never settles, Billpay's Execute sends the settlement event here itself, dated when the money moved (Proposed). For Pay with Bank Transfer, M3's notice is the settlement, and it comes through `CreateBillpaySettlementEvent.v1` below. |
 | `CreateAccountsReceivableTransactionEventHandler.v1` | Accounts Receivable (GAR) events. An AR posting is recorded in the inbox against its payment, or leg, and presentment. |
 | `CreateOpentoBuyUpdatePaymentEventHandler.v1` | Authorizations (AMP) events. It acknowledges them and does nothing else: no inbox row, and no work in Billpay. |
+| `CreateBillpaySettlementEvent.v1` | M3's notice that the payer's bank has settled a Pay with Bank Transfer payment, or that the settlement failed (agreed 2026-11-23). It calls billpay-online's `POST /payments/{payment-id}/settlement`, which signals the waiting payment. Proposed: it records a settled notice in the inbox against its payment, as the settlement for `PAID`. Its contract is a placeholder until the company's repo supplies it. |
 
 The inbox lives in One-Data's Postgres database, not in Billpay's Oracle. For `PAID`, One-Data marks a payment's row `READY` once it has both an AR posting and a settlement, whether the settlement came from MR/M3 or from Billpay, and `ProcessPaidEventsWorkflow` reads only `READY` rows and sets each payment or leg `PAID`.
 

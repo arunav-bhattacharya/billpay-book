@@ -22,6 +22,9 @@ entry:
   - kind: function
     label: CreateConfirmPendingPayment.v1
     note: once the customer is back; answers with the status
+  - kind: function
+    label: CreateBillpaySettlementEvent.v1
+    note: M3's notice, passed on to Billpay
 
 core:
   - kind: api
@@ -30,7 +33,7 @@ core:
     label: POST /payments/{payment-id}/confirm
   - kind: api
     label: POST /payments/{payment-id}/settlement
-    note: M3's notice
+    note: M3's notice, through One-Data
 
 workflow:
   - label: CreatePaymentIntentWorkflow
@@ -81,26 +84,29 @@ steps:
   - name: While pending
     state: ACCEPTED
     mode: background
-    caption: GET /payment-status at a fixed interval until success or failure
+    caption: GET /payment-status, the gap doubling from 2 to 30 minutes
     poll:
       label: GET /payment-status
-      note: Amex Pay with Bank Transfer, asked at a fixed interval until it answers success or failure
+      note: Amex Pay with Bank Transfer, asked again with a gap that doubles from 2 to 30 minutes, until it answers success or failure
     exit:
       - state: DECLINED
         label: failed
+      - state: DECLINED
+        label: no answer in 24 to 48 h
       - state: CANCELLED
         label: the customer's no
 
   - name: Settled
     state: ACCEPTED
     mode: awaiting
-    caption: M3's notice that the bank has settled the money
+    caption: M3's notice, through One-Data, that the bank has settled the money
     trigger:
       kind: signal
       name: Bank Settled Event
-      label: M3's notice that the bank has settled the money
+      label: M3's notice, through One-Data's CreateBillpaySettlementEvent.v1, that the bank has settled the money
     exit:
-      label: "no notice: exception list"
+      - label: "no notice: exception list"
+      - label: "failed: exception list"
 
   - name: Execute
     state: PROCESSING
@@ -164,24 +170,27 @@ detail:
       `BANK_CONFIRMATION_DECLINED` (the code is Proposed). Pending, or a call that times out or
       fails, is `PENDING`. The channel shows the customer that status, and its part ends there: the
       customer sees the final state later in their list of payments, which the channel reads through
-      `ReadPayments.v1`. If the channel never calls, Billpay waits a fixed time and starts asking
-      anyway.
+      `ReadPayments.v1`. If the channel never calls, Billpay waits 2 minutes (still TBD) and starts
+      asking anyway.
   - text: Everything after this runs with nobody waiting, in the same workflow.
   - step: 5
     text: >-
-      While the answer is pending, the workflow waits a fixed interval and asks again, until the
-      answer is success or failure. The delay, the interval and the status call's timeout are still
-      to be set, and so is whether anything caps the calls. The customer can still say no at any
-      point until the payment is decided, and it ends `CANCELLED`. Until then, the payment's pending
-      entry blocks the account's next payment.
+      While the answer is pending, the workflow asks again with a gap that backs off: 2 minutes, then
+      4, 8 and 16, then every 30 minutes, until the answer is success or failure. The asking stops
+      once the market's wait of 24 to 48 hours has passed since the create, and a payment still
+      pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`. The status call's timeout is still to
+      be set. The customer can still say no at any point until the payment is decided, and it ends
+      `CANCELLED`. Until then, the payment's pending entry blocks the account's next payment.
   - step: 6
     text: >-
       An `ACCEPTED` payment waits for the money to settle. Once the bank settles it in real time, it
-      tells Amex; M3 intercepts that message and calls billpay-online's `POST
-      /payments/{payment-id}/settlement`, which signals the workflow: the Bank Settled Event. If
-      M3's notice arrives before the status says success, Billpay accepts the payment on it, stops
-      asking, and logs it. If the notice never comes, the payment goes on the exception list with an
-      alert; how long Billpay waits is still open.
+      tells Amex; M3 intercepts that message and calls One-Data's `CreateBillpaySettlementEvent.v1`,
+      and One-Data calls billpay-online's `POST /payments/{payment-id}/settlement`, which signals the
+      workflow: the Bank Settled Event. If M3's notice arrives before the status says success,
+      Billpay accepts the payment on it, stops asking, and logs it. If the notice never comes, the
+      payment goes on the exception list with an alert; how long Billpay waits is still TBD. If M3
+      says the settlement failed, because Amex never received the money from the payer's bank, the
+      payment stays `ACCEPTED`, nothing executes, and a manual exception process moves it later.
   - step: 7
     text: >-
       Execute makes no clearing call, since the money moved at the bank. The statement balance goes
@@ -194,7 +203,8 @@ detail:
   - step: 9
     text: >-
       `PAID` follows once the settlement and the AR posting are both in. M3's notice is this
-      payment's settlement; how it reaches One-Data's pairing is still open.
+      payment's settlement, and One-Data keeps it for the pairing when it passes the notice on
+      (Proposed).
 
 reference:
   to: /docs/design/sequence-diagrams#14-pay-by-bank-create-status-and-settlement

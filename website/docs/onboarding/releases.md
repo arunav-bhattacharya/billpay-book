@@ -57,7 +57,7 @@ The Market Onboarding UI already has most of this flow. These are the changes th
 - `recordRfc()` stays, and becomes required before the E3 sign-off.
 - `Readiness.kt` is simulated today. The deployment rows replace it.
 - The behaviors gain `requiresBankConfirmation`, and `requiresRepresentableReturn` goes, since representment is now a market rule. Today's profiles hold none of the Operations step's settings yet.
-- The Operations step gains the scheduling horizon and the Pay with MR Points setting (Proposed). Whether the horizon stays is open, now that `ReadPaymentOptions.v1` gives each customer's date range.
+- The Operations step gains the Pay with MR Points setting (Proposed), and the governor's cutoff and floor, `executionCutoff` and `executionFloorTps`. It has no scheduling horizon: `ReadPaymentOptions.v1` gives each customer's date range (agreed 2026-11-23).
 - The API catalog takes the spec's names: `CreatePaymentIntent.v1` goes, `CreateConfirmPendingPayment.v1` and `CreatePaymentAllocations.v1` join, and the event handlers' names start with Create.
 - The third account type is stored as `BUSINESS_TRAVEL_ACCOUNT`. Onboarding maps it to `BUSINESS_TRAVEL` (Proposed, 2026-10-18).
 - Authoring will check each new behavior combination against the build's capability manifest.

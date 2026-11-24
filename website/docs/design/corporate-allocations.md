@@ -11,7 +11,7 @@ import CorporateTracks from '@site/src/components/CorporateTracks';
 
 <Lead>A corporate payment fetches its allocations before it moves money. No workflow waits for them: each step is a row in Oracle that a dispatcher picks up, and a payment made today and a scheduled one take the same path once they are `ALLOCATED`.</Lead>
 
-A corporate payment is paid once, as one amount, and the allocations manager knows how that amount divides into allocations, up to 100,000 of them in one payment. Billpay asks for that breakdown before the money moves, and the payment's own state records how far it has got: `ALLOCATING` while the batches come in, `ALLOCATED` once they add up. A corporate payment always comes from a channel, through `CreatePayment.v3`. Accounts Receivable never raises one.
+A corporate payment is paid once, as one amount, and the allocations manager knows how that amount divides into allocations, up to 100,000 of them in one payment. Billpay asks for that breakdown before the money moves, and the payment's own state records how far it has got: `ALLOCATING` while the batches come in, `ALLOCATED` once they add up. A corporate payment comes from a channel, through `CreatePayment.v3`, or from a third party as an inbound payment, which takes the same path but never clears: its parent only releases the legs (agreed 2026-11-23). Accounts Receivable never raises one.
 
 <CorporateTracks />
 

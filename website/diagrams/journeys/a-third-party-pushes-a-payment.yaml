@@ -41,8 +41,8 @@ steps:
   - name: Execute
     state: PROCESSING
     mode: background
+    caption: no clearing call
     systems:
-      - MR/M3
       - GAR
       - Payment Instruments
       - AMP
@@ -67,9 +67,8 @@ steps:
     trigger:
       kind: events
       name: Settled and Posted Events
-      label: the bank's settlement and Accounts Receivable's posting, paired in One-Data's inbox
+      label: the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's inbox
     systems:
-      - MR/M3
       - GAR
     exit:
       state: RETURNED
@@ -84,9 +83,18 @@ detail:
     text: >-
       A payment American Express doesn't accept ends at `DISALLOWED`. That state exists only on this
       journey.
+  - step: 3
+    text: >-
+      An inbound payment makes no clearing call. Execute applies it in Accounts Receivable and
+      Authorizations, and hands One-Data the settlement event Billpay creates, as for a debit card.
   - text: >-
-      Past that, it is an ordinary payment. The money is applied, every downstream system is told,
-      and it turns `PAID` once both confirmations are in.
+      One inbound payment can be split across several card accounts, each leg running
+      `ExecuteSplitPaymentWorkflow`. A consumer's request names the card accounts and how much each
+      takes. A corporate one gets its split from the allocations manager, as a [corporate
+      payment](#pay-a-corporate-bill-today) does, and its parent only releases the legs.
+  - text: >-
+      Past that, it is an ordinary payment. Every downstream system is told, and it turns `PAID` once
+      both confirmations are in.
 
 reference:
   to: /docs/design/sequence-diagrams#9-inbound-payment

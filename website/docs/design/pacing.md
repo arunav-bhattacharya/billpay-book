@@ -132,7 +132,8 @@ CPU over 70%, or online p99 over its SLO, halves the budget outright. Persistenc
 - Raise by 5%, but only after two calm checks in a row, because the metrics lag by about 30 seconds. Cut by multiplying by 0.8.
 - The budget is in Temporal writes per second, not workflow starts, because the database is the constraint. Each class is charged its measured cost per workflow: about 55 writes for a scheduled execution, 40 for a leg, 20 for a return.
 - The PAID drain costs only about 20 Temporal writes per batch of 500 payments, but its weight falls on Oracle instead. So its rate is in payments a second, and the Oracle signals cut it first.
-- The ceiling is the writes per second the load test measured at 60% CPU.
+- A corporate parent's execution is charged 20 writes. It clears once and releases its legs, and the legs carry their own cost.
+- The ceiling is the writes per second the load test measured at 60% CPU. Until the load test runs, the ceiling of 2,000 writes a second, the starting budget of 500 and the latency baselines are Proposed.
 
 ### Handing it out, in order
 
@@ -142,7 +143,13 @@ CPU over 70%, or online p99 over its SLO, halves the budget outright. Persistenc
 4. AR intake: its demand, the requests waiting in One-Data's inbox.
 5. The rest by priority, up to demand: SEPA and US execution above their floors, then corporate (split evenly across the active corporate payments), then inbound, then representments, then returns, and the PAID drain last.
 
-Every class is also capped by the downstream systems it calls (see [Throttling](./throttling.md)). The inbox dispatchers have no in-flight cap, so while RTF calls fail or a downstream they call is out, they get no rate at all.
+A **floor** is the lowest rate the governor promises a scheduled run, however hard it is cutting everything else. Each market's release sets two keys for it: `executionCutoff`, how long after the run starts it must finish (`PT3H`, say), and `executionFloorTps`, the lowest rate the run may drop to, 50 for the US. A market whose release sets a cutoff is a cutoff market. When a market has several releases, one per account type, it takes the earliest cutoff and the highest floor.
+
+A dispatcher's **demand** is what it found on its last fetch. At a rate of zero it fetches nothing, so it would never show demand again and would stay stuck at zero. To keep that from happening, each inbox dispatcher keeps a standing demand of one start a second, and the PAID drain one batch a second.
+
+The **even corporate split** means corporate payments take turns. Each payment to one card account inside a corporate payment is a leg, and one corporate payment can have up to 100,000 of them. The governor writes one leg rate for every market, and the leg dispatcher takes legs from each corporate payment in turn. A payment with 50 legs finishes in about a second instead of waiting about 17 minutes behind one with 100,000. The per-key limit stops any one payment from taking over a queue, and each payment's share is written to `governor_decision`.
+
+Every class is also capped by the downstream systems it calls (see [Throttling](./throttling.md)). The inbox dispatchers have no in-flight cap, so while RTF calls fail or a downstream they call is out, they get no rate at all. Floors give way to an outage too. While a downstream is out, every call to it would fail, so the work that calls it gets no rate, floor included: a SEPA run waits for clearing even close to its cutoff, and the cutoff alert tells operations.
 
 ### The cutoff alert
 
@@ -153,7 +160,7 @@ Two hours before each SEPA run, it also warns when online traffic is likely to b
 ### Guardrails
 
 - If metrics go missing, the governor holds its rates. Still missing after 5 minutes, it drops to the floors.
-- If the governor itself stops, dispatchers fall back to their floors once `rate_allocation` is 5 minutes stale.
+- If the governor itself stops, dispatchers fall back to their floors once `rate_allocation` is 5 minutes stale. The age is measured on the database clock, which stamps the row and which the dispatcher reads, never a pod's own clock.
 - Manual overrides always win.
 - Every decision goes to `governor_decision` with its inputs, so any rate can be explained later.
 

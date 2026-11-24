@@ -124,8 +124,8 @@ detail:
       `ReadBillpayInstruments.v1`.
   - step: 2
     text: >-
-      The payment method is a debit card, so the Router sets card authentication to Y (Proposed) and
-      starts `CreatePaymentIntentWorkflow`. Amex's own checks come first, before 3D Secure: Payment
+      The payment method is a debit card, so the Router sets card authentication to Y and starts
+      `CreatePaymentIntentWorkflow`. Amex's own checks come first, before 3D Secure: Payment
       Instruments, Payment Options' `ReadPaymentOptionByIdentifier.v1` for the option the customer
       picked, and Plans where the market requires a mandate. A payment that fails them is `DECLINED`
       at once, and 3D Secure never starts.
@@ -135,7 +135,7 @@ detail:
       callback URL. When the card's bank wants a challenge, the provider returns the challenge link,
       and the caller's update returns `PENDING` with it. When it needs none, the caller gets
       `PENDING` with no link (Proposed). If the provider doesn't answer, the payment is `DECLINED`
-      instead (Proposed).
+      instead.
   - step: 4
     text: >-
       The customer completes the challenge, such as a one-time code or a banking-app approval, while
@@ -144,7 +144,7 @@ detail:
       taken.
   - step: 5
     text: >-
-      The card provider calls `POST /payments/{payment-id}/authentication` (the path is Proposed)
+      The card provider calls `POST /payments/{payment-id}/authentication`, with mutual TLS,
       directly, not through One-Data, and the call is an update to the waiting workflow. A failed 3D
       Secure result is `DECLINED` with no authorization. Otherwise, since Amex's own checks passed
       at the create, Verify only authorizes the payment with the card provider (the check is

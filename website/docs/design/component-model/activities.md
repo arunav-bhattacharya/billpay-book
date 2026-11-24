@@ -124,7 +124,7 @@ An activity takes what it needs as lightly as it can: usually the payment ID, or
 
 <ActivityTable rows={ACTIVITIES} />
 
-`BankConfirmationActivities` asks Amex Pay with Bank Transfer for two things: the redirect link, at the create, and the payment's status, through `GET /payment-status`, once the customer is back, and again at a fixed interval while it says pending. The status call has one try each time, and the next interval is its retry, so a timeout or a 5xx counts as pending. The channel's call and M3's notice are not activities: both call billpay-online, which sends the channel's call to the workflow as an update and M3's notice as a signal.
+`BankConfirmationActivities` asks Amex Pay with Bank Transfer for two things: the redirect link, at the create, and the payment's status, through `GET /payment-status`, once the customer is back, and again while it says pending, with a gap that doubles from 2 to 30 minutes. The status call has one try each time, and the next ask is its retry, so a timeout or a 5xx counts as pending. The channel's call and M3's notice are not activities: both reach billpay-online, M3's through One-Data's `CreateBillpaySettlementEvent.v1`, and billpay-online sends the channel's call to the workflow as an update and M3's notice as a signal.
 
 `CardActivities` makes two calls for a debit card. RequestConfirmation starts 3D Secure and gets the challenge link, and Verify's card authorization check authorizes the payment last, which debits the customer's account. The card provider's answer to 3D Secure doesn't come back through an activity at all: the provider calls billpay-online's callback, and the waiting workflow takes it as an update.
 

@@ -267,7 +267,8 @@
                 "Card provider",
                 "Installments",
                 "Globestar",
-                "Allocations"
+                "Allocations",
+                "Loyalty"
               ],
               "enumDescriptions": [
                 "Payment Instruments, which owns and verifies the way a customer pays, and gives the clear-text details that open-to-buy and the notifications need",
@@ -289,7 +290,8 @@
                 "The market's card provider, for a debit card's 3D Secure and its authorization: Checkout.com in the UK",
                 "Installments, which owns the instalment plan",
                 "Globestar, which holds the instalment plan",
-                "Allocations Manager, which returns a corporate breakdown"
+                "Allocations Manager, which returns a corporate breakdown",
+                "Loyalty, which redeems a customer's Membership Rewards points"
               ]
             }
           },

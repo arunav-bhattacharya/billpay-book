@@ -157,26 +157,34 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         result = decision.status
         // ... the delete and the announcement; then, for ACCEPTED:
         if (result == PaymentDecision.ACCEPTED && profile.bankConfirmation) {
-            Workflow.await(checkNotNull(profile.settlementWait)) { settlement != null }  // its length is open
+            Workflow.await(checkNotNull(profile.settlementWait)) { settlement != null }  // its length is TBD
             if (settlement == null) return stages.exceptions.noSettlement(paymentId)   // exception list, alert
+            if (!settlement!!.settled)                                  // Amex never got the money: it stays
+                return stages.exceptions.settlementFailed(paymentId)   // ACCEPTED for a manual process
         }
         // ... Execute, with no clearing call, then Fulfil, for ACCEPTED
         Workflow.await { Workflow.isEveryHandlerFinished() }   // no update left without its reply
     }
 
-    // A bank: wait for the channel's call or the fixed time, then ask until the status is final.
+    // A bank: wait for the channel's call or 2 minutes, then ask until the status is final or the wait ends.
     private fun bank(stages: Stages, paymentId: String, own: OwnChecks, profile: ResolvedProfile): Decision {
-        Workflow.await(profile.statusCheckDelay) { back || no || settlement != null }   // the delay is still to be set
+        val paid = { settlement?.settled == true }
+        val end = Workflow.currentTimeMillis() + checkNotNull(profile.confirmationWindow).toMillis()  // 24 to 48 h
+        var gap = profile.statusCheckInterval                                // 2 minutes, doubling up to 30
+        Workflow.await(profile.statusCheckDelay) { back || no || paid() }   // 2 minutes, still TBD
         while (true) {
             if (no) return stages.cancel.run(paymentId)                      // CANCELLED
-            if (settlement != null) return stages.verify.accept(paymentId, own)  // M3 first: logged
+            if (paid()) return stages.verify.accept(paymentId, own)          // M3 first: logged
             back = false
             val status = stages.verify.paymentStatus(paymentId)              // GET /payment-status, one try;
                                                                              // a timeout or a 5xx counts as PENDING
             if (status != BankStatus.PENDING) return stages.verify.bankStatus(paymentId, own, status)
             asks++                                                           // a waiting channel's call gets PENDING
-            Workflow.await(profile.statusCheckInterval) { back || no || settlement != null }   // pending: ask again
-        }                                                                    // later, or at once on the channel's call
+            val left = Duration.ofMillis(end - Workflow.currentTimeMillis())
+            if (left <= Duration.ZERO) return stages.verify.notReceived(paymentId, own)  // CONFIRMATION_NOT_RECEIVED
+            Workflow.await(minOf(gap, left)) { back || no || paid() }        // pending: ask again after the gap,
+            gap = minOf(gap.multipliedBy(2), profile.statusCheckMaxInterval) // or at once on the channel's call
+        }
     }
 
     // A debit card: wait for the 3D Secure callback, 2 minutes and the grace.
@@ -196,7 +204,7 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
         Workflow.await { asks > before || result != null }                 // the next status answer
         return result ?: PaymentDecision.PENDING                           // PENDING, ACCEPTED or DECLINED
     }
-    override fun settled(notice: SettlementNotice) { if (settlement == null) settlement = notice }   // M3's signal
+    override fun settled(notice: SettlementNotice) { if (settlement == null) settlement = notice }   // M3's, via One-Data
     // decision() answers the create, as in Create Immediate Payment; decline() and authenticated(result), the
     // card provider's 3D Secure callback, are updates that set `no` or keep the result for Verify
 }
@@ -205,8 +213,8 @@ class CreatePaymentIntentWorkflowImpl(private val stageResolver: StageResolver) 
 *(GRACE is 10 seconds.)*
 
 - The no, the 3D Secure callback and the channel's call are updates with fixed IDs, `{paymentId}-no`, `{paymentId}-authentication` and `{paymentId}-returned` (Proposed), so a repeat whose reply was lost attaches to the same update and gets the same answer.
-- One call is a signal, since it needs no answer from the workflow. M3's settled notice, `POST /payments/{payment-id}/settlement`, sends `settled`: it lets Execute run for an `ACCEPTED` bank payment, and accepts one whose status hasn't said success yet (agreed 2026-11-10). It gets 202.
-- For a bank, the channel's call, `POST /payments/{payment-id}/confirm`, sends `returned`, and Verify calls Amex Pay with Bank Transfer's `GET /payment-status` at once. Success is `ACCEPTED` and failure `DECLINED` with `BANK_CONFIRMATION_DECLINED` (Proposed). Pending, a timeout or a 5xx is `PENDING`. The update replies with that status, and the channel's part ends there (agreed 2026-11-22). While it is pending, Billpay asks again after a fixed interval, until the status is final. With no call from the channel, the first ask comes after a fixed time. The delay, the interval and the status call's timeout are still to be set, and so is whether anything caps the calls.
+- One call is a signal, since it needs no answer from the workflow. M3's settled notice reaches One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data calls `POST /payments/{payment-id}/settlement`, which sends `settled`: it lets Execute run for an `ACCEPTED` bank payment, and accepts one whose status hasn't said success yet (agreed 2026-11-10; through One-Data 2026-11-23). It gets 202. A notice that the settlement failed leaves the payment `ACCEPTED`, on the exception list, for a manual exception process (agreed 2026-11-23).
+- For a bank, the channel's call, `POST /payments/{payment-id}/confirm`, sends `returned`, and Verify calls Amex Pay with Bank Transfer's `GET /payment-status` at once. Success is `ACCEPTED` and failure `DECLINED` with `BANK_CONFIRMATION_DECLINED` (Proposed). Pending, a timeout or a 5xx is `PENDING`. The update replies with that status, and the channel's part ends there (agreed 2026-11-22). While it is pending, Billpay asks again after a gap that starts at 2 minutes and doubles up to 30 minutes, until the status is final. With no call from the channel, the first ask comes after 2 minutes, still TBD. Once the market's wait of 24 to 48 hours has passed since the create, a payment still pending is `DECLINED` with `CONFIRMATION_NOT_RECEIVED` (agreed 2026-11-23). The status call's timeout is still to be set.
 - When a debit card's timer fires with no callback, the workflow cancels the payment itself and announces it. It never relies on a terminate or an execution timeout, because either would leave the payment `PENDING` with nobody told.
 - A timer handled late, because the Online cluster or its workers were down, ends the wait like any other: a bank payment then asks for the status, and a debit card payment is cancelled.
 - Amex's own checks run before the bank step or 3D Secure (agreed 2026-11-06), so a payment they would decline never sends the customer to their bank. After a debit card's callback, Verify runs only the card authorization (agreed 2026-11-06). For a bank, it calls `GET /payment-status`, and a rule reads the status, with no token check and no funds check (agreed 2026-11-22). How Verify splits its checks is Proposed: each check says whether it needs the bank step, and the first part's facts are carried in the workflow.

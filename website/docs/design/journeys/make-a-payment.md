@@ -34,13 +34,13 @@ A channel makes at most four calls. Each one is drawn as a navy chip, like <Call
 3. <CallChip name="CreatePayment.v3" />, when the customer reviews and pays. It carries the chosen option's ID, and it is the only call that starts anything.
 4. <CallChip name="CreateConfirmPendingPayment.v1" trigger="update" event="Channel Confirm Event" />, for Pay with Bank Transfer only, once the payer's bank routes the customer back to the channel. Billpay asks Amex Pay with Bank Transfer for the payment's status and answers with it: `PENDING`, `ACCEPTED` or `DECLINED` ([below](#pay-with-bank-transfer)). The channel shows the customer that status, and its part of the payment ends there.
 
-Two more calls reach billpay-online directly, never from the channel: <CallChip who="other" name="POST /payments/{payment-id}/settlement" trigger="signal" event="Bank Settled Event" />, M3's notice that the bank has settled a Pay with Bank Transfer payment, and <CallChip who="other" name="POST /payments/{payment-id}/authentication" trigger="update" event="Card Authenticated Event" />, the card provider's 3D Secure callback for a debit card.
+Two more calls reach Billpay from other systems, never from the channel. M3 calls <CallChip who="other" name="CreateBillpaySettlementEvent.v1" trigger="signal" event="Bank Settled Event" /> when the payer's bank has settled a Pay with Bank Transfer payment, and One-Data passes the notice on to billpay-online's `POST /payments/{payment-id}/settlement`. The card provider calls <CallChip who="other" name="POST /payments/{payment-id}/authentication" trigger="update" event="Card Authenticated Event" /> directly, its 3D Secure callback for a debit card.
 
 The reads only guide the page. Once the payment is created, Verify calls Payment Options and Payment Instruments again, and those calls decide. A scheduled payment is checked once more on its due date, when Reverify confirms the customer still owes money and the option still holds. Pay with Bank Transfer, a debit card and MR Points pay today only, so once the customer picks a later date the page doesn't offer them, and a later create with one gets 422 before any workflow starts. Wallets aren't a source for now.
 
 ## One list, two journey contexts
 
-The same customer can see a different list of enrolled instruments depending on what they are setting up. The channel says which through `journeyContext`, and the market's `enrolledInstrumentStatuses` setting lists the instrument statuses each context may offer. Every context offers `ACTIVE` instruments alone until a market says otherwise. DE is the example: a one-time payment takes only `ACTIVE` instruments, but Autopay may also take one still pending verification.
+The same customer can see a different list of enrolled instruments depending on what they are setting up. The channel says which through `journeyContext`, and the market's `enrolledInstrumentStatuses` setting lists the instrument statuses each context may offer. Every context offers `ACTIVE` instruments alone until a market says otherwise. Verify's `INSTRUMENT_OPEN` rule reads the same setting, so a status a market adds is accepted at the create too, with no code change. DE is the example: a one-time payment takes only `ACTIVE` instruments, but Autopay may also take one still pending verification.
 
 | `journeyContext` | What it sets up | Default | DE |
 | --- | --- | --- | --- |
@@ -60,9 +60,9 @@ The page sends one request to one door, `CreatePayment.v3`, whatever the custome
 | [Pay by Bank today](./all-journeys.md#pay-by-bank-today) | Today, with a way to pay that needs a bank step | `CreatePaymentIntentWorkflow` |
 | [Pay by Debit card](./all-journeys.md#pay-by-debit-card) | Today, a debit card | `CreatePaymentIntentWorkflow` |
 | [Pay with multiple instructions](./all-journeys.md#pay-with-multiple-instructions) | Today, a bank account and MR Points | `CreatePaymentWithMultipleInstructionsWorkflow` |
-| [Pay with MR Points](./all-journeys.md#pay-with-mr-points) | Today, MR Points only | The Pay with MR Points composite |
+| [Pay with MR Points](./all-journeys.md#pay-with-mr-points) | Today, MR Points only | `CreateImmediatePaymentWorkflow`, which redeems the points before it replies |
 
-The Router checks them in its own order, and the first that matches wins: a wait first, because a payment that waits for the customer has to run in the one workflow that can wait for them. Then a later date, then several instructions, then MR Points alone, and pay today last. The order is Proposed, and so is MR Points' place in it.
+The Router checks them in its own order, and the first that matches wins: a wait first, because a payment that waits for the customer has to run in the one workflow that can wait for them. Then a later date, then several instructions, and pay today last, which takes MR Points alone too. The order is Proposed.
 
 ## When another payment is still pending
 
@@ -82,10 +82,13 @@ Billpay talks to one bank-transfer service, Amex Pay with Bank Transfer, which w
 1. The Router starts `CreatePaymentIntentWorkflow`. Amex's own checks run first: the Instrument, Options and Mandate checks. A payment that fails them is `DECLINED` at once, with no link.
 2. RequestConfirmation asks Amex Pay with Bank Transfer for the customer's redirect link, and the reply is `PENDING` with it. The customer approves the payment at their bank.
 3. The payer's bank routes the customer back to the channel, and the channel calls <CallChip name="CreateConfirmPendingPayment.v1" trigger="update" event="Channel Confirm Event" />. The channel waits while Billpay calls Amex Pay with Bank Transfer's `GET /payment-status` once. Success makes the payment `ACCEPTED`, and failure makes it `DECLINED`. Pending, or a call that times out or fails, leaves it `PENDING`. The reply carries that status, the channel shows it to the customer, and the channel's part ends there.
-4. While the answer is pending, Billpay waits a fixed interval and asks again, until the answer is success or failure. Nobody waits for it. If the channel never calls, Billpay waits a fixed time and starts asking anyway.
-5. An `ACCEPTED` payment waits once more, for M3's notice that the bank has settled the money. Only then do Execute and Fulfil run. Execute makes no clearing call, since the money moved at the bank. If M3's notice comes before the status says success, Billpay accepts the payment on it and stops asking.
+4. While the answer is pending, Billpay asks again, and nobody waits for it. The gaps back off: 2 minutes, then 4, 8 and 16, then every 30 minutes, until the answer is success or failure. If the channel never calls, Billpay waits 2 minutes and starts asking anyway; that first 2 minutes is still TBD.
+5. The asking stops when the market's wait runs out, 24 to 48 hours after the create. A payment still pending then is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`.
+6. An `ACCEPTED` payment waits once more, for M3's notice that the bank has settled the money. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, and One-Data passes it on to billpay-online. Only then do Execute and Fulfil run. Execute makes no clearing call, since the money moved at the bank. If M3's notice comes before the status says success, Billpay accepts the payment on it and stops asking.
 
-The customer sees the final state later in their list of payments, which the channel reads through `ReadPayments.v1`. The customer can say no at any point until the payment is decided, and it ends `CANCELLED`. An `ACCEPTED` payment whose notice never comes goes on the exception list with an alert.
+The customer sees the final state later in their list of payments, which the channel reads through `ReadPayments.v1`. The customer can say no at any point until the payment is decided, and it ends `CANCELLED`. An `ACCEPTED` payment whose notice never comes goes on the exception list with an alert; how long Billpay waits for it is still TBD.
+
+M3's notice can also say the settlement failed: Amex never received the money from the payer's bank. The payment then stays `ACCEPTED`, nothing executes, and a manual exception process moves it later.
 
 ## Debit card
 
@@ -93,25 +96,27 @@ A debit card is its own way to pay, apart from a bank account. Every debit card 
 
 1. The Router starts `CreatePaymentIntentWorkflow`. Amex's own checks run first, and a payment that fails them is `DECLINED` before 3D Secure starts. Otherwise RequestConfirmation asks the market's card provider (Checkout.com in the UK) to start 3D Secure, and gives it Billpay's callback URL.
 2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link (Proposed).
-3. The card provider calls `POST /payments/{payment-id}/authentication` (Proposed) once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
+3. The card provider calls `POST /payments/{payment-id}/authentication`, with mutual TLS, once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
 4. Verify authorizes the payment (the check is Proposed). The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
 5. Execute makes no clearing call, because the money has moved. Billpay creates the settlement event itself and hands it to One-Data (Proposed), and the payment is `PAID` once that event and Accounts Receivable's posting are both in.
 
 If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. Consumer and business travel payments can pay by debit card; corporate payments can't. A debit card pays today only, with one instruction, never with MR Points and never through Pay & Plan.
 
+A debit card and Pay with Bank Transfer are built to stay alike. Both run in `CreatePaymentIntentWorkflow`, both reply `PENDING` with a `confirmationUrl` (the redirect link or the challenge link), and the payment keeps either kind in one `CustomerConfirmation`: the provider's reference and the link. Both settlements reach One-Data's inbox, M3's for a bank and Billpay's own for a card. What differs is only what each provider needs: the status calls and M3's notice for a bank, the callback and the authorization for a card.
+
 ## Pay & Plan and MR Points
 
 Pay & Plan doesn't come through this door. A customer who sets up a plan sends `CreatePaymentInstallment.v1`, and the Router starts the Pay & Plan composite. One-Data's pending check covers that create too.
 
-MR Points sit next to the way to pay. Points alone run the Pay with MR Points composite, across Billpay and Loyalty. Points with a bank account are two instructions, so they run as Pay with multiple instructions. Points pay today only, and a debit card doesn't combine with them. A market whose Pay with MR Points setting is off turns a points create away with 422 (Proposed).
+MR Points sit next to the way to pay. Redeeming them is one call to Loyalty, and it is part of the decision the customer waits for: Verify redeems the points last, once every other rule has passed, and a failed redemption declines the payment. Points alone run as pay today, in `CreateImmediatePaymentWorkflow`, with no composite and no child workflow. Execute makes no clearing call for them, and the rest runs as for any payment. Points with a bank account are two instructions, so they run as Pay with multiple instructions, and the points instruction is redeemed the same way. Points pay today only, and a debit card doesn't combine with them. A market whose Pay with MR Points setting is off turns a points create away with 422 (Proposed).
 
 ## Still to be defined
 
 - Where the page gets the ways to pay the market offers, its limits, the cancellation window, whether it offers Pay & Plan and MR Points, and a payment already pending. `ReadPaymentOptions.v1` is one option.
 - The contract of `ReadBillpayInstruments.v1`, and the path of the billpay-online endpoint behind it.
 - The contract of Amex Pay with Bank Transfer's `GET /banks`.
-- For Pay with Bank Transfer: the fixed time before Billpay first asks for the status when the channel doesn't call, the interval between calls, and where both are set; the status call's timeout inside the channel's call; whether anything caps the calls; the contract of `GET /payment-status`; and the contract of M3's notice, how long an `ACCEPTED` payment waits for it, and what Billpay does when money moves on a declined payment.
-- Whether Verify's `INSTRUMENT_OPEN` rule, which takes `ACTIVE` alone, follows `enrolledInstrumentStatuses` when a market adds a status for a one-time payment.
-- The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionByIdentifier.v1`, and the decline code for an option that no longer holds.
-- The steps of the Pay with MR Points composite, and its calls to Loyalty.
-- Wallet: which instrument it is, and whether it needs a bank step.
+- For Pay with Bank Transfer: the first 2 minutes before Billpay asks for the status when the channel doesn't call, the status call's timeout, and how long an `ACCEPTED` payment waits for M3's notice.
+- The contracts of `ReadPaymentOptions.v1` and `ReadPaymentOptionByIdentifier.v1`, `GET /payment-status`, `CreateBillpaySettlementEvent.v1` and Loyalty's redemption. They stay placeholders until the company's repo supplies them.
+- The decline code for an option that no longer holds.
+
+Wallets are out of scope for now.

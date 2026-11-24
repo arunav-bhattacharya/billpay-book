@@ -1,0 +1,115 @@
+# yaml-language-server: $schema=../schemas/journey.schema.json
+# $schema: ../schemas/journey.schema.json
+#
+# Pay with MR Points: one journey on Design > Journeys > All Journeys.
+# Change the words after the colons. Keep the indenting as it is.
+# How to edit, and what each field means: website/diagrams/README.md
+
+title: Pay with MR Points
+eyebrow: Immediate payment, Membership Rewards points
+kind: customer
+
+origin:
+  actor: Cardmember
+  channels:
+    - Web
+    - Mobile app
+    - Servicing rep
+  note: A market offers points only where its Pay with MR Points setting is on (Proposed).
+
+entry:
+  - kind: function
+    label: CreatePayment.v3
+
+core:
+  - kind: api
+    label: POST /payments
+
+workflow:
+  - label: CreateImmediatePaymentWorkflow
+
+steps:
+  - name: Capture
+    state: PENDING
+    mode: live
+
+  - name: Verify
+    state: ACCEPTED
+    mode: live
+    caption: redeems the points last, then replies
+    reply: to the caller with ACCEPTED or DECLINED
+    systems:
+      - Payment Instruments
+      - Payment Options
+      - Loyalty
+    exit:
+      state: DECLINED
+
+  - name: Execute
+    state: PROCESSING
+    mode: background
+    caption: no clearing call
+    systems:
+      - GAR
+      - Payment Instruments
+      - AMP
+
+  - name: Fulfil
+    state: PROCESSED
+    mode: background
+    systems:
+      - Accounting
+      - eBNC
+      - Risk
+      - TFNE
+      - GPHDB
+      - B2Notifier
+      - RTF
+      - Raven
+
+  - name: Paid
+    state: PAID
+    mode: awaiting
+    caption: settled and posted
+    trigger:
+      kind: events
+      name: Settled and Posted Events
+      label: the settlement event Billpay creates and Accounts Receivable's posting, paired in One-Data's inbox
+    systems:
+      - GAR
+    exit:
+      state: RETURNED
+
+detail:
+  - text: >-
+      Next to the way to pay, the customer ticks Pay with MR Points. When the points are the only
+      instruction, the Router sets points redemption to Y and starts the same workflow as
+      any payment today. There is no composite and no child workflow.
+  - step: 1
+    text: >-
+      Billpay writes the payment and its idempotency key in one insert-if-absent, as for any
+      payment.
+  - step: 2
+    text: >-
+      Verify runs its checks and rules first. Only once they pass does it redeem the points, through
+      one call to Loyalty, because the redemption takes the points and no later rule may decline a
+      payment that has already taken them. A failed redemption declines the payment with
+      `POINTS_REDEMPTION_FAILED` (a placeholder code). Verify then commits `ACCEPTED` or `DECLINED`,
+      and the caller's update returns right there.
+  - text: Everything after this runs with nobody waiting, in the same workflow.
+  - step: 3
+    text: >-
+      Execute makes no clearing call, since redeeming the points paid the bill. The statement
+      balance goes down in Accounts Receivable and available credit up in Authorizations, as for any
+      payment.
+  - step: 4
+    text: >-
+      Accounting, eBNC, risk, TFNE, GPHDB and B2Notifier first, then the RTF event and the Raven
+      message, then `PROCESSED`.
+  - step: 5
+    text: >-
+      Billpay creates the settlement event itself and hands it to One-Data, as for a debit card,
+      so the payment turns `PAID` once that event and the AR posting are both in.
+  - text: >-
+      Points pay today only, and never with a debit card. With a bank account as well, the payment is
+      two instructions, and runs as [Pay with multiple instructions](#pay-with-multiple-instructions).
