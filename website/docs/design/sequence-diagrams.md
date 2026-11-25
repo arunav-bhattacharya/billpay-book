@@ -17,7 +17,7 @@ import Lead from '@site/src/components/Lead';
 - A numbered label such as **1 · Create** names each phase. Each phase's label has its own colour, so you can tell neighbouring phases apart.
 - The field behind a phase says which side runs it: pale blue for the Online side (billpay-online and its cluster, where a caller is usually waiting), pale navy for the Offline side (billpay-offline and its cluster, where dispatchers pace the work). No field means the step happens outside Billpay. The key under each diagram repeats this.
 - A grey note between phases is time when nothing runs, because the work is waiting in Oracle, in One-Data's inbox, or on a workflow's timer.
-- A pink arrow is where something outside starts or resumes the payment: an update or a signal to its running workflow, a dispatcher or a callback starting the next workflow, or the events One-Data pairs before `PAID`. [All Journeys](./journeys/all-journeys.md) marks the same steps with pink flags.
+- A pink arrow is where something outside starts or resumes the payment: an update or a signal to its running workflow, a dispatcher or a callback starting the next workflow, or the events that reach One-Data's inbox before `PAID`. [All Journeys](./journeys/all-journeys.md) marks the same steps with pink flags.
 - An arrow to `PaymentStore` is a commit: the guarded state change and its timeline entry in one transaction, with any Work Tracker rows.
 - Every payment workflow starts through the Router, which admits the request and pins the resolved profile. The PAID drain and the missing-events check start from Schedules instead.
 - RTF and Raven are drawn because their timing matters. Each change is announced to RTF, and to Raven where the customer is told, after the commit that makes it. Fulfil is the exception: it tells both before it commits `PROCESSED`, except for a Pay with Bank Transfer or debit card payment, whose `PROCESSED` goes to neither.
@@ -426,12 +426,12 @@ sequenceDiagram
 
   rect rgba(0,23,90,0.12)
     Note over MM,RAV: 2 · Return, every minute
-    RD->>IN: ReadStartRequests.v1
+    RD->>IN: read READY returns, over JDBC
     IN-->>RD: the oldest READY returns
     RD->>R: start through the Router
     Note over R: admit, pin profile,<br/>priority 5
     R->>WF: dispatcher start,<br/>{paymentId}-return-{seq}
-    RD->>IN: UpdateStartRequests.v1: DONE
+    RD->>IN: mark DONE
     Note over WF,QR: checks the payment and the presentment that came back
     WF->>RET: run
     RET->>PS: presentment RETURNED
@@ -495,7 +495,7 @@ sequenceDiagram
 
 ## 9. Inbound payment
 
-Inbound payments are push payments: a third party sends the money in. One-Data stores each one and replies 202, so the sender never waits on Billpay. The inbound dispatcher starts it on Offline at priority 3, and Verify either accepts it or marks it `DISALLOWED`. An accepted one runs Execute with no clearing call, then Fulfil. One that is split runs a leg for each card account: a consumer's request names them, and a corporate payment's come from the allocations manager, as on [Corporate Allocations](./corporate-allocations.md).
+Inbound payments are push payments: a third party sends the money in. One-Data stores each one and replies 202, so the sender never waits on Billpay. The inbound dispatcher starts it on Offline at priority 3, and Verify either accepts it or marks it `DISALLOWED`. An accepted one runs Execute with no clearing call, then Fulfil. One that is split runs a leg for each card account: a consumer's or business travel account's request names them, and a corporate payment's come from the allocations manager, as on [Corporate Allocations](./corporate-allocations.md).
 
 ```mermaid
 ---
@@ -532,12 +532,12 @@ sequenceDiagram
 
   rect rgba(0,23,90,0.12)
     Note over TP,RTF: 2 · Decide, every minute
-    ID->>IN: ReadStartRequests.v1
+    ID->>IN: read READY payments, over JDBC
     IN-->>ID: the oldest READY payments
     ID->>R: start through the Router
     Note over R: admit, pin profile,<br/>priority 3
     R->>WF: dispatcher start,<br/>{paymentId}-init
-    ID->>IN: UpdateStartRequests.v1:<br/>DONE, or REJECTED
+    ID->>IN: mark DONE, or REJECTED
     WF->>CAP: run
     CAP->>PS: PENDING, if new
     WF->>RTF: PENDING event
@@ -555,7 +555,7 @@ sequenceDiagram
 
 ## 10. Paid events
 
-A payment is paid once two events are in: the settlement from MR/M3 and the AR posting from GAR. A debit card payment has no clearing, so MR/M3 sends no settlement for it. Billpay creates that event itself: Execute hands it to the same handler MR/M3 uses, dated when the money moved, so its row pairs the same way. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, which records it for the pairing (Proposed). MR Points and inbound payments have no clearing either, and Billpay creates their settlement events as it does a debit card's (agreed 2026-11-23). One-Data's inbox keeps one row per payment or leg, and whichever event arrives second sets the row `READY`. A corporate leg's posting takes its payment's settlement, and a consumer split's leg has its own. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, with no routing, which settles up to 500 rows in one transaction, tells RTF, and marks each row `DONE` if it turned `PAID`, or `UNMATCHED` if it didn't.
+A payment is paid once Billpay has its AR posting from GAR and, unless the settlement is known, its settlement from MR/M3. One-Data only stores: each event fills its time on the payment's, or leg's, inbox row and marks the row `READY`, which means an event came in for Billpay to look at. Billpay decides (agreed 2026-11-24). A debit card, MR Points or inbound payment, and its legs, has a known settlement, because its money moved at the card authorization, the points redemption or the third party's push, so it is paid on the posting alone and Billpay sends no settlement event of its own. A Pay with Bank Transfer payment's settlement is M3's notice, which One-Data stores as the settlement. A corporate leg reads its payment's settlement, and a consumer split's leg has its own. Every 30 seconds a Schedule starts `ProcessPaidEventsWorkflow`, with no routing. It reads up to 500 `READY` rows from One-Data's table itself, over JDBC, pairs the events and settles the ones that are paid in one transaction, tells RTF, and marks each row `DONE`, `WAITING` if an event is still missing, or `UNMATCHED` if it could be paid but its payment isn't `PROCESSED`.
 
 ```mermaid
 ---
@@ -585,22 +585,23 @@ sequenceDiagram
 
   participant RTF
 
-  Note over MM,RTF: 1 · Pair the two events, one inbox row per payment or leg
+  Note over MM,RTF: 1 · Store the events, one inbox row per payment or leg
   MM->>IN: settlement,<br/>CreateMoneyMovementEventHandler.v1
-  Note over MM,IN: debit card and Pay with Bank Transfer:<br/>Billpay's Execute sends it instead
+  Note over MM,IN: none for a known settlement:<br/>debit card, MR Points, inbound
   GAR->>IN: AR posting, CreateAccounts<br/>ReceivableTransactionEventHandler.v1
-  Note over GAR,IN: the second one sets the row READY
+  Note over GAR,IN: each event marks its row READY
 
   rect rgba(0,23,90,0.12)
     Note over MM,RTF: 2 · Settle, every 30 s
     SCH->>WF: start, overlap SKIP
     loop until a fetch returns fewer than 500 rows
-      WF->>IN: ReadPaidReadyPayments.v1
-      IN-->>WF: up to 500 READY rows
+      WF->>IN: read up to 500 READY rows, over JDBC
+      IN-->>WF: the rows and their times
       WF->>SET: run, with a batch ID
+      Note over SET: pairs the events: the posting and<br/>a settlement, or the posting alone<br/>where the settlement is known
       SET->>PS: PAID, one transaction
       WF->>RTF: PAID events, one call
-      WF->>IN: UpdatePaidReadyPayments.v1:<br/>DONE or UNMATCHED
+      WF->>IN: mark DONE, WAITING<br/>or UNMATCHED, guarded
       Note over WF: paced by the governor
     end
   end
@@ -608,7 +609,7 @@ sequenceDiagram
 
 ## 11. Missing paid events
 
-Sometimes one of the two events never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing (for a corporate leg, the settlement is its payment's; the posting is the leg's own), and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. MR/M3 never settles a debit card payment, so for one the check asks GAR alone, and always hands over Billpay's own settlement event again, since Billpay can't read the inbox to see whether it has it (Proposed). M3 does report a Pay with Bank Transfer payment's settlement, so whether the check asks it about one waits on how M3's notice reaches the pairing (open). Whatever it can't find raises an alert, and the inbox row shows which event is missing.
+Sometimes an event never arrives. `ProcessMissingPaidEventsWorkflow` looks for payments and legs still `PROCESSED` after 48 hours, asks MR/M3 and GAR for what is missing (for a corporate leg, the settlement is its payment's; the posting is the leg's own), and sends anything it finds through the usual One-Data handler, so the event reaches the inbox the one way events do. Where the settlement is known (a debit card, MR Points, or an inbound payment and its legs) it asks GAR alone, and it hands over no settlement event of Billpay's. It asks GAR alone for a Pay with Bank Transfer payment too, since M3's notice came in before Execute ran (agreed 2026-11-24). Whatever it can't find raises an alert, and the inbox row shows which event is missing.
 
 ```mermaid
 ---
@@ -635,15 +636,12 @@ sequenceDiagram
     SCH->>WF: start, hourly (Proposed)
     Note over SCH,WF: still PROCESSED after 48 hours,<br/>split parents skipped
     loop each one found
-      opt not a debit card
+      opt the settlement isn't known, and not Pay with Bank Transfer
         WF->>MM: ask for the settlement
         MM-->>WF: current state
       end
       WF->>GAR: ask for the AR posting
       GAR-->>WF: current state
-      opt a debit card
-        WF->>IN: Billpay's own settlement again<br/>(Proposed)
-      end
       alt found
         WF->>IN: hands it to its One-Data handler
       else still missing
@@ -652,7 +650,7 @@ sequenceDiagram
     end
   end
 
-  Note over IN,WF: a row UNMATCHED for 48 hours alerts through UpdateUnmatchedPayments.v1
+  Note over IN,WF: a row UNMATCHED for 48 hours alerts<br/>through billpay_paid_unmatched_stale
 ```
 
 ## 12. Pay & Plan
@@ -824,7 +822,7 @@ What the picture leaves out, so it stays readable:
 - **Declines at the create.** A failed own check, or no link from Amex Pay with Bank Transfer, makes the payment `DECLINED` in one commit guarded on `PENDING`, and the channel gets `DECLINED` with no link.
 - **A failed submission.** If `PaymentSubmission` times out or gets a 5xx, the reply is `PENDING`, and Amex Pay with Bank Transfer's confirmation or the fallback status calls decide the payment later.
 - **After the reply.** The customer sees the payment's final state later in their list of payments, which the channel reads through `ReadPayments.v1`. RTF gets every state change as an event but `PROCESSED`, and Raven sends the customer the market's messages, none for `PROCESSED`.
-- **A late confirmation.** Amex Pay with Bank Transfer sends its answer whether or not the channel called, so a payment already `ACCEPTED` ignores it. A confirmed answer on a payment already `DECLINED` or `CANCELLED` goes on the exception list with an alert (Proposed).
+- **A late confirmation.** Amex Pay with Bank Transfer sends its answer whether or not the channel called, so a payment already `ACCEPTED` ignores it. A confirmed answer on a payment already `DECLINED` or `CANCELLED` goes on the exception list, and an alert fires.
 - **No answer at all.** The fallback status calls start 2 minutes after the create. The 2 minutes is still TBD, and so are the timeouts of `PaymentSubmission` and the status call.
 - **The market's wait ends.** If the answer is still pending 24 to 48 hours after the create, the payment is `DECLINED` with `CONFIRMATION_NOT_RECEIVED`, and the asking stops.
 - **A repeated submission.** It attaches to the same update and gets the same answer.
@@ -887,7 +885,7 @@ sequenceDiagram
 
 ## 16. Pay by Debit card: create, 3D Secure and authorization
 
-A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, on the instrument and the payment option, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-online directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS. Execute makes no clearing call, because the money has already moved, and hands One-Data the settlement event Billpay creates, dated when the money moved. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
+A debit card payment needs 3D Secure, the card schemes' check that the customer is the cardholder, and then an authorization that takes the money. One workflow, `CreatePaymentIntentWorkflow`, holds the payment throughout. Amex's own checks run first, on the instrument and the payment option, and a payment that fails them is `DECLINED` before 3D Secure starts. RequestConfirmation then asks the market's card provider (Checkout.com in the UK) to start 3D Secure and gives it Billpay's callback URL. The create's update ends at `PENDING` with the challenge link, or with no link when the card's bank needs no challenge. The provider then calls billpay-online directly, not through One-Data, and the callback is an update to the same workflow. Verify then only authorizes the payment: the authorization debits the customer's account if it holds enough money, and the card's bank declines it if not. The callback's reply carries the decision, and the callback itself is authenticated by mutual TLS. Execute makes no clearing call, because the money has already moved, and hands One-Data no settlement event: the settlement is known, so the payment turns `PAID` on GAR's posting alone. Once the payment is decided, the workflow calls One-Data's delete API, as in diagram 14. If no callback comes within 2 minutes and the grace, the timer cancels the payment, and nothing was taken.
 
 ```mermaid
 ---

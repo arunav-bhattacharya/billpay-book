@@ -64,13 +64,13 @@ steps:
   - name: Paid
     state: PAID
     mode: awaiting
-    caption: settled and posted
+    caption: posted
     trigger:
       kind: events
       name: Posted Event from GAR
       label: >-
-        Accounts Receivable's posting, paired in One-Data's inbox with the settlement event Billpay
-        creates
+        Accounts Receivable's posting. The settlement is known, so the posting alone pays the
+        payment, or each leg
     systems:
       - GAR
     exit:
@@ -89,15 +89,20 @@ detail:
   - step: 3
     text: >-
       An inbound payment makes no clearing call. Execute applies it in Accounts Receivable and CAS,
-      and hands One-Data the settlement event Billpay creates, as for a debit card.
+      and hands One-Data no settlement event: the third party has already sent the money, so the
+      settlement is known.
   - text: >-
       One inbound payment can be split across several card accounts, each leg running
-      `ExecuteSplitPaymentWorkflow`. A consumer's request names the card accounts and how much each
-      takes. A corporate one gets its split from the allocations manager, as a [corporate
-      payment](#pay-a-corporate-bill-today) does, and its parent only releases the legs.
+      `ExecuteSplitPaymentWorkflow`. A consumer's or business travel account's request names the
+      card accounts and how much each takes, as a list of legs, tens of them and fewer than 100; the
+      legs must add up exactly to the amount, or the request is `REJECTED`. A corporate one gets its
+      split from the allocations manager, as a [corporate payment](#pay-a-corporate-bill-today)
+      does, and its parent only releases the legs. The parent sends nothing once its legs finish:
+      every message goes out per leg.
   - text: >-
-      Past that, it is an ordinary payment. Every downstream system is told, and it turns `PAID`
-      once both confirmations are in.
+      Past that, it is an ordinary payment, with no wait for a date: one dated after its submit date
+      still runs at once. Every downstream system is told, and it turns `PAID` once Accounts
+      Receivable's posting is in.
 
 reference:
   to: /docs/design/sequence-diagrams#9-inbound-payment

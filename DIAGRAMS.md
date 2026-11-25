@@ -309,7 +309,7 @@ the same file. Use tokens and both themes work for free.
 One colour sits outside the DLS on purpose. `--amex-trigger`, a pink, with
 `--amex-trigger-ink` for type on it, marks anything that starts or resumes a payment
 from outside its running work: a Temporal update or signal, a callback, a dispatcher,
-or the events One-Data pairs. Temporal's own UI marks signals in pink, and a blue mark
+or the events that reach the inbox before `PAID`. Temporal's own UI marks signals in pink, and a blue mark
 would sink among the blue arrows. Use it only for that, and through one of the three
 places that already draw it: JourneyMap's Outside lane, the `TriggerTag` component
 (also `CallChip`'s `trigger` prop), RouteMap's lines, and a sequence diagram's `%% trigger:` lines.

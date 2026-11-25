@@ -326,7 +326,7 @@
 }
 /* Triggers: a message where something outside starts or resumes a payment
    (a signal, an update to a running workflow, a dispatcher's or callback's
-   start, the events One-Data pairs). The diagram's source names them with
+   start, the events that reach the inbox before PAID). The diagram's source names them with
    `%% trigger:` comments, and src/theme/Mermaid marks them. One class more
    than the message rules above, so these win by specificity, not by order. */
 .docusaurus-mermaid-container svg[aria-roledescription='sequence'] .bp-trigger.messageLine0,

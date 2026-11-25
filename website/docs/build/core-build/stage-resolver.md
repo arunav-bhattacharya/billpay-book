@@ -295,7 +295,7 @@ class BatchClearing : ClearingMethod {
 
 Realtime clearing is either Y or N for any payment, so exactly one of the two applies. Execute's stage asks the registry for its clearing method and never needs to know which one it got.
 
-Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank, or at the card authorization. Each gets a clearing method that makes no clearing call. MR/M3 never sends a settlement for a debit card, so its method creates the settlement event instead. It hands the event to One-Data's money movement handler, `CreateMoneyMovementEventHandler.v1`, through `InboxActivities`, dated when the money moved, and One-Data pairs it with the AR posting like any other. For Pay with Bank Transfer, M3 reports the settlement itself, and its notice is the settlement, so that method creates no event (2026-11-10). Each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names and mechanism Proposed):
+Pay with Bank Transfer and a debit card need no clearing at all, because their money has moved already: at the bank, or at the card authorization. Each gets a clearing method that makes no call at all. MR/M3 never sends a settlement for a debit card, and Billpay sends none either: the settlement is known, so the PAID drain pays the payment on the AR posting alone (agreed 2026-11-24). For Pay with Bank Transfer, M3 reports the settlement itself, and its notice is the settlement (2026-11-10). Each names one more behavior than `RealtimeClearing`, so it wins the key for those payments without an `if` anywhere (names and mechanism Proposed):
 
 ```kotlin
 @Singleton
@@ -304,12 +304,12 @@ class CardSettlement : ClearingMethod {
     override val appliesTo =
         AppliesTo(on = setOf(REALTIME_CLEARING, CARD_AUTHENTICATION))
     // no clearing call: the authorization moved the money.
-    // Billpay creates the settlement event, dated when the money moved,
-    // and hands it to One-Data's money movement handler.
+    // no settlement event either: the settlement is known, so the
+    // AR posting alone makes the payment PAID.
 }
 ```
 
-`BankTransferSettlement` names `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`, and creates no event, since M3's notice, which reaches One-Data through `CreateBillpaySettlementEvent.v1`, is the settlement. `PointsSettlement` names `POINTS_REDEMPTION`, and creates the event as `CardSettlement` does (agreed 2026-11-23). A US payment confirmed through Plaid is Pay with Bank Transfer too, so it names no market. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
+`BankTransferSettlement` names `BANK_CONFIRMATION` in place of `CARD_AUTHENTICATION`, and creates no event, since M3's notice, which reaches One-Data through `CreateBillpaySettlementEvent.v1`, is the settlement. `PointsSettlement` names `POINTS_REDEMPTION`, and makes no call either, since a points payment's settlement is known too (agreed 2026-11-24). A US payment confirmed through Plaid is Pay with Bank Transfer too, so it names no market. RequestConfirmation picks its request the same way: `BankConfirmationRequest` for bank confirmation, `CardAuthenticationRequest` for a debit card's 3D Secure.
 
 ## How the registry decides
 

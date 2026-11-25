@@ -94,13 +94,21 @@ Every write from a channel answers through Update-With-Start: the caller gets th
 
 **Billpay Core API** · `POST /payments/{payment-id}/submission` (path Proposed) · SLA availability: **99.95%**
 
-**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It is an update to the payment's waiting workflow, which submits the payment through Amex Pay with Bank Transfer's `PaymentSubmission` once and answers with the status, so its latency includes that call. The targets are still to be set, together with that call's timeout (2026-11-24). **Error budget:** 0.05% / 30-day window.
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 150 ms | 300 ms | 600 ms | 1 s | 1.5 s |
+
+**SLI:** request-to-response latency for the channel's call once the customer is back from their bank. It is an update to the payment's waiting workflow, which submits the payment through Amex Pay with Bank Transfer's `PaymentSubmission` once and answers with the status, so its latency includes that call. No contract will come, so these targets are placeholders, set like the 3D Secure callback's (agreed 2026-11-24). **Error budget:** 0.05% / 30-day window.
 
 ## Amex Pay with Bank Transfer's Confirmation
 
-**Billpay Core API** · `POST /payments/{payment-id}/confirmation` (path Proposed) · SLA availability: not set yet
+**Billpay Core API** · `POST /payments/{payment-id}/confirmation` (path Proposed) · SLA availability: **99.95%**
 
-**SLI:** latency to the 202 once the payment's waiting workflow has the signal. Amex Pay with Bank Transfer sends its answer to One-Data's `UpdatePaymentConfirmation.v1`, and One-Data calls this endpoint. Its targets are still to come.
+| P50 | P90 | P99 | P99.9 | P99.99 |
+| --- | --- | --- | --- | --- |
+| 50 ms | 110 ms | 230 ms | 450 ms | 800 ms |
+
+**SLI:** latency to the 202 once the payment's waiting workflow has the signal. Amex Pay with Bank Transfer sends its answer to One-Data's `UpdatePaymentConfirmation.v1`, and One-Data calls this endpoint. The targets are placeholders, set like the allocations callback's (agreed 2026-11-24). **Error budget:** 0.05% / 30-day window.
 
 ## M3's Settled Notice
 

@@ -71,17 +71,13 @@ steps:
   - name: Paid
     state: PAID
     mode: awaiting
-    caption: settled and posted
+    caption: posted
     trigger:
       kind: events
       name: Posted Event from GAR
-      label: >-
-        Accounts Receivable's posting, paired in One-Data's inbox with the settlement event Billpay
-        creates
+      label: Accounts Receivable's posting. The settlement is known, so the posting alone pays it
     systems:
       - GAR
-    exit:
-      state: RETURNED
 
 detail:
   - text: >-
@@ -110,8 +106,10 @@ detail:
       Raven message, then `PROCESSED`.
   - step: 5
     text: >-
-      Billpay creates the settlement event itself and hands it to One-Data, as for a debit card, so
-      the payment turns `PAID` with the Posted Event from GAR, once the AR posting joins that event.
+      Redeeming the points was the settlement, so there is nothing more to wait for. Billpay sends
+      no settlement event, and the payment turns `PAID` with the Posted Event from GAR, Accounts
+      Receivable's posting alone. `PAID` is final: a points payment can't be returned, since it
+      doesn't clear through MR/M3, where returns come from.
   - text: >-
       Points pay today only, and never with a debit card. With a bank account as well, the payment
       is two instructions, and runs as [Pay with multiple

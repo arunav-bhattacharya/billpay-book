@@ -73,7 +73,7 @@ Each start sets the deterministic workflow ID, reuse policy `REJECT_DUPLICATE`, 
 
 ### The inbox dispatchers
 
-The AR intake, returns and inbound dispatchers run the same tick against One-Data's inbox. `ReadStartRequests.v1` takes the place of the claim, and `UpdateStartRequests.v1` marks the requests `DONE` once they have started, or `REJECTED` when the Router can't admit them. Nothing needs claiming, because each of these dispatchers has one run at a time (overlap SKIP) and a repeated start counts as done. The workflow ID comes from the request itself.
+The AR intake, returns and inbound dispatchers run the same tick against One-Data's inbox. billpay-offline reads the requests from One-Data's table itself, over JDBC, in place of the claim, and marks them `DONE` once they have started, or `REJECTED` when the Router can't admit them. Nothing needs claiming, because each of these dispatchers has one run at a time (overlap SKIP) and a repeated start counts as done. The workflow ID comes from the request itself.
 
 They have no in-flight cap, because no Work Tracker row counts their work. The governor's rate paces them instead, and it drops to zero while RTF calls fail or a downstream they call is out.
 

@@ -41,9 +41,8 @@ A stage makes its calls first, in parallel wherever they don't depend on each ot
 @Singleton
 class DefaultPaymentExecuteStage(
     // RealtimeClearing or BatchClearing; BankTransferSettlement or
-    // CardSettlement, which make no clearing call. CardSettlement hands
-    // One-Data the settlement event Billpay creates; for a bank, M3's
-    // settled notice is the settlement
+    // CardSettlement, which make no call: a card's settlement is known,
+    // and for a bank, M3's settled notice is the settlement
     private val clearingMethods: MethodRegistry<ClearingMethod>,
 ) : PaymentExecuteStage {
     override val key = EXECUTE

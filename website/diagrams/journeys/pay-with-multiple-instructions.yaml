@@ -47,9 +47,12 @@ detail:
       through `ReadPaymentOptionByIdentifier.v1`, and if the option no longer holds, every
       instruction is declined with `PAYMENT_OPTION_INVALID`. The points instruction's Verify redeems
       its points through Loyalty, last, before the reply, and a failed redemption declines that
-      instruction.
+      instruction. Each instruction has its own profile, with points redemption only on the points
+      instruction, and no mandate check for the points, since they take no money from a bank
+      account.
   - step: 2
     text: >-
       Each accepted instruction then runs Execute and Fulfil in a child on the same cluster, the
       same steps as [Pay my bill today](#pay-my-bill-today). The points instruction's Execute makes
-      no clearing call, since redeeming the points already paid it.
+      no clearing call, since redeeming the points already paid it. It needs no settlement event
+      either: the points instruction turns `PAID` on Accounts Receivable's posting alone.

@@ -134,28 +134,8 @@ For definitions of SLA, SLI and SLO, and how to read each entry, see the [overvi
 
 **SLI:** latency of the call every create workflow makes once its payment is decided, after the caller's reply (an inbound payment makes none), to remove the stored create and the account's pending entry. The workflow retries until it lands, so a breach shows up as entries that stay in Redis longer, and while one stays, One-Data declines that account's next payment. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
 
-## Read Inbox
-
-**One-Data Functions** · `ReadPaidReadyPayments.v1` · `ReadStartRequests.v1` · SLA availability: **99.9%**
-
-| P50 | P90 | P99 | P99.9 | P99.99 |
-| --- | --- | --- | --- | --- |
-| 50 ms | 120 ms | 300 ms | 600 ms | 1 s |
-
-**SLI:** latency for one batch of `READY` rows, up to 500 for the `PAID` drain or a dispatcher's tick for start requests. A miss only delays the next tick. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
-
-## Update Inbox
-
-**One-Data Functions** · `UpdatePaidReadyPayments.v1` · `UpdateStartRequests.v1` · SLA availability: **99.9%**
-
-| P50 | P90 | P99 | P99.9 | P99.99 |
-| --- | --- | --- | --- | --- |
-| 40 ms | 100 ms | 250 ms | 500 ms | 900 ms |
-
-**SLI:** latency for setting one batch of rows `DONE`, `UNMATCHED` or `REJECTED` in one transaction. Setting a status twice does no harm, so a retry is safe. Targets Proposed (2026-10-20). **Error budget:** 0.1% / 30-day window.
-
 ## Not Targeted
 
-`UpdateUnmatchedPayments.v1` has no SLA. One-Data runs it on a cron schedule and nobody calls it, so the measure is the alert it raises for a row `UNMATCHED` for 48 hours.
+The inbox has no function to measure any more: billpay-offline reads and updates its two tables itself, over JDBC, so those reads count as the PAID drain's and the dispatchers' own work (agreed 2026-11-24). Billpay's gauge, `billpay_paid_unmatched_stale`, raises the alert for a row `UNMATCHED` for 48 hours.
 
-The hourly sweep of pending entries has none either, for the same reason. Its measure is its alert, raised when a run removes entries whose delete never landed or finds payments still `PENDING` past their market's sweep age.
+The hourly sweep of pending entries has no SLA either. One-Data runs it on a schedule and nobody calls it. Its measure is its alert, raised when a run removes entries whose delete never landed or finds payments still `PENDING` past their market's sweep age.

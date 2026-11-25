@@ -84,8 +84,8 @@ const JOURNEYS = {
   points: {
     term: 'Pay with MR Points',
     to: `${ALL}#pay-with-mr-points`,
-    wf: 'Pay with MR Points composite',
-    text: 'A composite across Billpay and Loyalty. Its steps are still to be defined.',
+    wf: 'CreateImmediatePaymentWorkflow',
+    text: 'Verify redeems the points through Loyalty last, once the other checks pass. Execute makes no clearing call, and the payment turns PAID on its Accounts Receivable posting alone.',
   },
 };
 

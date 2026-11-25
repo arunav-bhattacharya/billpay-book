@@ -52,7 +52,7 @@ Each entry on the two sub-pages has:
 - [One-Data Functions](./one-data-functions.md) carries the SLA, SLI and SLO for the versioned, contract-level functions. Each function's availability matches the core API behind it, and its latency targets are a little looser, because they include the function edge.
 - [Billpay Core APIs](./billpay-apis.md) carries the same for the REST endpoints behind them. Latency targets are slightly tighter, because there is no function-edge overhead.
 
-Between them, the two pages cover every API and function in [Build → API Spec](../../../build/api-spec/index.md): the channel's call after the bank, the allocations callback, AR and inbound intake, the event handlers, the inbox functions and the Market Onboarding API included. Every figure is assumed for now, until it is agreed. An entry whose targets are marked Proposed had them proposed with its API, and the instruments read has no targets yet.
+Between them, the two pages cover every API and function in [Build → API Spec](../../../build/api-spec/index.md): the channel's call after the bank, the allocations callback, AR and inbound intake, the event handlers and the Market Onboarding API included. Billpay reads One-Data's inbox itself, over JDBC, so the inbox has no function of its own to measure. Every figure is assumed for now, until it is agreed. An entry whose targets are marked Proposed had them proposed with its API, and the instruments read has no targets yet.
 
 One target is fixed by the design rather than by contract: p99 for `POST /payments` is held to 500 ms. The governor watches it: past 70% of that it stops raising offline rates, and past 90% it cuts them.
 

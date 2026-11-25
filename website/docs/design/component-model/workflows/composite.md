@@ -50,6 +50,8 @@ The request carries one payment option ID for the whole payment (agreed 2026-11-
 
 It never takes bank confirmation or a debit card, because one request would need several redirect links and several answers. A request with several instructions that would need either gets 422 before any workflow starts. To the customer, several instructions are a bank account and MR Points; a debit card doesn't combine with MR Points.
 
+Each instruction has its own profile. The Router pins one resolved profile per instruction, with points redemption only on the MR Points instruction, because MR Points beside another way to pay may come (agreed 2026-11-24). The points instruction keeps every other behavior of the request except mandate authorization, which the Router resolves to N for it: points take no money from a bank account, so Plans has nothing to check. Its settlement is known, so it turns `PAID` on Accounts Receivable's posting alone.
+
 ### Workflow IDs and search
 
 One-Data makes a group ID for the whole request, a ULID like the payment IDs, and sends it with the create and on every retry. One-Data passes every ID, and Billpay derives none (agreed 2026-11-07). The proposed form (Proposed): the composite is `{groupId}-init`, and each instruction's child is `{groupId}_{paymentId}-init`. The suffix is the instruction's own payment ID, joined with `_` the way split legs are. A redelivered create carries the same IDs, so Update-With-Start joins the running workflow instead of starting a second one.

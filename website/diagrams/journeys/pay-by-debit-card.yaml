@@ -101,15 +101,13 @@ steps:
   - name: Paid
     state: PAID
     mode: awaiting
-    caption: settled and posted
+    caption: posted
     trigger:
       kind: events
       name: Posted Event from GAR
-      label: Accounts Receivable's posting, which One-Data pairs with Billpay's own settlement event
+      label: Accounts Receivable's posting. The settlement is known, so the posting alone pays it
     systems:
       - GAR
-    exit:
-      state: RETURNED
 
 detail:
   - step: 1
@@ -151,10 +149,10 @@ detail:
   - text: Everything after this runs with nobody waiting, in the same workflow.
   - step: 6
     text: >-
-      No clearing call: the authorization has already moved the money. Billpay creates the
-      settlement event itself, and Execute hands it to One-Data, dated when the money moved
-      (Proposed). The statement balance goes down in Accounts Receivable and available credit up in
-      CAS, at once. CAS waits for the instrument's clear-text details from Payment Instruments.
+      No clearing call: the authorization has already moved the money. Execute hands One-Data no
+      settlement event: the settlement is known. The statement balance goes down in Accounts
+      Receivable and available credit up in CAS, at once. CAS waits for the instrument's clear-text
+      details from Payment Instruments.
   - step: 7
     text: >-
       Accounting, TFNE, GPHDB and AMP, which hears that the payment has executed, then `PROCESSED`.
@@ -162,8 +160,10 @@ detail:
       Raven message for `PROCESSED`.
   - step: 8
     text: >-
-      `PAID` follows with the Posted Event from GAR, once Accounts Receivable's posting joins the
-      settlement Billpay created in One-Data's inbox.
+      `PAID` follows with the Posted Event from GAR. The settlement is known, so Accounts
+      Receivable's posting alone is enough, and the payment's settlement time is when it turned
+      `PROCESSING`. `PAID` is final: a debit card payment can't be returned, since it doesn't clear
+      through MR/M3, where returns come from.
   - text: Consumer and business travel payments can pay by debit card. A corporate payment can't.
   - text: >-
       A debit card pays today only, with one instruction, never with MR Points and never through Pay

@@ -84,7 +84,7 @@ The Router checks that the market, the account type and the API are live in this
 | --- | --- |
 | A core API | 422, which senders don't retry |
 | A core API, for a create One-Data held while billpay-online was slow, which RTF delivers with an async flag that a direct call never carries (agreed 2026-11-07) | Not a refusal: the create is captured and declined, so the customer is told and the delete call to One-Data still runs (agreed 2026-10-18). The Router starts its workflow with a resolved profile that only captures and declines, and Verify declines it (agreed 2026-10-19) |
-| An inbox dispatcher | The request is marked `REJECTED` through `UpdateStartRequests.v1`, and an alert tells operations. The sender is not told |
+| An inbox dispatcher | The dispatcher marks the request `REJECTED` in One-Data's inbox table, and an alert tells operations. The sender is not told |
 | A Work Tracker dispatcher | The row goes from `DISPATCHING` to `FAILED`, which raises the retries-exhausted alert. A row is refused only when its market was taken out of service after the row was written |
 
 The allocations callback has one more check: its start must fit inside its traffic class's budget, or the API answers 429 with `Retry-After`, and the allocations manager retries. Proposed (2026-11-07): the class is `ALLOCATION_CALLBACK`, with its `RATE_ALLOCATION` row scoped `'*'`. Its bucket holds one second of rate, a `PAUSE` override answers `Retry-After: 30`, `MAXIMUM` caps the rate, and a class with no row isn't limited. The callback runs in the corporate priority class, keyed on its payment. Dispatchers skip this check, because the [governor](../../design/pacing.md#the-governor) already sets their rate.

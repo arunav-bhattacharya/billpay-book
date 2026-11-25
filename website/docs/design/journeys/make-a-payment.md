@@ -98,7 +98,7 @@ A debit card is its own way to pay, apart from a bank account. Every debit card 
 2. When the card's bank wants a challenge, such as a one-time code or a banking-app approval, the reply is `PENDING` with the challenge link. When it needs none, the reply is `PENDING` with no link (Proposed).
 3. The card provider calls `POST /payments/{payment-id}/authentication`, with mutual TLS, once the card is authenticated, or authentication has failed. The waiting workflow takes the call as an update.
 4. Verify authorizes the payment (the check is Proposed). The authorization debits the customer's account if it holds enough money; the card's bank declines it if not, and the payment is `DECLINED`.
-5. Execute makes no clearing call, because the money has moved. Billpay creates the settlement event itself and hands it to One-Data (Proposed). Fulfil is the same short one as for a bank: accounting, TFNE, GPHDB and Authorizations (AMP), and nothing to RTF or Raven for `PROCESSED`. The payment is `PAID` with the Posted Event from GAR, once Accounts Receivable's posting joins the settlement Billpay created.
+5. Execute makes no clearing call, because the money has moved, and Billpay sends no settlement event: the settlement is known. Fulfil is the same short one as for a bank: accounting, TFNE, GPHDB and Authorizations (AMP), and nothing to RTF or Raven for `PROCESSED`. The payment is `PAID` with the Posted Event from GAR, Accounts Receivable's posting alone.
 
 If no callback comes within 2 minutes, the workflow cancels the payment, and nothing has been taken. Consumer and business travel payments can pay by debit card; corporate payments can't. A debit card pays today only, with one instruction, never with MR Points and never through Pay & Plan.
 

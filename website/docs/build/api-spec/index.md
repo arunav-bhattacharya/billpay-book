@@ -20,7 +20,7 @@ Each layer has its own job. One-Data makes the payment ID, runs the check for ot
     {
       term: 'One-Data Functions',
       to: '/docs/build/api-spec/one-data',
-      desc: `Every function and the Billpay API behind it, the pending check in Redis, the event handlers, and the inbox functions Billpay pulls work through.`,
+      desc: `Every function and the Billpay API behind it, the pending check in Redis, the event handlers, and how Billpay reads and updates the inbox itself.`,
     },
     {
       term: 'Billpay Core APIs',

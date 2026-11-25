@@ -256,7 +256,7 @@ export const BANDS = [
             behave: 'Example values. The Router sets points redemption to Y when MR Points are the one instruction. There is no composite and no child workflow.',
             notes: {
               Verify: "Its checks and rules run first. Only once they pass does Loyalty redeem the points, in one call, so no later rule can decline a payment whose points are gone. A failed redemption is DECLINED with POINTS_REDEMPTION_FAILED.",
-              Execute: 'No clearing call: redeeming the points paid the bill. The AR balance and the open-to-buy call to CAS go out, and One-Data gets the settlement event Billpay creates.',
+              Execute: 'No clearing call: redeeming the points paid the bill. The AR balance and the open-to-buy call to CAS go out. No settlement event: the settlement is known, so the AR posting alone makes it PAID.',
             },
             exc: {'Execute|ClearingActivities': {kind: 'skip', note: 'redeeming the points paid the bill'}},
             then: [{to: 'paid', text: 'PAID with the Posted Event from GAR, once the GAR posting joins the settlement Billpay created'}],
@@ -482,7 +482,7 @@ export const BANDS = [
             move: {Verify: 'PENDING to ACCEPTED or DECLINED'},
             notes: {
               Verify:
-                "Confirmed commits ACCEPTED and declined DECLINED, with BANK_CONFIRMATION_DECLINED (Proposed), guarded on PENDING, and the fallback status calls stop. No call goes out: the answer is in the signal. A confirmed answer on a payment already DECLINED or CANCELLED goes on the exception list with an alert (Proposed).",
+                "Confirmed commits ACCEPTED and declined DECLINED, with BANK_CONFIRMATION_DECLINED (Proposed), guarded on PENDING, and the fallback status calls stop. No call goes out: the answer is in the signal. A confirmed answer on a payment already DECLINED or CANCELLED goes on the exception list with an alert.",
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'skip', note: 'a bank payment makes no Instrument check'},
@@ -518,7 +518,7 @@ export const BANDS = [
             wfId: '{paymentId}-init',
             answer: '202 at once',
             chips: five('CONSUMER', 'Y', 'Y'),
-            behave: "Example values. M3's notice is the payment's settlement, so Execute makes no clearing call and Billpay creates no settlement event.",
+            behave: "Example values. M3's notice is the payment's settlement, so Execute makes no clearing call and Billpay sends no settlement event.",
             move: {Verify: 'PENDING to ACCEPTED, before a success'},
             notes: {
               Verify: "Runs only when the payment is still PENDING: Amex Pay with Bank Transfer hasn't said success yet. One guarded commit to ACCEPTED, and a log line that names the payment ID.",
@@ -535,7 +535,7 @@ export const BANDS = [
               'Fulfil|LifecycleEventActivities': {kind: 'skip', note: 'a bank payment sends no RTF event for PROCESSED'},
               'Fulfil|CommunicationActivities': {kind: 'skip', note: 'a bank payment sends no Raven message for PROCESSED'},
             },
-            then: [{to: 'paid', text: "PAID with the Posted Event from GAR: the GAR posting, which One-Data pairs with M3's notice (Proposed)"}],
+            then: [{to: 'paid', text: "PAID with the Posted Event from GAR: the GAR posting, which Billpay pairs with M3's notice"}],
           },
         ],
       },
@@ -565,7 +565,7 @@ export const BANDS = [
             notes: {
               Verify:
                 "A failed 3D Secure result is DECLINED with no authorization. Otherwise, since Amex's own checks ran at the create, the card provider authorizes the payment (the check is Proposed): approved, it debits the customer's account; declined by the card's bank, the payment is DECLINED. One commit, guarded on PENDING, and the callback's reply returns here.",
-              Execute: "No clearing call: the authorization moved the money. The AR balance and open-to-buy calls go out, and One-Data gets the settlement event Billpay creates, dated when the money moved.",
+              Execute: "No clearing call: the authorization moved the money. The AR balance and open-to-buy calls go out. No settlement event: the settlement is known, so the AR posting alone makes it PAID.",
             },
             exc: {
               'Verify|InstrumentActivities': {kind: 'skip', note: 'it ran at the create, before 3D Secure'},
@@ -697,7 +697,7 @@ export const BANDS = [
               'Example values. Return varies by account type, and QueueRepresentment by the four behaviors other than bank confirmation.',
             notes: {
               Return:
-                'It checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again. That presentment stays RETURNED.',
+                'It checks the payment, full or split, the presentment that came back, and its status: PROCESSING, PROCESSED, PAID, or REPRESENTED when it is returned again. That presentment stays RETURNED. A Pay with Bank Transfer, debit card or MR Points payment can\'t be returned: none of them clears through MR/M3.',
               QueueRepresentment:
                 "It judges whether the payment can be represented under the market's rules (which return reasons can be represented, and how many times) and sets the date from the same rules, then writes the next presentment as a new row, numbered one higher, in REPRESENTING, with that date as its clearing date and a REPRESENT row due on it.",
             },
@@ -945,14 +945,14 @@ export const BANDS = [
           {
             id: 'paid',
             wf: 'ProcessPaidEvents',
-            lead: 'The PAID drain: it settles what One-Data has marked READY.',
+            lead: 'The PAID drain: it reads the rows One-Data has marked READY, pairs the events and settles what is complete.',
             own: ['Settle'],
             wfId: "its Schedule's ID plus the trigger time",
             notes: {
               Settle:
-                'Up to 500 READY rows a batch, in one transaction: each payment or leg goes from PROCESSED to PAID. Then the PAID events go to RTF. A debit card payment has no clearing, so its settlement is the event Billpay created in Execute, and it pairs the same way. For Pay with Bank Transfer it is M3\'s settled notice, and how that reaches the pairing is still open.',
+                'Up to 500 READY rows a batch, read over JDBC. Settle pairs the events: the posting and a settlement, a corporate leg\'s from its payment\'s row, or the posting alone where the settlement is known (a debit card, MR Points or inbound payment, and its legs). What is complete goes from PROCESSED to PAID in one transaction, and the PAID events go to RTF. Each row is then marked DONE, WAITING or UNMATCHED. For Pay with Bank Transfer the settlement is M3\'s settled notice, which One-Data stores as such.',
             },
-            then: [{to: 'returned', text: 'PAID is final, unless a return arrives'}],
+            then: [{to: 'returned', text: 'PAID is final, unless a return arrives; never for Pay with Bank Transfer, a debit card or MR Points'}],
           },
         ],
       },
@@ -1218,8 +1218,8 @@ const UNSTORED = new Set(['arScheduled', 'arRefund']);
 
 /* how a road reaches One-Data, which no stage calls */
 export function inboxUse(j) {
-  if (j.band.drain) return 'fetches READY rows before Settle, and marks them after';
-  /* an inbox dispatcher's tick calls the One-Data client itself, not this
+  if (j.band.drain) return 'reads READY rows from One-Data\'s table before Settle, over JDBC, and marks them after';
+  /* an inbox dispatcher's tick reads One-Data's table itself, not through this
      interface (agreed 2026-11-08), so a pulled road lights it only for the delete */
   if (j.band.key === 'pulled') {
     return UNSTORED.has(j.id) ? 'once Verify decides, the workflow calls the delete API after its reply, which finds nothing to remove, since One-Data never stored this create' : null;
@@ -1236,7 +1236,7 @@ export function inboxUse(j) {
     return "calls the delete API here only when M3's notice is what accepts the payment, before Amex Pay with Bank Transfer says success";
   }
   if (j.id === 'authenticated') {
-    return "calls the delete API once Verify decides, so the account's pending entry goes. Execute hands One-Data the settlement event Billpay creates, dated when the money moved";
+    return "calls the delete API once Verify decides, so the account's pending entry goes. Execute hands One-Data no settlement event: the settlement is known";
   }
   if (j.id === 'no') return "calls the delete API once Cancel decides, so the account's pending entry goes";
   if (j.id === 'multiple') return "calls the delete API for every instruction it decides, a declined one included, after the reply, so each stored create and its pending entry leave One-Data's Redis";
@@ -1283,7 +1283,7 @@ function runsOn(j, f, s) {
     return "RTF, on the workflow's own queue, since RTF has no rate limit. The workflow sends one state change at a time, so the payment's events reach RTF in order.";
   }
   if (f.name === 'InboxActivities') {
-    return "One-Data's inbox functions, on the workflow's own queue, since nobody throttles them.";
+    return "One-Data's inbox tables, read and updated over JDBC, and its handlers, on the workflow's own queue, since nobody throttles them.";
   }
   const sys = f.long || f.system;
   if (localOnOnline(j, f, s)) {

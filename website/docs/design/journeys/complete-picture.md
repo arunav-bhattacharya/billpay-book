@@ -43,7 +43,7 @@ A few things are easier to see here than anywhere else.
 - The customer waits only while a request is answered: at the create, and again at a no or a 3D Secure callback. The solid line ends at Verify, or at the reply that carries the link, and everything after it runs with nobody waiting.
 - Work that waits for a date waits in Oracle, not in Temporal. Between runs, the Workflows band is empty and the Work Tracker row is what carries the payment forward.
 - A corporate payment takes six kinds of run to get from the request to `PAID`, and asks for its allocations before any money moves. Its own execution clears once, for the whole payment; its legs do the rest.
-- Two ways to pay have no clearing at all. Pay with Bank Transfer moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call. It hands One-Data a settlement event Billpay creates instead, and `PAID` still waits for that and the Accounts Receivable posting.
+- Two ways to pay have no clearing at all. Pay with Bank Transfer moves its money at the bank, and Pay by Debit card at the card authorization, so Execute makes no clearing call. Its settlement is known, so Billpay sends no settlement event, and `PAID` waits only for the Accounts Receivable posting.
 - A create on an account that already has a payment in `PENDING` never appears here. One-Data declines it before billpay-online is called, so no workflow runs ([When another payment is still pending](./make-a-payment.md#when-another-payment-is-still-pending)).
 - One journey skips the Router. Nobody asks for `ProcessPaidEventsWorkflow`: a Schedule starts it every 30 seconds, and it settles whatever One-Data has marked `READY`.
 

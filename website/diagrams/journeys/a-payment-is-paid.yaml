@@ -30,12 +30,12 @@ workflow:
 steps:
   - name: Fetch
     mode: background
-    caption: up to 500 READY rows
+    caption: up to 500 READY rows, over JDBC
 
   - name: Settle
     state: PAID
     mode: background
-    caption: one Oracle transaction
+    caption: pairs the events; one Oracle transaction
 
   - name: Announce
     mode: background
@@ -45,48 +45,56 @@ steps:
 
   - name: Mark
     mode: background
-    caption: DONE or UNMATCHED
+    caption: DONE, WAITING or UNMATCHED
 
 detail:
   - text: >-
       A payment reaches this point `PROCESSED`: the money has gone to the bank and every system has
-      been told. Two confirmations are still owed. The bank says the money settled, and Accounts
-      Receivable says the payment posted. For a debit card payment, the settlement is the one
-      Billpay created in Execute; for Pay with Bank Transfer, it is M3's settled notice.
+      been told. Accounts Receivable still has to say the payment posted, and, unless the settlement
+      is known, the bank has to say the money settled. A debit card, MR Points or inbound payment,
+      and its legs, has a known settlement, because its money moved at the card authorization, the
+      points redemption or the third party's push. For Pay with Bank Transfer, the settlement is
+      M3's notice.
   - text: >-
-      Both arrive as events, sometimes 1,000 a second, and neither touches Billpay directly.
-      One-Data's event handlers store each one in its inbox, a Postgres database of its own, and
-      whichever arrives second marks the payment's row `READY`.
+      The events arrive at One-Data, sometimes 1,000 a second, and none touches Billpay directly.
+      One-Data only stores: each handler writes the event to its inbox, a Postgres database of its
+      own, fills its time on the payment's, or leg's, row, and marks the row `READY`. That now means
+      an event came in for Billpay to look at. Billpay decides `PAID`.
   - step: 1
     text: >-
       A Schedule starts `ProcessPaidEventsWorkflow` every 30 seconds, and only one run is ever
-      active. Each batch fetches up to 500 `READY` rows through a One-Data function.
+      active. Each batch reads up to 500 `READY` rows from One-Data's table itself, over JDBC,
+      through billpay-offline's own pool. There is no One-Data function in between.
   - step: 2
     text: >-
-      Settle moves the batch from `PROCESSED` to `PAID` in one Oracle transaction, each row by a
-      guarded update, and tags each `PAID` timeline row with the batch's ID. A retried Settle finds
-      the payments it already moved by that ID.
+      Settle pairs the events. A row with the posting and a settlement is paid, and so is one with
+      the posting alone where the settlement is known; its settlement time is then when the payment
+      turned `PROCESSING`. A corporate leg reads its payment's settlement. Each paid row is a
+      guarded update from `PROCESSED` to `PAID` in one Oracle transaction, and each `PAID` timeline
+      row is tagged with the batch's ID, so a retried Settle finds the payments it already moved.
   - step: 3
     text: The `PAID` events go to RTF.
   - step: 4
     text: >-
-      Last, the rows are marked `DONE`, or `UNMATCHED` when Billpay found nothing ready to pay. An
-      `UNMATCHED` row is tried again an hour later, for up to 48 hours, and after that One-Data's
-      own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert. Marking last means a row
-      is `DONE` only once its event has gone out.
+      Last, the rows are marked: `DONE` for a payment now `PAID`, `WAITING` when an event is still
+      missing, and `UNMATCHED` when the row could be paid but its payment isn't `PROCESSED`. Each
+      mark is guarded on what Billpay read, so an event that came in meanwhile leaves the row
+      `READY` for the next batch. An `UNMATCHED` row is tried again an hour later, for up to 48
+      hours, and after that Billpay's gauge, `billpay_paid_unmatched_stale`, raises an alert.
+      Marking last means a row is `DONE` only once its event has gone out.
   - text: >-
-      A split payment turns `PAID` leg by leg: a leg is ready once it has posted and its settlement
-      is in. A corporate leg takes its parent's settlement, and a consumer split's leg settles on
-      its own. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a
-      consumer split.
+      A split payment turns `PAID` leg by leg. A corporate leg pays once it has posted and its
+      parent's settlement is in; when the parent's settlement comes after a leg's posting, the drain
+      wakes the legs that were waiting. A consumer split's leg settles on its own, and an inbound
+      payment's leg pays on its posting alone. The parent stays where it was: `PROCESSED` for a
+      corporate payment, `ACCEPTED` for a consumer split.
   - text: >-
       The drain is the last thing the governor gives budget to, so a burst of events waits in the
       inbox rather than competing with execution. If a confirmation never arrives,
       `ProcessMissingPaidEventsWorkflow` finds payments still `PROCESSED` after 48 hours, asks MR/M3
-      and GAR, and hands any event it finds to One-Data, or raises an alert. It doesn't ask MR/M3
-      about a debit card payment, which MR/M3 never settles: it asks GAR alone, and always hands
-      over Billpay's own settlement event again, since Billpay can't read the inbox (Proposed). For
-      Pay with Bank Transfer, M3's notice is the settlement, and how it reaches the pairing is open.
+      and GAR, and hands any event it finds to One-Data, or raises an alert. Where the settlement is
+      known, and for Pay with Bank Transfer, it asks GAR alone, and it never hands over a settlement
+      event of Billpay's.
 
 reference:
   to: /docs/design/sequence-diagrams#10-paid-events

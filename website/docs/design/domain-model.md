@@ -31,7 +31,7 @@ The [stages](./component-model/stages.md) are where these moves run. Verify move
 
 ## Full payments and legs
 
-Two shapes cross the states. A `FullPayment` settles as one amount. A `SplitPayment` is a leg: it carries its parent's ID as `originalPaymentId`, a `sequenceNumber` and its own amount. A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`, which is also how One-Data pairs a corporate leg's Accounts Receivable (AR) posting with the settlement of its parent: it reads the part before the `_`. A consumer split's leg settles on its own.
+Two shapes cross the states. A `FullPayment` settles as one amount. A `SplitPayment` is a leg: it carries its parent's ID as `originalPaymentId`, a `sequenceNumber` and its own amount. A leg's ID is its parent's plus the sequence number, `{paymentId}_{seq}`, which is also how Billpay pairs a corporate leg's Accounts Receivable (AR) posting with the settlement of its parent: it reads the part before the `_`. A consumer split's leg settles on its own.
 
 That makes nineteen classes in all. A full payment has a class for each of the fourteen states. A leg has five. It starts at `ACCEPTED`: it is made from a parent Verify has already passed, by `toAcceptedSplitPayment(splitSlice)`, so there's no pending, scheduled, allocating or allocated leg. From there it moves through `PROCESSING` and `PROCESSED` to `PAID`, and can be `RETURNED`. Only a whole payment is represented (agreed 2026-11-07), so a returned leg stays `RETURNED`, and the leg has no representment classes (dropped 2026-11-08). A leg is never cancelled or declined.
 

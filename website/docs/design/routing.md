@@ -66,7 +66,7 @@ How a workflow starts depends on who is waiting for it.
 | --- | --- | --- | --- |
 | A caller waits | Update-With-Start, conflict policy `USE_EXISTING` | The update's result: `PENDING`, `ACCEPTED`, `SCHEDULED`, `DECLINED` or `CANCELLED` | Pay today, schedule, a payment that waits for the customer, composites, update, cancel, refunds from channels |
 | A caller answers a waiting payment | An update to its running `CreatePaymentIntentWorkflow` | The update's result: `PENDING`, `ACCEPTED`, `DECLINED` or `CANCELLED`; 409 once the workflow no longer waits | The customer's no, the card provider's 3D Secure callback, and the channel's call once the customer is back from their bank, which answers with the status |
-| A caller tells a waiting payment something | A signal to its running `CreatePaymentIntentWorkflow` | 202 (Proposed) | M3's settled notice for Pay with Bank Transfer |
+| A caller tells a waiting payment something | A signal to its running `CreatePaymentIntentWorkflow` | 202 (Proposed) | Amex Pay with Bank Transfer's confirmation and M3's settled notice, for Pay with Bank Transfer |
 | Nobody waits | One-Data stores the request; a dispatcher pulls it from the inbox and starts it through the Router | AR intake and inbound: 202 from One-Data, once stored. A return arrives as an event | AR intake (payments and refunds), returns, inbound |
 | An allocation callback | Async start; the workflow exists before Billpay replies | 202; 429 with `Retry-After` over budget | Allocation callbacks |
 | Due on a date, or a big fan-out | A Work Tracker row in the producer's commit; a dispatcher starts it through the Router | None | Scheduled execution, allocation requests, corporate execution, corporate legs, representments |
@@ -258,7 +258,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
         {
           desc: 'Pushed by a third party',
           flow: [{via: 'inbox', detail: 'inbound dispatcher', name: 'ProcessInboundPayment', cluster: 'Offline'}],
-          note: 'It can split across several card accounts; how is still open',
+          note: 'It can split across several card accounts: a consumer or business travel request names its legs, and a corporate one gets them from the allocations manager',
         },
       ],
     },
@@ -275,7 +275,7 @@ One tray per trigger. The square on each workflow is the cluster it runs on, and
   ]}
 />
 
-Settlement and Accounts Receivable posting are the one input the Router never sees. One-Data pairs the two events in its inbox, and `ProcessPaidEventsWorkflow` pulls the payments that have both every 30 seconds. A debit card payment has no clearing, so Billpay creates its settlement event itself, in Execute, and it pairs with the posting the same way. For Pay with Bank Transfer, M3's settled notice is the settlement, and how it reaches the pairing is still open ([Periodic Workflows](./component-model/workflows/periodic.md) has the detail).
+Settlement and Accounts Receivable posting are the one input the Router never sees. One-Data only stores the events in its inbox, and every 30 seconds `ProcessPaidEventsWorkflow` reads the rows that have news, pairs the events and pays what is complete. A debit card, MR Points or inbound payment has a known settlement, so its posting alone pays it, and Billpay sends no settlement event of its own. For Pay with Bank Transfer, M3's settled notice is the settlement, which One-Data stores as such ([Periodic Workflows](./component-model/workflows/periodic.md) has the detail).
 
 ## Child workflows
 

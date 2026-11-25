@@ -21,20 +21,20 @@ const DELETE_ANY = {c: 'DeletePendingPayment.v1', s: 'once Verify decides; a pla
 const DELETE_NONE = {c: 'DeletePendingPayment.v1', s: 'once Verify decides: nothing to remove', at: 'Verify'};
 
 const PAID_SEGMENT = {
-  phase: ['Settled and posted', 'when both events are in'],
+  phase: ['Settled and posted', 'Billpay pairs the events'],
   road: 'paid',
   customer: [{t: 'Sees PAID', s: 'in their payment list', st: 'PAID', m: 'on', at: 'Settle'}],
-  oneData: [{c: 'inbox', s: 'settlement from MR/M3, AR posting from GAR. READY when both are in', at: 'Settle'}],
+  oneData: [{c: 'inbox', s: 'settlement from MR/M3, AR posting from GAR; each marks the row READY, and Billpay pairs them', at: 'Settle'}],
 };
 
-/* A debit card has no clearing, so MR/M3 sends no settlement. Execute hands
-   One-Data the one Billpay creates, and the row pairs it with the GAR posting
-   like any other. Pay with Bank Transfer has no clearing either, but M3
-   reports its settlement (2026-11-10). */
-const PAID_BILLPAY_SETTLEMENT = {
+/* A debit card, MR Points or inbound payment has a known settlement: its
+   money moved at the authorization, the redemption or the push. MR/M3 sends
+   no settlement and Billpay sends none of its own, so the AR posting alone
+   pays it (2026-11-24). */
+const PAID_KNOWN_SETTLEMENT = {
   ...PAID_SEGMENT,
   phase: ['Posted', 'the Posted Event from GAR'],
-  oneData: [{c: 'inbox', s: 'the AR posting from GAR, paired with the settlement Billpay created in Execute. READY once the posting is in', at: 'Settle'}],
+  oneData: [{c: 'inbox', s: 'the AR posting from GAR. The settlement is known, so Billpay pays it on the posting alone', at: 'Settle'}],
 };
 
 const paidAfter = (ruler) => (ruler ? {...PAID_SEGMENT, ruler: [{t: 'the next 30-second run', at: 'Settle'}]} : PAID_SEGMENT);
@@ -154,7 +154,7 @@ export const GROUPS = [
           {
             ...PAID_SEGMENT,
             phase: ['Posted', 'the Posted Event from GAR'],
-            oneData: [{c: 'inbox', s: "the AR posting from GAR, paired with M3's settlement, which One-Data kept when it passed the notice on (Proposed)", at: 'Settle'}],
+            oneData: [{c: 'inbox', s: "the AR posting from GAR, which Billpay pairs with M3's settlement, stored when One-Data passed the notice on", at: 'Settle'}],
           },
         ],
       },
@@ -187,9 +187,9 @@ export const GROUPS = [
               {t: 'Not told PROCESSED', s: 'a debit card payment sends no Raven message for it', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'},
             ],
             oneData: [{c: 'DeletePendingPayment.v1', s: 'once Verify decides: the entry goes', at: 'Verify'}],
-            after: "The authorization in Verify debits the customer's account, so Execute makes no clearing call. It hands One-Data the settlement event Billpay creates, dated when the money moved.",
+            after: "The authorization in Verify debits the customer's account, so Execute makes no clearing call, and Billpay sends no settlement event: the settlement is known.",
           },
-          PAID_BILLPAY_SETTLEMENT,
+          PAID_KNOWN_SETTLEMENT,
         ],
       },
       {
@@ -228,7 +228,7 @@ export const GROUPS = [
             ],
             oneData: [{...CREATE, at: 'Capture'}, DELETE_END],
           },
-          PAID_BILLPAY_SETTLEMENT,
+          PAID_KNOWN_SETTLEMENT,
         ],
       },
       {
@@ -545,7 +545,7 @@ export const GROUPS = [
             customer: [{t: 'Told PROCESSED', s: 'with a Raven message', st: 'PROCESSED', m: 'quiet', at: 'Fulfil'}],
             oneData: [{c: 'CreateInboundPayment.v1', s: 'stores it, replies 202', at: 'Capture'}],
           },
-          paidAfter(false),
+          PAID_KNOWN_SETTLEMENT,
         ],
       },
       {

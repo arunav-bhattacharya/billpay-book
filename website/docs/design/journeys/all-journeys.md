@@ -198,7 +198,7 @@ The breakdown itself. Billpay asks for it and then stops: no workflow waits for 
 
 ### A payment is paid
 
-This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for the bank to confirm the money settled and for Accounts Receivable to confirm it posted, and the two confirmations arrive on their own schedules. A debit card payment has no clearing, so MR/M3 sends no settlement. Billpay creates that event itself, in Execute, and it pairs with the posting like any other. A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, which records it for the pairing (Proposed). MR Points and inbound payments have no clearing either, and Billpay creates their settlement events as it does a debit card's (agreed 2026-11-23).
+This is where a payment turns `PAID`, or for a split payment, each of its legs. Billpay doesn't mark a payment paid because it sent the money. It waits for Accounts Receivable to confirm the payment posted, and, unless the settlement is known, for the bank to confirm the money settled. The confirmations arrive on their own schedules, and One-Data only stores them: Billpay pairs them and decides. A debit card, MR Points or inbound payment has a known settlement, because its money moved at the card authorization, the points redemption or the third party's push, so the posting alone pays it. A Pay with Bank Transfer payment's settlement is M3's notice, which One-Data stores as the settlement.
 
 <JourneyMap journey="a-payment-is-paid" />
 

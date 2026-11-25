@@ -52,19 +52,25 @@ A run's workflow ID is `dispatch-` and its Schedule's ID, such as `dispatch-sche
 
 <WorkflowMeta cluster="Offline" id="`paid-drain`, its Schedule's ID, plus the trigger time" start="The `paid-drain` Schedule (Proposed), every 30 seconds, overlap SKIP" behaviors="generic" />
 
-`ProcessPaidEventsWorkflow` marks payments `PAID`. The two confirmations it needs, settlement from the bank and posting from Accounts Receivable, don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own, and mark a payment's row `READY` once both are in. A debit card payment has no clearing, so MR/M3 never settles it. Billpay creates its settlement event instead, in Execute, and hands it to the same handler MR/M3 uses, dated when the money moved, so its row pairs the same way (Proposed). A Pay with Bank Transfer payment has no clearing either, but M3 reports its settlement, and that notice is the settlement. M3 sends it to One-Data's `CreateBillpaySettlementEvent.v1`, which records it for the pairing (Proposed). MR Points and inbound payments have no clearing either, and Billpay creates their settlement events as it does a debit card's (agreed 2026-11-23). This workflow pulls those rows at Billpay's own pace.
+`ProcessPaidEventsWorkflow` marks payments `PAID`, and it decides when. The confirmations it needs, settlement from the bank and posting from Accounts Receivable (AR), don't arrive in Billpay's Oracle: Oracle only gets their timestamps, which Settle writes. One-Data's event handlers keep the events in its inbox, a Postgres database of its own. A handler only stores: it fills the event's time on the payment's, or leg's, row and marks the row `READY`, which means an event came in for Billpay to look at. Billpay reads those rows itself, over JDBC, at its own pace, and pairs the events (agreed 2026-11-24).
+
+A payment needs its AR posting, and its settlement unless the settlement is known. A debit card, MR Points or inbound payment, and its legs, has a known settlement: the money moved at the card authorization, the points redemption or the third party's push. So it is paid on the posting alone, and Billpay sends no settlement event of its own. A Pay with Bank Transfer payment's settlement is M3's notice, which One-Data stores as the settlement; every other payment's comes from MR/M3.
 
 Only one run is ever active. A run takes batches until the inbox has no `READY` rows left, then ends. Each batch:
 
-1. Fetches up to 500 `READY` rows through `ReadPaidReadyPayments.v1`. Fewer than 500 means this is the run's last batch; none ends the run.
-2. Settles the batch in one `PaymentStore` transaction: a guarded update from `PROCESSED` to `PAID` for each payment or leg, plus a `PAID` timeline row tagged with the batch ID. The workflow generates that ID with `Workflow.randomUUID()`, so a retried Settle uses the same one.
+1. Fetches up to 500 `READY` rows from One-Data's table, after moving `UNMATCHED` rows last tried over an hour ago, and under 48 hours old, back to `READY`. Fewer than 500 means this is the run's last batch; none ends the run.
+2. Settles the batch in one `PaymentStore` transaction. Settle pairs the events and decides each row:
+   - The posting and a settlement make the payment or leg `PAID`. A corporate leg reads its payment's settlement from the payment's own row, whatever that row's status.
+   - The posting alone does too, where the settlement is known. The settlement time is then when the payment, or leg, turned `PROCESSING`.
+   - A row still missing an event waits, as `WAITING`.
+   - A row that could be paid, but has no `PROCESSED` payment or leg, is `UNMATCHED`, and comes back hourly for 48 hours.
+
+   Each payment it pays gets a guarded update from `PROCESSED` to `PAID`, plus a `PAID` timeline row tagged with the batch ID. The workflow generates that ID with `Workflow.randomUUID()`, so a retried Settle uses the same one.
 3. Announces: one `LifecycleEventActivities` call sends a `PAID` event to RTF for each payment or leg whose timeline row carries the batch ID.
-4. Marks the rows through `UpdatePaidReadyPayments.v1`: `DONE` for a payment or leg now `PAID`, `UNMATCHED` for the rest.
+4. Marks the rows `DONE`, `WAITING` or `UNMATCHED`. Each update is guarded on `READY` and on the times it read, so an event that came in meanwhile leaves the row `READY` for the next batch. A corporate payment's own row goes `DONE` once read; if it holds the settlement, the legs that posted first go back to `READY`, so the next fetch pays them.
 5. Paces itself: it waits as long as the governor's rate for the `PAID` class asks, then fetches again. The run continues-as-new every 20 batches.
 
-Proposed (2026-11-07): Settle is the drain's one Settle stage, taken without a profile, since it varies by nothing and the drain mixes markets. The run waits for a `PAID` rate above zero before each fetch, re-reading it every 5 seconds, and paces with rows ÷ rate. A row whose payment or leg an earlier batch already made `PAID` is marked `DONE`. The `PAID` timeline row holds the settlement and posting times and the batch ID.
-
-These are the functions' real names: every One-Data function's name starts with Create, Read, Update or Delete, by what it does. The fetch returns each row's settlement and AR posting times, which Settle writes onto the payment as `stlmt_ts` and `ar_pstd_ts`.
+Proposed (2026-11-07): Settle is the drain's one Settle stage, taken without a profile, since it varies by nothing and the drain mixes markets. The run waits for a `PAID` rate above zero before each fetch, re-reading it every 5 seconds, and paces with rows ÷ rate. A row whose payment or leg an earlier batch already made `PAID` is marked `DONE`. The `PAID` timeline row holds the settlement and posting times and the batch ID; for a known settlement, its settlement time is the `PROCESSING` time, as on the payment.
 
 Every step is safe to repeat. Settle changes only the rows that still need it, and a Settle that committed and is then retried still finds the payments it moved by their batch ID, so their events go out. Marking runs last, so a row is `DONE` only once its payment's event has gone out, and RTF's consumers already accept a repeated event.
 
@@ -72,9 +78,9 @@ When something goes wrong:
 
 - If RTF is down, the run waits on its batch. Later triggers are skipped, and new rows wait in the inbox. Its inbox and RTF calls retry with no schedule-to-close, so a long outage never leaves payments `PAID` without their event (Proposed).
 - A run terminated by hand between Settle and the announcement leaves its payments `PAID` without their event. The batch ID, in the run's history and on their timeline rows, says which payments to re-send.
-- An `UNMATCHED` row, for a payment or leg that doesn't exist or isn't `PROCESSED` yet, comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED`, and One-Data's own scheduled check, `UpdateUnmatchedPayments.v1`, raises an alert.
+- An `UNMATCHED` row, for a payment or leg that doesn't exist or isn't `PROCESSED` yet, comes back an hour later through the fetch. After 48 hours it stays `UNMATCHED`, and Billpay's gauge, `billpay_paid_unmatched_stale`, raises an alert.
 
-A split payment turns `PAID` leg by leg: a leg's row is `READY` once the leg has posted and its settlement is in: a corporate leg takes its parent's settlement, and a consumer split's leg its own (agreed 2026-11-07). The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split. One corporate parent's settlement can make up to 100K legs ready at once, and the drain takes them 500 at a time.
+A split payment turns `PAID` leg by leg. A corporate leg pays once it has posted and its parent's settlement is in, a consumer split's leg once it has its own (agreed 2026-11-07), and an inbound payment's leg once it has posted, since its settlement is known. The parent stays where it was: `PROCESSED` for a corporate payment, `ACCEPTED` for a consumer split. One corporate parent's settlement can wake up to 100K legs at once, and the drain takes them 500 at a time.
 
 One run settles an estimated 1,000 payments a second, at about half a second a batch; load-test run 1 measures the real figure. Going faster would need lanes, with each fetch taking a lane number and filtering on a hash of the payment ID.
 
@@ -86,10 +92,10 @@ One run settles an estimated 1,000 payments a second, at about half a second a b
 
 - It finds payments, and legs of split payments, that have been `PROCESSED` for more than 48 hours without turning `PAID`. Split parents are skipped, since only their legs turn `PAID`.
 - It asks MR/M3 and GAR for the payment's current state (for a corporate leg, its payment's settlement and its own posting; for a consumer split's leg, its own) and hands any event it finds to its One-Data handler, so events reach the inbox only one way. An event the check still can't find raises an alert, and the payment's inbox row shows which one. The alert's counter, `billpay_paid_overdue_total`, counts only the payments and legs the check couldn't fix: if 100 are late and it finds the events for 95, it counts 5 (agreed 2026-11-07).
-- It never asks MR/M3 about a debit card payment, because MR/M3 never settles one. It asks GAR alone, and always hands over Billpay's own settlement event again, under its first key, `{paymentId}-settlement`; Billpay can't read the inbox to see whether it is there, and the handler ignores a copy it already has (Proposed, 2026-11-07).
-- M3 does report a Pay with Bank Transfer payment's settlement, and its notice is the settlement. Whether the check asks M3 about one waits on how that notice reaches One-Data's pairing, which is still open (2026-11-10).
+- Where the settlement is known, it asks GAR alone and hands over no settlement event: a debit card, MR Points, and an inbound payment and its legs, a consumer's and a corporate one's.
+- It doesn't ask M3 about a Pay with Bank Transfer payment either. It asks GAR alone, since M3's notice came in before Execute ran.
 - Proposed (2026-11-07): a run takes up to 500 payments and 500 legs, and its calls run at priority 5 with the fairness key `paid-check`.
-- A row that has been `UNMATCHED` for 48 hours is left for a person. Replaying an event can't bring it back, because the inbox only moves rows that are still waiting, so One-Data's alert names it.
+- A row that has been `UNMATCHED` for 48 hours is left for a person. Replaying an event can't bring it back, because a repeated event changes nothing, so Billpay's alert names it.
 
 ## Purge Transaction Data
 

@@ -100,9 +100,9 @@ export const ACTIVITIES = [
   },
   {
     name: 'InboxActivities',
-    system: "One-Data's inbox functions, event handlers and delete API",
+    system: "One-Data's event handlers and delete API, and its two inbox tables, read and updated over JDBC",
     queue: "The workflow's own queue",
-    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; every create workflow once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too; Execute, to hand One-Data the settlement event Billpay creates for a debit card payment (Proposed); a Pay with Bank Transfer payment\'s settlement is M3\'s notice',
+    calledBy: '`ProcessPaidEventsWorkflow`, to fetch and mark; `ProcessMissingPaidEventsWorkflow`, to hand a found event to its handler; every create workflow once its payment is decided, for the delete: One-Data\'s one activity interface makes this call too. Execute hands One-Data no settlement event: a debit card, MR Points or inbound payment has a known settlement, and a Pay with Bank Transfer payment\'s is M3\'s notice',
   },
   {
     name: 'LifecycleEventActivities',
