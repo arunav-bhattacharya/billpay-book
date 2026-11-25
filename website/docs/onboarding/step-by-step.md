@@ -56,8 +56,8 @@ A profile whose combinations are all in the manifest goes live with config alone
 2. **Author the profile.** Pick the Billpay APIs the market takes and answer the five behaviors. Where a behavior is BOTH, set its rule: which journeys get Y, or for bank confirmation, which payment methods ([Market Profile](./market-profile.md)).
 3. **Fill in the Operations step.** Time zone and execution time, cancellation window, cutoff and floor, allocation timing for corporate payments, representment rules, which status changes send a Raven message, the bank-confirmation timing, the instrument statuses for each journey context, the pending sweep age, the card provider and authentication window for debit cards, the verification rule settings, Pay with MR Points (Proposed), and the expected volumes ([Operations Settings](./operations-settings.md)).
 4. **Get it approved.** A second person checks the content and approves it. The backend then freezes it as release **v1**: the full profile as JSON, a checksum, the author and the approver. A release never changes after this.
-5. **Send it to E1.** The backend calls E1's Market Onboarding API with v1. In E1, `MarketOnboardingWorkflow` checks v1 against the manifest, saves it as an inactive version with the Schedules, dispatcher settings and rate rows it needs, and sends test payments through it from mock accounts set up for v1. The Router pins v1 only for those accounts, so nothing else sees it.
-6. **Sign off in E1.** Once the test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. The workflow activates v1: `market_config_active` points at it, its Schedules and settings go live, and every pod of both apps reloads its copy of the config.
+5. **Send it to E1.** The backend calls E1's Market Onboarding API with v1. In E1, `MarketOnboardingWorkflow` checks v1 against the manifest, saves it as an inactive version with the Schedules it needs, and sends test payments through it from mock accounts set up for v1. The Router pins v1 only for those accounts, so nothing else sees it.
+6. **Sign off in E1.** Once the test payments pass, someone signs off in the UI, and the backend sends the sign-off through the same API. The workflow activates v1: `market_config_active` points at it, its Schedules go live, and every pod of both apps reloads its copy of the config.
 7. **Repeat in E2.** The same v1 goes to E2, and steps 5 and 6 run there.
 8. **Repeat in E3, with the RFC.** Raise the change request first. The E3 sign-off counts only once the RFC passes the ServiceNow check.
 9. **Channels start sending.** Live in E3 doesn't mean traffic. Payments come from the channels, mostly through One-Data, and the market gets none until they start sending it. Before the profile is live, a request for it gets 422.
@@ -99,8 +99,8 @@ Say a market needs mandate authorization, and the build can't run that combinati
 
 None of these needs a new release:
 
-- **Rollback** points the profile back at its previous version, and puts that version's Schedules and settings back with it. Nothing is deleted, so it is as quick as going live.
-- **Pause** stops the profile's dispatchers. Its due work waits in Oracle, and its config doesn't change.
-- **Resume** starts the dispatchers again, and the waiting work flows in at the governor's pace.
+- **Rollback** points the profile back at the version the release replaced, and puts that version's Schedules back with it. Nothing is deleted, so it is as quick as going live. It goes back one level: a version a rollback made active again can't be rolled back itself.
+- **Pause** stops the profile's Schedules and sets a pause override on the market's execution rate, which stops execution for every account type in the market (Proposed). Its due work waits in Oracle, and its config doesn't change.
+- **Resume** lifts both, and the waiting work flows in at the governor's pace.
 
 On every path there are only two human checks: approval once, on the content, and sign-off in each environment after its test payments pass.

@@ -38,7 +38,7 @@ There are three ways to pause, from the narrowest:
 
 - A traffic class, a market or one corporate payment: a pause override in `rate_allocation`.
 - A dispatcher or a periodic job: pause its Temporal Schedule, which stops new runs.
-- A whole live market: pause it in the Market Onboarding UI, which stops the market's dispatchers through the Market Onboarding API. Its config doesn't change.
+- A whole live market: pause it in the Market Onboarding UI, which stops the market's dispatchers through the Market Onboarding API. The API pauses the market and account type's Schedules and sets a pause override on the market's execution rate, so execution stops for every account type in the market (Proposed). Its config doesn't change.
 
 In every case nothing is lost. Due work waits in Oracle, pulled work waits in One-Data's inbox, and workflows already running carry on.
 

@@ -41,7 +41,7 @@ The scheduled-payments dispatcher runs per market and account type, at the time 
 
 1. [The onboarding workflow](../onboarding/market-onboarding-api.md) saves the release with its Schedules, inactive.
 2. When the release is activated, the Schedules go live with it.
-3. A rollback switches back to the previous version's Schedules and settings.
+3. A rollback switches back to the Schedules of the version the release replaced.
 
 Each release sets `timeZone`, an IANA zone such as `America/Phoenix`, and `executionTime`, `HH:mm`, local midnight when unset (agreed 2026-11-07). A Schedule takes its time zone, so the execution time holds across daylight saving. Test the daylight-saving weekends: on the Temporal dev server (1.32.2), a Schedule at local midnight in `Europe/London` fires one extra run at 00:00Z on 2027-10-31, which is 01:00 BST, just before the clocks go back. That run finds nothing due and ends after its sweep, so it does no harm, but check the production server's version before a market with daylight saving relies on Schedules. The US market runs on Phoenix time, which has no daylight saving, so its run starts at 00:01 MST all year. Execution runs every day: no market keeps a holiday calendar.
 

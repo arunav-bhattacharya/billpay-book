@@ -37,8 +37,8 @@ There is one deployment row per release and environment, and it follows that rel
 
 ## Pause, resume and rollback
 
-- Pause stops a live market's dispatchers, through the environment's Market Onboarding API. The market's due work waits in Oracle, and nothing about its config changes.
+- Pause stops a live market's dispatchers, through the environment's Market Onboarding API, which acts at once. It stops the market and account type's Schedules and sets a pause override on the market's execution rate. The rate belongs to the market, so execution stops for every account type in it (Proposed). The market's due work waits in Oracle, and nothing about its config changes.
 - Resume starts them again, and the waiting work is picked up at the governor's pace.
-- Rollback switches the market back to its previous version, with that version's Schedules and settings. New payments use the previous version, and payments already running keep the version pinned in their resolved profile.
+- Rollback switches the market back to the version the release replaced, with that version's Schedules. It goes back one level only. New payments use the previous version, and payments already running keep the version pinned in their resolved profile.
 
 To slow one kind of work rather than stop a market, use a rate override instead ([Dispatch Controls](./dispatch-controls.md)).

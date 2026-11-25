@@ -263,7 +263,7 @@ VERIFY  mandate=N bank=N card=Y  Instrument, Options, CardAuthorization
 VERIFY  mandate=Y bank=N card=N  Instrument, Options, Mandate
 ```
 
-One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: Amex Pay with Bank Transfer's calls and the rule that reads their answer serve every market. No row has mandate authorization Y beside bank confirmation or card authentication, because the Router resolves it to N for both (Proposed, 2026-11-23).
+One stage serves every row, and every market gets the same rows, since no market has a check of its own. Bank confirmation adds no check class to Verify: Amex Pay with Bank Transfer's calls and the rule that reads their answer serve every market. Verify takes how the bank's wait ended as a fact, so it doesn't name bank confirmation. Execute's `BankTransferSettlement` does, and acts on it. No row has mandate authorization Y beside bank confirmation or card authentication, because the Router resolves it to N for both (Proposed, 2026-11-23).
 
 :::info[Placeholder: Represent's checks]
 Represent's rows in the report list no checks yet. Which systems Represent calls, and what fails its recheck, are still to be defined. When they are, its checks and rules are classes like these, listing Represent among their steps, and the report shows them on its rows.
@@ -409,7 +409,7 @@ The registries find mistakes when the app starts. Unit tests build the registrie
 | Mistake | What catches it |
 | --- | --- |
 | Two strategies level for one key | The app refuses to start, and the error names both |
-| A behavior nobody handles | Each step names the behaviors it must act on: mandate authorization, bank confirmation and card authentication for Verify. A combination where one of them is Y, and no strategy that applies names it, can't run. Delete `MandateCheck`, and no combination with a mandate can run, while payments without one are unaffected |
+| A behavior nobody handles | Each step names the behaviors it must act on: mandate authorization, card authentication and points redemption for Verify, and bank confirmation for Execute. A combination where one of them is Y, and no strategy that applies names it, can't run. Delete `MandateCheck`, and no combination with a mandate can run, while payments without one are unaffected |
 | A key nobody fills | Each step also names the keys it must fill, such as `CLEARING` for Execute. A combination with no clearing method can't run |
 | A class Quarkus can't see | Quarkus only finds beans in modules that carry an index, so each module that holds strategies has an empty `META-INF/beans.xml`. A test compares the strategy classes on the classpath with what the registries hold, and fails for any that are missing |
 | A misleading name | A test fails for a class whose `appliesTo` names a market when its name doesn't start with that market's code |
@@ -419,7 +419,7 @@ The resolver has unit tests of its own, listed on [Testing → Unit](../../testi
 
 ## The capability manifest
 
-The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /market-onboarding/capabilities` returns it, and the onboarding workflow checks each market release against it before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
+The registries also work out the build's capability manifest when the app starts: every combination of behaviors that every step of its journey can run, by the two rules above for behaviors and keys. `GET /market-onboarding/capabilities` lists from it, per account type, each Y and N setting of the other four behaviors that a release with every API and the plain ways to pay could go live with. The onboarding workflow checks each market release in full: it works out what the release's payments would run from the Router's own rules, and asks the manifest about each journey and combination before anything goes live. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed. Before a build rolls out to an environment, the [deploy pipeline](../../deployment/pipeline.md#the-capability-manifest) compares its manifest with every release live there, and stops the rollout if a combination a live release uses is missing.
 
 ## Why the lookup stays in the workflow
 

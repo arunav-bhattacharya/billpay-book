@@ -27,7 +27,7 @@ A release is one profile, one market and account type. It never changes after it
 A release moves through E1, E2 and E3, always in that order. E3 is production, and it needs a change request (RFC) as well as a sign-off.
 
 1. The backend sends vN to E1's Market Onboarding API, using its own service identity. Sending is idempotent: there is one onboarding workflow per market, account type, version and environment, so a repeated send doesn't start a second one.
-2. A deployment row per release and environment tracks the workflow: requested, running, waiting for sign-off, active or failed. The readiness screen in the Market Onboarding UI reads those rows, so it shows real progress.
+2. A deployment row per release and environment tracks the workflow: requested, running, waiting for sign-off, active or failed, and later rolled back or superseded. The readiness screen in the Market Onboarding UI reads those rows, so it shows real progress.
 3. In each environment the workflow runs test payments against vN. Once they pass, someone signs off in the UI, and the backend sends the sign-off through the same API.
 4. Once vN is active and signed off in E1, the same vN goes to E2, then to E3. In E3 the RFC must pass the ServiceNow check before the sign-off counts.
 5. A new market's traffic is enabled only once its release is live in E3, so no real payment reaches it before it has passed in every environment. Even then, it takes payments only once the channels, mostly through One-Data, start sending them. A new account type in a live market works the same way.
@@ -38,11 +38,11 @@ There are two human checks in all: approval once, on the content, and sign-off i
 
 ## Going live, and going back
 
-Activation switches the market's active config to vN and applies its Schedules and settings. New payments use vN at once. Payments already running keep the version they started with, because it is pinned in their resolved profile.
+Activation switches the market's active config to vN and applies its Schedules. It writes no rates: the governor sets the market's rates on its next check. New payments use vN at once. Payments already running keep the version they started with, because it is pinned in their resolved profile.
 
-Rollback switches the pointer back to the previous version, and its Schedules and settings with it. Nothing is deleted, so rolling back is as quick as going live.
+Rollback switches the pointer, and the Schedules, back to the version the release replaced. Nothing is deleted, so rolling back is as quick as going live. It goes back one level: a version that a rollback made active again can't be rolled back itself, but a new release can replace it. For this the onboarding workflow stays open after activation, and ends when the next version supersedes it.
 
-A live market can also be paused and resumed. Pausing stops the market's dispatchers, so its due work waits in Oracle, and resuming starts them again. Neither changes the market's config.
+A live market can also be paused and resumed. The API does both at once, outside the workflow. Pausing stops the market and account type's Schedules and sets a pause override on the market's execution rate, so its due work waits in Oracle, and resuming starts them again. Neither changes the market's config. The rate belongs to the market, so a pause stops execution for every account type in that market (Proposed). Whether that is right is still open.
 
 Taking a market out of service sets `IN_SERVICE_IN` to N on its active row (Proposed), so its active version stays readable. A new create for it gets 422, and a held create that arrives afterwards, which RTF delivers with an async flag, is captured and declined with `MARKET_OUT_OF_SERVICE` (Proposed), so the customer is told.
 

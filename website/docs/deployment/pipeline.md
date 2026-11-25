@@ -27,7 +27,7 @@ No payment workflow sleeps until a due date, because dated work waits in Oracle 
 
 ## The capability manifest
 
-Every build ships a manifest of the behavior combinations it can run, worked out when the app starts by the same lookup that picks stages at runtime. `GET /market-onboarding/capabilities` returns it, and the onboarding workflow checks every market release against it.
+Every build ships a manifest of the behavior combinations it can run, worked out when the app starts by the same lookup that picks stages at runtime. `GET /market-onboarding/capabilities` lists, per account type, the behavior settings a release could go live with, and the onboarding workflow checks every market release against it in full.
 
 This is where the pipeline and market onboarding meet. A release built only from combinations in the manifest goes live with config alone. A release that needs a new combination is flagged as needing a build while it is authored, and the onboarding workflow stops at its first step until a build with that combination is deployed.
 

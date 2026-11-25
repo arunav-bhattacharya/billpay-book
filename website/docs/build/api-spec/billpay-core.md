@@ -86,17 +86,17 @@ Every write is safe to send twice. Billpay's stores, the only code that reaches 
 
 ## Market Onboarding API
 
-Each environment's billpay-offline exposes the Market Onboarding API, because the onboarding workflow runs on the Offline cluster. Only the market-onboarding control plane, the Market Onboarding UI's backend, calls it, with its own service identity. The work runs in `MarketOnboardingWorkflow`, so every call but the two reads answers `202` as soon as the workflow has it.
+Each environment's billpay-offline exposes the Market Onboarding API, because the onboarding workflow runs on the Offline cluster. Only the market-onboarding control plane, the Market Onboarding UI's backend, calls it, with its own service identity. A release, a sign-off and a rollback run in `MarketOnboardingWorkflow`, so each answers `202` as soon as the workflow has it. Pause and resume act from the API at once, since both writes are safe to repeat. The API's calls to the Offline cluster are bounded at 5 s, and past that it answers `503` with `Retry-After: 30`.
 
 The bodies are Proposed (2026-10-18), for the Market Onboarding UI team to confirm. E3 is production, the one environment that needs a change request (RFC). To keep the table readable, `{release}` stands for `/market-onboarding/releases/{market}/{account-type}/{version}` and `{live}` for `/market-onboarding/markets/{market}/{account-type}`.
 
 | Call | Request | Response |
 | --- | --- | --- |
-| `POST /market-onboarding/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again |
-| `GET {release}` | No body | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE` or `FAILED`), the step the workflow is on, and for a failure, the step and the reason |
-| `POST {release}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off |
-| `POST {release}/rollback` | `requestedBy`, `reason` | `202`; the version before it becomes active again |
-| `POST {live}/pause` and `POST {live}/resume` | `requestedBy`, `reason` | `202` |
-| `GET /market-onboarding/capabilities` | No body | `buildVersion`, and `combinations`: one entry per combination the build can run, an account type with Y or N for each of the other four behaviors |
+| `POST /market-onboarding/releases` | `market`, `accountType`, `version`, `checksum`, `config` (the frozen profile as JSON), `author`, `approver` | `202` with the workflow ID and status `REQUESTED`; the same reply when the release is sent again; `409` when the same version comes again with another checksum |
+| `GET {release}` | No body | The status (`REQUESTED`, `RUNNING`, `WAITING_FOR_SIGN_OFF`, `ACTIVE`, `FAILED`, `ROLLED_BACK` or `SUPERSEDED`), the step the workflow is on, `ROLLBACK` among them, and for a failure, the step and the reason |
+| `POST {release}/sign-off` | `signedOffBy`, `signedOffAt`, and in E3 the RFC number | `202`; `409` when the release isn't waiting for a sign-off, or its workflow has ended |
+| `POST {release}/rollback` | `requestedBy`, `reason` | `202`; the version the release replaced becomes active again. One level only, while the release is active; `409` once its workflow has ended |
+| `POST {live}/pause` and `POST {live}/resume` | `requestedBy`, `reason` | `202`; done by the API at once |
+| `GET /market-onboarding/capabilities` | No body | `buildVersion`, and `combinations`: per account type, each Y and N setting of the other four behaviors that a release with every API and the plain ways to pay could go live with. The workflow's first step is still the full check |
 
 Sending a release is idempotent: one onboarding workflow per market, account type, version and environment. [Market Onboarding API](../../onboarding/market-onboarding-api.md) follows a release through it.

@@ -107,7 +107,7 @@ billpay-offline reads and updates One-Data's two inbox tables itself, `billpay_p
 
 - Every update is guarded on `READY` and on the row's timestamps as Billpay read them, so an event that comes in meanwhile leaves the row `READY` for the next batch, and setting a status twice does no harm.
 - `billpay_paid_unmatched_stale`, a gauge of the rows `UNMATCHED` for 48 hours, raises the alert One-Data's function used to.
-- billpay-offline checks the age of the oldest `READY` row in each table at each read, for the returns and `PAID` backlog-age alerts (agreed 2026-11-24). A row's age counts from when it last became `READY`, so a row back from `UNMATCHED` doesn't look old (agreed 2026-11-07).
+- At each read, the returns dispatcher and the `PAID` drain check the age of the oldest `READY` row in their table, and bump `billpay_inbox_over_age_total{queue}` past 6 hours for returns or 1 hour for `PAID` (both Proposed), which raises the backlog-age alerts (agreed 2026-11-24). Held at a rate of zero, each still makes one fetch, and the held drain checks the age again once a minute, so its alert can't clear while it stays held. A row's age counts from when it last became `READY`, so a row back from `UNMATCHED` doesn't look old (agreed 2026-11-07).
 
 One-Data still has to agree: the two tables as a contract, with the wiki's names and columns; a database user for billpay-offline that may read both tables and update `sta_cd` and `lst_updt_ts`; a row marked `READY` whenever an event fills an empty timestamp; and M3's settled notice stored as the payment's settlement.
 

@@ -86,7 +86,7 @@ Promote a standby when its cluster can't be restored in time, or when all of us-
 
 ## PAID backlog age
 
-The PAID backlog age alert fires when the oldest `READY` row in One-Data's inbox passes its age threshold.
+The PAID backlog age alert fires when the oldest `READY` row in One-Data's inbox passes its age threshold, 1 hour for now (Proposed). The drain checks the age at each read, and once a minute while the governor holds it, so the alert stays up for as long as the drain is held.
 
 The `PAID` drain comes last in the governor's order, and the Oracle signals cut it first, so it is meant to wait behind the execution windows.
 

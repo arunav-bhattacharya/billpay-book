@@ -38,8 +38,8 @@ Escalation paths, and the steps to acknowledge and resolve an alert in Kibana, a
 
 | Alert | Fires when | People do |
 | --- | --- | --- |
-| Returns backlog age | The oldest return waiting in One-Data's inbox passes its age threshold, checked by billpay-offline at each read | Check whether higher priorities are holding the queue |
-| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold, counted from when the row last became `READY`, so a row back from `UNMATCHED` doesn't trip it (agreed 2026-11-07), checked by billpay-offline at each read | Check whether the governor is holding the drain, or RTF is down. [Runbook](../../operations/sops.md#paid-backlog-age) |
+| Returns backlog age | The oldest return waiting in One-Data's inbox passes 6 hours (Proposed). The returns dispatcher checks it at each read and bumps `billpay_inbox_over_age_total{queue="returns"}` | Check whether higher priorities are holding the queue |
+| PAID backlog age | The oldest `READY` row in the inbox passes its age threshold, counted from when the row last became `READY`, so a row back from `UNMATCHED` doesn't trip it (agreed 2026-11-07). The threshold is 1 hour (Proposed). The PAID drain checks it at each read, and once a minute while it is held, and bumps `billpay_inbox_over_age_total{queue="paid"}` | Check whether the governor is holding the drain, or RTF is down. [Runbook](../../operations/sops.md#paid-backlog-age) |
 
 Returns sit at the lowest priority, so during an execution window they can wait behind everything else. That is fine for work nobody is waiting on, and the age alert keeps a long wait from going unnoticed.
 
